@@ -11,10 +11,8 @@
   },
   "dependencies": {
     "@stripe/stripe-js": "^9.15.0",
-    "clsx": "2.1.1",
     "react": "19.2.6",
     "react-dom": "19.2.6",
-    "tailwind-merge": "3.4.0",
     "three": "^0.186.0"
   },
   "devDependencies": {

@@ -295,22 +295,6 @@ export class GameAudio {
     this.noiseBurst(0.2, 800 + speed * 12, 0.07 * speedRatio);
   }
 
-  countdownBeep(isGo = false): void {
-    if (isGo) {
-      this.tone(880, 0.24, "sine", 0.16, 1174.66);
-      this.tone(1320, 0.22, "triangle", 0.08);
-    } else {
-      this.tone(440, 0.12, "sine", 0.12);
-    }
-  }
-
-  eggHatch(): void {
-    this.noiseBurst(0.06, 1400, 0.14);
-    this.tone(587.33, 0.12, "triangle", 0.08, 880);
-    this.tone(880, 0.16, "sine", 0.1, 1174.66);
-    this.tone(1174.66, 0.28, "sine", 0.12);
-  }
-
   /* ---------- synth primitives ---------- */
 
   private tone(freq: number, dur: number, type: OscillatorType, gain: number, slideTo?: number): void {

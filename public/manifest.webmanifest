@@ -5,17 +5,25 @@
   "id": "/",
   "start_url": "/",
   "scope": "/",
-  "display": "standalone",
+  "display": "fullscreen",
   "orientation": "landscape",
   "background_color": "#4aa0e8",
   "theme_color": "#4aa0e8",
+  "categories": ["games", "entertainment"],
+  "shortcuts": [
+    {
+      "name": "Quick Flight",
+      "url": "/?mode=daytrip",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
   "screenshots": [
     {
       "src": "/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "Sunbird gameplay"
+      "label": "Sunbird gameplay — hold to dive, release to soar"
     }
   ],
   "icons": [

@@ -659,3 +659,28 @@ h2 {
     right: 14px;
   }
 }
+
+/* ---------- reduced motion (WCAG 2.3.3) ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .game-root::after { display: none; }
+}
+
+/* ---------- forced-colors (Windows High Contrast) ---------- */
+@media (forced-colors: active) {
+  .primary-btn { border: 2px solid ButtonText; }
+  .soft-btn { border: 1px solid ButtonText; }
+  .toggle { border: 2px solid ButtonText; }
+}
+
+/* ---------- print (for sharing results) ---------- */
+@media print {
+  .hud-root { display: none; }
+  .game-root { position: static; }
+}

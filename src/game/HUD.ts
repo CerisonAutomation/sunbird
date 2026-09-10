@@ -342,7 +342,7 @@ export class HUD {
         <div class="paper-card slim">
           <h2>Paused</h2>
           <p class="tagline">Your flight is waiting. The daylight timer is stopped.</p>
-          <button class="primary-btn hero" data-ui data-action="resume"><span class="hero-label">Resume flight</span><span class="hero-hint">P or Esc</span></button>
+          <button class="primary-btn hero" data-ui data-action="resume" aria-label="Resume flight — press P or Escape"><span class="hero-label">Resume flight</span><span class="hero-hint">P or Esc</span></button>
           <div class="btn-row">
             <button class="soft-btn wide2" data-ui data-action="open-settings">⚙ Settings</button>
             <button class="ghost-btn wide2" data-ui data-action="menu">End flight</button>
@@ -569,7 +569,7 @@ export class HUD {
               .map(
                 (r) => `<span class="rb ${r.you ? "you" : ""} ${r.remote ? "remote" : ""} ${r.finished ? "done" : ""}"
                   style="left:${(r.progress * 100).toFixed(1)}%;--h:${Math.round(r.hue * 360)}"
-                  title="${escapeHtml(r.name)}">${r.emote ? `<b class="rb-emote">${r.emote}</b>` : ""}</span>`,
+                  title="${escapeHtml(r.name)}">${r.emote ? `<b class="rb-emote">${escapeHtml(r.emote)}</b>` : ""}</span>`,
               )
               .join("")}</div>` +
             `<div class="roster-meta"><span class="rm-lead">👑 ${escapeHtml(leader ? leader.name : "—")}</span>` +
@@ -1116,7 +1116,7 @@ function renderMain(s: HudSnapshot): string {
     </div>
     <p class="seed">${s.seedLabel}</p>
     ${seedPicker}
-    <button class="primary-btn hero" data-ui data-action="start">
+    <button class="primary-btn hero" data-ui data-action="start" aria-label="Take flight — hold anywhere">
       <span class="hero-label">Take flight</span>
       <span class="hero-hint">hold anywhere</span>
     </button>
@@ -1465,7 +1465,7 @@ function renderGameOver(s: HudSnapshot): string {
     ${s.nearMiss ? `<div class="nearmiss">${s.nearMiss}</div>` : ""}
     ${raceStrip}
     <div class="reached-strip">Reached <b>${s.biomeEmoji} ${s.biomeName}</b> · Island ${s.island + 1}</div>
-    <button class="primary-btn big hero" data-ui data-action="retry"><span class="hero-label">Fly again</span><span class="hero-hint">hold anywhere · R</span></button>
+    <button class="primary-btn big hero" data-ui data-action="retry" aria-label="Fly again — hold anywhere or press R"><span class="hero-label">Fly again</span><span class="hero-hint">hold anywhere · R</span></button>
     <div class="btn-row">
       <button class="soft-btn wide2" data-ui data-action="mode-select">🎯 Change mode</button>
       <button class="soft-btn wide2" data-ui data-action="menu">🏠 Menu</button>
