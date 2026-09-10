@@ -280,7 +280,16 @@ export class Game {
     canvas.className = "game-canvas";
     host.appendChild(canvas);
 
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+    this.renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: !isMobile,
+      powerPreference: isMobile ? "low-power" : "high-performance",
+      stencil: false,
+      alpha: false,
+      premultipliedAlpha: true,
+      failIfMajorPerformanceCaveat: true,
+    });
     this.renderer.setClearColor(0x87c8ee, 1);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -2172,7 +2181,9 @@ export class Game {
   }
 
   private preferredDpr(): number {
-    const dev = Math.min(window.devicePixelRatio || 1, 2);
+    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+    const maxDpr = isMobile ? 1.5 : 2;
+    const dev = Math.min(window.devicePixelRatio || 1, maxDpr);
     return this.save.state.settings.quality === "low" ? 1 : dev;
   }
 
