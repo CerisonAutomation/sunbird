@@ -221,8 +221,62 @@ export const BIOMES: BiomeDef[] = [
   },
 ];
 
+function shade(hex: number, amt: number): number {
+  const r = Math.max(0, Math.min(255, ((hex >> 16) & 255) + amt));
+  const g = Math.max(0, Math.min(255, ((hex >> 8) & 255) + amt));
+  const b = Math.max(0, Math.min(255, (hex & 255) + amt));
+  return (r << 16) | (g << 8) | b;
+}
+
+const WILD_SUFFIX = ["Wilds", "Reaches", "Expanse", "Frontier", "Verge", "Beyond"];
+const _wildCache = new Map<number, BiomeDef>();
+
 export function biomeForIsland(island: number): BiomeDef {
-  return BIOMES[((island % BIOMES.length) + BIOMES.length) % BIOMES.length]!;
+  const i = Math.max(0, Math.floor(island));
+  if (i < BIOMES.length) return BIOMES[i]!;
+  // UNLIMITED LEVELS: deterministic remix past the hand-tuned six.
+  // Same seed => same island forever, new hue shift + amp/wave drift per lap.
+  const cached = _wildCache.get(i);
+  if (cached) return cached;
+  const base = BIOMES[i % BIOMES.length]!;
+  const lap = Math.floor(i / BIOMES.length); // 1,2,3...
+  // deterministic pseudo-random from island index
+  let h = (i * 2654435761) >>> 0;
+  const rnd = (): number => {
+    h ^= h << 13; h >>>= 0; h ^= h >> 17; h ^= h << 5; h >>>= 0;
+    return (h >>> 0) / 4294967296;
+  };
+  const shift = Math.floor((rnd() - 0.5) * 36) + lap * 12;
+  const amp = base.amp * (1 + lap * 0.07 + rnd() * 0.08);
+  const wave = base.wave * (1 + (rnd() - 0.5) * 0.14);
+  const suffix = WILD_SUFFIX[i % WILD_SUFFIX.length]!;
+  const decoPool: DecoKind[] = ["tree", "palm", "pine", "spire", "crystal", "cactus"];
+  const gen: BiomeDef = {
+    ...base,
+    id: `wild-${i}`,
+    name: `${base.name} ${suffix} ${lap + 1}`,
+    tagline: `Uncharted lap ${lap + 1} — remixed ${base.name.toLowerCase()}`,
+    emoji: base.emoji,
+    amp, wave,
+    top: shade(base.top, shift), ridge: shade(base.ridge, shift),
+    mid: shade(base.mid, shift), deep: shade(base.deep, shift),
+    sand: shade(base.sand, Math.floor(shift / 2)),
+    farA: shade(base.farA, shift), farB: shade(base.farB, shift), farC: shade(base.farC, shift),
+    skyTop: shade(base.skyTop, shift), skyHorizon: shade(base.skyHorizon, Math.floor(shift / 2)),
+    cloudTint: shade(base.cloudTint, Math.floor(shift / 3)),
+    fogTint: shade(base.fogTint, Math.floor(shift / 2)),
+    snowLine: base.snowLine > 0 ? base.snowLine + lap * 2 : rnd() < 0.25 ? 24 + lap * 2 : 0,
+    deco: decoPool[Math.floor(rnd() * decoPool.length)]!,
+    decoDensity: base.decoDensity * (0.9 + rnd() * 0.5),
+    hazard: lap >= 2 && rnd() < 0.3 ? (rnd() < 0.5 ? "gust" : "storm") : base.hazard,
+    thermals: Math.max(1, Math.min(7, base.thermals + Math.floor((rnd() - 0.4) * 2))),
+  };
+  _wildCache.set(i, gen);
+  if (_wildCache.size > 64) {
+    const first = _wildCache.keys().next().value;
+    if (first !== undefined) _wildCache.delete(first);
+  }
+  return gen;
 }
 
 /** Difficulty tier: every full lap of the world cycle raises the stakes. */

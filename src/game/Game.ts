@@ -48,6 +48,8 @@ import { BOOSTS, GOLD, PROMO_CODES, SKINS, VIP, skinById, type BoostView, type S
 import { GhostPlayer, GhostRecorder } from "./Ghost";
 import { HUD, type CheckoutMode, type HudSnapshot, type SeedMode, type UiScreen, type UiState } from "./HUD";
 import { Input } from "./Input";
+// PvP system available for future integration
+// import { divisionFor, featuredRivals, nextDivision, ratingDelta, streakBonus } from "./pvp";
 import { clamp, dateSeed, formatDatePretty, lerp } from "./math";
 import { Missions, type MissionView, type QuestReward, type QuestView, type RunStats } from "./Missions";
 import { ParticleFX } from "./ParticleFX";
@@ -204,6 +206,10 @@ export class Game {
   private roomCode = "";
   private lastEmoteAt = 0;
   private draftBanner = 0;
+  // PvP fields reserved for rank screen integration
+  // private rankedRace = true;
+  // private _lastRatingDelta = 0;
+  // private _lastRatingBonus = 0;
   /** Rival tracking: who beat you last time, for the revenge prompt. */
   private nemesis = "";
   private photoFinish = "";
