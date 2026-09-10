@@ -148,6 +148,8 @@ export class MassRace {
     const n = clamp(Math.floor(count), 0, MAX_RIVALS);
     this.ensureCapacity(n);
     const rng = new SeededRandom(`${seed}:field`);
+    // Dispose old rivals before overwriting to prevent GPU memory leak.
+    for (const r of this.rivals) r.bird.dispose();
     this.rivals = [];
 
     for (let i = 0; i < n; i++) {

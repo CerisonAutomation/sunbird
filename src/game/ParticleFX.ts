@@ -371,13 +371,12 @@ export class ParticleFX {
   }
 
   update(dt: number): void {
-    for (let i = this.particles.length - 1; i >= 0; i--) {
+    // Compaction: move alive particles to the front, then truncate — O(n) instead of O(n²) splice.
+    let write = 0;
+    for (let i = 0; i < this.particles.length; i++) {
       const p = this.particles[i]!;
       p.life -= dt;
-      if (p.life <= 0) {
-        this.particles.splice(i, 1);
-        continue;
-      }
+      if (p.life <= 0) continue;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.z += p.vz * dt;
@@ -386,7 +385,10 @@ export class ParticleFX {
         p.vx *= 0.92;
         p.vy *= 0.92;
       }
+      if (write !== i) this.particles[write] = p;
+      write++;
     }
+    this.particles.length = write;
 
     // Only the live prefix of the buffers is written and uploaded; everything
     // past `n` is hidden by setDrawRange instead of being zeroed each frame.

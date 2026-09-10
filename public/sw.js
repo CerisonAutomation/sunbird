@@ -1,4 +1,4 @@
-const CACHE = "sunbird-shell-v2";
+const CACHE = "sunbird-shell-v3";
 const PRECACHE = [
   "/",
   "/index.html",
@@ -11,7 +11,17 @@ const PRECACHE = [
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(PRECACHE)).catch(() => undefined));
+  event.waitUntil(
+    caches.open(CACHE).then(async (cache) => {
+      for (const url of PRECACHE) {
+        try {
+          await cache.add(url);
+        } catch (e) {
+          console.warn("SW precache failed:", url, e);
+        }
+      }
+    }),
+  );
   self.skipWaiting();
 });
 
@@ -26,17 +36,26 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  // Network-first with timeout fallback to cache for navigation requests;
+  // cache-first for assets to avoid redundant downloads.
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
   event.respondWith(
     caches.match(event.request).then(
       (cached) =>
-        cached ||
-        fetch(event.request)
+        fetch(event.request, { signal: controller.signal })
           .then((res) => {
-            const copy = res.clone();
-            caches.open(CACHE).then((cache) => cache.put(event.request, copy)).catch(() => undefined);
+            clearTimeout(timeout);
+            if (res.ok) {
+              const copy = res.clone();
+              caches.open(CACHE).then((cache) => cache.put(event.request, copy)).catch(() => undefined);
+            }
             return res;
           })
-          .catch(() => caches.match("/index.html")),
+          .catch(() => {
+            clearTimeout(timeout);
+            return cached || caches.match("/index.html");
+          }),
     ),
   );
 });

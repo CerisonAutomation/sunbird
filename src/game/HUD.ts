@@ -1219,14 +1219,14 @@ function renderPaywall(s: HudSnapshot): string {
   return `
     ${head("Gold &amp; VIP")}
     <div class="gold-hero"><div class="gold-badge">✦</div><div class="gold-price">${s.goldPrice}<small> one-time</small></div></div>
-    <ul class="feature-list">${s.goldFeatures.map((f) => `<li>${f}</li>`).join("")}</ul>
+    <ul class="feature-list">${s.goldFeatures.map((f) => `<li>${escapeHtml(f)}</li>`).join("")}</ul>
     ${
       s.gold
         ? `<div class="owned-banner">You own Gold. Thank you, sunbird ✦</div>`
         : `<button class="primary-btn gold" data-ui data-action="gold-buy">Unlock Gold · ${s.goldPrice}</button>`
     }
       <div class="gold-hero vip"><div class="gold-badge vip">♛</div><div class="gold-price">${s.vipPrice}<small> per month</small></div></div>
-    <ul class="feature-list">${s.vipFeatures.map((f) => `<li>${f}</li>`).join("")}</ul>
+    <ul class="feature-list">${s.vipFeatures.map((f) => `<li>${escapeHtml(f)}</li>`).join("")}</ul>
     ${
       s.vip
         ? `<div class="owned-banner vip">VIP active — ${s.vipDaysLeft} day${s.vipDaysLeft === 1 ? "" : "s"} left${
@@ -1402,7 +1402,7 @@ function renderAccount(s: HudSnapshot): string {
     <div class="section-title">Cloud save</div>
     <div class="sheet">
       <p class="tagline">Copy this code to move your progress to another device.</p>
-      <textarea class="cloud-box" data-ui data-ref="cloudExport" readonly rows="3">${s.cloudCode}</textarea>
+      <textarea class="cloud-box" data-ui data-ref="cloudExport" readonly rows="3">${escapeHtml(s.cloudCode)}</textarea>
       <button class="mini-btn" data-ui data-action="copy-cloud">Copy code</button>
       <p class="tagline" style="margin-top:10px">Paste a code from another device to restore it here:</p>
       <textarea class="cloud-box" data-ui data-ref="cloudImport" rows="3" placeholder="Paste save code…"></textarea>

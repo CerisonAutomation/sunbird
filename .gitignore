@@ -34,3 +34,4 @@ rust/target/
 
 # Graph-it
 .graph-it/
+.vercel

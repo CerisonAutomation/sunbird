@@ -91,7 +91,7 @@ textarea {
 .play-hud {
   position: absolute;
   inset: 0;
-  padding: calc(12px + env(safe-area-inset-top)) 16px 16px;
+  padding: calc(12px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
 }
 
 .top-bar {

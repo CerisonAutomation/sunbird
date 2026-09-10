@@ -139,12 +139,13 @@ export class Collectibles {
     }
 
     const magnet = magnetOn ? MAGNET_RADIUS : MAGNET_RADIUS_NORMAL;
-    for (let i = this.activeCoins.length - 1; i >= 0; i--) {
+    // Compaction for coins: O(n) instead of O(n²) splice.
+    let cw = 0;
+    for (let i = 0; i < this.activeCoins.length; i++) {
       const c = this.activeCoins[i]!;
       if (c.taken || c.x < bird.x - 30) {
         c.taken = true;
         this.hideCoin(c);
-        this.activeCoins.splice(i, 1);
         continue;
       }
       const dx = bird.x - c.x;
@@ -158,21 +159,24 @@ export class Collectibles {
       if (d < (c.gem ? 2.4 : 1.7)) {
         c.taken = true;
         this.hideCoin(c);
-        this.activeCoins.splice(i, 1);
         ev.onCoin(c.x, c.y, c.gem);
         continue;
       }
       this.writeCoin(c, time);
+      if (cw !== i) this.activeCoins[cw] = c;
+      cw++;
     }
+    this.activeCoins.length = cw;
     this.coinMesh.instanceMatrix.needsUpdate = true;
     this.gemMesh.instanceMatrix.needsUpdate = true;
 
-    for (let i = this.activeClouds.length - 1; i >= 0; i--) {
+    // Compaction for clouds.
+    let clw = 0;
+    for (let i = 0; i < this.activeClouds.length; i++) {
       const c = this.activeClouds[i]!;
       if (c.taken || c.x < bird.x - 60) {
         c.taken = true;
         c.sprite.visible = false;
-        this.activeClouds.splice(i, 1);
         continue;
       }
       c.phase += dt;
@@ -185,17 +189,20 @@ export class Collectibles {
       if (Math.hypot(bird.x - c.x, bird.y - c.y) < 3.8 && Math.abs(c.z) < 8) {
         c.taken = true;
         c.sprite.visible = false;
-        this.activeClouds.splice(i, 1);
         ev.onCloud(c.kind, c.x, c.y);
       }
+      if (clw !== i) this.activeClouds[clw] = c;
+      clw++;
     }
+    this.activeClouds.length = clw;
 
-    for (let i = this.activePickups.length - 1; i >= 0; i--) {
+    // Compaction for pickups.
+    let pw = 0;
+    for (let i = 0; i < this.activePickups.length; i++) {
       const p = this.activePickups[i]!;
       if (p.taken || p.x < bird.x - 30) {
         p.taken = true;
         p.mesh.visible = false;
-        this.activePickups.splice(i, 1);
         continue;
       }
       p.phase += dt;
@@ -206,10 +213,12 @@ export class Collectibles {
       if (Math.hypot(bird.x - p.x, bird.y - p.y) < 2.6) {
         p.taken = true;
         p.mesh.visible = false;
-        this.activePickups.splice(i, 1);
         ev.onPickup(p.kind, p.x, p.y);
       }
+      if (pw !== i) this.activePickups[pw] = p;
+      pw++;
     }
+    this.activePickups.length = pw;
   }
 
   dispose(): void {
