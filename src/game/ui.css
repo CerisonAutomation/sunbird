@@ -1773,3 +1773,266 @@ label input {
 @keyframes pulse {
   50% { filter: brightness(1.3); }
 }
+
+/* ============================================================
+   15/10 VISUAL JUICE — Game Feel Improvements
+   ============================================================ */
+
+/* ---------- toast notifications (upgraded) ---------- */
+.toast {
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: rgba(255, 246, 232, 0.94);
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  box-shadow: 0 4px 12px rgba(42, 28, 40, 0.18), 0 6px 0 rgba(42, 28, 40, 0.08);
+  transform: translateY(12px) scale(0.85);
+  opacity: 0;
+  transition: 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform, opacity;
+}
+.toast.in {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+.toast.out {
+  opacity: 0;
+  transform: translateY(-16px) scale(0.92);
+  transition: 0.25s ease-in;
+}
+.toast.perfect {
+  background: linear-gradient(135deg, #ffe08a, #ffc14a);
+  box-shadow: 0 4px 16px rgba(255, 193, 74, 0.35), 0 6px 0 #c98a10;
+  color: #5a3a00;
+}
+.toast.fever {
+  background: linear-gradient(135deg, #ff7a45, #ff5a3a);
+  box-shadow: 0 4px 16px rgba(255, 90, 58, 0.35), 0 6px 0 #c8452a;
+  color: #fff;
+  animation: feverPulse 0.4s ease;
+}
+.toast.island {
+  background: linear-gradient(135deg, #7ad0ff, #5eb7ea);
+  box-shadow: 0 4px 16px rgba(94, 183, 234, 0.35), 0 6px 0 #3a8ab8;
+  color: #fff;
+}
+.toast.cloud {
+  background: linear-gradient(135deg, #fff, #f0f0f0);
+  box-shadow: 0 4px 12px rgba(42, 28, 40, 0.12);
+}
+.toast.gold {
+  background: linear-gradient(135deg, #ffd76a, #ffb020);
+  box-shadow: 0 4px 16px rgba(255, 176, 32, 0.35), 0 6px 0 #c98a10;
+  color: #5a3a00;
+}
+.toast.warn {
+  background: linear-gradient(135deg, #ff8a6a, #ff6b4a);
+  box-shadow: 0 4px 12px rgba(255, 107, 74, 0.3);
+  color: #fff;
+}
+.toast.power {
+  background: linear-gradient(135deg, #c8a0ff, #9060e0);
+  box-shadow: 0 4px 12px rgba(144, 96, 224, 0.3);
+  color: #fff;
+}
+.toast.quest {
+  background: linear-gradient(135deg, #b6e0a8, #8ac87a);
+  box-shadow: 0 4px 12px rgba(138, 200, 122, 0.3);
+  color: #2d6a3a;
+}
+.toast.vip {
+  background: linear-gradient(135deg, #c8a0ff, #9060e0);
+  box-shadow: 0 4px 12px rgba(144, 96, 224, 0.35);
+  color: #fff;
+}
+.toast.info {
+  background: rgba(255, 246, 232, 0.94);
+}
+@keyframes feverPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+/* ---------- score popup (float-up animation) ---------- */
+.score-popup {
+  position: absolute;
+  pointer-events: none;
+  font-weight: 800;
+  font-size: 18px;
+  color: #ffe08a;
+  text-shadow: 0 2px 0 #a64a12, 0 0 12px rgba(255, 224, 138, 0.5);
+  animation: scoreFloat 1s ease-out forwards;
+  will-change: transform, opacity;
+}
+@keyframes scoreFloat {
+  0% { transform: translateY(0) scale(0.5); opacity: 0; }
+  20% { transform: translateY(-8px) scale(1.2); opacity: 1; }
+  100% { transform: translateY(-40px) scale(0.8); opacity: 0; }
+}
+
+/* ---------- screen vignette pulse (on impacts) ---------- */
+.vignette-pulse {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(255, 90, 58, 0.25) 100%);
+  opacity: 0;
+  animation: vignettePulse 0.4s ease-out forwards;
+}
+@keyframes vignettePulse {
+  0% { opacity: 0.8; }
+  100% { opacity: 0; }
+}
+
+/* ---------- speed lines (upgraded) ---------- */
+.speedlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 22px,
+      rgba(255, 255, 255, 0.03) 22px,
+      rgba(255, 255, 255, 0.03) 23px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 40px,
+      rgba(255, 255, 255, 0.015) 40px,
+      rgba(255, 255, 255, 0.015) 41px
+    );
+  transition: opacity 0.4s ease;
+  z-index: 2;
+}
+
+/* ---------- button press feedback ---------- */
+.primary-btn,
+.soft-btn,
+.mini-btn,
+.tile,
+.mode-card {
+  transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.12s ease;
+}
+.primary-btn:active,
+.soft-btn:active,
+.mini-btn:active:not(:disabled) {
+  transform: translateY(3px) scale(0.97);
+}
+
+/* ---------- card hover/tap states ---------- */
+.tile:hover,
+.mode-card:hover,
+.skin-card:hover,
+.cup-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(42, 28, 40, 0.1);
+}
+.tile:active,
+.mode-card:active,
+.skin-card:active {
+  transform: scale(0.97);
+}
+
+/* ---------- streak fire effect ---------- */
+.streak-fire {
+  display: inline-block;
+  animation: fireFlicker 0.6s ease-in-out infinite alternate;
+}
+@keyframes fireFlicker {
+  0% { transform: scale(1) rotate(-2deg); }
+  100% { transform: scale(1.1) rotate(2deg); }
+}
+
+/* ---------- loading spinner ---------- */
+.loading-dots {
+  display: inline-flex;
+  gap: 4px;
+}
+.loading-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink);
+  opacity: 0.3;
+  animation: dotPulse 1.2s ease-in-out infinite;
+}
+.loading-dots span:nth-child(2) { animation-delay: 0.15s; }
+.loading-dots span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes dotPulse {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1.2); }
+}
+
+/* ---------- rank badge glow ---------- */
+.rank-1 { box-shadow: 0 0 12px rgba(255, 215, 106, 0.5); }
+.rank-2 { box-shadow: 0 0 8px rgba(192, 192, 192, 0.4); }
+.rank-3 { box-shadow: 0 0 8px rgba(205, 127, 50, 0.4); }
+
+/* ---------- progress bar shimmer ---------- */
+.qb i,
+.pass-progress i {
+  position: relative;
+  overflow: hidden;
+}
+.qb i::after,
+.pass-progress i::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  animation: progressShimmer 2s ease-in-out infinite;
+}
+@keyframes progressShimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* ---------- countdown glow ---------- */
+.countdown.go {
+  text-shadow: 0 0 24px rgba(255, 107, 74, 0.6), 0 4px 0 rgba(42, 28, 40, 0.3);
+}
+
+/* ---------- launch banner upgrade ---------- */
+.launch-banner.perfect {
+  background: linear-gradient(135deg, rgba(255, 224, 138, 0.15), rgba(255, 193, 74, 0.1));
+  padding: 8px 20px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 193, 74, 0.2);
+}
+
+/* ---------- menu card entrance animation ---------- */
+.paper-card {
+  animation: cardEnter 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes cardEnter {
+  0% { transform: translateY(20px) scale(0.95); opacity: 0; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+/* ---------- coin collect flash ---------- */
+@keyframes coinFlash {
+  0% { box-shadow: 0 0 0 0 rgba(255, 193, 74, 0.4); }
+  100% { box-shadow: 0 0 0 12px rgba(255, 193, 74, 0); }
+}
+
+/* ---------- reduced motion override ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .toast,
+  .score-popup,
+  .vignette-pulse,
+  .countdown,
+  .launch-banner,
+  .combo,
+  .paper-card {
+    animation: none !important;
+    transition: none !important;
+  }
+}
