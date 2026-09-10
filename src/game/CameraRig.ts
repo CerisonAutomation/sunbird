@@ -146,8 +146,10 @@ export class CameraRig {
     }
 
     this.shake *= Math.pow(0.04, dt);
-    this.shakeX = (Math.random() - 0.5) * this.shake;
-    this.shakeY = (Math.random() - 0.5) * this.shake;
+    // Sine-sum shake for organic, non-repeating motion instead of random jitter.
+    const t = performance.now() * 0.001;
+    this.shakeX = (Math.sin(t * 23.7) * 0.7 + Math.sin(t * 31.3) * 0.3) * this.shake;
+    this.shakeY = (Math.cos(t * 29.1) * 0.7 + Math.cos(t * 37.9) * 0.3) * this.shake;
     this.apply();
   }
 

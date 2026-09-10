@@ -3,6 +3,69 @@
    Modern game UI with glassmorphism, PvP focus, premium feel
    ============================================================ */
 
+/* ---------- glassmorphism (from Zenith Glide reference) ---------- */
+.glass {
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  background: rgba(14, 21, 38, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.glass-soft {
+  backdrop-filter: blur(12px) saturate(120%);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  background: rgba(255, 246, 232, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* ---------- tabular numerics (eliminates digit jitter) ---------- */
+.num,
+.stat-value,
+.over-stats b,
+.board-row .bv,
+.rr-time,
+.alt-read,
+.combo,
+.countdown,
+.finish-countdown {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- vignette overlay (cinematic frame) ---------- */
+.game-root::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+  background: radial-gradient(ellipse at center, transparent 52%, rgba(18, 10, 28, 0.28) 100%);
+}
+
+/* ---------- speed readout ---------- */
+.speed-readout {
+  position: absolute;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  left: 16px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+  transition: opacity 0.3s;
+}
+.speed-readout fast {
+  font-size: 20px;
+  font-weight: 800;
+  display: block;
+}
+.speed-readout em {
+  font-style: normal;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
 /* ---------- HUD chip styles ---------- */
 .biome-chip {
   background: rgba(255, 255, 255, 0.7);

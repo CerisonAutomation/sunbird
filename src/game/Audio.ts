@@ -411,8 +411,9 @@ export class GameAudio {
     src.buffer = buffer;
     src.loop = true;
     const filter = this.ctx.createBiquadFilter();
-    filter.type = "lowpass";
+    filter.type = "bandpass";
     filter.frequency.value = 900;
+    filter.Q.value = 0.7;
     const g = this.ctx.createGain();
     g.gain.value = 0;
     src.connect(filter);

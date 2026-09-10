@@ -142,6 +142,7 @@ export class Game {
   private hidden = false;
   private timeScale = 1;
   private zenithTimer = 0;
+  private hitStopTimer = 0;
   private frameEma = 1 / 60;
   private qualityTimer = 0;
   private dpr = 1;
@@ -458,6 +459,15 @@ export class Game {
     this.pumpNetwork(raw);
     this.dayTick(raw);
     this.adaptQuality(raw);
+    // Hit stop: freeze time for cinematic impact on perfect launches.
+    if (this.hitStopTimer > 0) {
+      this.hitStopTimer -= raw;
+      this.elapsed += raw;
+      this.input.pollGamepads();
+      this.render(raw, raw);
+      this.pushHud();
+      return;
+    }
     if (this.resetArmed) {
       this.resetTimer -= raw;
       if (this.resetTimer <= 0) {
@@ -619,7 +629,7 @@ export class Game {
         this.audio.storm();
         this.particles.emitAsh(x, y);
         this.shake(0.6);
-        this.haptic(20);
+        this.haptic([15, 10, 15, 10, 30]);
         this.hud.toast("Ash cloud!", "warn");
         this.perfectChain = 0;
       },
@@ -729,7 +739,7 @@ export class Game {
         this.hud.toast(`${b.emoji} ${b.name}`, "island");
         this.flash("island");
         this.shake(0.7);
-        this.haptic(30);
+        this.haptic([40, 20, 60]);
         this.bonus += 80 * idx;
         this.awardXp(XP_RULES.island);
       } else {
@@ -879,7 +889,11 @@ export class Game {
       for (let i = 0; i < 10 + combo * 4; i++) this.particles.emitSparkle(this.bird.x, this.bird.y);
       this.flash("perfect");
       this.shake(0.35 + Math.min(0.4, combo * 0.06));
-      this.haptic(14);
+      // Hit stop: 2-frame freeze for cinematic impact.
+      if (!this.save.state.settings.reduceMotion) {
+        this.hitStopTimer = 2 / 60;
+      }
+      this.haptic([50, 30, 50]);
       // A breath of slow-motion so the launch lands emotionally.
       if (!this.save.state.settings.reduceMotion) {
         this.timeScale = 0.45;
@@ -995,7 +1009,7 @@ export class Game {
         this.audio.duckMusic(0.6, 0.7);
         this.hud.toast(`ZENITH +${pts}`, "zenith");
         this.flash("perfect");
-        this.haptic(25);
+        this.haptic([60, 40, 80]);
         this.telemetry.track("zenith", { alt: Math.round(alt) });
       }
     }
@@ -1007,7 +1021,7 @@ export class Game {
     this.bonus += 25;
     this.audio.powerup();
     this.particles.emitCollect(x, y);
-    this.haptic(16);
+    this.haptic([40, 30, 40, 30, 100]);
     this.powers.add(kind);
     switch (kind) {
       case "sun":
@@ -1479,6 +1493,7 @@ export class Game {
     this.continueTimer = 0;
     this.timeScale = 1;
     this.zenithTimer = 0;
+    this.hitStopTimer = 0;
     this.runRecorded = false;
     this.newlyCompleted = [];
     this.claimedQuests = [];
@@ -2225,10 +2240,10 @@ export class Game {
     this.hud.flash(kind);
   }
 
-  private haptic(ms: number): void {
+  private haptic(pattern: number | number[]): void {
     if (!this.save.state.settings.haptics) return;
     try {
-      navigator.vibrate?.(ms);
+      navigator.vibrate?.(pattern);
     } catch {
       /* unsupported */
     }

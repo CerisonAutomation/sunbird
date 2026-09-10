@@ -221,6 +221,7 @@ export class HUD {
   private biomeChip!: HTMLElement;
   private speedLines!: HTMLElement;
   private handEl!: HTMLElement;
+  private speedReadout!: HTMLElement;
   private altGauge!: HTMLElement;
   private altFill!: HTMLElement;
   private altBird!: HTMLElement;
@@ -331,6 +332,7 @@ export class HUD {
           <div class="fever-bar"><div class="fever-fill" data-ref="feverFill"></div></div>
         </div>
         <button class="icon-btn pause-btn" data-ui data-action="pause" aria-label="Pause">❙❙</button>
+        <div class="speed-readout" data-ref="speedReadout"><fast>0</fast><em>km/h</em></div>
         <div class="combo" data-ref="combo"></div>
         <div class="hint" data-ref="hint"></div>
         <div class="hand" data-ref="hand">☝</div>
@@ -627,6 +629,10 @@ export class HUD {
           `<div class="vs-row p2"><span>P2</span><i><b style="width:${pct(s.p2Stats.distance)}%"></b></i><em>${Math.round(s.p2Stats.distance)}m</em></div>`;
       }
       this.handEl.classList.toggle("show", s.showTutorialHand);
+      // Speed readout — converts game speed to km/h for player feedback.
+      const speedKmh = Math.round(s.speedNorm * 120);
+      const speedFast = this.speedReadout.querySelector("fast");
+      if (speedFast && speedFast.textContent !== String(speedKmh)) speedFast.textContent = String(speedKmh);
       if (html !== this.lastChips) {
         this.lastChips = html;
         this.powersEl.innerHTML = html;
@@ -777,6 +783,7 @@ export class HUD {
     this.draftMeter = grab("draftMeter");
     this.finishCd = grab("finishCd");
     this.emoteWheel = grab("emoteWheel");
+    this.speedReadout = grab("speedReadout");
   }
 }
 

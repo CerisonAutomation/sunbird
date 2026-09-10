@@ -412,8 +412,11 @@ export class Bird {
       this.blink -= dt;
       if (this.blink < 0) this.blink = 2.2 + Math.random() * 2.5;
       const closed = this.blink < 0.12 ? 0.9 : 0.08;
-      this.lidL.scale.y = lerp(this.lidL.scale.y, closed, 0.4);
-      this.lidR.scale.y = lerp(this.lidR.scale.y, closed, 0.4);
+      // Eye squint at high speed — adds personality and reads as intensity.
+      const speedSquint = clamp((sp - 60) / 60, 0, 0.35);
+      const target = Math.max(closed, speedSquint);
+      this.lidL.scale.y = lerp(this.lidL.scale.y, target, 0.4);
+      this.lidR.scale.y = lerp(this.lidR.scale.y, target, 0.4);
     }
 
     this.glowPulse += dt * 6;
