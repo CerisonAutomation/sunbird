@@ -1,0 +1,33 @@
+[workspace]
+members = ["crates/sunbird-protocol", "crates/sunbird-server"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+license = "UNLICENSED"
+publish = false
+rust-version = "1.75"
+
+[workspace.dependencies]
+anyhow = { version = "1", features = ["backtrace"] }
+axum = { version = "0.7", features = ["json", "ws"] }
+base64 = "0.22"
+hex = "0.4"
+hmac = "0.12"
+http = "1"
+metrics = "0.23"
+metrics-exporter-prometheus = { version = "0.15", features = ["http_listener"] }
+parking_lot = "0.12"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+sha2 = "0.10"
+thiserror = "1"
+time = { version = "0.3", features = ["serde-well-known", "formatting", "macros"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "limit", "timeout", "trace"] }
+tracing = "0.1"
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "time"] }
+url = "2"
+uuid = { version = "1", features = ["serde", "v4"] }

@@ -1,0 +1,121 @@
+# Sunbird Leaderboard & Multiplayer Contract
+
+Sunbird ships with the client half of both systems fully implemented. Each one
+runs in a clearly-labelled offline mode until you point it at a server.
+
+| Feature | Env var | Without it | With it |
+| --- | --- | --- | --- |
+| Global leaderboard | `VITE_LEADERBOARD_URL` | On-device board, badged **"On-device board"** in the UI | Worldwide ranking, badged **"Live global"** |
+| Networked rivals | `VITE_MULTIPLAYER_URL` | Mass Race field is 40 local pilots | Real players occupy slots as they join |
+
+The UI never presents device-only data as if it were worldwide. That labelling
+is deliberate and should be kept.
+
+---
+
+## 1. Leaderboard HTTP contract
+
+Two endpoints. Any stack that speaks this JSON works (Workers, Lambda, Express…).
+
+### `GET /board?scope=<global|daily|friends>&metric=<distance|altitude|perfects|coins>&device=<id>`
+
+```jsonc
+{
+  "entries": [
+    {
+      "deviceId": "d1a2b3",
+      "name": "Kestrel",
+      "skin": "bluejay",
+      "distance": 4210,
+      "altitude": 268,
+      "perfects": 21,
+      "coins": 143,
+      "date": "2026-02-14"
+    }
+  ],
+  "rank": 37,     // the requesting device's rank (0 if unranked)
+  "total": 128401 // total ranked pilots
+}
+```
+
+Return entries already sorted by the requested `metric`, best first. 50 rows is
+a good page size — the client renders what it receives.
+
+### `POST /score`
+
+Body is the run record:
+
+```jsonc
+{
+  "deviceId": "d1a2b3",
+  "name": "Kestrel",
+  "skin": "bluejay",
+  "distance": 4210,
+  "altitude": 268,
+  "perfects": 21,
+  "coins": 143,
+  "score": 6100,
+  "seed": "2026-02-14",
+  "mode": "daytrip",
+  "date": "2026-02-14"
+}
+```
+
+Respond `200` with any body. The client posts with `keepalive` and **ignores
+failures on purpose** — the local record is already saved, so a player never
+loses credit for a run because of a network blip.
+
+### Server-side notes
+
+- **Validate before trusting.** `seed` and `mode` are included so you can
+  re-simulate or sanity-bound a submission. The client is not authoritative.
+- Rate-limit by `deviceId`; keep only each pilot's personal best per metric.
+- `name` is player-supplied. The client escapes it on render, but sanitise on
+  ingest too.
+
+---
+
+## 2. Multiplayer transport
+
+`MassRace` accepts any object implementing `NetTransport`:
+
+```ts
+interface NetTransport {
+  readonly connected: boolean;
+  send(x: number, y: number, rotation: number, distance: number): void;
+  poll(): RemoteSnapshot[];   // { id, name, x, y, rotation, finished? }
+}
+```
+
+Wire it with `massRace.attachTransport(myTransport)`. When a snapshot arrives
+for an unknown id, a local pilot slot is promoted to `remote` so the field size
+stays constant mid-race. Remote birds are rendered with a rim highlight and
+marked `⇄` in the standings.
+
+**What is honest about the current build:** with no transport configured, the
+40 rivals are local pilots running the *identical* `Bird.step()` physics on the
+*identical* terrain, seeded so the race is reproducible. They are not scripted
+paths or position lerps — they win and lose on their own timing. They are
+labelled as squadron pilots, not as people.
+
+A minimal authoritative server should:
+
+1. Group players into rooms of ≤ 40 sharing one `seed`.
+2. Broadcast position snapshots at 10–20 Hz (the client interpolates).
+3. Own the finish order — never trust a client's "I won".
+
+---
+
+## 3. Tournaments
+
+Tournaments are fully client-side and need no server:
+
+- Two cups run per ISO week, chosen deterministically from the catalogue, so
+  every device on the same week sees the same pairing.
+- Divisions are fixed cut-offs (bronze → diamond) on a real run metric.
+- Prizes grant through the same save APIs the shop uses, so a cup-won item is
+  indistinguishable from a purchased one. Double-claiming is blocked.
+- Weekly reset clears results; won cosmetics are permanent.
+
+To make cups competitive rather than solo, submit cup scores to the same
+leaderboard backend and rank them server-side.
