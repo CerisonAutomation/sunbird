@@ -238,6 +238,8 @@ export class Game {
   private mmOpts: { ranked: boolean; storm: boolean } | null = null;
   /** Stormfront mode: PvE hazards×PvP race hybrid — everyone flies the gauntlet. */
   private stormfront = false;
+  /** True once the DO's official finish place has been folded in this race. */
+  private serverPlaceApplied = false;
   private duelResult: "" | "won" | "lost" = "";
   private duelDelta = 0;
   /** Which challenge (if any) the current run is flying under. */
@@ -1454,6 +1456,7 @@ export class Game {
     this.challengeRun = opts?.challenge ?? "";
     this.challengeMods = this.challengeRun === "daily" ? modsFor(dailyChallenge(this.today).modifier.id) : NO_MODS;
     this.eventRun = Boolean(opts?.event);
+    this.serverPlaceApplied = false;
     // Stormfront survives only through launchMatch(); any other entry resets.
     if (!opts?.storm) this.stormfront = false;
     this.challengeOutcome = "";
@@ -2290,6 +2293,17 @@ export class Game {
         this.checkoutWaiting = false;
         this.setScreen(this.screen === "checkout" ? "paywall" : "main");
         break;
+      case "buy-nest": {
+        const price = this.save.nestUpgradePrice();
+        if (this.save.buyNestUpgrade()) {
+          this.audio.fanfare();
+          this.hud.toast(`Nest upgraded → ×${this.save.nestMultiplier().toFixed(2)} score forever`, "gold");
+        } else {
+          this.hud.toast(this.save.state.nestBought >= 10 ? "Nest is fully upgraded" : `Need ● ${price}`, "info");
+        }
+        this.bump();
+        break;
+      }
       case "buy-skin":
         this.buySkin(id);
         break;
@@ -3013,6 +3027,21 @@ export class Game {
     const net = this.net;
     if (!net) return;
     net.tick(raw);
+    // Server-authoritative result: the DO ordered every live pilot's finish.
+    // Blend it with the local bot field — humans ranked by the referee, bots
+    // by simulation — and correct the shown place if the estimate was off.
+    if (!this.serverPlaceApplied && net.myPlace > 0 && this.raceFinishTime > 0 && this.massRace.active) {
+      this.serverPlaceApplied = true;
+      const botsAhead = this.massRace.rivals.filter(
+        (r) => r.kind === "local" && r.finished && r.finishTime <= this.runTime,
+      ).length;
+      const official = net.myPlace + botsAhead;
+      if (official !== this.racePlace) {
+        this.racePlace = official;
+        this.hud.toast(`Official result: P${official} (server-verified)`, "gold");
+        this.bump();
+      }
+    }
     for (const e of net.drainEmotes()) this.massRace.showEmote(e.id, e.emote);
     if (this.state === "playing" && this.massRace.active) {
       net.send(this.bird.x, this.bird.y, this.bird.rotation, Math.max(0, this.bird.x - this.startX));
@@ -3401,6 +3430,8 @@ export class Game {
       streakDays: st.streak.days,
       nestLevel: st.nestLevel,
       nestMult: this.save.nestMultiplier(),
+      nestPrice: this.save.nestUpgradePrice(),
+      nestMaxed: this.save.state.nestBought >= 10,
       missions: this.missionViews,
       quests: this.questViews,
       highScores: st.highScores,

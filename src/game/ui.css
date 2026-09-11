@@ -3941,3 +3941,4 @@ button:focus-visible, .toggle:focus-visible {
   color: #33406e;
   font-weight: 800;
 }
+.menu-hero-layer.hidden { opacity: 0; visibility: hidden; }

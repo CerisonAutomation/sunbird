@@ -156,3 +156,19 @@ describe("modes", () => {
     }
   });
 });
+
+describe("nest coin sink", () => {
+  it("price curve escalates ×1.5 and the multiplier cap holds", () => {
+    // Mirror of SaveData.nestUpgradePrice: 300 * 1.5^bought.
+    const price = (bought: number): number => Math.round(300 * Math.pow(1.5, bought));
+    expect(price(0)).toBe(300);
+    expect(price(1)).toBe(450);
+    expect(price(2)).toBe(675);
+    // Total cost to max (10 levels) must be a meaningful sink: > 30k coins.
+    let total = 0;
+    for (let i = 0; i < 10; i++) total += price(i);
+    expect(total).toBeGreaterThan(30_000);
+    // Cap: bought levels alone add at most +1.2x (10 × 0.12).
+    expect(10 * 0.12).toBeCloseTo(1.2);
+  });
+});

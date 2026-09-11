@@ -116,6 +116,8 @@ export function makeRoomCode(): string {
 export class RealtimeClient implements NetTransport {
   state: PresenceState = "offline";
   roomCode = "";
+  /** Our server-assigned finish place among live pilots (0 = none yet). */
+  myPlace = 0;
   seed = "";
   capacity = 40;
   errorText = "";
@@ -167,6 +169,7 @@ export class RealtimeClient implements NetTransport {
     this.closedByUs = false;
     this.roomCode = code.toUpperCase();
     this.seed = seed;
+    this.myPlace = 0;
     this.state = "connecting";
     this.errorText = "";
     this.open();
@@ -306,12 +309,20 @@ export class RealtimeClient implements NetTransport {
         break;
       }
       case "finish": {
+        // The DO is the referee: it assigns places by arrival order of finish
+        // messages. When the echo for OUR finish lands, keep the official
+        // place so the result screen can correct the local estimate.
+        if (msg.id === this.selfId) {
+          this.myPlace = msg.place || 0;
+          break;
+        }
         const t = this.track(msg.id);
         t.finished = true;
         t.finishTime = msg.time;
         break;
       }
       case "start":
+        this.myPlace = 0;
         this.startsAt = msg.at;
         this.seed = msg.seed || this.seed;
         this.state = "racing";

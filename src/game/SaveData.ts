@@ -55,6 +55,8 @@ export type SaveState = {
   wallet: number;
   nestLevel: number;
   completedMissions: string[];
+  /** Nest levels bought with coins (stacks with mission levels). */
+  nestBought: number;
   highScores: HighScore[];
   gold: boolean;
   vip: boolean;
@@ -158,6 +160,7 @@ function defaults(): SaveState {
     wallet: 0,
     nestLevel: 0,
     completedMissions: [],
+    nestBought: 0,
     highScores: [],
     gold: false,
     vip: false,
@@ -272,6 +275,7 @@ export class SaveData {
         wallet: p.wallet === undefined ? num(p.totalCoins) : num(p.wallet),
         nestLevel: num(p.nestLevel),
         completedMissions: strArr(p.completedMissions),
+        nestBought: num(p.nestBought),
         highScores: Array.isArray(p.highScores)
           ? p.highScores
               .map((h) => ({
@@ -653,7 +657,23 @@ export class SaveData {
   completeMission(id: string): boolean {
     if (this.state.completedMissions.includes(id)) return false;
     this.state.completedMissions.push(id);
-    this.state.nestLevel = this.state.completedMissions.length;
+    this.state.nestLevel = this.state.completedMissions.length + this.state.nestBought;
+    this.persist();
+    return true;
+  }
+
+  /** Price of the next bought nest level: 300, 450, 675… (×1.5 per level). */
+  nestUpgradePrice(): number {
+    return Math.round(300 * Math.pow(1.5, this.state.nestBought));
+  }
+
+  /** The coin sink: convert coins into a permanent score multiplier level. */
+  buyNestUpgrade(): boolean {
+    const price = this.nestUpgradePrice();
+    if (this.state.nestBought >= 10) return false; // cap: +1.2x from purchases
+    if (!this.spend(price)) return false;
+    this.state.nestBought += 1;
+    this.state.nestLevel = this.state.completedMissions.length + this.state.nestBought;
     this.persist();
     return true;
   }

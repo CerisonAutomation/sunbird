@@ -112,6 +112,8 @@ export type HudSnapshot = {
   wallet: number;
   streakDays: number;
   nestLevel: number;
+  nestPrice: number;
+  nestMaxed: boolean;
   nestMult: number;
   missions: MissionView[];
   quests: QuestView[];
@@ -531,6 +533,9 @@ export class HUD {
     this.menuEl.classList.toggle("hidden", !menuVisible);
     if (menuVisible) this.menuSky.resize(this.menuEl.clientWidth, this.menuEl.clientHeight);
     this.menuSky.setActive(menuVisible);
+    // The hero bird only plays on the title screen — flying over the shop or
+    // pass card reads as a glitch, not charm.
+    this.menuSky.heroHost.classList.toggle("hidden", !(menuVisible && s.screen === "main"));
     this.pauseEl.classList.toggle("hidden", s.state !== "paused");
     this.contEl.classList.toggle("hidden", s.state !== "continue");
     this.adEl.classList.toggle("hidden", s.state !== "ad");
@@ -1760,6 +1765,19 @@ function renderShop(s: HudSnapshot): string {
     ${renderSkinCollections(s)}
     <div class="section-title">Boosts <small>${armed} armed for your next flight</small></div>
     <div class="boost-list">${s.boosts.map((b) => renderBoostRow(b, s.wallet)).join("")}</div>
+    <div class="section-title">Nest <small>permanent score multiplier</small></div>
+    <div class="boost-list"><div class="boost-row nest-row">
+      <span class="bi">☀️</span>
+      <div><div class="mt">Nest upgrade <span class="boost-once">forever</span></div>
+      <div class="md">Lv.${s.nestLevel} · ×${s.nestMult.toFixed(2)} score${s.nestMaxed ? " · fully upgraded" : ` · next ×${(s.nestMult + 0.12).toFixed(2)}`}</div></div>
+      ${
+        s.nestMaxed
+          ? `<span class="tag on">MAX ✓</span>`
+          : s.wallet >= s.nestPrice
+            ? `<button class="mini-btn gold" data-ui data-action="buy-nest">● ${s.nestPrice}</button>`
+            : `<span class="tag need">Need ${s.nestPrice - s.wallet}●</span>`
+      }
+    </div></div>
     <div class="section-title">Trails <small>cosmetic — yours forever</small></div>
     <div class="trail-list">${s.shopTrails.map((t) => renderTrailCard(t, s.wallet)).join("")}</div>
     ${s.portalName === "none" && !(s.gold && s.vip) ? upsellStrip() : ""}
