@@ -39,6 +39,23 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: "gauntlet_5", title: "Eye of the Storm", desc: "Clear 5 weekly gauntlets", rarity: "platinum", target: 5, metric: (s) => s.state.challenges.gauntletsCleared },
   { id: "races_25", title: "Pack Animal", desc: "Fly 25 mass races", rarity: "silver", target: 25, metric: (s) => s.state.racesRun },
   { id: "mastery_15", title: "Journeyman of the Air", desc: "Earn 15 total mastery stars", rarity: "gold", target: 15, metric: (s) => totalMastery(s) },
+  { id: "combo_5", title: "Chain Master", desc: "5x launch combo", rarity: "bronze", target: 5, metric: (s) => s.state.bestCombo || 0 },
+  { id: "combo_10", title: "Combo King", desc: "10x launch combo", rarity: "silver", target: 10, metric: (s) => s.state.bestCombo || 0 },
+  { id: "combo_20", title: "Combo Legend", desc: "20x launch combo", rarity: "gold", target: 20, metric: (s) => s.state.bestCombo || 0 },
+  { id: "streak_3", title: "Hat Trick", desc: "3-day login streak", rarity: "bronze", target: 3, metric: (s) => s.state.streak.days },
+  { id: "streak_7", title: "Weekly Warrior", desc: "7-day login streak", rarity: "silver", target: 7, metric: (s) => s.state.streak.days },
+  { id: "streak_30", title: "Dedicated", desc: "30-day login streak", rarity: "platinum", target: 30, metric: (s) => s.state.streak.days },
+  { id: "altitude_200", title: "Cloud Nine", desc: "Reach 200m altitude", rarity: "silver", target: 200, metric: (s) => s.state.bestAltitude || 0 },
+  { id: "altitude_500", title: "Stratosphere Runner", desc: "Reach 500m altitude", rarity: "gold", target: 500, metric: (s) => s.state.bestAltitude || 0 },
+  { id: "altitude_1k", title: "Edge of Space", desc: "Reach 1000m altitude", rarity: "platinum", target: 1000, metric: (s) => s.state.bestAltitude || 0 },
+  { id: "distance_5k", title: "Marathoner", desc: "5,000 m in one flight", rarity: "silver", target: 5000, metric: (s) => s.state.bestDistance || 0 },
+  { id: "distance_20k", title: "Ultra Marathoner", desc: "20,000 m in one flight", rarity: "gold", target: 20000, metric: (s) => s.state.bestDistance || 0 },
+  { id: "skins_6", title: "Collector", desc: "Own 6 bird skins", rarity: "bronze", target: 6, metric: (s) => s.state.ownedSkins.length },
+  { id: "skins_12", title: "Fashion Icon", desc: "Own 12 bird skins", rarity: "gold", target: 12, metric: (s) => s.state.ownedSkins.length },
+  { id: "island_20", title: "Deep Explorer", desc: "Reach island 20", rarity: "platinum", target: 20, metric: (s) => s.state.farthestIsland + 1 },
+  { id: "ghost_25", title: "Ghost Hunter", desc: "Beat your ghost 25 times", rarity: "platinum", target: 25, metric: (s) => s.state.lifetime.ghostBeats },
+  { id: "races_50", title: "Racing Legend", desc: "Complete 50 races", rarity: "gold", target: 50, metric: (s) => s.state.runsPlayed },
+  { id: "flights_200", title: "Sky Master", desc: "Complete 200 flights", rarity: "platinum", target: 200, metric: (s) => s.state.runsPlayed },
 ];
 
 function totalMastery(s: SaveData): number {

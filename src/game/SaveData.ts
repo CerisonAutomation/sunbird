@@ -104,6 +104,10 @@ export type SaveState = {
   calendar: { cycleDay: number; lastClaim: string };
   /** Runs flown per mode, feeding mode mastery levels. */
   mastery: Record<string, number>;
+  /** Campaign chapters whose rewards were claimed. */
+  campaignClaimed: string[];
+  /** Weekly-event / monthly-theme progress windows. */
+  events: { week: string; clearsThisWeek: number; month: string; clearsThisMonth: number; claimedTrailMonth: string };
 };
 
 export type DuelState = {
@@ -188,6 +192,8 @@ function defaults(): SaveState {
     challenges: { dailyDate: "", dailyDone: false, dailiesDone: 0, gauntletWeek: "", gauntletDone: [], gauntletsCleared: 0 },
     calendar: { cycleDay: 0, lastClaim: "" },
     mastery: {},
+    campaignClaimed: [],
+    events: { week: "", clearsThisWeek: 0, month: "", clearsThisMonth: 0, claimedTrailMonth: "" },
   };
 }
 
@@ -378,6 +384,17 @@ export class SaveData {
           p.mastery && typeof p.mastery === "object" && !Array.isArray(p.mastery)
             ? Object.fromEntries(Object.entries(p.mastery as Record<string, unknown>).map(([k, v]) => [k, num(v)]))
             : {},
+        campaignClaimed: strArr(p.campaignClaimed),
+        events:
+          p.events && typeof p.events === "object"
+            ? {
+                week: String((p.events as Record<string, unknown>).week ?? ""),
+                clearsThisWeek: num((p.events as Record<string, unknown>).clearsThisWeek),
+                month: String((p.events as Record<string, unknown>).month ?? ""),
+                clearsThisMonth: num((p.events as Record<string, unknown>).clearsThisMonth),
+                claimedTrailMonth: String((p.events as Record<string, unknown>).claimedTrailMonth ?? ""),
+              }
+            : d.events,
       };
     } catch {
       return d;
@@ -560,6 +577,39 @@ export class SaveData {
     return c.cycleDay;
   }
 
+  /** Records a weekly-event clear. @returns clears this week / this month. */
+  recordEventClear(week: string, month: string): { week: number; month: number } {
+    const e = this.state.events;
+    if (e.week !== week) {
+      e.week = week;
+      e.clearsThisWeek = 0;
+    }
+    if (e.month !== month) {
+      e.month = month;
+      e.clearsThisMonth = 0;
+    }
+    e.clearsThisWeek += 1;
+    e.clearsThisMonth += 1;
+    this.persist();
+    return { week: e.clearsThisWeek, month: e.clearsThisMonth };
+  }
+
+  /** Marks the monthly theme trail as claimed for `month`. @returns false if already claimed. */
+  claimThemeTrail(month: string): boolean {
+    if (this.state.events.claimedTrailMonth === month) return false;
+    this.state.events.claimedTrailMonth = month;
+    this.persist();
+    return true;
+  }
+
+  /** Claims a campaign chapter reward. @returns false if already claimed. */
+  claimCampaign(chapterId: string): boolean {
+    if (this.state.campaignClaimed.includes(chapterId)) return false;
+    this.state.campaignClaimed.push(chapterId);
+    this.persist();
+    return true;
+  }
+
   /** Counts a run toward per-mode mastery. @returns the new run count. */
   addMasteryRun(modeId: string): number {
     const n = (this.state.mastery[modeId] ?? 0) + 1;
@@ -734,6 +784,8 @@ export class SaveData {
   touchStreak(today: string, yesterday: string): number {
     const s = this.state.streak;
     if (s.claimedDate === today) return 0;
+    // Check for comeback BEFORE overwriting s.last
+    const isComeback = s.last !== yesterday && s.last !== today && s.days > 0;
     if (s.last === yesterday) s.days += 1;
     else if (s.last !== today) s.days = 1;
     s.last = today;
@@ -741,6 +793,12 @@ export class SaveData {
     const reward = 20 * Math.min(7, Math.max(1, s.days));
     this.state.wallet += reward;
     this.state.totalCoins += reward;
+    // Comeback bonus: only when returning after missing days (not day 1)
+    if (isComeback) {
+      const comebackBonus = 50;
+      this.state.wallet += comebackBonus;
+      this.state.totalCoins += comebackBonus;
+    }
     this.persist();
     return reward;
   }

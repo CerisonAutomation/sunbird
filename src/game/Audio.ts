@@ -8,6 +8,7 @@ import { Music, type BiomeMusicStyle, type MusicMode } from "./Music";
  */
 export class GameAudio {
   private ctx: AudioContext | null = null;
+  private noiseBuffer: AudioBuffer | null = null;
   private master: GainNode | null = null;
   private sfxBus: GainNode | null = null;
   private reverbSend: GainNode | null = null;
@@ -51,6 +52,12 @@ export class GameAudio {
     this.sfxBus = this.ctx.createGain();
     this.sfxBus.gain.value = this.muted ? 0 : 0.75 * this.sfxVol;
     this.sfxBus.connect(this.master);
+
+    // Pre-allocate noise buffer for reuse (avoids per-call allocation)
+    const noiseLen = Math.floor(this.ctx.sampleRate * 0.5);
+    this.noiseBuffer = this.ctx.createBuffer(1, noiseLen, this.ctx.sampleRate);
+    const noiseData = this.noiseBuffer.getChannelData(0);
+    for (let i = 0; i < noiseLen; i++) noiseData[i] = (Math.random() * 2 - 1) * (1 - i / noiseLen);
 
     const convolver = this.ctx.createConvolver();
     convolver.buffer = this.makeImpulse(1.8, 2.3);
@@ -288,6 +295,40 @@ export class GameAudio {
     this.tone(1318.5, 0.12, "sine", 0.06, 1567.98);
   }
 
+  /** Comedy honk — a squeezed rubber-duck blast for silly moments. */
+  honk(): void {
+    this.tone(196, 0.16, "square", 0.1, 175);
+    this.tone(392, 0.12, "sawtooth", 0.05, 330);
+    this.noiseBurst(0.05, 1800, 0.03);
+  }
+
+  /** Tiny sneeze: inhale chirp then a fast descending "choo". */
+  sneeze(): void {
+    this.tone(880, 0.09, "sine", 0.06, 1320);
+    this.tone(660, 0.16, "triangle", 0.09, 220);
+    this.noiseBurst(0.12, 2400, 0.06);
+  }
+
+  /** Cartoon boing for springy surprises. */
+  boing(): void {
+    this.tone(220, 0.28, "sine", 0.12, 660);
+    this.tone(330, 0.22, "triangle", 0.06, 880);
+  }
+
+  /** Short triumphant fanfare for surprise windfalls. */
+  fanfare(): void {
+    this.tone(523.25, 0.12, "square", 0.06, 523.25);
+    this.tone(659.25, 0.12, "square", 0.06, 659.25);
+    this.tone(783.99, 0.16, "square", 0.07, 783.99);
+    this.tone(1046.5, 0.4, "triangle", 0.1, 1046.5);
+    this.tone(1318.5, 0.3, "sine", 0.05, 1318.5);
+  }
+
+  /** Woozy slide-whistle drop — plays when something absurd happens. */
+  slideWhistle(): void {
+    this.tone(1400, 0.45, "sine", 0.08, 300);
+  }
+
   launchWhoosh(rating: string, speed: number): void {
     const speedRatio = Math.min(1.5, Math.max(0.4, speed / 55));
     const baseFreq = rating === "perfect" ? 784 : rating === "great" ? 587 : 440;
@@ -302,6 +343,29 @@ export class GameAudio {
     } else {
       this.tone(440, 0.12, "sine", 0.12);
     }
+  }
+
+  /** Feather-soft UI tick for screen navigation — barely there, very tactile. */
+  uiTick(): void {
+    this.tone(2093, 0.035, "sine", 0.028, 1567.98);
+  }
+
+  /** Weekly-event stinger: a rising two-note "something special" cue. */
+  eventStinger(): void {
+    this.tone(392, 0.14, "triangle", 0.08, 523.25);
+    this.tone(587.33, 0.2, "sine", 0.09, 783.99);
+    this.tone(1174.66, 0.26, "sine", 0.05);
+  }
+
+  /** Campaign chapter-complete fanfare — bigger than the windfall fanfare. */
+  chapterFanfare(): void {
+    this.tone(392, 0.14, "square", 0.06);
+    this.tone(523.25, 0.14, "square", 0.06, 523.25);
+    this.tone(659.25, 0.18, "square", 0.07);
+    this.tone(783.99, 0.3, "triangle", 0.1, 830);
+    this.tone(1046.5, 0.5, "sine", 0.09, 1046.5);
+    this.tone(1568, 0.35, "sine", 0.04);
+    this.noiseBurst(0.08, 3200, 0.03);
   }
 
   eggHatch(): void {
@@ -337,9 +401,10 @@ export class GameAudio {
   private noiseBurst(dur: number, freq: number, gain: number): void {
     if (!this.ctx || !this.sfxBus || this.muted || !this.started) return;
     const len = Math.floor(this.ctx.sampleRate * dur);
-    const buffer = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    // Reuse pre-allocated noise buffer when duration fits, otherwise create new
+    const buffer = (this.noiseBuffer && len <= this.noiseBuffer.length)
+      ? this.noiseBuffer
+      : this.ctx.createBuffer(1, len, this.ctx.sampleRate);
     const src = this.ctx.createBufferSource();
     src.buffer = buffer;
     const filter = this.ctx.createBiquadFilter();

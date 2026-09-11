@@ -22,6 +22,10 @@ type Storm = { x: number; y: number; sprite: THREE.Sprite; active: boolean; cool
 export class Weather {
   readonly group = new THREE.Group();
   gust = 0; // 0..1 current headwind strength
+  /** Storm Ward boost: gusts and ash storms barely touch the bird this run. */
+  ward = false;
+  /** Weekly-event wind multiplier (Storm Surge doubles gust push). */
+  windMult = 1;
   inThermal = false;
   private readonly thermals: Thermal[] = [];
   private readonly storms: Storm[] = [];
@@ -64,6 +68,7 @@ export class Weather {
   }
 
   reset(): void {
+    this.ward = false;
     for (const t of this.thermals) {
       t.active = false;
       t.mesh.visible = false;
@@ -125,7 +130,7 @@ export class Weather {
       }
       const target = this.gustPhase === "blowing" ? 1 : 0;
       this.gust = lerp(this.gust, target, 1 - Math.pow(0.02, dt));
-      if (this.gust > 0.05 && airborne && !diving) bird.vx -= 7.5 * this.gust * dt;
+      if (this.gust > 0.05 && airborne && !diving) bird.vx -= (this.ward ? 1.8 : 7.5) * this.windMult * this.gust * dt;
     } else {
       this.gust = lerp(this.gust, 0, 1 - Math.pow(0.02, dt));
       this.gustPhase = "calm";
@@ -145,8 +150,8 @@ export class Weather {
       const dy = Math.abs(bird.y - s.y);
       if (dx < 5.2 && dy < 2.6 && this.stormCd <= 0) {
         this.stormCd = 1.2;
-        bird.vx *= 0.78;
-        bird.vy = Math.min(bird.vy, 2);
+        bird.vx *= this.ward ? 0.95 : 0.78;
+        if (!this.ward) bird.vy = Math.min(bird.vy, 2);
         ev.onStormHit(s.x, s.y);
       }
     }

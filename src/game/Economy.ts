@@ -360,6 +360,90 @@ export const SKINS: SkinDef[] = [
     daylightBonus: 4,
     magnetAlways: false,
   },
+  {
+    id: "jet",
+    name: "Jet",
+    perk: "+8% top speed",
+    price: 350,
+    body: 0x2d2d2d,
+    wing: 0xff4444,
+    belly: 0xffcccc,
+    beak: 0xff6666,
+    speedMult: 1.08,
+    feverBonus: 0,
+    daylightBonus: 0,
+    magnetAlways: false,
+  },
+  {
+    id: "cloudwalker",
+    name: "Cloudwalker",
+    perk: "+6 s daylight",
+    price: 500,
+    body: 0xe8f4fd,
+    wing: 0xb8d8f8,
+    belly: 0xffffff,
+    beak: 0xffd166,
+    speedMult: 1,
+    feverBonus: 0,
+    daylightBonus: 6,
+    magnetAlways: false,
+  },
+  {
+    id: "stormchaser",
+    name: "Stormchaser",
+    perk: "+3 s fever duration",
+    price: 600,
+    body: 0x4a6fa5,
+    wing: 0x8ab4d8,
+    belly: 0xd4e8f5,
+    beak: 0xffa040,
+    speedMult: 1.02,
+    feverBonus: 3,
+    daylightBonus: 0,
+    magnetAlways: false,
+  },
+  {
+    id: "snowowl",
+    name: "Snow Owl",
+    perk: "+8 s daylight",
+    price: 550,
+    body: 0xf0f0f8,
+    wing: 0xc8d0e8,
+    belly: 0xffffff,
+    beak: 0xffb020,
+    speedMult: 1,
+    feverBonus: 0,
+    daylightBonus: 8,
+    magnetAlways: false,
+  },
+  {
+    id: "ruby",
+    name: "Ruby",
+    perk: "+5% speed · +2 s fever",
+    price: 400,
+    body: 0xcc2244,
+    wing: 0xff5577,
+    belly: 0xffddee,
+    beak: 0xffaa44,
+    speedMult: 1.05,
+    feverBonus: 2,
+    daylightBonus: 0,
+    magnetAlways: false,
+  },
+  {
+    id: "golden",
+    name: "Golden Eagle",
+    perk: "+4% speed · +4 s daylight",
+    price: 800,
+    body: 0xdaa520,
+    wing: 0xffd700,
+    belly: 0xfff8dc,
+    beak: 0xffa500,
+    speedMult: 1.04,
+    feverBonus: 0,
+    daylightBonus: 4,
+    magnetAlways: false,
+  },
 ];
 
 export function skinById(id: string): SkinDef {
@@ -379,7 +463,39 @@ export const BOOSTS: BoostDef[] = [
   { id: "magnet", name: "Coin Magnet", desc: "Take off with 15 s of magnet", price: 40, icon: "🧲" },
   { id: "sunflask", name: "Sun Flask", desc: "+12 s daylight at takeoff", price: 50, icon: "☀" },
   { id: "headstart", name: "Head Start", desc: "Launch from 300 m at full speed", price: 90, icon: "🚀" },
+  { id: "stormward", name: "Storm Ward", desc: "Ash clouds and gusts barely touch you", price: 70, icon: "🌩" },
+  { id: "hotwings", name: "Hot Wings", desc: "Take off already in Fever", price: 80, icon: "🔥" },
 ];
+
+/* ---------- shop trails (coins) — prize trails still come from cups ---------- */
+
+export type ShopTrailDef = {
+  id: string;
+  label: string;
+  desc: string;
+  price: number;
+  /** CSS colors for the shop swatch, mirrors TRAILS[id].colors */
+  css: string[];
+};
+
+export const SHOP_TRAILS: ShopTrailDef[] = [
+  { id: "trail_ember", label: "Emberline", desc: "A streak of live coals", price: 300, css: ["#ff8a3a", "#ff4a2a", "#ffd27a"] },
+  { id: "trail_tide", label: "Tideglass", desc: "Cool sea-green ribbon", price: 350, css: ["#3ae0c8", "#2a9ad8", "#c8fff2"] },
+  { id: "trail_bloom", label: "Petalfall", desc: "Drifting pink petals", price: 350, css: ["#ff9ac8", "#ff6a9a", "#ffe0ee"] },
+  { id: "trail_gold", label: "Goldleaf", desc: "Pure molten gold", price: 500, css: ["#ffd76a", "#ffb020", "#fff2c8"] },
+  { id: "trail_void", label: "Voidwake", desc: "Deep-space violet wake", price: 420, css: ["#6a3aff", "#2a1a6a", "#c8a8ff"] },
+  { id: "trail_mint", label: "Mintcloud", desc: "Fresh mint vapor", price: 280, css: ["#7affc8", "#3ad89a", "#e0fff2"] },
+  { id: "trail_rose", label: "Rosewind", desc: "Warm rose-gold shimmer", price: 380, css: ["#ffb0a0", "#ff7a6a", "#ffe8d8"] },
+  { id: "trail_neon", label: "Neonpulse", desc: "Electric arcade glow", price: 450, css: ["#3affff", "#ff3aff", "#ffff3a"] },
+];
+
+/** Deterministic daily deal: one boost at half price, same for everyone all day. */
+export function dailyDealBoost(dateStr: string): { id: string; price: number } {
+  let h = 5381;
+  for (let i = 0; i < dateStr.length; i++) h = ((h << 5) + h + dateStr.charCodeAt(i)) >>> 0;
+  const def = BOOSTS[h % BOOSTS.length]!;
+  return { id: def.id, price: Math.max(10, Math.floor(def.price / 2 / 5) * 5) };
+}
 
 export const GOLD = {
   sku: "sunbird_gold" as const,
@@ -430,5 +546,14 @@ export type SkinView = {
 export type BoostView = {
   def: BoostDef;
   armed: boolean;
+  affordable: boolean;
+  /** Present when this boost is today's half-price deal. */
+  dealPrice?: number;
+};
+
+export type ShopTrailView = {
+  def: ShopTrailDef;
+  owned: boolean;
+  equipped: boolean;
   affordable: boolean;
 };

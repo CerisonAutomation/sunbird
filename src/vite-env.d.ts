@@ -12,6 +12,8 @@ interface ImportMetaEnv {
   readonly VITE_LEADERBOARD_URL?: string;
   /** Optional WebSocket URL enabling real networked rivals in Mass Race. */
   readonly VITE_MULTIPLAYER_URL?: string;
+  /** Optional HTTPS base URL for the social server (friends/clubs/chat). */
+  readonly VITE_SOCIAL_URL?: string;
 }
 
 interface ImportMeta {

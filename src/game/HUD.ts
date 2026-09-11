@@ -7,9 +7,12 @@ import type { BoardMetric, BoardPage, BoardScope } from "./Leaderboard";
 import type { TournamentView } from "./Tournaments";
 import type { RosterBird, Standing } from "./MassRace";
 import { VIP_DAILY_GIFT } from "./constants";
-import type { BoostView, SkinView } from "./Economy";
+import type { BoostView, ShopTrailView, SkinView } from "./Economy";
 import { formatDistance } from "./math";
 import type { MissionView, QuestReward, QuestView } from "./Missions";
+import type { CampaignChapterView } from "./Campaign";
+import type { MonthlyTheme, WeeklyEvent } from "./Events";
+import type { SquadState } from "./Squad";
 import type { HighScore, Settings } from "./SaveData";
 import type { TierView } from "./SeasonPass";
 
@@ -29,7 +32,9 @@ export type UiScreen =
   | "cups"
   | "live"
   | "rank"
-  | "challenges";
+  | "challenges"
+  | "campaign"
+  | "squad";
 
 export type RivalCard = {
   rating: number;
@@ -116,6 +121,7 @@ export type HudSnapshot = {
   claimedQuests: QuestReward[];
   skins: SkinView[];
   boosts: BoostView[];
+  shopTrails: ShopTrailView[];
   settings: Settings;
   goldPrice: string;
   goldFeatures: string[];
@@ -223,6 +229,18 @@ export type HudSnapshot = {
   calendar: CalendarCard;
   mastery: MasteryRow[];
   challengeOutcome: string;
+  /* --- live-ops events + campaign + squad --- */
+  weeklyEvent: WeeklyEvent;
+  monthlyTheme: MonthlyTheme;
+  eventClearsWeek: number;
+  eventClearsMonth: number;
+  themeTrailClaimed: boolean;
+  themeTrailNeed: number;
+  campaign: CampaignChapterView[];
+  campaignDone: number;
+  campaignTotal: number;
+  squad: SquadState;
+  squadNotice: string;
 };
 
 export type DailyCard = {
@@ -377,6 +395,8 @@ export class HUD {
             <div class="stat-sub">best <span data-ref="best">0</span></div>
           </div>
         </div>
+        <div class="position-badge" data-ref="positionBadge">1<span class="pos-suffix">st</span></div>
+        <div class="race-progress" data-ref="raceProgress"><div class="race-progress-fill" data-ref="raceProgressFill" style="width:10%"></div><div class="race-progress-dot you" style="left:10%"></div><div class="race-progress-dot leader" style="left:85%"></div><span class="race-progress-finish">🏁</span></div>
         <div class="speedlines" data-ref="speedlines"></div>
         <div class="alt-gauge" data-ref="altGauge">
           <div class="alt-track">
@@ -443,6 +463,9 @@ export class HUD {
 
       <div class="toasts" data-ref="toasts"></div>
       <div class="flash" data-ref="flash"></div>
+      <div class="victory-banner hidden" data-ref="victoryBanner"><div class="victory-text" data-ref="victoryText"></div></div>
+      <div class="matchmaking hidden" data-ref="matchmaking"><div class="matchmaking-spinner"></div><div class="matchmaking-count" data-ref="matchmakingCount">0/40</div><div class="matchmaking-label">Finding rivals...</div></div>
+      <div class="vs-screen hidden" data-ref="vsScreen"><div class="vs-title">VS</div><div class="vs-players"><div class="vs-player"><div class="vs-player-name" data-ref="vsP1">You</div></div><div class="vs-player"><div class="vs-player-name" data-ref="vsP2">Rival</div></div></div></div>
     `;
     parent.appendChild(this.root);
     this.bind();
@@ -622,7 +645,7 @@ export class HUD {
                 (r) =>
                   `<span class="rb ${r.you ? "you" : ""} ${r.remote ? "remote" : ""} ${r.finished ? "done" : ""}" ` +
                   `style="left:${(r.progress * 100).toFixed(1)}%;--h:${Math.round(r.hue * 360)}" ` +
-                  `title="#${r.place} ${escapeHtml(r.name)}${r.remote ? " · live" : ""}">${r.emote ? `<b class="rb-emote">${r.emote}</b>` : ""}</span>`,
+                  `title="#${r.place} ${escapeHtml(r.name)}${r.remote ? " · live" : ""}">${r.emote ? `<b class="rb-emote">${escapeHtml(r.emote)}</b>` : ""}</span>`,
               )
               .join("")}</div>`;
         }
@@ -790,6 +813,10 @@ export class HUD {
         return renderRank(s);
       case "challenges":
         return renderChallenges(s);
+      case "campaign":
+        return renderCampaign(s);
+      case "squad":
+        return renderSquad(s);
       default:
         return renderMain(s);
     }
@@ -992,8 +1019,23 @@ function renderLive(s: HudSnapshot): string {
 
     <div class="lobby-rules">
       <span><b>3,000 m</b> gate</span><span class="dot"></span>
-      <span><b>41</b> birds</span><span class="dot"></span>
+      <span><b>${s.roomSize + 1}</b> birds</span><span class="dot"></span>
       <span>Same hills · same wind</span>
+    </div>
+
+    <div class="room-controls">
+      <div class="room-ctl">
+        <span class="room-ctl-label">Field size</span>
+        <div class="seg">${[5, 10, 20, 40]
+          .map((n) => `<button data-ui data-action="room-size" data-id="${n}" class="${s.roomSize === n ? "on" : ""}">${n}</button>`)
+          .join("")}</div>
+      </div>
+      <div class="room-ctl">
+        <span class="room-ctl-label">Rival skill</span>
+        <div class="seg">${(["chill", "sharp", "ace"] as const)
+          .map((k) => `<button data-ui data-action="room-skill" data-id="${k}" class="${s.roomSkill === k ? "on" : ""}">${k === "chill" ? "😌 Chill" : k === "sharp" ? "🎯 Sharp" : "🔥 Ace"}</button>`)
+          .join("")}</div>
+      </div>
     </div>
 
     <div class="loadout-card">
@@ -1016,7 +1058,7 @@ function renderLive(s: HudSnapshot): string {
           <button class="mini-btn" data-ui data-action="join-room">Join</button>
         </div>
       </div>
-      <div class="race-card how">
+      <div class="race-card craft">
         <div class="race-card-h"><b>Race craft</b><span>win the pack</span></div>
         <div class="race-tip"><b>🌀 Draft</b><span>Tuck behind a rival to cut drag, then slingshot past.</span></div>
         <div class="race-tip"><b>👑 Roster</b><span>Every bird rides the top rail — you are gold.</span></div>
@@ -1096,13 +1138,122 @@ function renderChallenges(s: HudSnapshot): string {
         .join("")}
     </div>`;
 
+  const ev = s.weeklyEvent;
+  const th = s.monthlyTheme;
+  const trailDone = s.themeTrailClaimed;
+  const event = `
+    <div class="section-title">Live event <small>new twist every week</small></div>
+    <div class="event-card">
+      <div class="daily-head"><span class="daily-icon">${ev.icon}</span><div><b>${ev.name}</b><em>${escapeHtml(ev.desc)}</em></div><span class="pill coin">● ${ev.reward}</span></div>
+      <div class="event-meta"><span>Fly ${ev.target.toLocaleString()} m in one event run</span><span>${s.eventClearsWeek > 0 ? `✓ ${s.eventClearsWeek} clear${s.eventClearsWeek > 1 ? "s" : ""} this week` : "No clears yet this week"}</span></div>
+      <button class="primary-btn" data-ui data-action="play-event">${ev.icon} FLY THE EVENT</button>
+      <div class="theme-strip ${trailDone ? "done" : ""}">
+        <span class="theme-icon">${th.icon}</span>
+        <div class="theme-body"><b>${th.name}</b><em>${escapeHtml(th.tagline)}</em></div>
+        <span class="theme-prog">${trailDone ? "✨ trail claimed" : `${Math.min(s.eventClearsMonth, s.themeTrailNeed)}/${s.themeTrailNeed} clears → trail`}</span>
+      </div>
+    </div>`;
+
   return `
     ${head("Challenges", "back", `<span class="pill">☀ Daily · 🌩 Weekly</span>`)}
     <p class="tagline">Same hills as everyone else today. Modifiers change how you fly them.</p>
+    ${event}
     ${daily}
     ${gauntlet}
     ${calendar}
     ${mastery}
+  `;
+}
+
+function renderCampaign(s: HudSnapshot): string {
+  const rows = s.campaign
+    .map((ch) => {
+      const goals = ch.goals
+        .map(
+          (g) => `<div class="camp-goal ${g.done ? "done" : ""}">
+            <span class="check">${g.done ? "✓" : ""}</span>
+            <span class="cg-label">${escapeHtml(g.def.label)}</span>
+            <span class="cg-prog">${Math.floor(g.progress).toLocaleString()}/${g.def.target.toLocaleString()}</span>
+          </div>`,
+        )
+        .join("");
+      const cta = !ch.unlocked
+        ? `<span class="tag">🔒 Finish chapter ${ch.index} first</span>`
+        : ch.claimed
+          ? `<span class="tag on">✓ ${escapeHtml(ch.def.rewardLabel)}</span>`
+          : ch.complete
+            ? `<button class="mini-btn gold" data-ui data-action="claim-campaign" data-id="${ch.def.id}">CLAIM ● ${ch.def.rewardCoins}</button>`
+            : `<span class="tag">● ${ch.def.rewardCoins} on completion</span>`;
+      return `<div class="camp-chapter ${!ch.unlocked ? "locked" : ""} ${ch.claimed ? "claimed" : ""}">
+        <div class="camp-head"><span class="camp-icon">${ch.def.icon}</span><div><b>Chapter ${ch.index + 1} · ${escapeHtml(ch.def.title)}</b><em>${escapeHtml(ch.def.story)}</em></div></div>
+        ${ch.unlocked ? goals : ""}
+        <div class="camp-foot">${cta}</div>
+      </div>`;
+    })
+    .join("");
+  return `
+    ${head("The Long Migration", "back", `<span class="pill">${s.campaignDone}/${s.campaignTotal}</span>`)}
+    <p class="tagline">A journey in eight chapters. Progress accrues from every flight — no separate grind.</p>
+    <div class="camp-list">${rows}</div>
+  `;
+}
+
+function renderSquad(s: HudSnapshot): string {
+  const sq = s.squad;
+  if (!sq.live) {
+    return `
+      ${head("Squad", "back")}
+      <p class="tagline">Friends, clubs and club chat live on the social server.</p>
+      <div class="empty-note">🔌 Social server not configured.<br/><small>Set <b>VITE_SOCIAL_URL</b> and restart — see SOCIAL_API.md. No fake friends here, ever.</small></div>
+    `;
+  }
+  const notice = s.squadNotice ? `<div class="reward-strip">${escapeHtml(s.squadNotice)}</div>` : "";
+  const friends = `
+    <div class="section-title">Friends <small>${sq.friends.length} winged</small></div>
+    <div class="redeem"><input data-ui data-ref="squadCode" placeholder="Friend's code (SUN-XXXXXX)" maxlength="10" autocomplete="off" /><button class="mini-btn" data-ui data-action="squad-add">Add</button></div>
+    ${
+      sq.friends.length
+        ? `<div class="friend-list">${sq.friends
+            .map(
+              (f) => `<div class="friend-row"><span class="fr-name">🪶 ${escapeHtml(f.name)}</span><span class="fr-code">${escapeHtml(f.code)}</span><button class="mini-btn ghost" data-ui data-action="squad-remove" data-id="${escapeHtml(f.code)}">✕</button></div>`,
+            )
+            .join("")}</div>`
+        : `<div class="empty-note">No friends yet — swap codes! Yours is <b>${escapeHtml(sq.myCode || "…")}</b></div>`
+    }`;
+  const myClub = sq.clubs.find((c) => c.id === sq.myClubId);
+  const clubs = myClub
+    ? `
+    <div class="section-title">Your club <small>${myClub.members}/30 members</small></div>
+    <div class="club-card mine">
+      <div class="daily-head"><span class="daily-icon">🏰</span><div><b>${escapeHtml(myClub.name)}</b><em>${escapeHtml(myClub.motto)}</em></div><button class="mini-btn ghost" data-ui data-action="squad-leave-club">Leave</button></div>
+      <div class="chat-box" data-ref="chatBox">${
+        sq.chat.length
+          ? sq.chat.map((m) => `<div class="chat-msg"><b>${escapeHtml(m.name)}</b><span>${escapeHtml(m.text)}</span></div>`).join("")
+          : `<div class="chat-msg dim"><span>Quiet in here. Say hi 👋</span></div>`
+      }</div>
+      <div class="redeem"><input data-ui data-ref="chatText" placeholder="Message your club…" maxlength="200" autocomplete="off" /><button class="mini-btn" data-ui data-action="squad-chat">Send</button></div>
+    </div>`
+    : `
+    <div class="section-title">Clubs <small>join or found one</small></div>
+    ${
+      sq.clubs.length
+        ? `<div class="club-list">${sq.clubs
+            .map(
+              (c) => `<div class="club-row"><div><b>🏰 ${escapeHtml(c.name)}</b><em>${escapeHtml(c.motto)} · ${c.members}/30</em></div><button class="mini-btn" data-ui data-action="squad-join-club" data-id="${c.id}" ${c.members >= 30 ? "disabled" : ""}>Join</button></div>`,
+            )
+            .join("")}</div>`
+        : `<div class="empty-note">No clubs yet — found the first one.</div>`
+    }
+    <div class="redeem"><input data-ui data-ref="clubName" placeholder="Club name" maxlength="24" autocomplete="off" /><button class="mini-btn gold" data-ui data-action="squad-create-club">Found club</button></div>`;
+  return `
+    ${head("Squad", "back", sq.myCode ? `<span class="pill">${escapeHtml(sq.myCode)}</span>` : "")}
+    <p class="tagline">Real pilots only — friends, clubs and club chat.</p>
+    ${sq.loading ? `<div class="reward-strip">↻ Syncing with the roost…</div>` : ""}
+    ${sq.error ? `<div class="empty-note">⚠ ${escapeHtml(sq.error)}</div>` : ""}
+    ${notice}
+    ${friends}
+    ${clubs}
+    <button class="soft-btn wide" data-ui data-action="squad-refresh">↻ Refresh</button>
   `;
 }
 
@@ -1309,10 +1460,29 @@ function renderMain(s: HudSnapshot): string {
     </div>
     ${seedPicker}
 
-    <button class="primary-btn fly-cta" data-ui data-action="pvp-practice">
-      <span class="fly-label">☀&nbsp;FLY</span>
-      <span class="fly-sub">HOLD to dive · RELEASE to soar</span>
-    </button>
+    <!-- MAIN PLAY MODES: 1P · PVP · PVE · TOURNAMENT -->
+    <div class="mode-cards" role="group" aria-label="Play modes">
+      <button class="mode-card-main" data-ui data-action="pvp-practice">
+        <span class="mode-icon-lg">☀</span>
+        <span class="mode-name">1 PLAYER</span>
+        <span class="mode-desc">Free flight — chase the daylight</span>
+      </button>
+      <button class="mode-card-main pvp" data-ui data-action="open-live">
+        <span class="mode-icon-lg">⚔</span>
+        <span class="mode-name">PVP</span>
+        <span class="mode-desc">Race 40 pilots · duels · rooms</span>
+      </button>
+      <button class="mode-card-main pve" data-ui data-action="open-challenges">
+        <span class="mode-icon-lg">🎯</span>
+        <span class="mode-name">PVE</span>
+        <span class="mode-desc">Daily challenge & storm gauntlet</span>
+      </button>
+      <button class="mode-card-main cup" data-ui data-action="open-cups">
+        <span class="mode-icon-lg">🏆</span>
+        <span class="mode-name">TOURNAMENT</span>
+        <span class="mode-desc">Weekly cups — win exclusive gear</span>
+      </button>
+    </div>
 
     <button class="rank-card" data-ui data-action="open-rank" aria-label="View Rival rank">
       <span class="rank-div">${s.rival.divisionIcon} ${s.rival.division}</span>
@@ -1322,7 +1492,7 @@ function renderMain(s: HudSnapshot): string {
         s.rival.nextNeeded > 0
           ? `${s.rival.nextNeeded} to ${s.rival.nextName}`
           : "Top division — defend it"
-      } · 🔥${s.rival.streak} streak · local rating</span>
+      } · 🔥${s.rival.streak} streak</span>
     </button>
 
     <div class="pvp-modes" role="group" aria-label="Play modes">
@@ -1336,6 +1506,11 @@ function renderMain(s: HudSnapshot): string {
       <span class="ds-icon">${s.daily.done ? "✓" : s.daily.modifierIcon}</span>
       <span class="ds-body"><b>Daily · ${s.daily.title}</b><em>${s.daily.done ? "Complete — gauntlet & calendar inside" : `${s.daily.modifierLabel} · ${escapeHtml(s.daily.metric)} ≥ ${s.daily.target} · ● ${s.daily.reward}`}</em></span>
       <span class="ds-go">${s.daily.done ? "›" : "FLY"}</span>
+    </button>
+    <button class="event-strip" data-ui data-action="play-event">
+      <span class="ds-icon">${s.weeklyEvent.icon}</span>
+      <span class="ds-body"><b>Event · ${s.weeklyEvent.name}</b><em>${s.monthlyTheme.icon} ${s.monthlyTheme.name} · fly ${s.weeklyEvent.target.toLocaleString()} m · ● ${s.weeklyEvent.reward}</em></span>
+      <span class="ds-go">${s.eventClearsWeek > 0 ? `✓${s.eventClearsWeek}` : "FLY"}</span>
     </button>
     ${!s.calendar.claimedToday ? `<button class="cal-strip" data-ui data-action="claim-calendar">📅 Daily gift ready — day ${(s.calendar.cycleDay % 28) + 1} of 28 <b>CLAIM</b></button>` : ""}
 
@@ -1358,6 +1533,8 @@ function renderMain(s: HudSnapshot): string {
       <button class="nav-btn" data-ui data-action="open-pass"><i>🎟</i><span>Pass ${s.season.tier}</span></button>
       <button class="nav-btn" data-ui data-action="open-trophies"><i>🏅</i><span>${s.trophyCounts.unlocked}/${s.trophyCounts.total}</span></button>
       <button class="nav-btn" data-ui data-action="open-rank"><i>⚔</i><span>Rank</span></button>
+      <button class="nav-btn" data-ui data-action="open-campaign"><i>🧭</i><span>Story ${s.campaignDone}/${s.campaignTotal}</span></button>
+      <button class="nav-btn" data-ui data-action="open-squad"><i>🤝</i><span>Squad</span></button>
       <button class="nav-btn" data-ui data-action="open-atlas"><i>🗺</i><span>Atlas</span></button>
       <button class="nav-btn" data-ui data-action="open-scores"><i>📈</i><span>Scores</span></button>
       <button class="nav-btn" data-ui data-action="open-account"><i>👤</i><span>Account</span></button>
@@ -1439,13 +1616,32 @@ function renderSkinCard(v: SkinView, portal = false): string {
 
 function renderBoostRow(v: BoostView, wallet: number): string {
   const d = v.def;
-  const missing = Math.max(0, d.price - wallet);
+  const price = v.dealPrice ?? d.price;
+  const missing = Math.max(0, price - wallet);
+  const priceLabel = v.dealPrice !== undefined ? `<s>● ${d.price}</s> ● ${price}` : `● ${price}`;
   const action = v.armed
     ? `<span class="tag on">Armed ✓</span>`
     : v.affordable
-      ? `<button class="mini-btn" data-ui data-action="buy-boost" data-id="${d.id}">● ${d.price}</button>`
+      ? `<button class="mini-btn ${v.dealPrice !== undefined ? "gold" : ""}" data-ui data-action="buy-boost" data-id="${d.id}">${priceLabel}</button>`
       : `<span class="tag need">Need ${missing}●</span>`;
-  return `<div class="boost-row ${v.armed ? "armed" : ""}"><span class="bi">${d.icon}</span><div><div class="mt">${d.name}<span class="boost-once">one flight</span></div><div class="md">${d.desc}</div></div>${action}</div>`;
+  const dealTag = v.dealPrice !== undefined && !v.armed ? `<span class="deal-tag">TODAY −50%</span>` : "";
+  return `<div class="boost-row ${v.armed ? "armed" : ""} ${v.dealPrice !== undefined ? "deal" : ""}"><span class="bi">${d.icon}</span><div><div class="mt">${d.name}<span class="boost-once">one flight</span>${dealTag}</div><div class="md">${d.desc}</div></div>${action}</div>`;
+}
+
+function renderTrailCard(v: ShopTrailView, wallet: number): string {
+  const d = v.def;
+  const stops = d.css.join(", ");
+  const missing = Math.max(0, d.price - wallet);
+  const action = v.equipped
+    ? `<span class="tag on">✓ In use</span>`
+    : v.owned
+      ? `<button class="mini-btn" data-ui data-action="buy-trail" data-id="${d.id}">Equip</button>`
+      : v.affordable
+        ? `<button class="mini-btn" data-ui data-action="buy-trail" data-id="${d.id}">● ${d.price}</button>`
+        : `<span class="tag need">Need ${missing}●</span>`;
+  return `<div class="trail-card ${v.equipped ? "equipped" : ""}">
+    <span class="trail-swatch" style="background:linear-gradient(90deg, ${stops})"></span>
+    <div class="trail-body"><b>${d.label}</b><em>${d.desc}</em></div>${action}</div>`;
 }
 
 function renderShop(s: HudSnapshot): string {
@@ -1458,6 +1654,8 @@ function renderShop(s: HudSnapshot): string {
     <div class="skin-grid">${s.skins.map((skin) => renderSkinCard(skin, s.portalName !== "none")).join("")}</div>
     <div class="section-title">Boosts <small>${armed} armed for your next flight</small></div>
     <div class="boost-list">${s.boosts.map((b) => renderBoostRow(b, s.wallet)).join("")}</div>
+    <div class="section-title">Trails <small>cosmetic — yours forever</small></div>
+    <div class="trail-list">${s.shopTrails.map((t) => renderTrailCard(t, s.wallet)).join("")}</div>
     ${s.portalName === "none" && !(s.gold && s.vip) ? upsellStrip() : ""}
     <p class="fineprint">Earn coins by flying, daily quests, streaks and the Nest Pass.</p>
   `;
@@ -1529,7 +1727,7 @@ function renderCheckout(s: HudSnapshot): string {
       <label>Card number<input data-ui value="4242 4242 4242 4242" readonly /></label>
       <div class="two"><label>Expiry<input data-ui value="12 / 29" readonly /></label><label>CVC<input data-ui value="123" readonly /></label></div>
       <label>Name on card<input data-ui value="Sunbird Tester" readonly /></label>
-      ${s.checkoutError ? `<p class="error">${s.checkoutError}</p>` : ""}
+      ${s.checkoutError ? `<p class="error">${escapeHtml(s.checkoutError)}</p>` : ""}
       <button class="primary-btn gold ${s.checkoutBusy ? "busy" : ""}" data-ui data-action="checkout-pay" ${s.checkoutBusy ? "disabled" : ""}>${s.checkoutBusy ? "Processing…" : `Pay ${item.price}`}</button>
       <p class="fineprint">Sandbox card · no real charge. Connect Stripe in .env to go live.</p>
     </div>

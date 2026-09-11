@@ -6,6 +6,7 @@ import { Bird, type BirdStepOpts } from "./Bird";
 import { CameraRig } from "./CameraRig";
 import { Collectibles, type CloudKind, type PickupKind } from "./Collectibles";
 import { evaluateNearMiss, FlowTuner, SessionGoals, type NearMiss } from "./Engagement";
+import { BIG_LAUNCH_QUIPS, SLEEP_QUIPS, SPLASH_QUIPS, SurpriseEngine, quip } from "./Surprises";
 import { LaunchSystem, ratingLabel, type LaunchResult } from "./LaunchSystem";
 import { MASS_RACE_FIELD, MODES, modeById, RACE_FINISH, type ModeDef, type ModeId } from "./Modes";
 import { MassRace } from "./MassRace";
@@ -26,6 +27,9 @@ import {
   type ChallengeMods,
 } from "./Challenges";
 import { bankMasteryRun, masteryViews } from "./Mastery";
+import { campaignProgress, campaignViews, CAMPAIGN } from "./Campaign";
+import { monthKey, monthlyTheme, THEME_TRAIL_CLEARS, weeklyEvent } from "./Events";
+import { emptySquadState, SquadClient } from "./Squad";
 import { PowerUps } from "./PowerUps";
 import { Racer } from "./Racer";
 import {
@@ -57,7 +61,7 @@ import {
   ZENITH_DURATION,
   ZENITH_SLOWMO,
 } from "./constants";
-import { BOOSTS, GOLD, PROMO_CODES, SKINS, VIP, skinById, type BoostView, type SkinDef, type SkinView } from "./Economy";
+import { BOOSTS, GOLD, PROMO_CODES, SHOP_TRAILS, SKINS, VIP, dailyDealBoost, skinById, type BoostView, type ShopTrailView, type SkinDef, type SkinView } from "./Economy";
 import { GhostPlayer, GhostRecorder } from "./Ghost";
 import { HUD, type CalendarCard, type CheckoutMode, type DailyCard, type GauntletCard, type HudSnapshot, type LoadoutView, type RivalCard, type SeedMode, type UiScreen, type UiState } from "./HUD";
 import { divisionFor, duelOpponent, duelSkillFor, featuredRivals, nextDivision } from "./pvp";
@@ -133,6 +137,7 @@ export class Game {
   private questViews: QuestView[] = [];
   private skinViews: SkinView[] = [];
   private boostViews: BoostView[] = [];
+  private shopTrailViews: ShopTrailView[] = [];
 
   private raf = 0;
   private acc = 0;
@@ -172,6 +177,12 @@ export class Game {
   private zeniths = 0;
   private pickups = 0;
   private magnetTimer = 0;
+  /** Ridge-skim flow: seconds spent hugging the terrain at speed. */
+  private skimTime = 0;
+  private skimCd = 0;
+  /** Rare delightful mid-run events (comedy + windfalls). */
+  private readonly surprises = new SurpriseEngine();
+  private splashQuipN = 0;
   private shield = 0;
   private boostTimer = 0;
   private continueUsed = false;
@@ -225,6 +236,12 @@ export class Game {
   private challengeMods: ChallengeMods = NO_MODS;
   /** End-of-run outcome line for the challenge strip on the results card. */
   private challengeOutcome = "";
+  /** Weekly live event: current run flies under the event modifiers. */
+  private eventRun = false;
+  /** Squad (friends/clubs/chat) client + last action notice. */
+  private squad: SquadClient | null = null;
+  private squadNotice = "";
+  private squadPoll = 0;
   private readonly flow = new FlowTuner();
   private readonly goals: SessionGoals;
   private nearMiss: NearMiss = { kind: "none", gap: 0, text: "" };
@@ -294,6 +311,8 @@ export class Game {
     // Ranked season rollover can also land between sessions.
     const seasonEnd = this.save.ensureRankSeason();
     this.seed = this.today;
+    this.squad = new SquadClient(this.save.state.deviceId, () => this.pilotName);
+    this.squad.setOnChange(() => this.bump());
 
     host.classList.add("game-root");
     const canvas = document.createElement("canvas");
@@ -480,6 +499,14 @@ export class Game {
     this.pumpNetwork(raw);
     this.dayTick(raw);
     this.adaptQuality(raw);
+    // Club chat: light polling only while the Squad screen is on screen.
+    if (this.screen === "squad" && this.state === "menu" && this.squad?.live) {
+      this.squadPoll += raw;
+      if (this.squadPoll >= 4) {
+        this.squadPoll = 0;
+        void this.squad.pollChat(false);
+      }
+    }
     // Hit stop: freeze time for cinematic impact on perfect launches.
     if (this.hitStopTimer > 0) {
       this.hitStopTimer -= raw;
@@ -610,6 +637,7 @@ export class Game {
         // Slipstream: tucking behind a rival genuinely reduces your drag.
         dragMult: this.powers.dragMult() * this.massRace.draftFor(this.bird.x, this.bird.y),
         feather: this.powers.featherOn(),
+        gravityMult: this.eventRun ? weeklyEvent().mods.gravityMult : 1,
       },
       this.terrain,
     );
@@ -745,6 +773,29 @@ export class Game {
     if (this.bird.grounded && this.bird.speed() > 10) {
       this.particles.emitDust(this.bird.x, this.terrain.heightAt(this.bird.x) + 0.3, this.bird.speed(), slope);
     }
+
+    // Ridge skim: airborne, fast, and hugging the hill — flow-state bonus.
+    this.skimCd = Math.max(0, this.skimCd - dt);
+    const skimming =
+      !this.bird.grounded &&
+      !this.bird.inWater &&
+      this.bird.altitude > 0.4 &&
+      this.bird.altitude < 3.2 &&
+      this.bird.speed() > 40;
+    if (skimming) {
+      this.skimTime += dt;
+      if (this.skimTime > 1.1 && this.skimCd <= 0) {
+        this.skimCd = 1.4;
+        const pts = 6;
+        this.bonus += pts;
+        this.awardXp(XP_RULES.coin);
+        this.audio.butter();
+        this.hud.toast(`Ridge skim +${pts}`, "cloud");
+        this.particles.emitDust(this.bird.x, this.terrain.heightAt(this.bird.x) + 0.4, this.bird.speed(), slope);
+      }
+    } else if (this.bird.altitude > 6 || this.bird.grounded) {
+      this.skimTime = 0;
+    }
     if (this.feverOn || this.boostTimer > 0 || this.bird.speed() > 48 || ((skin.magnetAlways || skin.id === "aurora") && this.bird.speed() > 24)) {
       this.emitTrail(dt);
     }
@@ -763,6 +814,48 @@ export class Game {
       this.audio.splash();
       this.shake(0.45);
       this.daylight = Math.max(0, this.daylight - DAYLIGHT_OCEAN_PENALTY);
+      this.splashQuipN += 1;
+      if (this.splashQuipN % 3 === 1) this.hud.toast(quip(SPLASH_QUIPS, this.splashQuipN), "cloud");
+    }
+
+    // Rare delight: golden geese, sneezes, encores. Never punishing.
+    const surprise = this.surprises.tick(dt, this.bird.x - this.startX, !this.bird.grounded && !this.bird.inWater && !this.bird.asleep);
+    if (surprise) {
+      this.hud.toast(surprise.toast, "gold");
+      switch (surprise.kind) {
+        case "golden-goose":
+          this.audio.honk();
+          this.particles.emitConfetti(this.bird.x + 6, this.bird.y + 4);
+          break;
+        case "tailwind":
+          this.audio.slideWhistle();
+          this.bird.vx += 9;
+          this.particles.emitWind(this.bird.x, this.bird.y, 1);
+          break;
+        case "sneeze":
+          this.audio.sneeze();
+          this.shake(0.3);
+          this.particles.emitDust(this.bird.x, this.bird.y, this.bird.speed(), 0);
+          break;
+        case "coin-comet":
+          this.audio.fanfare();
+          this.particles.emitConfetti(this.bird.x + 10, this.bird.y + 8);
+          break;
+        case "photobomb":
+          this.audio.boing();
+          this.particles.emitSplash(this.bird.x + 4, WATER_Y);
+          break;
+        case "encore":
+          this.audio.fanfare();
+          this.enterFever();
+          this.feverTimer = Math.max(this.feverTimer, surprise.feverSeconds);
+          break;
+      }
+      if (surprise.coins > 0) {
+        this.runCoins += surprise.coins;
+        this.save.addCoins(surprise.coins);
+      }
+      this.telemetry.track("surprise", { kind: surprise.kind });
     }
 
     const idx = this.terrain.islandIndex(this.bird.x);
@@ -791,12 +884,14 @@ export class Game {
     this.collect.update(dt, this.bird, this.terrain, magnetOn, this.elapsed, {
       onCoin: (x, y, gem) => {
         const base = gem ? 5 : 1;
-        const value =
+        const value = Math.round(
           base *
-          (this.save.state.gold ? 2 : 1) *
-          this.powers.coinMult() *
-          (this.mode.id === "coinrush" ? 2 : 1) *
-          this.challengeMods.coinMult;
+            (this.save.state.gold ? 2 : 1) *
+            this.powers.coinMult() *
+            (this.mode.id === "coinrush" ? 2 : 1) *
+            this.challengeMods.coinMult *
+            (this.eventRun ? weeklyEvent().mods.coinMult : 1),
+        );
         this.runCoins += value;
         this.bonus += 4 * COIN_VALUE * value;
         this.awardXp(XP_RULES.coin);
@@ -981,7 +1076,10 @@ export class Game {
       this.camera.punch(5 + combo);
       this.camera.dollyZoom(1.5 + Math.min(2.4, combo * 0.5));
       this.camera.tilt(-0.06 - Math.min(0.14, combo * 0.03));
-      if (res.speed > 74) this.particles.emitSonicBoom(this.bird.x, this.bird.y);
+      if (res.speed > 74) {
+        this.particles.emitSonicBoom(this.bird.x, this.bird.y);
+        this.hud.toast(quip(BIG_LAUNCH_QUIPS, combo + Math.round(res.speed)), "zenith");
+      }
       if (this.perfectChain >= FEVER_NEED) this.enterFever();
     } else if (res.rating === "great") {
       this.bonus += 18;
@@ -1303,7 +1401,7 @@ export class Game {
 
   /* ------------------------------------------------------------- run flow */
 
-  private startRun(opts?: { duel?: boolean; challenge?: "" | "daily" | `gauntlet${number}` }): void {
+  private startRun(opts?: { duel?: boolean; challenge?: "" | "daily" | `gauntlet${number}`; event?: boolean }): void {
     this.exitVersus();
     this.mode = modeById(this.modeId);
     // Duels and challenges only apply when their action explicitly asks for
@@ -1313,10 +1411,15 @@ export class Game {
     this.duelDelta = 0;
     this.challengeRun = opts?.challenge ?? "";
     this.challengeMods = this.challengeRun === "daily" ? modsFor(dailyChallenge(this.today).modifier.id) : NO_MODS;
+    this.eventRun = Boolean(opts?.event);
     this.challengeOutcome = "";
     this.resetRun(false);
     // Modes reshape the clock; Race has no sunset at all.
-    this.daylight = (this.mode.clock > 0 ? this.mode.clock : this.daylightMax()) * this.challengeMods.daylightMult;
+    this.daylight =
+      (this.mode.clock > 0 ? this.mode.clock : this.daylightMax()) *
+      this.challengeMods.daylightMult *
+      (this.eventRun ? weeklyEvent().mods.daylightMult : 1);
+    this.weather.windMult = this.eventRun ? weeklyEvent().mods.windMult : 1;
     // Mass Race: build the 40-bird grid on the *same* seed so the field is
     // identical for anyone flying this race. Real players take over slots as
     // they join; unfilled slots keep flying as local squadron pilots.
@@ -1356,6 +1459,11 @@ export class Game {
 
     const armed = this.save.consumeArmedBoosts();
     for (const id of armed) this.applyBoost(id);
+    if (this.eventRun) {
+      const ev = weeklyEvent();
+      this.hud.toast(`${ev.icon} ${ev.name} · fly ${ev.target.toLocaleString()} m`, "quest");
+      this.audio.eventStinger();
+    }
     if (this.challengeRun === "daily") {
       const c = dailyChallenge(this.today);
       this.hud.toast(`${c.modifier.icon} ${c.title} · ${c.modifier.label}`, "quest");
@@ -1385,6 +1493,12 @@ export class Game {
       case "sunflask":
         this.daylight += 12;
         break;
+      case "stormward":
+        this.weather.ward = true;
+        break;
+      case "hotwings":
+        this.enterFever();
+        break;
       case "headstart": {
         let hx = this.startX + HEADSTART_DISTANCE;
         for (let i = 0; i < 40; i++) {
@@ -1413,6 +1527,7 @@ export class Game {
     this.audio.sleep();
     this.audio.setMusicMode("sleep");
     this.flash("sleep");
+    this.hud.toast(quip(SLEEP_QUIPS, Math.round(this.bird.x)), "cloud");
     const gold = this.save.state.gold;
     const canCoins = this.save.state.wallet >= CONTINUE_COST;
     const canAd = this.portalEnabled()
@@ -1541,6 +1656,30 @@ export class Game {
       }
     }
 
+    // Weekly live event: clear = hit the event distance in an event-flagged run.
+    if (this.eventRun) {
+      const ev = weeklyEvent();
+      if (stats.distance >= ev.target) {
+        const counts = this.save.recordEventClear(ev.week, monthKey());
+        this.save.addCoins(ev.reward);
+        this.challengeOutcome = `${ev.icon} ${ev.name} clear ×${counts.week} · +${ev.reward} coins`;
+        this.hud.toast(this.challengeOutcome, "gold");
+        this.audio.eventStinger();
+        // Monthly theme trail: 3 event clears inside the month.
+        const th = monthlyTheme();
+        if (counts.month >= THEME_TRAIL_CLEARS && this.save.claimThemeTrail(th.month)) {
+          if (this.save.ownTrail(th.prizeTrail)) {
+            this.hud.toast(`${th.icon} ${th.name} · ✨ ${TRAILS[th.prizeTrail]?.label ?? th.prizeTrail} trail unlocked!`, "gold");
+          } else {
+            this.save.addCoins(300);
+            this.hud.toast(`${th.icon} ${th.name} complete · trail owned, +300 coins`, "gold");
+          }
+        }
+      } else {
+        this.challengeOutcome = `${ev.icon} ${ev.name} missed — needed ${ev.target.toLocaleString()} m`;
+      }
+    }
+
     // Mode mastery: every finished run banks progress; level-ups pay coins.
     const mastery = bankMasteryRun(this.save, this.modeId);
     if (mastery) this.hud.toast(`${this.mode.icon} ${this.mode.name} mastery Lv.${mastery.level} · +${mastery.coins} coins`, "gold");
@@ -1659,6 +1798,9 @@ export class Game {
     this.lastIsland = 0;
     this.perfects = 0;
     this.perfectChain = 0;
+    this.skimTime = 0;
+    this.skimCd = 0;
+    this.surprises.reset();
     this.feverTimer = 0;
     this.feverOn = false;
     this.feverReached = false;
@@ -1750,7 +1892,8 @@ export class Game {
             const idx = Number(this.challengeRun.slice(8)) || 0;
             if (!this.save.gauntletDone(weekKey()).includes(idx)) this.startRun({ challenge: this.challengeRun });
             else this.startRun();
-          } else this.startRun();
+          } else if (this.eventRun) this.startRun({ event: true });
+          else this.startRun();
         }
         break;
       case "pause":
@@ -1936,6 +2079,77 @@ export class Game {
       case "open-challenges":
         this.setScreen("challenges");
         break;
+      case "play-event": {
+        this.modeId = "daytrip";
+        this.mode = modeById("daytrip");
+        this.exitVersus();
+        this.startRun({ event: true });
+        break;
+      }
+      case "open-campaign":
+        this.setScreen("campaign");
+        break;
+      case "claim-campaign": {
+        const ch = CAMPAIGN.find((c) => c.id === id);
+        if (!ch) break;
+        const view = campaignViews(this.save, this.save.state.campaignClaimed).find((v) => v.def.id === id);
+        if (!view || !view.unlocked || !view.complete || !this.save.claimCampaign(id)) {
+          this.hud.toast("Chapter not ready yet", "info");
+          break;
+        }
+        this.save.addCoins(ch.rewardCoins);
+        this.hud.toast(`${ch.icon} ${ch.title} · +${ch.rewardCoins} coins — ${ch.rewardLabel}`, "gold");
+        this.audio.chapterFanfare();
+        this.bump();
+        break;
+      }
+      case "open-squad":
+        this.setScreen("squad");
+        this.squadNotice = "";
+        void this.squad?.refresh();
+        break;
+      case "squad-refresh":
+        this.squadNotice = "";
+        void this.squad?.refresh();
+        break;
+      case "squad-add": {
+        const code = this.hud.readValue("squadCode").trim().toUpperCase();
+        if (!code) break;
+        void this.squad?.addFriend(code).then((msg) => {
+          this.squadNotice = msg;
+          this.bump();
+        });
+        break;
+      }
+      case "squad-remove":
+        void this.squad?.removeFriend(id);
+        break;
+      case "squad-create-club": {
+        const name = this.hud.readValue("clubName").trim();
+        if (!name) {
+          this.hud.toast("Give your club a name first", "info");
+          break;
+        }
+        void this.squad?.createClub(name, "Fly together, land badly").then((msg) => {
+          this.squadNotice = msg;
+          this.bump();
+        });
+        break;
+      }
+      case "squad-join-club":
+        void this.squad?.joinClub(parseInt(id, 10) || 0).then((msg) => {
+          this.squadNotice = msg;
+          this.bump();
+        });
+        break;
+      case "squad-leave-club":
+        void this.squad?.leaveClub();
+        break;
+      case "squad-chat": {
+        const text = this.hud.readValue("chatText");
+        void this.squad?.sendChat(text).then(() => this.bump());
+        break;
+      }
       case "room-size": {
         const n = Math.max(5, Math.min(40, parseInt(id || "40", 10) || 40));
         this.roomSize = n;
@@ -2010,6 +2224,9 @@ export class Game {
         break;
       case "buy-boost":
         this.buyBoost(id);
+        break;
+      case "buy-trail":
+        this.buyTrail(id);
         break;
       case "gold-buy":
         if (this.portalEnabled()) break;
@@ -2246,14 +2463,39 @@ export class Game {
       this.hud.toast("Already armed for next flight", "info");
       return;
     }
-    if (!this.save.spend(def.price)) {
-      this.hud.toast(`Need ${def.price - st.wallet} more coins`, "warn");
+    const deal = dailyDealBoost(this.today);
+    const price = def.id === deal.id ? deal.price : def.price;
+    if (!this.save.spend(price)) {
+      this.hud.toast(`Need ${price - st.wallet} more coins`, "warn");
       return;
     }
     this.save.armBoost(id);
     this.audio.purchase();
     this.hud.toast(`${def.icon} ${def.name} armed`, "power");
-    this.telemetry.track("boost_bought", { id, price: def.price });
+    this.telemetry.track("boost_bought", { id, price });
+    this.bump();
+  }
+
+  private buyTrail(id: string): void {
+    const def = SHOP_TRAILS.find((t) => t.id === id);
+    if (!def) return;
+    const st = this.save.state;
+    if (st.tournaments.trails.includes(id)) {
+      // already owned → toggle equip
+      this.save.equipTrail(st.activeTrail === id ? "" : id);
+      this.audio.ding();
+      this.bump();
+      return;
+    }
+    if (!this.save.spend(def.price)) {
+      this.hud.toast(`Need ${def.price - st.wallet} more coins`, "warn");
+      return;
+    }
+    this.save.ownTrail(id);
+    this.save.equipTrail(id);
+    this.audio.purchase();
+    this.hud.toast(`${def.label} trail is yours!`, "gold");
+    this.telemetry.track("trail_bought", { id, price: def.price });
     this.bump();
   }
 
@@ -2742,6 +2984,7 @@ export class Game {
   }
 
   private setScreen(s: UiScreen): void {
+    if (s !== this.screen) this.audio.uiTick();
     this.screen = s;
     this.menuHold = 0;
     this.needRelease = true;
@@ -2900,7 +3143,17 @@ export class Game {
       lockReason: def.vipOnly && !this.save.isVipActive() ? "vip" : def.goldOnly && !st.gold ? "gold" : null,
       affordable: st.wallet >= def.price,
     }));
-    this.boostViews = BOOSTS.map((def) => ({ def, armed: st.armedBoosts.includes(def.id), affordable: st.wallet >= def.price }));
+    const deal = dailyDealBoost(this.today);
+    this.boostViews = BOOSTS.map((def) => {
+      const dealPrice = def.id === deal.id ? deal.price : undefined;
+      return { def, armed: st.armedBoosts.includes(def.id), affordable: st.wallet >= (dealPrice ?? def.price), dealPrice };
+    });
+    this.shopTrailViews = SHOP_TRAILS.map((def) => ({
+      def,
+      owned: st.tournaments.trails.includes(def.id),
+      equipped: st.activeTrail === def.id,
+      affordable: st.wallet >= def.price,
+    }));
     this.viewsVersion = this.uiVersion;
   }
 
@@ -2963,6 +3216,7 @@ export class Game {
       claimedQuests: this.claimedQuests,
       skins: this.skinViews,
       boosts: this.boostViews,
+      shopTrails: this.shopTrailViews,
       settings: st.settings,
       goldPrice: GOLD.price,
       goldFeatures: GOLD.features,
@@ -3080,6 +3334,17 @@ export class Game {
       calendar: this.cardCache.calendar,
       mastery: this.cardCache.mastery,
       challengeOutcome: this.challengeOutcome,
+      weeklyEvent: weeklyEvent(),
+      monthlyTheme: monthlyTheme(),
+      eventClearsWeek: st.events.week === weekKey() ? st.events.clearsThisWeek : 0,
+      eventClearsMonth: st.events.month === monthKey() ? st.events.clearsThisMonth : 0,
+      themeTrailClaimed: st.events.claimedTrailMonth === monthKey(),
+      themeTrailNeed: THEME_TRAIL_CLEARS,
+      campaign: campaignViews(this.save, st.campaignClaimed),
+      campaignDone: campaignProgress(st.campaignClaimed).done,
+      campaignTotal: campaignProgress(st.campaignClaimed).total,
+      squad: this.squad?.state ?? emptySquadState(),
+      squadNotice: this.squadNotice,
       showTutorialHand: this.state === "playing" && st.tutorialRuns < 2 && this.hintTimer < 2.6 && !this.input.diving,
     };
     this.hud.update(snap);

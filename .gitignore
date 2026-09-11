@@ -40,3 +40,7 @@ rust/target/
 backend/node_modules
 backend/.wrangler
 .wrangler/
+
+# Playwright MCP debug snapshots
+.playwright-mcp/
+server/social/sunbird-social-data/

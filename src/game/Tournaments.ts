@@ -339,4 +339,95 @@ export const TRAILS: Record<string, { label: string; colors: [number, number, nu
       [0.9, 0.95, 1],
     ],
   },
+  /* shop trails — bought with coins in the Shop (SHOP_TRAILS in Economy.ts) */
+  trail_ember: {
+    label: "Emberline",
+    colors: [
+      [1, 0.54, 0.23],
+      [1, 0.29, 0.16],
+      [1, 0.82, 0.48],
+    ],
+  },
+  trail_tide: {
+    label: "Tideglass",
+    colors: [
+      [0.23, 0.88, 0.78],
+      [0.16, 0.6, 0.85],
+      [0.78, 1, 0.95],
+    ],
+  },
+  trail_bloom: {
+    label: "Petalfall",
+    colors: [
+      [1, 0.6, 0.78],
+      [1, 0.42, 0.6],
+      [1, 0.88, 0.93],
+    ],
+  },
+  trail_gold: {
+    label: "Goldleaf",
+    colors: [
+      [1, 0.84, 0.42],
+      [1, 0.69, 0.13],
+      [1, 0.95, 0.78],
+    ],
+  },
+  trail_void: {
+    label: "Voidwake",
+    colors: [
+      [0.42, 0.23, 1],
+      [0.16, 0.1, 0.42],
+      [0.78, 0.66, 1],
+    ],
+  },
+  trail_mint: {
+    label: "Mintcloud",
+    colors: [
+      [0.48, 1, 0.78],
+      [0.23, 0.85, 0.6],
+      [0.88, 1, 0.95],
+    ],
+  },
+  trail_rose: {
+    label: "Rosewind",
+    colors: [
+      [1, 0.69, 0.63],
+      [1, 0.48, 0.42],
+      [1, 0.91, 0.85],
+    ],
+  },
+  trail_neon: {
+    label: "Neonpulse",
+    colors: [
+      [0.23, 1, 1],
+      [1, 0.23, 1],
+      [1, 1, 0.23],
+    ],
+  },
+  /* event trails — earned from weekly live events (Events.ts) */
+  trail_harvest: {
+    label: "Harvestlight",
+    colors: [
+      [1, 0.72, 0.29],
+      [0.85, 0.48, 0.16],
+      [1, 0.92, 0.6],
+    ],
+  },
+  trail_frost: {
+    label: "Frostspire",
+    colors: [
+      [0.72, 0.91, 1],
+      [0.42, 0.66, 1],
+      [0.95, 0.98, 1],
+    ],
+  },
+  trail_carnival: {
+    label: "Carnivale",
+    colors: [
+      [1, 0.29, 0.42],
+      [0.29, 0.78, 1],
+      [1, 0.85, 0.23],
+      [0.54, 1, 0.42],
+    ],
+  },
 };

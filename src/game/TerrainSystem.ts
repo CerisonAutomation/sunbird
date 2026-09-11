@@ -55,6 +55,7 @@ export class TerrainSystem {
   private readonly farMats: THREE.MeshBasicMaterial[] = [];
   private readonly farMeshes: THREE.Mesh[] = [];
   private readonly decoParts = new Map<DecoKind, DecoPart[]>();
+  private scatterParts: DecoPart[] = [];
   private farCenter = -9999;
   private farIsland = -1;
   private readonly segCache = new Map<number, Segment[]>();
@@ -317,6 +318,10 @@ export class TerrainSystem {
         p.mat.dispose();
       }
     }
+    for (const p of this.scatterParts) {
+      p.geo.dispose();
+      p.mat.dispose();
+    }
   }
 
   /* ------------------------------------------------------------ hills */
@@ -564,34 +569,56 @@ export class TerrainSystem {
 
   private buildDecoParts(): void {
     const lam = (color: number): THREE.MeshLambertMaterial => new THREE.MeshLambertMaterial({ color, flatShading: true });
+    // Layered silhouettes: every prop now has 3-4 parts (trunk, canopy tiers,
+    // accents) so hills read with depth instead of lollipop shapes.
     this.decoParts.set("tree", [
-      { geo: new THREE.CylinderGeometry(0.18, 0.26, 1.4, 5), mat: lam(0x6b4a2e), y: 0.7, s: 1 },
+      { geo: new THREE.CylinderGeometry(0.18, 0.28, 1.4, 5), mat: lam(0x6b4a2e), y: 0.7, s: 1 },
       { geo: new THREE.IcosahedronGeometry(1.25, 0), mat: lam(0x3f9a4f), y: 2.1, s: 1 },
+      { geo: new THREE.IcosahedronGeometry(0.8, 0), mat: lam(0x54b562), y: 2.85, s: 1 },
+      { geo: new THREE.IcosahedronGeometry(0.34, 0), mat: lam(0xffb9c8), y: 3.35, s: 1 }, // blossom crown
     ]);
     this.decoParts.set("palm", [
-      { geo: new THREE.CylinderGeometry(0.14, 0.22, 3.2, 5), mat: lam(0x9a6a3a), y: 1.6, s: 1 },
+      { geo: new THREE.CylinderGeometry(0.14, 0.24, 3.2, 5), mat: lam(0x9a6a3a), y: 1.6, s: 1 },
       { geo: new THREE.ConeGeometry(1.6, 0.7, 6), mat: lam(0x5aa84a), y: 3.3, s: 1 },
+      { geo: new THREE.ConeGeometry(1.15, 0.5, 6), mat: lam(0x72c25e), y: 3.62, s: 1 },
+      { geo: new THREE.SphereGeometry(0.16, 6, 5), mat: lam(0x8a5a2a), y: 3.05, s: 1 }, // coconuts
     ]);
     this.decoParts.set("pine", [
-      { geo: new THREE.CylinderGeometry(0.14, 0.2, 1, 5), mat: lam(0x5a3e2a), y: 0.5, s: 1 },
-      { geo: new THREE.ConeGeometry(0.95, 2.6, 6), mat: lam(0x2f6e4a), y: 2.2, s: 1 },
-      { geo: new THREE.ConeGeometry(0.62, 1.6, 6), mat: lam(0x3a8a58), y: 3.4, s: 1 },
+      { geo: new THREE.CylinderGeometry(0.14, 0.22, 1, 5), mat: lam(0x5a3e2a), y: 0.5, s: 1 },
+      { geo: new THREE.ConeGeometry(1.1, 2.2, 6), mat: lam(0x275a40), y: 1.9, s: 1 },
+      { geo: new THREE.ConeGeometry(0.95, 2, 6), mat: lam(0x2f6e4a), y: 2.6, s: 1 },
+      { geo: new THREE.ConeGeometry(0.6, 1.5, 6), mat: lam(0x3a8a58), y: 3.5, s: 1 },
     ]);
     this.decoParts.set("spire", [
-      { geo: new THREE.ConeGeometry(0.7, 3.4, 5), mat: lam(0x2a1a22), y: 1.6, s: 1 },
+      { geo: new THREE.ConeGeometry(0.8, 3.4, 5), mat: lam(0x2a1a22), y: 1.6, s: 1 },
+      { geo: new THREE.ConeGeometry(0.4, 1.8, 5), mat: lam(0x3c2530), y: 2.6, s: 1 },
       { geo: new THREE.ConeGeometry(0.22, 1.1, 4), mat: lam(0xff7a2a), y: 3.2, s: 1 },
+      { geo: new THREE.SphereGeometry(0.14, 6, 5), mat: lam(0xffb020), y: 3.8, s: 1 }, // ember tip
     ]);
     this.decoParts.set("crystal", [
       { geo: new THREE.OctahedronGeometry(1.1, 0), mat: lam(0x9ad8ff), y: 1.3, s: 1 },
       { geo: new THREE.OctahedronGeometry(0.6, 0), mat: lam(0xd8a8ff), y: 0.9, s: 1 },
+      { geo: new THREE.OctahedronGeometry(0.42, 0), mat: lam(0x7ae8d8), y: 1.9, s: 1 },
     ]);
     this.decoParts.set("cactus", [
-      { geo: new THREE.CylinderGeometry(0.3, 0.34, 2.6, 7), mat: lam(0x4f9a5a), y: 1.3, s: 1 },
+      { geo: new THREE.CylinderGeometry(0.3, 0.36, 2.6, 7), mat: lam(0x4f9a5a), y: 1.3, s: 1 },
       { geo: new THREE.CylinderGeometry(0.17, 0.17, 1.1, 6), mat: lam(0x59a866), y: 1.9, s: 1 },
+      { geo: new THREE.SphereGeometry(0.14, 6, 5), mat: lam(0xff6a8a), y: 2.72, s: 1 }, // cactus flower
     ]);
     for (const parts of this.decoParts.values()) {
-      for (const p of parts) if (p.mat.color.getHex() === 0x9ad8ff || p.mat.color.getHex() === 0xd8a8ff) p.mat.emissive.setHex(0x223355);
+      for (const p of parts) {
+        const hexv = p.mat.color.getHex();
+        if (hexv === 0x9ad8ff || hexv === 0xd8a8ff || hexv === 0x7ae8d8) p.mat.emissive.setHex(0x223355);
+        if (hexv === 0xff7a2a || hexv === 0xffb020) p.mat.emissive.setHex(0x662200);
+      }
     }
+    // Small ground scatter shared across biomes: rocks + tufts fill the gaps
+    // between the big props so the ground never looks empty.
+    this.scatterParts = [
+      { geo: new THREE.DodecahedronGeometry(0.34, 0), mat: lam(0x8a8078), y: 0.2, s: 1 },
+      { geo: new THREE.ConeGeometry(0.16, 0.5, 4), mat: lam(0x4f9a5a), y: 0.25, s: 1 },
+      { geo: new THREE.SphereGeometry(0.14, 5, 4), mat: lam(0xffd76a), y: 0.14, s: 1 },
+    ];
   }
 
   private placeDecor(id: number, group: THREE.Group, disposables: { dispose(): void }[]): void {
@@ -616,23 +643,46 @@ export class TerrainSystem {
       const s = (behind ? 0.9 : 0.6) + r3 * 0.5;
       placements.push({ x, y: this.heightAt(x) - 0.2, z, s, rot: r2 * Math.PI * 2 });
     }
-    if (!placements.length) return;
-    for (const part of parts) {
-      const inst = new THREE.InstancedMesh(part.geo, part.mat, placements.length);
-      inst.castShadow = true;
-      inst.receiveShadow = true;
-      placements.forEach((p, i) => {
-        tmpObj.position.set(p.x, p.y + part.y * p.s, p.z);
-        tmpObj.rotation.set(0, p.rot, 0);
-        tmpObj.scale.setScalar(p.s * part.s);
-        tmpObj.updateMatrix();
-        inst.setMatrixAt(i, tmpObj.matrix);
-      });
-      inst.instanceMatrix.needsUpdate = true;
-      inst.frustumCulled = false;
-      group.add(inst);
-      disposables.push({ dispose: () => inst.dispose() });
+    const emit = (partList: DecoPart[], list: { x: number; y: number; z: number; s: number; rot: number }[]): void => {
+      if (!list.length) return;
+      for (const part of partList) {
+        const inst = new THREE.InstancedMesh(part.geo, part.mat, list.length);
+        inst.castShadow = true;
+        inst.receiveShadow = true;
+        list.forEach((p, i) => {
+          tmpObj.position.set(p.x, p.y + part.y * p.s, p.z);
+          tmpObj.rotation.set(0, p.rot, 0);
+          tmpObj.scale.setScalar(p.s * part.s);
+          tmpObj.updateMatrix();
+          inst.setMatrixAt(i, tmpObj.matrix);
+        });
+        inst.instanceMatrix.needsUpdate = true;
+        inst.frustumCulled = false;
+        group.add(inst);
+        disposables.push({ dispose: () => inst.dispose() });
+      }
+    };
+    emit(parts, placements);
+
+    // Second pass: small scatter (rocks / tufts / glints) between the props.
+    const scatter: { x: number; y: number; z: number; s: number; rot: number }[] = [];
+    const sCount = Math.round(10 * biome.decoDensity);
+    for (let i = 0; i < sCount; i++) {
+      const r1 = hash01(id * 197 + i * 11, this.seedN + 401);
+      const r2 = hash01(id * 197 + i * 11, this.seedN + 402);
+      const r3 = hash01(id * 197 + i * 11, this.seedN + 403);
+      const x = x0 + r1 * CHUNK_SIZE;
+      if (this.isOcean(x) || x < 30) continue;
+      if (Math.abs(this.slopeAt(x)) > 0.6) continue;
+      const lx = this.localX(x);
+      if (lx > RAMP_START - 10 && lx < GAP_START) continue;
+      const behind = r2 < 0.6;
+      const z = behind ? -2.5 - r3 * 5 : 3.5 + r3 * 4.5;
+      scatter.push({ x, y: this.heightAt(x) - 0.08, z, s: 0.5 + r3 * 0.7, rot: r2 * Math.PI * 2 });
     }
+    // one random scatter part per chunk keeps instancing cheap and looks varied
+    const pick = this.scatterParts[Math.abs(id) % this.scatterParts.length];
+    if (pick) emit([pick], scatter);
   }
 
   /* ------------------------------------------------------------ far */
