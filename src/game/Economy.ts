@@ -105,7 +105,7 @@ export const SKINS: SkinDef[] = [
   {
     id: "jet",
     name: "Jet",
-    perk: "+8% speed · featherweight",
+    perk: "+8% top speed",
     price: 350,
     body: 0x2d2d2d,
     wing: 0xff4444,
@@ -119,7 +119,7 @@ export const SKINS: SkinDef[] = [
   {
     id: "cloudwalker",
     name: "Cloudwalker",
-    perk: "+6s daylight · cloud bonus",
+    perk: "+6 s daylight",
     price: 500,
     body: 0xe8f4fd,
     wing: 0xb8d8f8,
@@ -133,7 +133,7 @@ export const SKINS: SkinDef[] = [
   {
     id: "stormchaser",
     name: "Stormchaser",
-    perk: "Weather immunity · +3s fever",
+    perk: "+3 s fever duration",
     price: 600,
     body: 0x4a6fa5,
     wing: 0x8ab4d8,
@@ -147,7 +147,7 @@ export const SKINS: SkinDef[] = [
   {
     id: "snowowl",
     name: "Snow Owl",
-    perk: "+8s daylight · stealth",
+    perk: "+8 s daylight",
     price: 550,
     body: 0xf0f0f8,
     wing: 0xc8d0e8,
@@ -161,7 +161,7 @@ export const SKINS: SkinDef[] = [
   {
     id: "ruby",
     name: "Ruby",
-    perk: "+5% speed · +2s fever",
+    perk: "+5% speed · +2 s fever",
     price: 400,
     body: 0xcc2244,
     wing: 0xff5577,
@@ -175,7 +175,7 @@ export const SKINS: SkinDef[] = [
   {
     id: "golden",
     name: "Golden Eagle",
-    perk: "+4% speed · +4s daylight",
+    perk: "+4% speed · +4 s daylight",
     price: 800,
     body: 0xdaa520,
     wing: 0xffd700,

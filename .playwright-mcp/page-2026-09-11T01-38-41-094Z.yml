@@ -1,0 +1,105 @@
+- generic [ref=f15e1]:
+  - region "Notifications alt+T"
+  - generic [ref=f15e5]:
+    - generic [ref=f15e8]:
+      - button "Toggle Sidebar" [ref=f15e9]
+      - generic [ref=f15e11]:
+        - list [ref=f15e12]:
+          - listitem [ref=f15e13]:
+            - button [ref=f15e14] [cursor=pointer]
+        - button [ref=f15e29] [cursor=pointer]
+      - list [ref=f15e34]:
+        - listitem [ref=f15e35]:
+          - link "New Chat" [ref=f15e36] [cursor=pointer]:
+            - /url: /
+        - listitem [ref=f15e41]:
+          - link "Leaderboard" [ref=f15e42] [cursor=pointer]:
+            - /url: /leaderboard/agent
+        - listitem [ref=f15e51]:
+          - link "Search" [ref=f15e52] [cursor=pointer]:
+            - /url: /history/search
+      - generic [ref=f15e58]:
+        - generic [ref=f15e60]:
+          - link [ref=f15e61] [cursor=pointer]:
+            - /url: https://www.youtube.com/watch?v=Kq3-fV7w3Nk
+          - generic [ref=f15e66]:
+            - generic [ref=f15e67]:
+              - heading "Get More Done With Agents" [level=3] [ref=f15e68]
+              - paragraph [ref=f15e69]:
+                - text: Start evaluating agentic AI on Arena today.
+                - link "Learn more" [ref=f15e70] [cursor=pointer]:
+                  - /url: https://arena.ai/blog/agent-mode/
+            - link "Try it now" [ref=f15e71] [cursor=pointer]:
+              - /url: /agent
+            - button "Hide this" [ref=f15e72] [cursor=pointer]
+        - list [ref=f15e73]:
+          - button "cerisonbrown1@gmail.com" [ref=f15e74] [cursor=pointer]
+        - generic [ref=f15e78]:
+          - link "Terms of Use" [ref=f15e79] [cursor=pointer]:
+            - /url: /terms-of-use
+          - link "Privacy Policy" [ref=f15e80] [cursor=pointer]:
+            - /url: /privacy-policy
+          - button "Cookies" [ref=f15e81] [cursor=pointer]
+    - main [ref=f15e82]:
+      - main [ref=f15e83]:
+        - generic [ref=f15e84]:
+          - generic [ref=f15e85]:
+            - button "Dismiss banner" [ref=f15e86] [cursor=pointer]
+            - link "Follow us for the latest in AI news and advancements" [ref=f15e89] [cursor=pointer]:
+              - /url: https://x.com/arena
+          - generic [ref=f15e90]:
+            - link "Follow us on X" [ref=f15e91] [cursor=pointer]:
+              - /url: https://x.com/arena
+            - link "Follow us on LinkedIn" [ref=f15e94] [cursor=pointer]:
+              - /url: https://www.linkedin.com/company/arenaai/
+            - link "Subscribe on YouTube" [ref=f15e97] [cursor=pointer]:
+              - /url: https://www.youtube.com/@ArenaAIOfficial
+        - main [ref=f15e100]:
+          - main [ref=f15e108]:
+            - generic [ref=f15e111]:
+              - generic:
+                - heading "What would you like to do?" [level=1]
+              - generic [ref=f15e112]:
+                - generic [ref=f15e114]:
+                  - generic [ref=f15e115]: Get started
+                  - generic [ref=f15e116]:
+                    - button "Create a landing page Create a sleek, modern landing page" [ref=f15e117] [cursor=pointer]:
+                      - generic [ref=f15e125]:
+                        - generic [ref=f15e126]: Create a landing page
+                        - generic [ref=f15e127]: Create a sleek, modern landing page
+                    - button "Build a dashboard Turn data into interactive charts" [ref=f15e128] [cursor=pointer]:
+                      - generic [ref=f15e134]:
+                        - generic [ref=f15e135]: Build a dashboard
+                        - generic [ref=f15e136]: Turn data into interactive charts
+                    - button "Make a game Build a playable browser game" [ref=f15e137] [cursor=pointer]:
+                      - generic [ref=f15e144]:
+                        - generic [ref=f15e145]: Make a game
+                        - generic [ref=f15e146]: Build a playable browser game
+                    - button "Design to Code Upload an image and have AI build it" [ref=f15e147] [cursor=pointer]:
+                      - generic [ref=f15e156]:
+                        - generic [ref=f15e157]: Design to Code
+                        - generic [ref=f15e158]: Upload an image and have AI build it
+                    - button "Build a fullstack app Create a templated full-stack app" [ref=f15e159] [cursor=pointer]:
+                      - generic [ref=f15e165]:
+                        - generic [ref=f15e166]: Build a fullstack app
+                        - generic [ref=f15e167]: Create a templated full-stack app
+                    - button "Launch a storefront Create a beautiful online shop" [ref=f15e168] [cursor=pointer]:
+                      - generic [ref=f15e177]:
+                        - generic [ref=f15e178]: Launch a storefront
+                        - generic [ref=f15e179]: Create a beautiful online shop
+                - generic [ref=f15e184]:
+                  - textbox "Ask anything…" [active] [ref=f15e185]
+                  - generic [ref=f15e186]:
+                    - generic [ref=f15e187]:
+                      - button "Add files" [ref=f15e188] [cursor=pointer]
+                      - combobox [ref=f15e197] [cursor=pointer]:
+                        - generic:
+                          - generic:
+                            - paragraph: Battle
+                      - combobox [aria-hidden] [ref=f15e200]
+                      - 'button "Modality: Auto" [ref=f15e201] [cursor=pointer]':
+                        - generic [ref=f15e205]: Auto
+                    - generic [ref=f15e208]:
+                      - button [ref=f15e210] [cursor=pointer]
+                      - button "Send message" [disabled]
+  - alert [ref=f15e214]

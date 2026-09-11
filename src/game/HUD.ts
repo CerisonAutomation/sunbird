@@ -1176,17 +1176,17 @@ function renderMain(s: HudSnapshot): string {
       <button class="mode-card-main" data-ui data-action="pvp-practice">
         <span class="mode-icon-lg">☀</span>
         <span class="mode-name">SOLO</span>
-        <span class="mode-desc">Free flight · Explore islands</span>
+        <span class="mode-desc">Free flight across the islands</span>
       </button>
       <button class="mode-card-main" data-ui data-action="pvp-ranked">
         <span class="mode-icon-lg">⚔</span>
         <span class="mode-name">PVP</span>
-        <span class="mode-desc">40-bird race · Rating on the line</span>
+        <span class="mode-desc">Race 40 rivals to the gate</span>
       </button>
       <button class="mode-card-main" data-ui data-action="open-live">
         <span class="mode-icon-lg">🎯</span>
         <span class="mode-name">PVE</span>
-        <span class="mode-desc">Missions · Challenges · Tournaments</span>
+        <span class="mode-desc">Complete missions and cups</span>
       </button>
     </div>
 
@@ -1202,10 +1202,10 @@ function renderMain(s: HudSnapshot): string {
     </button>
 
     <div class="pvp-modes" role="group" aria-label="PvP options">
-      <button class="pvp-mode rated" data-ui data-action="pvp-ranked"><i>🏆</i><b>Ranked</b><span>Rating moves</span></button>
-      <button class="pvp-mode" data-ui data-action="pvp-casual"><i>🐦</i><b>Casual</b><span>No rating</span></button>
+      <button class="pvp-mode rated" data-ui data-action="pvp-ranked"><i>🏆</i><b>Ranked</b><span>Rating on the line</span></button>
+      <button class="pvp-mode" data-ui data-action="pvp-casual"><i>🐦</i><b>Casual</b><span>No pressure</span></button>
       <button class="pvp-mode" data-ui data-action="versus"><i>👥</i><b>Local 2P</b><span>Same screen</span></button>
-      <button class="pvp-mode" data-ui data-action="pvp-practice"><i>🌅</i><b>Practice</b><span>Empty skies</span></button>
+      <button class="pvp-mode" data-ui data-action="pvp-practice"><i>🌅</i><b>Practice</b><span>Learn the hills</span></button>
     </div>
 
     <div class="loadout-strip">

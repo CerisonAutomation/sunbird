@@ -1,0 +1,1202 @@
+- generic [ref=f21e1]:
+  - link "Skip to content" [ref=f21e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - generic [ref=f21e3]:
+    - complementary [ref=f21e5]:
+      - link "Skip to content" [ref=f21e6] [cursor=pointer]:
+        - /url: "#main-content"
+      - button [expanded] [ref=f21e11]:
+        - generic [aria-hidden]: chevron_left
+      - link "OmniRoute v3.8.51" [ref=f21e13] [cursor=pointer]:
+        - /url: /home
+        - generic [ref=f21e27]:
+          - heading "OmniRoute" [level=1] [ref=f21e28]
+          - generic [ref=f21e29]: v3.8.51
+      - generic [ref=f21e32]:
+        - generic:
+          - generic [aria-hidden]: search
+        - searchbox "Search" [ref=f21e33]
+      - navigation "Main navigation" [ref=f21e34]:
+        - link "home Home Dashboard overview" [ref=f21e36] [cursor=pointer]:
+          - /url: /home
+          - generic [ref=f21e37]: home
+          - generic [ref=f21e38]:
+            - generic [ref=f21e39]: Home
+            - generic [ref=f21e40]: Dashboard overview
+        - generic [ref=f21e41]:
+          - button "OmniProxy push_pin expand_more" [expanded] [ref=f21e42] [cursor=pointer]:
+            - generic [ref=f21e43]: OmniProxy
+            - button "push_pin" [ref=f21e44]
+            - generic: expand_more
+          - generic [ref=f21e45]:
+            - link "api Endpoints Your AI connection URLs" [ref=f21e46] [cursor=pointer]:
+              - /url: /dashboard/endpoint
+              - generic [ref=f21e47]: api
+              - generic [ref=f21e48]:
+                - generic [ref=f21e49]: Endpoints
+                - generic [ref=f21e50]: Your AI connection URLs
+            - link "vpn_key API Keys Manage API keys and access" [ref=f21e51] [cursor=pointer]:
+              - /url: /dashboard/api-manager
+              - generic [ref=f21e52]: vpn_key
+              - generic [ref=f21e53]:
+                - generic [ref=f21e54]: API Keys
+                - generic [ref=f21e55]: Manage API keys and access
+            - link "dns Providers Manage AI providers" [ref=f21e56] [cursor=pointer]:
+              - /url: /dashboard/providers
+              - generic [ref=f21e57]: dns
+              - generic [ref=f21e58]:
+                - generic [ref=f21e59]: Providers
+                - generic [ref=f21e60]: Manage AI providers
+            - link "deployed_code Embedded Services Optional local services" [ref=f21e61] [cursor=pointer]:
+              - /url: /dashboard/providers/services
+              - generic [ref=f21e62]: deployed_code
+              - generic [ref=f21e63]:
+                - generic [ref=f21e64]: Embedded Services
+                - generic [ref=f21e65]: Optional local services
+            - link "layers Combos Group providers for failover" [ref=f21e66] [cursor=pointer]:
+              - /url: /dashboard/combos
+              - generic [ref=f21e67]: layers
+              - generic [ref=f21e68]:
+                - generic [ref=f21e69]: Combos
+                - generic [ref=f21e70]: Group providers for failover
+            - link "account_tree Combo Studio Live routing cascade" [ref=f21e71] [cursor=pointer]:
+              - /url: /dashboard/combos/live
+              - generic [ref=f21e72]: account_tree
+              - generic [ref=f21e73]:
+                - generic [ref=f21e74]: Combo Studio
+                - generic [ref=f21e75]: Live routing cascade
+            - link "tune Provider Quota Track provider usage limits" [ref=f21e76] [cursor=pointer]:
+              - /url: /dashboard/quota
+              - generic [ref=f21e77]: tune
+              - generic [ref=f21e78]:
+                - generic [ref=f21e79]: Provider Quota
+                - generic [ref=f21e80]: Track provider usage limits
+            - link "pie_chart Quota Sharing Share provider quotas across keys" [ref=f21e81] [cursor=pointer]:
+              - /url: /dashboard/costs/quota-share
+              - generic [ref=f21e82]: pie_chart
+              - generic [ref=f21e83]:
+                - generic [ref=f21e84]: Quota Sharing
+                - generic [ref=f21e85]: Share provider quotas across keys
+            - generic [ref=f21e86]:
+              - generic [ref=f21e87]: Compression Context
+              - link "settings Compression Settings Global defaults" [ref=f21e90] [cursor=pointer]:
+                - /url: /dashboard/context/settings
+                - generic [ref=f21e91]: settings
+                - generic [ref=f21e92]:
+                  - generic [ref=f21e93]: Compression Settings
+                  - generic [ref=f21e94]: Global defaults
+              - link "hub Engine Combos Combine compression engines" [ref=f21e95] [cursor=pointer]:
+                - /url: /dashboard/context/combos
+                - generic [ref=f21e96]: hub
+                - generic [ref=f21e97]:
+                  - generic [ref=f21e98]: Engine Combos
+                  - generic [ref=f21e99]: Combine compression engines
+              - link "compress Caveman Prompt compression" [ref=f21e100] [cursor=pointer]:
+                - /url: /dashboard/context/caveman
+                - generic [ref=f21e101]: compress
+                - generic [ref=f21e102]:
+                  - generic [ref=f21e103]: Caveman
+                  - generic [ref=f21e104]: Prompt compression
+              - link "filter_alt RTK Output filtering" [ref=f21e105] [cursor=pointer]:
+                - /url: /dashboard/context/rtk
+                - generic [ref=f21e106]: filter_alt
+                - generic [ref=f21e107]:
+                  - generic [ref=f21e108]: RTK
+                  - generic [ref=f21e109]: Output filtering
+              - link "table_rows Headroom Tabular compaction" [ref=f21e110] [cursor=pointer]:
+                - /url: /dashboard/context/headroom
+                - generic [ref=f21e111]: table_rows
+                - generic [ref=f21e112]:
+                  - generic [ref=f21e113]: Headroom
+                  - generic [ref=f21e114]: Tabular compaction
+              - link "content_copy Session Dedup Cross-turn deduplication" [ref=f21e115] [cursor=pointer]:
+                - /url: /dashboard/context/session-dedup
+                - generic [ref=f21e116]: content_copy
+                - generic [ref=f21e117]:
+                  - generic [ref=f21e118]: Session Dedup
+                  - generic [ref=f21e119]: Cross-turn deduplication
+              - link "archive CCR Retrieve markers" [ref=f21e120] [cursor=pointer]:
+                - /url: /dashboard/context/ccr
+                - generic [ref=f21e121]: archive
+                - generic [ref=f21e122]:
+                  - generic [ref=f21e123]: CCR
+                  - generic [ref=f21e124]: Retrieve markers
+              - link "psychology LLMLingua Semantic pruning" [ref=f21e125] [cursor=pointer]:
+                - /url: /dashboard/context/llmlingua
+                - generic [ref=f21e126]: psychology
+                - generic [ref=f21e127]:
+                  - generic [ref=f21e128]: LLMLingua
+                  - generic [ref=f21e129]: Semantic pruning
+              - link "compress Lite Fast whitespace cleanup" [ref=f21e130] [cursor=pointer]:
+                - /url: /dashboard/context/lite
+                - generic [ref=f21e131]: compress
+                - generic [ref=f21e132]:
+                  - generic [ref=f21e133]: Lite
+                  - generic [ref=f21e134]: Fast whitespace cleanup
+              - link "speed Aggressive Summary and aging" [ref=f21e135] [cursor=pointer]:
+                - /url: /dashboard/context/aggressive
+                - generic [ref=f21e136]: speed
+                - generic [ref=f21e137]:
+                  - generic [ref=f21e138]: Aggressive
+                  - generic [ref=f21e139]: Summary and aging
+              - link "bolt Ultra Heuristic pruning" [ref=f21e140] [cursor=pointer]:
+                - /url: /dashboard/context/ultra
+                - generic [ref=f21e141]: bolt
+                - generic [ref=f21e142]:
+                  - generic [ref=f21e143]: Ultra
+                  - generic [ref=f21e144]: Heuristic pruning
+              - link "grain OmniGlyph Context as images" [ref=f21e145] [cursor=pointer]:
+                - /url: /dashboard/context/omniglyph
+                - generic [ref=f21e146]: grain
+                - generic [ref=f21e147]:
+                  - generic [ref=f21e148]: OmniGlyph
+                  - generic [ref=f21e149]: Context as images
+              - link "monitoring Compression Studio Live engine cascade" [ref=f21e150] [cursor=pointer]:
+                - /url: /dashboard/compression/studio
+                - generic [ref=f21e151]: monitoring
+                - generic [ref=f21e152]:
+                  - generic [ref=f21e153]: Compression Studio
+                  - generic [ref=f21e154]: Live engine cascade
+              - link "block Exclusions Per-model/endpoint bypass" [ref=f21e155] [cursor=pointer]:
+                - /url: /dashboard/compression/exclusions
+                - generic [ref=f21e156]: block
+                - generic [ref=f21e157]:
+                  - generic [ref=f21e158]: Exclusions
+                  - generic [ref=f21e159]: Per-model/endpoint bypass
+            - generic [ref=f21e160]:
+              - generic [ref=f21e161]: Tools
+              - link "terminal CLI Code Code tools pointing to OmniRoute" [ref=f21e164] [cursor=pointer]:
+                - /url: /dashboard/cli-code
+                - generic [ref=f21e165]: terminal
+                - generic [ref=f21e166]:
+                  - generic [ref=f21e167]: CLI Code
+                  - generic [ref=f21e168]: Code tools pointing to OmniRoute
+              - link "smart_toy CLI Agents Autonomous CLI agents" [ref=f21e169] [cursor=pointer]:
+                - /url: /dashboard/cli-agents
+                - generic [ref=f21e170]: smart_toy
+                - generic [ref=f21e171]:
+                  - generic [ref=f21e172]: CLI Agents
+                  - generic [ref=f21e173]: Autonomous CLI agents
+              - link "device_hub ACP Agents CLIs spawned by OmniRoute" [ref=f21e174] [cursor=pointer]:
+                - /url: /dashboard/acp-agents
+                - generic [ref=f21e175]: device_hub
+                - generic [ref=f21e176]:
+                  - generic [ref=f21e177]: ACP Agents
+                  - generic [ref=f21e178]: CLIs spawned by OmniRoute
+              - link "cloud Cloud Agents Manage cloud-based agents" [ref=f21e179] [cursor=pointer]:
+                - /url: /dashboard/cloud-agents
+                - generic [ref=f21e180]: cloud
+                - generic [ref=f21e181]:
+                  - generic [ref=f21e182]: Cloud Agents
+                  - generic [ref=f21e183]: Manage cloud-based agents
+              - link "account_tree Conductor CLI-agent fleet" [ref=f21e184] [cursor=pointer]:
+                - /url: /dashboard/conductor
+                - generic [ref=f21e185]: account_tree
+                - generic [ref=f21e186]:
+                  - generic [ref=f21e187]: Conductor
+                  - generic [ref=f21e188]: CLI-agent fleet
+              - link "account_tree Orchestration Live view of everything running" [ref=f21e189] [cursor=pointer]:
+                - /url: /dashboard/orchestration
+                - generic [ref=f21e190]: account_tree
+                - generic [ref=f21e191]:
+                  - generic [ref=f21e192]: Orchestration
+                  - generic [ref=f21e193]: Live view of everything running
+              - link "link Agent Bridge Intercept IDE agent traffic" [ref=f21e194] [cursor=pointer]:
+                - /url: /dashboard/tools/agent-bridge
+                - generic [ref=f21e195]: link
+                - generic [ref=f21e196]:
+                  - generic [ref=f21e197]: Agent Bridge
+                  - generic [ref=f21e198]: Intercept IDE agent traffic
+              - link "network_check Traffic Inspector Inspect request and response traffic from your apps" [ref=f21e199] [cursor=pointer]:
+                - /url: /dashboard/tools/traffic-inspector
+                - generic [ref=f21e200]: network_check
+                - generic [ref=f21e201]:
+                  - generic [ref=f21e202]: Traffic Inspector
+                  - generic [ref=f21e203]: Inspect request and response traffic from your apps
+              - link "travel_explore Discovery Scan providers for free access" [ref=f21e204] [cursor=pointer]:
+                - /url: /dashboard/discovery
+                - generic [ref=f21e205]: travel_explore
+                - generic [ref=f21e206]:
+                  - generic [ref=f21e207]: Discovery
+                  - generic [ref=f21e208]: Scan providers for free access
+            - generic [ref=f21e209]:
+              - generic [ref=f21e210]: Integrations
+              - link "api API Endpoints Expose custom endpoints" [ref=f21e213] [cursor=pointer]:
+                - /url: /dashboard/api-endpoints
+                - generic [ref=f21e214]: api
+                - generic [ref=f21e215]:
+                  - generic [ref=f21e216]: API Endpoints
+                  - generic [ref=f21e217]: Expose custom endpoints
+              - link "webhook Webhooks Get notified of events" [ref=f21e218] [cursor=pointer]:
+                - /url: /dashboard/webhooks
+                - generic [ref=f21e219]: webhook
+                - generic [ref=f21e220]:
+                  - generic [ref=f21e221]: Webhooks
+                  - generic [ref=f21e222]: Get notified of events
+              - link "cloud_upload Log export Ship call logs out" [ref=f21e223] [cursor=pointer]:
+                - /url: /dashboard/log-export
+                - generic [ref=f21e224]: cloud_upload
+                - generic [ref=f21e225]:
+                  - generic [ref=f21e226]: Log export
+                  - generic [ref=f21e227]: Ship call logs out
+            - link "dns Proxy HTTP proxy settings" [ref=f21e228] [cursor=pointer]:
+              - /url: /dashboard/system/proxy
+              - generic [ref=f21e229]: dns
+              - generic [ref=f21e230]:
+                - generic [ref=f21e231]: Proxy
+                - generic [ref=f21e232]: HTTP proxy settings
+        - button "Analytics push_pin expand_more" [ref=f21e234] [cursor=pointer]:
+          - generic [ref=f21e235]: Analytics
+          - button "push_pin" [ref=f21e236]
+          - generic: expand_more
+        - button "Costs push_pin expand_more" [ref=f21e238] [cursor=pointer]:
+          - generic [ref=f21e239]: Costs
+          - button "push_pin" [ref=f21e240]
+          - generic: expand_more
+        - button "Monitoring push_pin expand_more" [ref=f21e242] [cursor=pointer]:
+          - generic [ref=f21e243]: Monitoring
+          - button "push_pin" [ref=f21e244]
+          - generic: expand_more
+        - button "Agentic Features push_pin expand_more" [ref=f21e246] [cursor=pointer]:
+          - generic [ref=f21e247]: Agentic Features
+          - button "push_pin" [ref=f21e248]
+          - generic: expand_more
+        - button "Other Features push_pin expand_more" [ref=f21e250] [cursor=pointer]:
+          - generic [ref=f21e251]: Other Features
+          - button "push_pin" [ref=f21e252]
+          - generic: expand_more
+        - button "Configuration push_pin expand_more" [ref=f21e254] [cursor=pointer]:
+          - generic [ref=f21e255]: Configuration
+          - button "push_pin" [ref=f21e256]
+          - generic: expand_more
+        - button "Help push_pin expand_more" [ref=f21e258] [cursor=pointer]:
+          - generic [ref=f21e259]: Help
+          - button "push_pin" [ref=f21e260]
+          - generic: expand_more
+      - 'button "Remote settings sync status: Sync off" [ref=f21e310] [cursor=pointer]':
+        - generic [aria-hidden]: cloud_off
+        - generic [ref=f21e311]: Sync off
+      - generic [ref=f21e261]:
+        - button "restart_alt Restart" [ref=f21e262]:
+          - generic: restart_alt
+          - generic [ref=f21e263]: Restart
+        - button "power_settings_new Shutdown" [ref=f21e264]:
+          - generic: power_settings_new
+          - generic [ref=f21e265]: Shutdown
+    - main [ref=f21e266]:
+      - generic [ref=f21e267]:
+        - generic [ref=f21e268]:
+          - generic [ref=f21e269]: dns
+          - generic [ref=f21e271]:
+            - heading "Providers" [level=1] [ref=f21e272]
+            - paragraph [ref=f21e273]: Manage your AI provider connections
+        - generic [ref=f21e274]:
+          - button "Open quick navigation" [ref=f21e275]:
+            - generic: search
+            - generic [ref=f21e276]: Quick nav
+            - generic [ref=f21e277]: ⌘K
+          - button "English EN expand_more" [ref=f21e279]:
+            - img "English" [ref=f21e280]
+            - generic [ref=f21e281]: EN
+            - generic: expand_more
+          - button "Switch to dark mode" [ref=f21e282]:
+            - generic: dark_mode
+          - button "check_circle" [ref=f21e313]
+          - button "Logout" [ref=f21e283]:
+            - generic: logout
+      - generic [ref=f21e285]:
+        - navigation "Breadcrumb" [ref=f21e286]:
+          - link "Dashboard" [ref=f21e288] [cursor=pointer]:
+            - /url: /dashboard
+          - generic [ref=f21e289]:
+            - generic [aria-hidden] [ref=f21e290]: ›
+            - link "Providers" [ref=f21e291] [cursor=pointer]:
+              - /url: /dashboard/providers
+          - generic [ref=f21e292]:
+            - generic [aria-hidden] [ref=f21e293]: ›
+            - generic [ref=f21e294]: Lmarena
+        - generic [ref=f21e296]:
+          - generic [ref=f21e314]:
+            - link "arrow_back Back to Providers" [ref=f21e315] [cursor=pointer]:
+              - /url: /dashboard/providers
+              - generic [ref=f21e316]: arrow_back
+              - text: Back to Providers
+            - generic [ref=f21e323]:
+              - link "Arena (Free) open_in_new" [ref=f21e324] [cursor=pointer]:
+                - /url: https://arena.ai
+                - text: Arena (Free)
+                - generic [ref=f21e325]: open_in_new
+              - paragraph [ref=f21e327]: 0 connections
+          - generic [ref=f21e328]:
+            - generic [ref=f21e329]:
+              - generic [ref=f21e330]:
+                - heading "Connections" [level=2] [ref=f21e331]
+                - button "vpn_lock Provider Proxy" [ref=f21e332]:
+                  - generic: vpn_lock
+                  - text: Provider Proxy
+              - button "Add" [ref=f21e334] [cursor=pointer]:
+                - generic [aria-hidden]: add
+                - text: Add
+            - generic [ref=f21e335]:
+              - generic [ref=f21e336]: key
+              - paragraph [ref=f21e338]: No connections yet
+              - paragraph [ref=f21e339]: Add your first connection to get started
+              - button "Add Connection" [ref=f21e341] [cursor=pointer]:
+                - generic [aria-hidden]: add
+                - text: Add Connection
+          - generic [ref=f21e342]:
+            - heading "Available Models" [level=2] [ref=f21e343]
+            - generic [ref=f21e344]:
+              - generic [ref=f21e345]:
+                - button "Import from /models" [disabled] [ref=f21e346]:
+                  - generic [aria-hidden]: download
+                  - text: Import from /models
+                - generic [ref=f21e347]: Add a connection to enable importing.
+              - generic [ref=f21e348]:
+                - generic [ref=f21e349]:
+                  - generic: search
+                  - textbox "Filter models..." [ref=f21e350]
+                - generic [ref=f21e351]:
+                  - button "All" [ref=f21e352]
+                  - button "Visible only" [ref=f21e353]
+                  - button "Hidden only" [ref=f21e354]
+                - generic [ref=f21e355]:
+                  - button "All" [ref=f21e356]
+                  - button "Free only" [ref=f21e357]
+                  - button "Paid only" [ref=f21e358]
+                - button "sort Free first" [ref=f21e359]:
+                  - generic: sort
+                  - generic [ref=f21e360]: Free first
+                - generic "When enabled, Test all hides non-transient failures from public catalogs such as /v1/models. Single-model tests never auto-hide." [ref=f21e361]:
+                  - checkbox "Auto-hide failed models" [ref=f21e362]
+                  - text: Auto-hide failed models
+                - button "science Test all models" [ref=f21e363]:
+                  - generic: science
+                  - generic [ref=f21e364]: Test all models
+                - button "visibility All" [disabled] [ref=f21e365]:
+                  - generic: visibility
+                  - generic [ref=f21e366]: All
+                - button "visibility_off Hide all" [ref=f21e367]:
+                  - generic: visibility_off
+                  - generic [ref=f21e368]: Hide all
+                - generic [ref=f21e369]: 48/48 active
+              - generic [ref=f21e370]:
+                - generic [ref=f21e371]:
+                  - generic [ref=f21e372]:
+                    - generic [ref=f21e373]: smart_toy
+                    - code [ref=f21e374]: lma/amazon.nova-pro-v1:0
+                    - generic [ref=f21e375]: Built-in
+                    - generic "Click to set alias" [ref=f21e377] [cursor=pointer]: amazon.nova-pro-v1:0
+                    - button "content_copy" [ref=f21e378]
+                  - generic [ref=f21e379]:
+                    - button "play_circle" [ref=f21e380]
+                    - button "visibility" [ref=f21e381]
+                    - button "tune Compatibility" [ref=f21e383]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e384]:
+                  - generic [ref=f21e385]:
+                    - generic [ref=f21e386]: smart_toy
+                    - code [ref=f21e387]: lma/claude-haiku-4-5-20251001
+                    - generic [ref=f21e388]: Built-in
+                    - generic "Click to set alias" [ref=f21e390] [cursor=pointer]: claude-haiku-4-5-20251001
+                    - button "content_copy" [ref=f21e391]
+                  - generic [ref=f21e392]:
+                    - button "play_circle" [ref=f21e393]
+                    - button "visibility" [ref=f21e394]
+                    - button "tune Compatibility" [ref=f21e396]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e397]:
+                  - generic [ref=f21e398]:
+                    - generic [ref=f21e399]: smart_toy
+                    - code [ref=f21e400]: lma/claude-sonnet-5
+                    - generic [ref=f21e401]: Built-in
+                    - generic "Click to set alias" [ref=f21e403] [cursor=pointer]: claude-sonnet-5-high
+                    - button "content_copy" [ref=f21e404]
+                  - generic [ref=f21e405]:
+                    - button "play_circle" [ref=f21e406]
+                    - button "visibility" [ref=f21e407]
+                    - button "tune Compatibility" [ref=f21e409]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e410]:
+                  - generic [ref=f21e411]:
+                    - generic [ref=f21e412]: smart_toy
+                    - code [ref=f21e413]: lma/deepseek-v4-pro-thinking
+                    - generic [ref=f21e414]: Built-in
+                    - generic "Click to set alias" [ref=f21e416] [cursor=pointer]: deepseek-v4-pro-thinking
+                    - button "content_copy" [ref=f21e417]
+                  - generic [ref=f21e418]:
+                    - button "play_circle" [ref=f21e419]
+                    - button "visibility" [ref=f21e420]
+                    - button "tune Compatibility" [ref=f21e422]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e423]:
+                  - generic [ref=f21e424]:
+                    - generic [ref=f21e425]: smart_toy
+                    - code [ref=f21e426]: lma/dola-seed-2.0-preview-vision
+                    - generic [ref=f21e427]: Built-in
+                    - generic "Click to set alias" [ref=f21e429] [cursor=pointer]: dola-seed-2.0-preview-vision
+                    - button "content_copy" [ref=f21e430]
+                  - generic [ref=f21e431]:
+                    - button "play_circle" [ref=f21e432]
+                    - button "visibility" [ref=f21e433]
+                    - button "tune Compatibility" [ref=f21e435]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e436]:
+                  - generic [ref=f21e437]:
+                    - generic [ref=f21e438]: smart_toy
+                    - code [ref=f21e439]: lma/ernie-5.0-preview-1220
+                    - generic [ref=f21e440]: Built-in
+                    - generic "Click to set alias" [ref=f21e442] [cursor=pointer]: ernie-5.0-preview-1220
+                    - button "content_copy" [ref=f21e443]
+                  - generic [ref=f21e444]:
+                    - button "play_circle" [ref=f21e445]
+                    - button "visibility" [ref=f21e446]
+                    - button "tune Compatibility" [ref=f21e448]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e449]:
+                  - generic [ref=f21e450]:
+                    - generic [ref=f21e451]: smart_toy
+                    - code [ref=f21e452]: lma/gemini-3.1-flash-lite
+                    - generic [ref=f21e453]: Built-in
+                    - generic "Click to set alias" [ref=f21e455] [cursor=pointer]: gemini-3.1-flash-lite
+                    - button "content_copy" [ref=f21e456]
+                  - generic [ref=f21e457]:
+                    - button "play_circle" [ref=f21e458]
+                    - button "visibility" [ref=f21e459]
+                    - button "tune Compatibility" [ref=f21e461]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e462]:
+                  - generic [ref=f21e463]:
+                    - generic [ref=f21e464]: smart_toy
+                    - code [ref=f21e465]: lma/gemini-3.1-pro-preview
+                    - generic [ref=f21e466]: Built-in
+                    - generic "Click to set alias" [ref=f21e468] [cursor=pointer]: gemini-3.1-pro-preview
+                    - button "content_copy" [ref=f21e469]
+                  - generic [ref=f21e470]:
+                    - button "play_circle" [ref=f21e471]
+                    - button "visibility" [ref=f21e472]
+                    - button "tune Compatibility" [ref=f21e474]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e475]:
+                  - generic [ref=f21e476]:
+                    - generic [ref=f21e477]: smart_toy
+                    - code [ref=f21e478]: lma/gemini-3.6-flash
+                    - generic [ref=f21e479]: Built-in
+                    - generic "Click to set alias" [ref=f21e481] [cursor=pointer]: gemini-3.6-flash
+                    - button "content_copy" [ref=f21e482]
+                  - generic [ref=f21e483]:
+                    - button "play_circle" [ref=f21e484]
+                    - button "visibility" [ref=f21e485]
+                    - button "tune Compatibility" [ref=f21e487]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e488]:
+                  - generic [ref=f21e489]:
+                    - generic [ref=f21e490]: smart_toy
+                    - code [ref=f21e491]: lma/significant-otter
+                    - generic [ref=f21e492]: Built-in
+                    - generic "Click to set alias" [ref=f21e494] [cursor=pointer]: gemma-4-26b-a4b
+                    - button "content_copy" [ref=f21e495]
+                  - generic [ref=f21e496]:
+                    - button "play_circle" [ref=f21e497]
+                    - button "visibility" [ref=f21e498]
+                    - button "tune Compatibility" [ref=f21e500]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e501]:
+                  - generic [ref=f21e502]:
+                    - generic [ref=f21e503]: smart_toy
+                    - code [ref=f21e504]: lma/pteronura
+                    - generic [ref=f21e505]: Built-in
+                    - generic "Click to set alias" [ref=f21e507] [cursor=pointer]: gemma-4-31b
+                    - button "content_copy" [ref=f21e508]
+                  - generic [ref=f21e509]:
+                    - button "play_circle" [ref=f21e510]
+                    - button "visibility" [ref=f21e511]
+                    - button "tune Compatibility" [ref=f21e513]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e514]:
+                  - generic [ref=f21e515]:
+                    - generic [ref=f21e516]: smart_toy
+                    - code [ref=f21e517]: lma/glm-5.1
+                    - generic [ref=f21e518]: Built-in
+                    - generic "Click to set alias" [ref=f21e520] [cursor=pointer]: glm-5.2 (max)
+                    - button "content_copy" [ref=f21e521]
+                  - generic [ref=f21e522]:
+                    - button "play_circle" [ref=f21e523]
+                    - button "visibility" [ref=f21e524]
+                    - button "tune Compatibility" [ref=f21e526]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e527]:
+                  - generic [ref=f21e528]:
+                    - generic [ref=f21e529]: smart_toy
+                    - code [ref=f21e530]: lma/glm-5v-turbo
+                    - generic [ref=f21e531]: Built-in
+                    - generic "Click to set alias" [ref=f21e533] [cursor=pointer]: glm-5v-turbo
+                    - button "content_copy" [ref=f21e534]
+                  - generic [ref=f21e535]:
+                    - button "play_circle" [ref=f21e536]
+                    - button "visibility" [ref=f21e537]
+                    - button "tune Compatibility" [ref=f21e539]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e540]:
+                  - generic [ref=f21e541]:
+                    - generic [ref=f21e542]: smart_toy
+                    - code [ref=f21e543]: lma/gpt-oss-120b
+                    - generic [ref=f21e544]: Built-in
+                    - generic "Click to set alias" [ref=f21e546] [cursor=pointer]: gpt-oss-120b
+                    - button "content_copy" [ref=f21e547]
+                  - generic [ref=f21e548]:
+                    - button "play_circle" [ref=f21e549]
+                    - button "visibility" [ref=f21e550]
+                    - button "tune Compatibility" [ref=f21e552]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e553]:
+                  - generic [ref=f21e554]:
+                    - generic [ref=f21e555]: smart_toy
+                    - code [ref=f21e556]: lma/gpt-5.2-high
+                    - generic [ref=f21e557]: Built-in
+                    - generic "Click to set alias" [ref=f21e559] [cursor=pointer]: gpt-5.2-high
+                    - button "content_copy" [ref=f21e560]
+                  - generic [ref=f21e561]:
+                    - button "play_circle" [ref=f21e562]
+                    - button "visibility" [ref=f21e563]
+                    - button "tune Compatibility" [ref=f21e565]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e566]:
+                  - generic [ref=f21e567]:
+                    - generic [ref=f21e568]: smart_toy
+                    - code [ref=f21e569]: lma/gpt-5.4-mini-high
+                    - generic [ref=f21e570]: Built-in
+                    - generic "Click to set alias" [ref=f21e572] [cursor=pointer]: gpt-5.4-mini-high
+                    - button "content_copy" [ref=f21e573]
+                  - generic [ref=f21e574]:
+                    - button "play_circle" [ref=f21e575]
+                    - button "visibility" [ref=f21e576]
+                    - button "tune Compatibility" [ref=f21e578]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e579]:
+                  - generic [ref=f21e580]:
+                    - generic [ref=f21e581]: smart_toy
+                    - code [ref=f21e582]: lma/gpt-5.4-nano-high
+                    - generic [ref=f21e583]: Built-in
+                    - generic "Click to set alias" [ref=f21e585] [cursor=pointer]: gpt-5.4-nano-high
+                    - button "content_copy" [ref=f21e586]
+                  - generic [ref=f21e587]:
+                    - button "play_circle" [ref=f21e588]
+                    - button "visibility" [ref=f21e589]
+                    - button "tune Compatibility" [ref=f21e591]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e592]:
+                  - generic [ref=f21e593]:
+                    - generic [ref=f21e594]: smart_toy
+                    - code [ref=f21e595]: lma/gpt-5.5-instant
+                    - generic [ref=f21e596]: Built-in
+                    - generic "Click to set alias" [ref=f21e598] [cursor=pointer]: gpt-5.5-instant
+                    - button "content_copy" [ref=f21e599]
+                  - generic [ref=f21e600]:
+                    - button "play_circle" [ref=f21e601]
+                    - button "visibility" [ref=f21e602]
+                    - button "tune Compatibility" [ref=f21e604]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e605]:
+                  - generic [ref=f21e606]:
+                    - generic [ref=f21e607]: smart_toy
+                    - code [ref=f21e608]: lma/grok-4.3/text
+                    - generic [ref=f21e609]: Built-in
+                    - generic "Click to set alias" [ref=f21e611] [cursor=pointer]: grok-4.5
+                    - button "content_copy" [ref=f21e612]
+                  - generic [ref=f21e613]:
+                    - button "play_circle" [ref=f21e614]
+                    - button "visibility" [ref=f21e615]
+                    - button "tune Compatibility" [ref=f21e617]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e618]:
+                  - generic [ref=f21e619]:
+                    - generic [ref=f21e620]: smart_toy
+                    - code [ref=f21e621]: lma/hunyuan-vision-1.5-thinking
+                    - generic [ref=f21e622]: Built-in
+                    - generic "Click to set alias" [ref=f21e624] [cursor=pointer]: hunyuan-vision-1.5-thinking
+                    - button "content_copy" [ref=f21e625]
+                  - generic [ref=f21e626]:
+                    - button "play_circle" [ref=f21e627]
+                    - button "visibility" [ref=f21e628]
+                    - button "tune Compatibility" [ref=f21e630]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e631]:
+                  - generic [ref=f21e632]:
+                    - generic [ref=f21e633]: smart_toy
+                    - code [ref=f21e634]: lma/hy3
+                    - generic [ref=f21e635]: Built-in
+                    - generic "Click to set alias" [ref=f21e637] [cursor=pointer]: hy3
+                    - button "content_copy" [ref=f21e638]
+                  - generic [ref=f21e639]:
+                    - button "play_circle" [ref=f21e640]
+                    - button "visibility" [ref=f21e641]
+                    - button "tune Compatibility" [ref=f21e643]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e644]:
+                  - generic [ref=f21e645]:
+                    - generic [ref=f21e646]: smart_toy
+                    - code [ref=f21e647]: lma/kimi-k2.6
+                    - generic [ref=f21e648]: Built-in
+                    - generic "Click to set alias" [ref=f21e650] [cursor=pointer]: kimi-k2.6
+                    - button "content_copy" [ref=f21e651]
+                  - generic [ref=f21e652]:
+                    - button "play_circle" [ref=f21e653]
+                    - button "visibility" [ref=f21e654]
+                    - button "tune Compatibility" [ref=f21e656]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e657]:
+                  - generic [ref=f21e658]:
+                    - generic [ref=f21e659]: smart_toy
+                    - code [ref=f21e660]: lma/ling-2.5-1t
+                    - generic [ref=f21e661]: Built-in
+                    - generic "Click to set alias" [ref=f21e663] [cursor=pointer]: ling-2.5-1t
+                    - button "content_copy" [ref=f21e664]
+                  - generic [ref=f21e665]:
+                    - button "play_circle" [ref=f21e666]
+                    - button "visibility" [ref=f21e667]
+                    - button "tune Compatibility" [ref=f21e669]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e670]:
+                  - generic [ref=f21e671]:
+                    - generic [ref=f21e672]: smart_toy
+                    - code [ref=f21e673]: lma/longcat-2.0
+                    - generic [ref=f21e674]: Built-in
+                    - generic "Click to set alias" [ref=f21e676] [cursor=pointer]: longcat-2.0
+                    - button "content_copy" [ref=f21e677]
+                  - generic [ref=f21e678]:
+                    - button "play_circle" [ref=f21e679]
+                    - button "visibility" [ref=f21e680]
+                    - button "tune Compatibility" [ref=f21e682]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e683]:
+                  - generic [ref=f21e684]:
+                    - generic [ref=f21e685]: smart_toy
+                    - code [ref=f21e686]: lma/mercury-2
+                    - generic [ref=f21e687]: Built-in
+                    - generic "Click to set alias" [ref=f21e689] [cursor=pointer]: mercury-2
+                    - button "content_copy" [ref=f21e690]
+                  - generic [ref=f21e691]:
+                    - button "play_circle" [ref=f21e692]
+                    - button "visibility" [ref=f21e693]
+                    - button "tune Compatibility" [ref=f21e695]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e696]:
+                  - generic [ref=f21e697]:
+                    - generic [ref=f21e698]: smart_toy
+                    - code [ref=f21e699]: lma/mimo-v2.5
+                    - generic [ref=f21e700]: Built-in
+                    - generic "Click to set alias" [ref=f21e702] [cursor=pointer]: mimo-v2.5
+                    - button "content_copy" [ref=f21e703]
+                  - generic [ref=f21e704]:
+                    - button "play_circle" [ref=f21e705]
+                    - button "visibility" [ref=f21e706]
+                    - button "tune Compatibility" [ref=f21e708]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e709]:
+                  - generic [ref=f21e710]:
+                    - generic [ref=f21e711]: smart_toy
+                    - code [ref=f21e712]: lma/mimo-v2.5-pro
+                    - generic [ref=f21e713]: Built-in
+                    - generic "Click to set alias" [ref=f21e715] [cursor=pointer]: mimo-v2.5-pro
+                    - button "content_copy" [ref=f21e716]
+                  - generic [ref=f21e717]:
+                    - button "play_circle" [ref=f21e718]
+                    - button "visibility" [ref=f21e719]
+                    - button "tune Compatibility" [ref=f21e721]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e722]:
+                  - generic [ref=f21e723]:
+                    - generic [ref=f21e724]: smart_toy
+                    - code [ref=f21e725]: lma/minimax-m3
+                    - generic [ref=f21e726]: Built-in
+                    - generic "Click to set alias" [ref=f21e728] [cursor=pointer]: minimax-m3
+                    - button "content_copy" [ref=f21e729]
+                  - generic [ref=f21e730]:
+                    - button "play_circle" [ref=f21e731]
+                    - button "visibility" [ref=f21e732]
+                    - button "tune Compatibility" [ref=f21e734]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e735]:
+                  - generic [ref=f21e736]:
+                    - generic [ref=f21e737]: smart_toy
+                    - code [ref=f21e738]: lma/mistral-large-3
+                    - generic [ref=f21e739]: Built-in
+                    - generic "Click to set alias" [ref=f21e741] [cursor=pointer]: mistral-large-3
+                    - button "content_copy" [ref=f21e742]
+                  - generic [ref=f21e743]:
+                    - button "play_circle" [ref=f21e744]
+                    - button "visibility" [ref=f21e745]
+                    - button "tune Compatibility" [ref=f21e747]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e748]:
+                  - generic [ref=f21e749]:
+                    - generic [ref=f21e750]: smart_toy
+                    - code [ref=f21e751]: lma/mistral-medium-3.5
+                    - generic [ref=f21e752]: Built-in
+                    - generic "Click to set alias" [ref=f21e754] [cursor=pointer]: mistral-medium-3.5
+                    - button "content_copy" [ref=f21e755]
+                  - generic [ref=f21e756]:
+                    - button "play_circle" [ref=f21e757]
+                    - button "visibility" [ref=f21e758]
+                    - button "tune Compatibility" [ref=f21e760]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e761]:
+                  - generic [ref=f21e762]:
+                    - generic [ref=f21e763]: smart_toy
+                    - code [ref=f21e764]: lma/mistral-small-2603
+                    - generic [ref=f21e765]: Built-in
+                    - generic "Click to set alias" [ref=f21e767] [cursor=pointer]: mistral-small-2603
+                    - button "content_copy" [ref=f21e768]
+                  - generic [ref=f21e769]:
+                    - button "play_circle" [ref=f21e770]
+                    - button "visibility" [ref=f21e771]
+                    - button "tune Compatibility" [ref=f21e773]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e774]:
+                  - generic [ref=f21e775]:
+                    - generic [ref=f21e776]: smart_toy
+                    - code [ref=f21e777]: lma/nova-2-lite
+                    - generic [ref=f21e778]: Built-in
+                    - generic "Click to set alias" [ref=f21e780] [cursor=pointer]: nova-2-lite
+                    - button "content_copy" [ref=f21e781]
+                  - generic [ref=f21e782]:
+                    - button "play_circle" [ref=f21e783]
+                    - button "visibility" [ref=f21e784]
+                    - button "tune Compatibility" [ref=f21e786]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e787]:
+                  - generic [ref=f21e788]:
+                    - generic [ref=f21e789]: smart_toy
+                    - code [ref=f21e790]: lma/nvidia-nemotron-3-nano-30b-a3b-bf16
+                    - generic [ref=f21e791]: Built-in
+                    - generic "Click to set alias" [ref=f21e793] [cursor=pointer]: nvidia-nemotron-3-nano-30b-a3b-bf16
+                    - button "content_copy" [ref=f21e794]
+                  - generic [ref=f21e795]:
+                    - button "play_circle" [ref=f21e796]
+                    - button "visibility" [ref=f21e797]
+                    - button "tune Compatibility" [ref=f21e799]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e800]:
+                  - generic [ref=f21e801]:
+                    - generic [ref=f21e802]: smart_toy
+                    - code [ref=f21e803]: lma/march26-chatbot1-public
+                    - generic [ref=f21e804]: Built-in
+                    - generic "Click to set alias" [ref=f21e806] [cursor=pointer]: nvidia-nemotron-3-super-120b-a12b
+                    - button "content_copy" [ref=f21e807]
+                  - generic [ref=f21e808]:
+                    - button "play_circle" [ref=f21e809]
+                    - button "visibility" [ref=f21e810]
+                    - button "tune Compatibility" [ref=f21e812]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e813]:
+                  - generic [ref=f21e814]:
+                    - generic [ref=f21e815]: smart_toy
+                    - code [ref=f21e816]: lma/may26-chatbot4-public
+                    - generic [ref=f21e817]: Built-in
+                    - generic "Click to set alias" [ref=f21e819] [cursor=pointer]: nvidia-nemotron-3-ultra-550b-a55b-nvfp4
+                    - button "content_copy" [ref=f21e820]
+                  - generic [ref=f21e821]:
+                    - button "play_circle" [ref=f21e822]
+                    - button "visibility" [ref=f21e823]
+                    - button "tune Compatibility" [ref=f21e825]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e826]:
+                  - generic [ref=f21e827]:
+                    - generic [ref=f21e828]: smart_toy
+                    - code [ref=f21e829]: lma/o3-2025-04-16
+                    - generic [ref=f21e830]: Built-in
+                    - generic "Click to set alias" [ref=f21e832] [cursor=pointer]: o3-2025-04-16
+                    - button "content_copy" [ref=f21e833]
+                  - generic [ref=f21e834]:
+                    - button "play_circle" [ref=f21e835]
+                    - button "visibility" [ref=f21e836]
+                    - button "tune Compatibility" [ref=f21e838]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e839]:
+                  - generic [ref=f21e840]:
+                    - generic [ref=f21e841]: smart_toy
+                    - code [ref=f21e842]: lma/qwen3.5-397b-a17b
+                    - generic [ref=f21e843]: Built-in
+                    - generic "Click to set alias" [ref=f21e845] [cursor=pointer]: qwen3.5-397b-a17b
+                    - button "content_copy" [ref=f21e846]
+                  - generic [ref=f21e847]:
+                    - button "play_circle" [ref=f21e848]
+                    - button "visibility" [ref=f21e849]
+                    - button "tune Compatibility" [ref=f21e851]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e852]:
+                  - generic [ref=f21e853]:
+                    - generic [ref=f21e854]: smart_toy
+                    - code [ref=f21e855]: lma/qwen3.7-max
+                    - generic [ref=f21e856]: Built-in
+                    - generic "Click to set alias" [ref=f21e858] [cursor=pointer]: qwen3.7-max
+                    - button "content_copy" [ref=f21e859]
+                  - generic [ref=f21e860]:
+                    - button "play_circle" [ref=f21e861]
+                    - button "visibility" [ref=f21e862]
+                    - button "tune Compatibility" [ref=f21e864]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e865]:
+                  - generic [ref=f21e866]:
+                    - generic [ref=f21e867]: smart_toy
+                    - code [ref=f21e868]: lma/qwen3.7-plus
+                    - generic [ref=f21e869]: Built-in
+                    - generic "Click to set alias" [ref=f21e871] [cursor=pointer]: qwen3.7-plus
+                    - button "content_copy" [ref=f21e872]
+                  - generic [ref=f21e873]:
+                    - button "play_circle" [ref=f21e874]
+                    - button "visibility" [ref=f21e875]
+                    - button "tune Compatibility" [ref=f21e877]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e878]:
+                  - generic [ref=f21e879]:
+                    - generic [ref=f21e880]: smart_toy
+                    - code [ref=f21e881]: lma/ring-2.5-1t
+                    - generic [ref=f21e882]: Built-in
+                    - generic "Click to set alias" [ref=f21e884] [cursor=pointer]: ring-2.5-1t
+                    - button "content_copy" [ref=f21e885]
+                  - generic [ref=f21e886]:
+                    - button "play_circle" [ref=f21e887]
+                    - button "visibility" [ref=f21e888]
+                    - button "tune Compatibility" [ref=f21e890]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e891]:
+                  - generic [ref=f21e892]:
+                    - generic [ref=f21e893]: smart_toy
+                    - code [ref=f21e894]: lma/step-3.5-flash
+                    - generic [ref=f21e895]: Built-in
+                    - generic "Click to set alias" [ref=f21e897] [cursor=pointer]: step-3.5-flash
+                    - button "content_copy" [ref=f21e898]
+                  - generic [ref=f21e899]:
+                    - button "play_circle" [ref=f21e900]
+                    - button "visibility" [ref=f21e901]
+                    - button "tune Compatibility" [ref=f21e903]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e904]:
+                  - generic [ref=f21e905]:
+                    - generic [ref=f21e906]: smart_toy
+                    - code [ref=f21e907]: lma/trinity-large-thinking
+                    - generic [ref=f21e908]: Built-in
+                    - generic "Click to set alias" [ref=f21e910] [cursor=pointer]: trinity-large-thinking
+                    - button "content_copy" [ref=f21e911]
+                  - generic [ref=f21e912]:
+                    - button "play_circle" [ref=f21e913]
+                    - button "visibility" [ref=f21e914]
+                    - button "tune Compatibility" [ref=f21e916]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e917]:
+                  - generic [ref=f21e918]:
+                    - generic [ref=f21e919]: smart_toy
+                    - code [ref=f21e920]: lma/claude-sonnet-5-search
+                    - generic [ref=f21e921]: Built-in
+                    - generic "Click to set alias" [ref=f21e923] [cursor=pointer]: claude-sonnet-5-search
+                    - button "content_copy" [ref=f21e924]
+                  - generic [ref=f21e925]:
+                    - button "play_circle" [ref=f21e926]
+                    - button "visibility" [ref=f21e927]
+                    - button "tune Compatibility" [ref=f21e929]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e930]:
+                  - generic [ref=f21e931]:
+                    - generic [ref=f21e932]: smart_toy
+                    - code [ref=f21e933]: lma/gemini-2.5-pro-grounding
+                    - generic [ref=f21e934]: Built-in
+                    - generic "Click to set alias" [ref=f21e936] [cursor=pointer]: gemini-2.5-pro-grounding
+                    - button "content_copy" [ref=f21e937]
+                  - generic [ref=f21e938]:
+                    - button "play_circle" [ref=f21e939]
+                    - button "visibility" [ref=f21e940]
+                    - button "tune Compatibility" [ref=f21e942]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e943]:
+                  - generic [ref=f21e944]:
+                    - generic [ref=f21e945]: smart_toy
+                    - code [ref=f21e946]: lma/gemini-3-flash-grounding
+                    - generic [ref=f21e947]: Built-in
+                    - generic "Click to set alias" [ref=f21e949] [cursor=pointer]: gemini-3-flash-grounding
+                    - button "content_copy" [ref=f21e950]
+                  - generic [ref=f21e951]:
+                    - button "play_circle" [ref=f21e952]
+                    - button "visibility" [ref=f21e953]
+                    - button "tune Compatibility" [ref=f21e955]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e956]:
+                  - generic [ref=f21e957]:
+                    - generic [ref=f21e958]: smart_toy
+                    - code [ref=f21e959]: lma/gpt-5.2-search
+                    - generic [ref=f21e960]: Built-in
+                    - generic "Click to set alias" [ref=f21e962] [cursor=pointer]: gpt-5.2-search
+                    - button "content_copy" [ref=f21e963]
+                  - generic [ref=f21e964]:
+                    - button "play_circle" [ref=f21e965]
+                    - button "visibility" [ref=f21e966]
+                    - button "tune Compatibility" [ref=f21e968]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e969]:
+                  - generic [ref=f21e970]:
+                    - generic [ref=f21e971]: smart_toy
+                    - code [ref=f21e972]: lma/grok-4.3/search
+                    - generic [ref=f21e973]: Built-in
+                    - generic "Click to set alias" [ref=f21e975] [cursor=pointer]: grok-4.3
+                    - button "content_copy" [ref=f21e976]
+                  - generic [ref=f21e977]:
+                    - button "play_circle" [ref=f21e978]
+                    - button "visibility" [ref=f21e979]
+                    - button "tune Compatibility" [ref=f21e981]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f21e982]:
+                  - generic [ref=f21e983]:
+                    - generic [ref=f21e984]: smart_toy
+                    - code [ref=f21e985]: lma/o3-search
+                    - generic [ref=f21e986]: Built-in
+                    - generic "Click to set alias" [ref=f21e988] [cursor=pointer]: o3-search
+                    - button "content_copy" [ref=f21e989]
+                  - generic [ref=f21e990]:
+                    - button "play_circle" [ref=f21e991]
+                    - button "visibility" [ref=f21e992]
+                    - button "tune Compatibility" [ref=f21e994]:
+                      - generic: tune
+                      - text: Compatibility
+            - generic [ref=f21e995]:
+              - heading "tune Custom Models" [level=3] [ref=f21e996]:
+                - generic [ref=f21e997]: tune
+                - text: Custom Models
+              - paragraph [ref=f21e998]: Add model IDs not in the default list. These will be available for routing.
+              - generic [ref=f21e999]:
+                - generic [ref=f21e1000]:
+                  - generic [ref=f21e1001]:
+                    - generic [ref=f21e1002]: Model ID
+                    - textbox "Model ID" [ref=f21e1003]:
+                      - /placeholder: e.g. gpt-4.5-turbo
+                  - generic [ref=f21e1004]:
+                    - generic [ref=f21e1005]: Display Name
+                    - textbox "Display Name" [ref=f21e1006]:
+                      - /placeholder: Optional
+                  - button "Add" [disabled] [ref=f21e1007]:
+                    - generic [aria-hidden]: add
+                    - text: Add
+                - generic [ref=f21e1008]:
+                  - generic [ref=f21e1009]:
+                    - generic [ref=f21e1010]: API Format
+                    - combobox "API Format" [ref=f21e1011]:
+                      - option "Chat Completions" [selected]
+                      - option "Responses API"
+                      - option "Embeddings"
+                      - option "Rerank"
+                      - option "Audio Transcriptions"
+                      - option "Audio Speech"
+                      - option "Images Generations"
+                      - option "Video"
+                  - generic [ref=f21e1012]:
+                    - generic [ref=f21e1013]: Target Format
+                    - combobox "Target Format" [ref=f21e1014]:
+                      - option "Default (auto)" [selected]
+                      - option "OpenAI Chat Completions"
+                      - option "OpenAI Responses API"
+                      - option "Anthropic Messages"
+                      - option "Gemini"
+                      - option "Antigravity"
+                  - generic [ref=f21e1015]:
+                    - generic [ref=f21e1016]: Supported endpoints
+                    - generic [ref=f21e1017]:
+                      - generic [ref=f21e1018] [cursor=pointer]:
+                        - checkbox "💬 Chat" [checked] [ref=f21e1019]
+                        - text: 💬 Chat
+                      - generic [ref=f21e1020] [cursor=pointer]:
+                        - checkbox "📐 Embeddings" [ref=f21e1021]
+                        - text: 📐 Embeddings
+                      - generic [ref=f21e1022] [cursor=pointer]:
+                        - checkbox "Rerank" [ref=f21e1023]
+                        - text: Rerank
+                      - generic [ref=f21e1024] [cursor=pointer]:
+                        - checkbox "🖼️ Images" [ref=f21e1025]
+                        - text: 🖼️ Images
+                      - generic [ref=f21e1026] [cursor=pointer]:
+                        - checkbox "🎬 Video" [ref=f21e1027]
+                        - text: 🎬 Video
+                      - generic [ref=f21e1028] [cursor=pointer]:
+                        - checkbox "🔊 Audio Speech" [ref=f21e1029]
+                        - text: 🔊 Audio Speech
+                      - generic [ref=f21e1030] [cursor=pointer]:
+                        - checkbox "🎙️ Audio Transcriptions" [ref=f21e1031]
+                        - text: 🎙️ Audio Transcriptions
+                  - generic [ref=f21e1032]:
+                    - generic "Manually flag this model as vision-capable when the provider's discovery metadata doesn't report an image input modality (common for self-hosted/local backends)." [ref=f21e1034] [cursor=pointer]:
+                      - checkbox "👁️ Vision capable" [ref=f21e1035]
+                      - text: 👁️ Vision capable
+                    - generic "Mark as free-tier (shown even when hide paid models is on)" [ref=f21e1036] [cursor=pointer]:
+                      - checkbox "FREE" [ref=f21e1037]
+                      - text: FREE
+              - paragraph [ref=f21e1038]: No custom models added yet.
+          - generic [ref=f21e1039]:
+            - heading "Playground" [level=2] [ref=f21e1040]
+            - generic [ref=f21e1041]:
+              - generic [ref=f21e1043]:
+                - generic [ref=f21e1044]: "Model:"
+                - combobox [disabled] [ref=f21e1045]:
+                  - option "Loading..." [selected]
+              - generic [ref=f21e1047]:
+                - generic [ref=f21e1048]: forum
+                - paragraph [ref=f21e1050]: Send a message to start the conversation
+                - paragraph [ref=f21e1051]: Shift+Enter for newline · Enter to send
+              - generic [ref=f21e1052]:
+                - textbox "Send…" [ref=f21e1053]
+                - button "arrow_upward" [disabled] [ref=f21e1054]
+          - generic [ref=f21e1055]:
+            - heading "Param Filters" [level=2] [ref=f21e1056]
+            - paragraph [ref=f21e1057]:
+              - text: Strip or re-add request parameters before sending to this provider. Used to avoid 400 errors from providers that reject certain params (e.g. NVIDIA NIM rejects
+              - code [ref=f21e1058]: thinking
+              - text: ).
+            - generic [ref=f21e1059]:
+              - generic [ref=f21e1060]: Blocked parameters
+              - textbox "thinking, reasoning_budget, … (comma-separated)" [ref=f21e1061]
+              - paragraph [ref=f21e1062]: These params are stripped from outgoing requests (denylist).
+            - generic [ref=f21e1063]:
+              - generic [ref=f21e1064]: Allowed parameters
+              - textbox "reasoning, … (comma-separated)" [ref=f21e1065]
+              - paragraph [ref=f21e1066]: These params are re-added after denylist stripping (only if the client sent them).
+            - generic [ref=f21e1067]:
+              - generic [ref=f21e1068] [cursor=pointer]:
+                - checkbox "Auto-learn from 400 errors" [ref=f21e1069]
+                - generic [ref=f21e1070]: Auto-learn from 400 errors
+              - paragraph [ref=f21e1071]: "When enabled, if the upstream returns a 400 with \"Unsupported parameter: X\", the param is automatically added to the block list and the request retried."
+            - generic [ref=f21e1072]:
+              - button "save Save Changes" [disabled] [ref=f21e1073]:
+                - generic: save
+                - text: Save Changes
+              - button "delete Reset to Default" [ref=f21e1074]:
+                - generic: delete
+                - text: Reset to Default
+          - generic [ref=f21e1075]:
+            - heading "Web Tool Interception" [level=2] [ref=f21e1076]
+            - paragraph [ref=f21e1077]: Route this provider's native web_search / web_fetch tool calls through OmniRoute's own search and fetch endpoints instead of letting the provider run them natively. Off by default — existing behavior is unchanged.
+            - generic [ref=f21e1078]:
+              - generic [ref=f21e1079]:
+                - switch "Intercept web_search" [ref=f21e1080] [cursor=pointer]
+                - generic [ref=f21e1081]:
+                  - generic [ref=f21e1082]: Intercept web_search
+                  - generic [ref=f21e1083]: Rewrite native web_search tool calls to OmniRoute's /v1/search.
+              - generic [ref=f21e1084]:
+                - switch "Intercept web_fetch" [ref=f21e1085] [cursor=pointer]
+                - generic [ref=f21e1086]:
+                  - generic [ref=f21e1087]: Intercept web_fetch
+                  - generic [ref=f21e1088]: Rewrite native web_fetch tool calls to OmniRoute's /v1/web/fetch.
+          - generic [ref=f21e1089]:
+            - heading "Expose in Claude Code (claude/…)" [level=2] [ref=f21e1090]
+            - paragraph [ref=f21e1091]: Advertise this provider's models under claude/&lt;provider&gt;/&lt;model&gt; mirror ids so Claude Code's gateway model discovery can list them. Off by default — enabling this doubles catalog entries for all clients.
+            - generic [ref=f21e1092]:
+              - generic [ref=f21e1093]: Provider default
+              - combobox "Provider default" [ref=f21e1094]:
+                - option "Inherit" [selected]
+                - option "On"
+                - option "Off"
+            - generic [ref=f21e1095]:
+              - textbox "Model id (e.g. gpt-4o)" [ref=f21e1096]
+              - button "Add override" [disabled] [ref=f21e1097]
+          - dialog [ref=f21e1100]:
+            - generic [ref=f21e1101]:
+              - heading "Add Arena (Free) session cookie" [level=2] [ref=f21e1107]
+              - button "Close" [active] [ref=f21e1108]:
+                - generic [aria-hidden]: close
+            - generic [ref=f21e1110]:
+              - link "Open arena.ai" [ref=f21e1111] [cursor=pointer]:
+                - /url: https://arena.ai
+                - generic [aria-hidden] [ref=f21e1112]: open_in_new
+                - text: Open arena.ai
+              - generic [ref=f21e1113]:
+                - button "Single" [ref=f21e1114]
+                - button "Bulk Add" [ref=f21e1115]
+              - generic [ref=f21e1116]:
+                - generic [ref=f21e1117]: Name
+                - textbox "Name" [ref=f21e1119]:
+                  - /placeholder: Production Key
+                  - text: main
+              - generic [ref=f21e1121]:
+                - generic [ref=f21e1122]: cookie
+                - generic [ref=f21e1123]:
+                  - generic [ref=f21e1124]:
+                    - paragraph [ref=f21e1125]: How to get the session credential
+                    - paragraph [ref=f21e1126]: Arena (Free) uses a browser web session instead of an API key.
+                  - paragraph [ref=f21e1127]: "Required cookie: full Cookie header (arena-auth-prod-v1.0 + arena-auth-prod-v1.1)"
+                  - list [ref=f21e1128]:
+                    - listitem [ref=f21e1129]:
+                      - text: Sign in to Arena (Free) in your browser.
+                      - link "Open arena.ai" [ref=f21e1130] [cursor=pointer]:
+                        - /url: https://arena.ai
+                        - text: Open arena.ai
+                        - generic [aria-hidden] [ref=f21e1131]: open_in_new
+                    - listitem [ref=f21e1132]: "Fast path: install the Cookie Editor extension (chromewebstore.google.com → Cookie Editor), open it on the Arena (Free) tab, find full Cookie header (arena-auth-prod-v1.0 + arena-auth-prod-v1.1) (select all numbered chunks if split), and click Export → Copy with the export format set to “Cookie header”."
+                    - listitem [ref=f21e1133]: "Manual path: open the browser developer tools (F12 → Network), refresh the page, open an authenticated request, and copy the Cookie header value from Request Headers — omit the Cookie: prefix."
+                    - listitem [ref=f21e1134]: Paste it here and check the connection. If it stops working, sign in again and replace it with a fresh value.
+                  - paragraph [ref=f21e1135]: "Treat this like a password: it may access your signed-in web account until it expires or is revoked."
+              - generic [ref=f21e1136]:
+                - generic [ref=f21e1137]:
+                  - generic [ref=f21e1138]: Session Cookie Label
+                  - textbox "Session Cookie Label" [ref=f21e1140]:
+                    - /placeholder: arena-auth-prod-v1.0=...; arena-auth-prod-v1.1=...; other=value (full Cookie header from arena.ai)
+                  - paragraph [ref=f21e1141]: "Open arena.ai, sign in, then copy the full Cookie header from a Network request. Include arena-auth-prod-v1.0 and arena-auth-prod-v1.1 (and further chunks if present), preferably with cf_clearance. Do not paste only the empty arena-auth-prod-v1 cookie. Optional: providerSpecificData.recaptchaV3Token if create-evaluation still returns 403."
+                - button "Check cookie" [disabled] [ref=f21e1143]
+              - button "Advanced Settings" [ref=f21e1144]:
+                - generic [aria-hidden] [ref=f21e1145]: ▶
+                - text: Advanced Settings
+              - generic [ref=f21e1146]:
+                - generic [ref=f21e1147]: Validation Model
+                - textbox "Validation Model" [ref=f21e1149]:
+                  - /placeholder: e.g. meta-llama/llama-3.1-8b-instruct
+                - paragraph [ref=f21e1150]: Model used to verify the API key. Leave blank to use the provider’s first available model.
+              - generic [ref=f21e1151]:
+                - generic [ref=f21e1152]: Priority
+                - spinbutton "Priority" [ref=f21e1154]: "1"
+              - generic [ref=f21e1155]:
+                - button "Save" [disabled] [ref=f21e1156]
+                - button "Cancel" [ref=f21e1157] [cursor=pointer]
+  - alert [ref=f21e309]
