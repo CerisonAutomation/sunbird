@@ -5,9 +5,9 @@
 //! frame vocabulary: `state` / `emote` / `ready` / `finish` up, and
 //! `welcome` / `peers` / `left` / `state` / `emote` / `finish` / `start` /
 //! `error` down. This module is the self-hostable Rust implementation of that
-//! exact protocol, and the direct replacement for both the Cloudflare Workers
-//! backend and the old `server/sunbird-server.mjs` Node prototype. It keeps the
-//! browser client working unchanged:
+//! exact protocol, and the self-hosted replacement for the old managed
+//! workers backend and the `server/sunbird-server.mjs` Node prototype. It keeps
+//! the browser client working unchanged:
 //!
 //! - room codes + public matchmaking (40 pilots per room),
 //! - a single 15 Hz packed state broadcast per room,
