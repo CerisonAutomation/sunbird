@@ -292,6 +292,13 @@ export class Tournaments {
     return [...this.state.trails];
   }
 
+  /** Every trophy tier the player has claimed across all cups (for prize-skin gates). */
+  claimedTiers(): TrophyTier[] {
+    return Object.values(this.state.entries)
+      .map((e) => e.claimedTier)
+      .filter((t): t is TrophyTier => t !== null);
+  }
+
   ownedTitles(): string[] {
     return [...this.state.titles];
   }

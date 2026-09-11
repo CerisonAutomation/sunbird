@@ -1693,6 +1693,7 @@ export class Game {
     const tierAfter = this.seasonPass.tier();
     const xp = this.seasonPass.xp();
     const newTrophies = this.achievements.checkNew();
+    this.checkPrizeSkins();
 
     this.telemetry.track("run_end", {
       distance: Math.round(stats.distance),
@@ -2896,6 +2897,27 @@ export class Game {
   }
 
   /** Tournament prizes are granted through the same APIs the shop uses. */
+  /**
+   * Achievement/tournament prize skins: each `prizeOnly` label in Economy.ts
+   * has a matching trigger here, so no earnable skin is ever a dead promise.
+   */
+  private checkPrizeSkins(): void {
+    const st = this.save.state;
+    const grant = (id: string, msg: string): void => {
+      if (st.ownedSkins.includes(id)) return;
+      this.save.ownSkin(id);
+      this.hud.toast(`🪶 ${msg}`, "gold");
+      this.audio.fanfare();
+    };
+    if (st.lifetime.ghostBeats >= 10) grant("ghost", "Ghost unlocked — 10 ghost wins!");
+    if (st.lifetime.zeniths >= 25) grant("shadow", "Shadow unlocked — 25 zeniths banked!");
+    if (st.duel.bestStreak >= 10) grant("mythic", "Mythic unlocked — 10-duel win streak!");
+    if (st.ownedSkins.length >= 16) grant("rainbow", "Rainbow unlocked — 15-skin collection!");
+    const tiers = this.cups.claimedTiers();
+    if (tiers.includes("gold") || tiers.includes("diamond")) grant("champion", "Champion unlocked — gold cup claimed!");
+    if (tiers.includes("diamond")) grant("legendary", "Legendary unlocked — diamond cup claimed!");
+  }
+
   private applyPrize(grant: PrizeGrant): void {
     const p = grant.prize;
     if (p.kind === "coins") this.save.addCoins(p.amount);
@@ -2908,6 +2930,7 @@ export class Game {
     this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
     this.hud.toast(`${p.icon} ${p.label} — ${grant.tier} in ${grant.cup}`, "gold");
     this.telemetry.track("cup_prize", { tier: grant.tier, kind: p.kind, id: p.id });
+    this.checkPrizeSkins();
     this.bump();
   }
 

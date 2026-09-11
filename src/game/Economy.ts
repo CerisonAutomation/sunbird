@@ -1,3 +1,6 @@
+export type SkinRarity = "starter" | "common" | "rare" | "epic" | "legendary" | "mythic";
+export type CollectionId = "starter" | "nature" | "elements" | "cosmic" | "seasonal" | "premium" | "tournament" | "achievement";
+
 export type SkinDef = {
   id: string;
   name: string;
@@ -15,6 +18,8 @@ export type SkinDef = {
   feverBonus: number;
   daylightBonus: number;
   magnetAlways: boolean;
+  rarity?: SkinRarity;
+  collection?: CollectionId;
 };
 
 export const SKINS: SkinDef[] = [
@@ -444,6 +449,44 @@ export const SKINS: SkinDef[] = [
     daylightBonus: 4,
     magnetAlways: false,
   },
+
+  // --- Expanded catalogue (Elements · Cosmic · Seasonal · Tournament · Achievement collections) ---
+  { id: "ember_wren", name: "Ember Wren", perk: "+3% speed · ember trail", price: 400, body: 0xcc4400, wing: 0xff8844, belly: 0xffddaa, beak: 0xffcc00, speedMult: 1.03, feverBonus: 0, daylightBonus: 0, magnetAlways: false, rarity: "common", collection: "elements" },
+  { id: "snow_owl", name: "Snowy Owl", perk: "+8 s daylight", price: 550, body: 0xf0f0f8, wing: 0xc8d0e8, belly: 0xffffff, beak: 0xffb020, speedMult: 1, feverBonus: 0, daylightBonus: 8, magnetAlways: false, rarity: "rare", collection: "elements" },
+  { id: "storm_rider", name: "Storm Rider", perk: "Weather immunity", price: 700, body: 0x2a3a5a, wing: 0x5a7a9a, belly: 0xd0e0f0, beak: 0xffa040, speedMult: 1.01, feverBonus: 1, daylightBonus: 0, magnetAlways: false, rarity: "rare", collection: "elements" },
+  { id: "crystal", name: "Crystal Wing", perk: "+5% speed · +2 s daylight", price: 600, body: 0x88ccff, wing: 0xaaeeff, belly: 0xffffff, beak: 0xffd700, speedMult: 1.05, feverBonus: 0, daylightBonus: 2, magnetAlways: false, rarity: "rare", collection: "elements" },
+  { id: "nebula", name: "Nebula", perk: "+3% speed · +3 s fever", price: 750, body: 0x6a3a8a, wing: 0xaa66cc, belly: 0xeeddff, beak: 0xffaa44, speedMult: 1.03, feverBonus: 3, daylightBonus: 0, magnetAlways: false, rarity: "epic", collection: "cosmic" },
+  { id: "comet", name: "Comet", perk: "+6% speed", price: 500, body: 0x2244aa, wing: 0x66aaff, belly: 0xccddff, beak: 0xffcc00, speedMult: 1.06, feverBonus: 0, daylightBonus: 0, magnetAlways: false, rarity: "common", collection: "cosmic" },
+  { id: "supernova", name: "Supernova", perk: "+4% speed · +4 s fever", price: 800, body: 0xff4400, wing: 0xff8800, belly: 0xffeecc, beak: 0xffdd00, speedMult: 1.04, feverBonus: 4, daylightBonus: 0, magnetAlways: false, rarity: "legendary", collection: "cosmic" },
+  { id: "void", name: "Void Walker", perk: "+5 s daylight · stealth", price: 650, body: 0x0a0a1a, wing: 0x2a2a4a, belly: 0x4a4a6a, beak: 0x8888aa, speedMult: 1, feverBonus: 0, daylightBonus: 5, magnetAlways: false, rarity: "rare", collection: "cosmic" },
+  { id: "spring", name: "Cherry Blossom", perk: "+3 s daylight · +2 s fever", price: 450, body: 0xffaacc, wing: 0xffccee, belly: 0xffffff, beak: 0xffaa44, speedMult: 1, feverBonus: 2, daylightBonus: 3, magnetAlways: false, rarity: "common", collection: "seasonal" },
+  { id: "summer", name: "Sunset", perk: "+5% speed · +3 s daylight", price: 500, body: 0xff6644, wing: 0xffaa66, belly: 0xffeedd, beak: 0xffcc00, speedMult: 1.05, feverBonus: 0, daylightBonus: 3, magnetAlways: false, rarity: "common", collection: "seasonal" },
+  { id: "autumn", name: "Maple", perk: "+4 s daylight", price: 400, body: 0xcc6600, wing: 0xffaa44, belly: 0xffeedd, beak: 0xff8800, speedMult: 1, feverBonus: 0, daylightBonus: 4, magnetAlways: false, rarity: "common", collection: "seasonal" },
+  { id: "winter", name: "Frost", perk: "+6 s daylight · weather immunity", price: 700, body: 0xaaccff, wing: 0xccddff, belly: 0xffffff, beak: 0xffdd00, speedMult: 1, feverBonus: 1, daylightBonus: 6, magnetAlways: false, rarity: "rare", collection: "seasonal" },
+  { id: "champion", name: "Champion", perk: "+5% speed · +5 s fever", price: 0, body: 0xffd700, wing: 0xffaa00, belly: 0xfff8dc, beak: 0xff6600, speedMult: 1.05, feverBonus: 5, daylightBonus: 0, magnetAlways: false, rarity: "legendary", collection: "tournament", prizeOnly: "Claim a gold cup trophy" },
+  { id: "legendary", name: "Legendary", perk: "+8% speed · +4 s daylight", price: 0, body: 0x9933ff, wing: 0xbb66ff, belly: 0xeeddff, beak: 0xffaa44, speedMult: 1.08, feverBonus: 0, daylightBonus: 4, magnetAlways: false, rarity: "legendary", collection: "tournament", prizeOnly: "Claim a diamond cup trophy" },
+  { id: "mythic", name: "Mythic", perk: "All stats +5%", price: 0, body: 0xff3366, wing: 0xff6699, belly: 0xffeedd, beak: 0xffcc00, speedMult: 1.05, feverBonus: 3, daylightBonus: 3, magnetAlways: false, rarity: "mythic", collection: "tournament", prizeOnly: "Win 10 duels in a row" },
+  { id: "ghost", name: "Ghost", perk: "+4 s daylight · ghost trail", price: 0, body: 0x888899, wing: 0xaaaacc, belly: 0xddeeff, beak: 0xccccdd, speedMult: 1, feverBonus: 0, daylightBonus: 4, magnetAlways: false, rarity: "epic", collection: "achievement", prizeOnly: "Beat your ghost 10 times" },
+  { id: "shadow", name: "Shadow", perk: "+3% speed · stealth", price: 0, body: 0x222233, wing: 0x444455, belly: 0x666677, beak: 0x888899, speedMult: 1.03, feverBonus: 0, daylightBonus: 0, magnetAlways: false, rarity: "epic", collection: "achievement", prizeOnly: "Bank 25 zeniths lifetime" },
+  { id: "rainbow", name: "Rainbow", perk: "All stats +3%", price: 0, body: 0xff4444, wing: 0x44ff44, belly: 0x4444ff, beak: 0xffff44, speedMult: 1.03, feverBonus: 2, daylightBonus: 2, magnetAlways: false, rarity: "legendary", collection: "achievement", prizeOnly: "Own 15 other skins" },
+  { id: "golden_eagle", name: "Golden Eagle", perk: "+4% speed · +4 s daylight", price: 800, body: 0xdaa520, wing: 0xffd700, belly: 0xfff8dc, beak: 0xffa500, speedMult: 1.04, feverBonus: 0, daylightBonus: 4, magnetAlways: false, rarity: "epic", collection: "cosmic" },
+  { id: "phoenix_ember", name: "Phoenix Ember", perk: "+6% speed · ember trail", price: 900, body: 0xff2200, wing: 0xff6600, belly: 0xffccaa, beak: 0xffaa00, speedMult: 1.06, feverBonus: 0, daylightBonus: 0, magnetAlways: false, rarity: "epic", collection: "cosmic" },
+  { id: "ice_dragon", name: "Ice Dragon", perk: "+7 s daylight · weather immunity", price: 850, body: 0x66aaff, wing: 0x88ccff, belly: 0xeeffff, beak: 0xffdd00, speedMult: 1, feverBonus: 1, daylightBonus: 7, magnetAlways: false, rarity: "epic", collection: "cosmic" },
+  { id: "fire_dragon", name: "Fire Dragon", perk: "+5% speed · +3 s fever", price: 850, body: 0xff4400, wing: 0xff8800, belly: 0xffeecc, beak: 0xffcc00, speedMult: 1.05, feverBonus: 3, daylightBonus: 0, magnetAlways: false, rarity: "epic", collection: "cosmic" },
+  { id: "thunder", name: "Thunder", perk: "+4% speed · weather immunity", price: 750, body: 0x334466, wing: 0x6688aa, belly: 0xccddee, beak: 0xffaa44, speedMult: 1.04, feverBonus: 1, daylightBonus: 0, magnetAlways: false, rarity: "epic", collection: "cosmic" },
+  { id: "wind", name: "Zephyr", perk: "+6% speed · +2 s daylight", price: 650, body: 0x88bbdd, wing: 0xaaddff, belly: 0xeeffff, beak: 0xffcc00, speedMult: 1.06, feverBonus: 0, daylightBonus: 2, magnetAlways: false, rarity: "rare", collection: "cosmic" },
+  { id: "earth", name: "Terra", perk: "+5 s daylight · magnet", price: 700, body: 0x668844, wing: 0x88aa66, belly: 0xccddaa, beak: 0xffaa44, speedMult: 1, feverBonus: 0, daylightBonus: 5, magnetAlways: false, rarity: "rare", collection: "cosmic" },
+  { id: "moon", name: "Moonbird", perk: "+4 s daylight · stealth", price: 600, body: 0xccccee, wing: 0xeeeeff, belly: 0xffffff, beak: 0xffdd00, speedMult: 1, feverBonus: 0, daylightBonus: 4, magnetAlways: false, rarity: "rare", collection: "cosmic" },
+  { id: "sun", name: "Solar", perk: "+3% speed · +3 s fever", price: 550, body: 0xffcc00, wing: 0xffee66, belly: 0xffffcc, beak: 0xff8800, speedMult: 1.03, feverBonus: 3, daylightBonus: 0, magnetAlways: false, rarity: "rare", collection: "cosmic" },
+  { id: "star", name: "Starlight", perk: "+5 s daylight · +2 s fever", price: 650, body: 0xffeeff, wing: 0xffffff, belly: 0xffffff, beak: 0xffdd00, speedMult: 1, feverBonus: 2, daylightBonus: 5, magnetAlways: false, rarity: "rare", collection: "cosmic" },
+  { id: "cosmos", name: "Cosmos", perk: "+4% speed · +4 s daylight", price: 700, body: 0x2233aa, wing: 0x4466cc, belly: 0xaabbdd, beak: 0xffaa44, speedMult: 1.04, feverBonus: 0, daylightBonus: 4, magnetAlways: false, rarity: "rare", collection: "cosmic" },
+  { id: "nova", name: "Nova", perk: "+5% speed · +2 s fever", price: 600, body: 0xff6644, wing: 0xffaa66, belly: 0xffeedd, beak: 0xffcc00, speedMult: 1.05, feverBonus: 2, daylightBonus: 0, magnetAlways: false, rarity: "rare", collection: "cosmic" },
+  { id: "quasar", name: "Quasar", perk: "+3% speed · +5 s daylight", price: 750, body: 0x4466cc, wing: 0x6688ee, belly: 0xaaccff, beak: 0xffaa44, speedMult: 1.03, feverBonus: 0, daylightBonus: 5, magnetAlways: false, rarity: "epic", collection: "cosmic" },
+  { id: "pulsar", name: "Pulsar", perk: "+4% speed · +3 s fever", price: 700, body: 0x6644aa, wing: 0x8866cc, belly: 0xccbbff, beak: 0xffaa44, speedMult: 1.04, feverBonus: 3, daylightBonus: 0, magnetAlways: false, rarity: "rare", collection: "cosmic" },
+  { id: "aurora_borealis", name: "Aurora Borealis", perk: "+3 s daylight · +3 s fever", price: 800, body: 0x44aa88, wing: 0x66ccaa, belly: 0xaaffcc, beak: 0xffaa44, speedMult: 1, feverBonus: 3, daylightBonus: 3, magnetAlways: false, rarity: "legendary", collection: "cosmic" },
+  { id: "solar_flare", name: "Solar Flare", perk: "+6% speed · +2 s fever", price: 850, body: 0xff4400, wing: 0xff8800, belly: 0xffccaa, beak: 0xffaa00, speedMult: 1.06, feverBonus: 2, daylightBonus: 0, magnetAlways: false, rarity: "legendary", collection: "cosmic" },
+  { id: "black_hole", name: "Black Hole", perk: "+5 s daylight · magnet", price: 900, body: 0x111122, wing: 0x222244, belly: 0x333355, beak: 0x6666aa, speedMult: 1, feverBonus: 0, daylightBonus: 5, magnetAlways: false, rarity: "mythic", collection: "cosmic" },
+  { id: "dark_matter", name: "Dark Matter", perk: "+4% speed · +4 s fever", price: 850, body: 0x1a1a2e, wing: 0x333355, belly: 0x4a4a6a, beak: 0x8888aa, speedMult: 1.04, feverBonus: 4, daylightBonus: 0, magnetAlways: false, rarity: "mythic", collection: "cosmic" },
 ];
 
 export function skinById(id: string): SkinDef {

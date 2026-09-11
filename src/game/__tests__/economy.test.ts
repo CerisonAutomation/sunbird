@@ -6,8 +6,8 @@ import { MODES } from "../Modes";
 import { BIOMES, biomeForIsland } from "../Biomes";
 
 describe("skin catalogue", () => {
-  it("has a meaningful roster (20+) with unique ids", () => {
-    expect(SKINS.length).toBeGreaterThanOrEqual(20);
+  it("has a meaningful roster (60+) with unique ids", () => {
+    expect(SKINS.length).toBeGreaterThanOrEqual(60);
     expect(new Set(SKINS.map((s) => s.id)).size).toBe(SKINS.length);
   });
 

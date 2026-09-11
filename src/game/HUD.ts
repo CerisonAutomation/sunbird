@@ -1574,8 +1574,10 @@ function renderMain(s: HudSnapshot): string {
   `;
 }
 
-function skinRarity(d: { goldOnly?: boolean; vipOnly?: boolean; prizeOnly?: string; price: number }): { key: string; label: string } {
+function skinRarity(d: { goldOnly?: boolean; vipOnly?: boolean; prizeOnly?: string; price: number; rarity?: string }): { key: string; label: string } {
   if (d.prizeOnly) return { key: "prize", label: "PRIZE" };
+  // Explicit rarity from the catalogue wins over inferred price bands.
+  if (d.rarity && d.rarity !== "starter") return { key: d.rarity, label: d.rarity.toUpperCase() };
   if (d.vipOnly) return { key: "mythic", label: "MYTHIC" };
   if (d.goldOnly) return { key: "legendary", label: "LEGENDARY" };
   if (d.price >= 700) return { key: "epic", label: "EPIC" };
