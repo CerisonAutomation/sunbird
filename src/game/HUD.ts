@@ -1213,6 +1213,15 @@ function renderMain(s: HudSnapshot): string {
       <button class="nav-btn" data-ui data-action="open-settings" aria-label="Settings"><i>⚙</i><span>Settings</span></button>
     </nav>
 
+    <!-- Bottom Tab Navigation (Popular Game Pattern) -->
+    <nav class="bottom-tabs" data-ref="bottomTabs">
+      <button class="tab-item active" data-ui data-action="pvp-practice"><span class="tab-icon">☀</span><span class="tab-label">Fly</span></button>
+      <button class="tab-item" data-ui data-action="open-rank"><span class="tab-icon">⚔</span><span class="tab-label">Rank</span></button>
+      <button class="tab-item" data-ui data-action="open-shop"><span class="tab-icon">🛍</span><span class="tab-label">Shop</span></button>
+      <button class="tab-item" data-ui data-action="open-pass"><span class="tab-icon">🎟</span><span class="tab-label">Pass</span></button>
+      <button class="tab-item" data-ui data-action="open-settings"><span class="tab-icon">⚙</span><span class="tab-label">More</span></button>
+    </nav>
+
     ${
       !portal && s.vipExpiredNotice
         ? `<div class="expire-strip">♛ VIP has lapsed — the Aurora bird stays yours, perks are paused.
@@ -1562,7 +1571,7 @@ function renderGameOver(s: HudSnapshot): string {
     ${s.nearMiss ? `<div class="nearmiss">${s.nearMiss}</div>` : ""}
     ${raceStrip}
     <div class="reached-strip">Reached <b>${s.biomeEmoji} ${s.biomeName}</b> · Island ${s.island + 1}</div>
-    <button class="primary-btn big" data-ui data-action="retry">Fly again <small>hold anywhere · R</small></button>
+    <button class="play-again-btn" data-ui data-action="retry">✈ FLY AGAIN</button>
     <button class="soft-btn wide" data-ui data-action="share" ${s.shareBusy ? "disabled" : ""}>${s.shareBusy ? "Preparing…" : "📤 Share this flight"}</button>
     <div class="btn-row">
       <button class="soft-btn" data-ui data-action="open-shop">🛍 Shop</button>
