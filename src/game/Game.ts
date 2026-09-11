@@ -4,7 +4,7 @@ import { GameAudio } from "./Audio";
 import { BIOMES, biomeForIsland } from "./Biomes";
 import { Bird, type BirdStepOpts } from "./Bird";
 import { CameraRig } from "./CameraRig";
-import { Collectibles, type CloudKind, type PickupKind } from "./Collectibles";
+import { PICKUP_STYLE, Collectibles, type CloudKind, type PickupKind } from "./Collectibles";
 import { evaluateNearMiss, FlowTuner, SessionGoals, type NearMiss } from "./Engagement";
 import { BIG_LAUNCH_QUIPS, SLEEP_QUIPS, SPLASH_QUIPS, SurpriseEngine, quip } from "./Surprises";
 import { LaunchSystem, ratingLabel, type LaunchResult } from "./LaunchSystem";
@@ -243,6 +243,10 @@ export class Game {
   private stormfront = false;
   /** Stormfront phase (1-3): the storm escalates as the field advances. */
   private stormPhase = 1;
+  /** First thermal of the run gets a toast; the HUD chip covers the rest. */
+  private thermalToasted = false;
+  /** Weekly-event physics mods, cached at run start (hot path: every frame + every coin). */
+  private weeklyMods = { coinMult: 1, gravityMult: 1, windMult: 1, daylightMult: 1 };
   /** Golden Hour: the last stretch of daylight — 2× coins, amber world. */
   private goldenHour = false;
   private nextMilestone = 500;
@@ -507,6 +511,8 @@ export class Game {
     window.removeEventListener("beforeinstallprompt", this.onBeforeInstall);
     window.removeEventListener("appinstalled", this.onInstalled);
     window.removeEventListener("focus", this.onFocus);
+    this.telemetry.flush();
+    this.telemetry.dispose();
     this.weather.dispose();
     this.net?.disconnect();
     this.massRace.dispose();
@@ -679,7 +685,7 @@ export class Game {
         // Slipstream: tucking behind a rival genuinely reduces your drag.
         dragMult: this.powers.dragMult() * this.massRace.draftFor(this.bird.x, this.bird.y),
         feather: this.powers.featherOn(),
-        gravityMult: this.eventRun ? weeklyEvent().mods.gravityMult : 1,
+        gravityMult: this.eventRun ? this.weeklyMods.gravityMult : 1,
       },
       this.terrain,
     );
@@ -728,7 +734,12 @@ export class Game {
     this.weather.update(dt, this.elapsed, this.bird, this.terrain, diving, {
       onThermalEnter: () => {
         this.audio.thermal();
-        if (this.hintTimer < 40) this.hud.toast("Thermal — release to ride it", "power");
+        // Once per run: after the first call-out the ♨ HUD chip carries the
+        // message — toasting every thermal doubled the same text on screen.
+        if (!this.thermalToasted && this.hintTimer < 40) {
+          this.thermalToasted = true;
+          this.hud.toast("Thermal — release to ride it", "power");
+        }
       },
       onGustStart: () => {
         this.audio.gust();
@@ -941,7 +952,7 @@ export class Game {
     }
 
     const magnetOn = this.feverOn || this.magnetTimer > 0 || skin.magnetAlways || this.powers.magnetOn();
-    this.collect.update(dt, this.bird, this.terrain, magnetOn, this.elapsed, {
+    this.collect.update(dt, this.bird, this.terrain, magnetOn, this.elapsed, this.powers.magnetScale(), {
       onCoin: (x, y, gem) => {
         const base = gem ? 5 : 1;
         const value = Math.round(
@@ -951,7 +962,7 @@ export class Game {
             (this.mode.id === "coinrush" ? 2 : 1) *
             this.challengeMods.coinMult *
             this.masteryPerk.coinMult *
-            (this.eventRun ? weeklyEvent().mods.coinMult : 1) *
+            (this.eventRun ? this.weeklyMods.coinMult : 1) *
             (this.goldenHour ? 2 : 1) *
             (this.stormfront && this.stormPhase >= 3 ? 2 : 1),
         );
@@ -1316,7 +1327,22 @@ export class Game {
     this.audio.powerup();
     this.particles.emitCollect(x, y);
     this.haptic([40, 30, 40, 30, 100]);
+    const wasLive = this.powers.has(kind);
     this.powers.add(kind);
+    // OVERCHARGE: doubling up while live promotes the power-up to tier II.
+    if (wasLive && this.powers.level(kind) === 2) {
+      // Impulse-style effects still fire — the promotion adds, never removes.
+      if (kind === "rocket") {
+        this.boostTimer = BOOST_TIME;
+        this.bird.vx += 42;
+        this.bird.vy += 8;
+        this.shake(0.55);
+      }
+      this.particles.burstRing(x, y, 0xffffff);
+      this.hud.toast(`⚡ OVERCHARGE II — ${PICKUP_STYLE[kind].label}`, "zenith");
+      this.shake(0.3);
+      return;
+    }
     switch (kind) {
       case "sun":
         this.daylight = Math.min(this.daylightMax(), this.daylight + PICKUP_SUN_TIME);
@@ -1387,7 +1413,9 @@ export class Game {
     const slope = this.terrain.slopeAt(this.bird.x);
     if (this.hintTimer < 2.6 && slope < -0.08) return "HOLD to dive";
     if (slope > 0.16 && this.bird.grounded && this.bird.speed() > 18) return "RELEASE to launch";
-    if (this.weather.inThermal && !this.input.diving) return "Riding the thermal!";
+    // No thermal line here: the ♨ HUD chip already says "release!" — three
+    // simultaneous thermal texts (toast + chip + hint) was the worst offender
+    // of the multiple-text bug.
     if (this.terrain.isOcean(this.bird.x + 40) && !this.terrain.isOcean(this.bird.x)) return "Build speed — then RELEASE";
     return "";
   }
@@ -1533,11 +1561,13 @@ export class Game {
     this.challengeRun = opts?.challenge ?? "";
     this.challengeMods = this.challengeRun === "daily" ? modsFor(dailyChallenge(this.today).modifier.id) : NO_MODS;
     this.eventRun = Boolean(opts?.event);
+    if (this.eventRun) this.weeklyMods = weeklyEvent().mods;
     this.serverPlaceApplied = false;
     this.goldenHour = false;
     this.nextMilestone = 500;
     this.rivalBeatenToast = false;
     this.stormPhase = 1;
+    this.thermalToasted = false;
     // Stormfront survives only through launchMatch(); any other entry resets.
     if (!opts?.storm) this.stormfront = false;
     this.challengeOutcome = "";
@@ -1554,8 +1584,8 @@ export class Game {
     this.daylight =
       (this.mode.clock > 0 ? this.mode.clock : this.daylightMax()) *
       this.challengeMods.daylightMult *
-      (this.eventRun ? weeklyEvent().mods.daylightMult : 1);
-    this.weather.windMult = (this.eventRun ? weeklyEvent().mods.windMult : 1) * (this.stormfront ? 1.7 : 1);
+      (this.eventRun ? this.weeklyMods.daylightMult : 1);
+    this.weather.windMult = (this.eventRun ? this.weeklyMods.windMult : 1) * (this.stormfront ? 1.7 : 1);
     this.weather.stormfront = this.stormfront;
     if (this.stormfront) this.hud.toast("⛈ STORMFRONT — same storm for every pilot. Survive and outfly.", "warn");
     // Mass Race: build the 40-bird grid on the *same* seed so the field is

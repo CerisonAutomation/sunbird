@@ -131,14 +131,14 @@ export class Collectibles {
     this.activePickups.length = 0;
   }
 
-  update(dt: number, bird: Bird, terrain: TerrainSystem, magnetOn: boolean, time: number, ev: CollectEvents): void {
+  update(dt: number, bird: Bird, terrain: TerrainSystem, magnetOn: boolean, time: number, magnetScale: number, ev: CollectEvents): void {
     const ahead = bird.x + 420;
     if (ahead > this.spawnedUntil) {
       this.spawnRange(Math.max(this.spawnedUntil, bird.x - 20), ahead, terrain);
       this.spawnedUntil = ahead;
     }
 
-    const magnet = magnetOn ? MAGNET_RADIUS : MAGNET_RADIUS_NORMAL;
+    const magnet = magnetOn ? MAGNET_RADIUS * magnetScale : MAGNET_RADIUS_NORMAL;
     for (let i = this.activeCoins.length - 1; i >= 0; i--) {
       const c = this.activeCoins[i]!;
       if (c.taken || c.x < bird.x - 30) {
@@ -151,7 +151,7 @@ export class Collectibles {
       const dy = bird.y - c.y;
       const d = Math.hypot(dx, dy);
       if (d < magnet && d > 0.01) {
-        const pull = magnetOn ? 52 : 18;
+        const pull = magnetOn ? 52 * magnetScale : 18;
         c.x += (dx / d) * pull * dt;
         c.y += (dy / d) * pull * dt;
       }

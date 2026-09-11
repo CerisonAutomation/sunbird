@@ -46,17 +46,23 @@ export type SocialState = {
   challenges: FriendChallenge[]; savedReplays: ReplayData[]; socialQuestsClaimed: string[];
 };
 
+/** SaveState grows an optional social branch, initialised on first touch. */
+type SocialHost = { social?: SocialState };
+
 export class SocialSystem {
   constructor(private save: SaveData) {}
   private ensureInit(): void {
-    const s = this.save.state as any;
-    if (!s.social) {
-      s.social = { friends: [], pendingRequests: [], incomingRequests: [], blocked: [],
+    const host = this.save.state as typeof this.save.state & SocialHost;
+    if (!host.social) {
+      host.social = { friends: [], pendingRequests: [], incomingRequests: [], blocked: [],
         club: null, dmThreads: [], challenges: [], savedReplays: [], socialQuestsClaimed: [] };
       this.save.persist();
     }
   }
-  private get social(): SocialState { this.ensureInit(); return (this.save.state as any).social; }
+  private get social(): SocialState {
+    this.ensureInit();
+    return (this.save.state as typeof this.save.state & Required<SocialHost>).social;
+  }
   sendFriendRequest(targetDeviceId: string, targetName: string): boolean {
     const s = this.social;
     if (targetDeviceId === this.save.state.deviceId) return false;
@@ -122,6 +128,13 @@ export class SocialSystem {
       createdAt: dateSeed(), expiresAt: this.dateSeedDaysLater(3) };
     s.challenges.push(challenge); this.save.persist(); return challenge;
   }
+  /** Accept a pending challenge so a finished run can complete it. */
+  acceptChallenge(challengeId: string): boolean {
+    const ch = this.social.challenges.find(c => c.id === challengeId);
+    if (!ch || ch.status !== "pending") return false;
+    if (this.isExpired(ch)) { ch.status = "expired"; this.save.persist(); return false; }
+    ch.status = "accepted"; this.save.persist(); return true;
+  }
   completeChallenge(challengeId: string, myValue: number): "won" | "lost" | "tied" | null {
     const ch = this.social.challenges.find(c => c.id === challengeId);
     if (!ch || ch.status !== "accepted") return null;
@@ -129,7 +142,16 @@ export class SocialSystem {
     const result: "won" | "lost" | "tied" = myValue > ch.challengerValue ? "won" : myValue < ch.challengerValue ? "lost" : "tied";
     ch.result = result; this.save.persist(); return result;
   }
-  getActiveChallenges(): FriendChallenge[] { return this.social.challenges.filter(c => c.status === "pending" || c.status === "accepted"); }
+  getActiveChallenges(): FriendChallenge[] {
+    // Sweep expiries lazily so stale challenges never linger as "active".
+    let dirty = false;
+    for (const c of this.social.challenges) {
+      if ((c.status === "pending" || c.status === "accepted") && this.isExpired(c)) { c.status = "expired"; dirty = true; }
+    }
+    if (dirty) this.save.persist();
+    return this.social.challenges.filter(c => c.status === "pending" || c.status === "accepted");
+  }
+  private isExpired(c: FriendChallenge): boolean { return c.expiresAt < dateSeed(); }
   saveReplay(data: ReplayData): void { const s = this.social; s.savedReplays.unshift(data); if (s.savedReplays.length > 10) s.savedReplays.splice(10); this.save.persist(); }
   getReplays(): ReplayData[] { return this.social.savedReplays; }
   private makeWeeklyChallenge(): ClubChallenge {
