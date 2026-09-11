@@ -223,7 +223,7 @@ impl LegacyRooms {
         broadcast_peers(room);
 
         if room.pilots.len() >= 2 && room.started_at == 0 {
-            room.started_at = epoch_ms() + 3000;
+            room.started_at = epoch_ms() + 6000;
             broadcast(
                 room,
                 &Out::Start {

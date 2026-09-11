@@ -92,7 +92,7 @@ export const MODES: ModeDef[] = [
     blurb: "A full 40-bird field on identical hills. Out-fly the pack to the line.",
     icon: "🐦",
     clock: 0,
-    finish: 3000,
+    finish: 4000,
     scoreBy: "time",
     escalate: false,
   },
