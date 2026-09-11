@@ -3322,3 +3322,89 @@ button {
   margin: 8px 0;
 }
 .empty-note small { font-size: 11px; color: #9a8a7a; }
+
+/* ================= animated menu sky (behind the paper card) ============= */
+.overlay.menu { position: absolute; }
+.menu-sky {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.overlay.menu .paper-card { position: relative; z-index: 1; }
+.menu-sky .msun {
+  position: absolute;
+  top: -90px;
+  left: 50%;
+  width: 300px;
+  height: 300px;
+  margin-left: -150px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 226, 150, 0.5), rgba(255, 196, 110, 0.18) 55%, transparent 72%);
+  animation: msunPulse 7s ease-in-out infinite;
+}
+@keyframes msunPulse {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+.menu-sky .mcloud {
+  position: absolute;
+  height: 26px;
+  border-radius: 999px;
+  background: rgba(255, 250, 240, 0.16);
+  filter: blur(6px);
+  animation: mdrift linear infinite;
+}
+.menu-sky .mcloud.c1 { top: 14%; width: 180px; animation-duration: 58s; }
+.menu-sky .mcloud.c2 { top: 30%; width: 120px; height: 18px; animation-duration: 43s; animation-delay: -18s; }
+.menu-sky .mcloud.c3 { top: 66%; width: 220px; height: 30px; animation-duration: 71s; animation-delay: -40s; }
+@keyframes mdrift {
+  from { left: -240px; }
+  to { left: 110%; }
+}
+/* the flock: swept-wing silhouettes gliding across on layered depths */
+.menu-sky .mb {
+  position: absolute;
+  width: 30px;
+  height: 13px;
+  fill: none;
+  stroke: rgba(70, 46, 60, 0.5);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  animation: mglide linear infinite, mflap 0.9s ease-in-out infinite alternate;
+}
+.menu-sky .b1 { top: 12%; animation-duration: 26s, 0.9s; }
+.menu-sky .b2 { top: 17%; width: 22px; stroke-width: 2; animation-duration: 31s, 1.05s; animation-delay: -8s, -0.3s; opacity: 0.7; }
+.menu-sky .b3 { top: 24%; width: 17px; stroke-width: 1.7; animation-duration: 38s, 1.2s; animation-delay: -20s, -0.6s; opacity: 0.45; }
+.menu-sky .b4 { top: 55%; width: 24px; animation-duration: 29s, 1s; animation-delay: -14s, -0.15s; opacity: 0.6; }
+.menu-sky .b5 { top: 70%; width: 18px; stroke-width: 1.8; animation-duration: 41s, 1.15s; animation-delay: -30s, -0.45s; opacity: 0.4; }
+.menu-sky .b6 { top: 84%; width: 26px; animation-duration: 33s, 0.95s; animation-delay: -5s, -0.7s; opacity: 0.55; }
+@keyframes mglide {
+  from { left: -40px; transform: translateY(0); }
+  25% { transform: translateY(-14px); }
+  50% { transform: translateY(4px); }
+  75% { transform: translateY(-10px); }
+  to { left: 108%; transform: translateY(0); }
+}
+@keyframes mflap {
+  from { transform: scaleY(1); }
+  to { transform: scaleY(0.55); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .menu-sky .mb, .menu-sky .mcloud, .menu-sky .msun { animation: none; }
+  .menu-sky .mb { display: none; }
+}
+
+/* ================= HUD overlap fixes ===================================== */
+/* Race strip sits under the top bar; badge clears both. */
+.race-progress { top: 78px; z-index: 8; }
+.position-badge { top: 92px; }
+/* Hint must never collide with the combo counter or launch banner. */
+.combo { z-index: 12; }
+/* Standings ticker below the race strip, never over the top-bar. */
+.standings { top: 118px; }
+/* Toasts float above everything except modals. */
+.toasts { z-index: 40; }
+/* Mid-meta chips: allow wrap so biome+mult+gold+vip can't overflow a row. */
+.mid-meta { flex-wrap: wrap; row-gap: 4px; }

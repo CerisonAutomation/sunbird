@@ -3371,6 +3371,7 @@ export class Game {
           ? this.massRace.standings(this.bird.x, this.startX, this.pilotName, 6).rows
           : [],
       racePlace: this.racePlace,
+      raceFinishM: this.mode.finish,
       raceField: this.raceField,
       raceFinishTime: this.raceFinishTime,
       massRace: this.modeId === "massrace",

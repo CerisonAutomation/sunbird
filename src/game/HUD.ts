@@ -193,6 +193,8 @@ export type HudSnapshot = {
   lastPrize: string;
   standings: Standing[];
   racePlace: number;
+  /** Finish line in metres for the live race progress strip (0 = endless). */
+  raceFinishM: number;
   raceField: number;
   raceFinishTime: number;
   massRace: boolean;
@@ -332,6 +334,12 @@ export class HUD {
   private goalStrip!: HTMLElement;
   private goalPop!: HTMLElement;
   private standingsEl!: HTMLElement;
+  private posBadgeEl!: HTMLElement;
+  private raceProgEl!: HTMLElement;
+  private raceProgFill!: HTMLElement;
+  private raceDotYou!: HTMLElement;
+  private raceDotLeader!: HTMLElement;
+  private lastPlace = 0;
   private rosterBar!: HTMLElement;
   private draftMeter!: HTMLElement;
   private finishCd!: HTMLElement;
@@ -387,6 +395,7 @@ export class HUD {
           <div class="stat-block">
             <div class="stat-label">Distance</div>
             <div class="stat-value" data-ref="distance">0 m</div>
+            <div class="stat-sub">best <span data-ref="best">0</span></div>
           </div>
           <div class="sun-meter" title="Daylight">
             <div class="sun-track">
@@ -398,11 +407,10 @@ export class HUD {
           <div class="stat-block right">
             <div class="stat-label">Coins</div>
             <div class="stat-value coin" data-ref="coins">0</div>
-            <div class="stat-sub">best <span data-ref="best">0</span></div>
           </div>
         </div>
-        <div class="position-badge" data-ref="positionBadge">1<span class="pos-suffix">st</span></div>
-        <div class="race-progress" data-ref="raceProgress"><div class="race-progress-fill" data-ref="raceProgressFill" style="width:10%"></div><div class="race-progress-dot you" style="left:10%"></div><div class="race-progress-dot leader" style="left:85%"></div><span class="race-progress-finish">🏁</span></div>
+        <div class="position-badge hidden" data-ref="positionBadge">1<span class="pos-suffix">st</span></div>
+        <div class="race-progress hidden" data-ref="raceProgress"><div class="race-progress-fill" data-ref="raceProgressFill" style="width:0%"></div><div class="race-progress-dot you" data-ref="raceDotYou" style="left:0%"></div><div class="race-progress-dot leader" data-ref="raceDotLeader" style="left:0%"></div><span class="race-progress-finish">🏁</span></div>
         <div class="speedlines" data-ref="speedlines"></div>
         <div class="alt-gauge" data-ref="altGauge">
           <div class="alt-track">
@@ -452,7 +460,7 @@ export class HUD {
         <div class="hand" data-ref="hand">☝</div>
       </div>
 
-      <div class="overlay menu hidden" data-ref="menu"><div class="paper-card" data-ref="menuCard"></div></div>
+      <div class="overlay menu hidden" data-ref="menu"><div class="menu-sky" aria-hidden="true"><span class="msun"></span><span class="mcloud c1"></span><span class="mcloud c2"></span><span class="mcloud c3"></span><svg class="mb b1" viewBox="0 0 28 12" aria-hidden="true"><path d="M1 9 Q8 1 14 8 Q20 1 27 9"/></svg><svg class="mb b2" viewBox="0 0 28 12" aria-hidden="true"><path d="M1 9 Q8 1 14 8 Q20 1 27 9"/></svg><svg class="mb b3" viewBox="0 0 28 12" aria-hidden="true"><path d="M1 9 Q8 1 14 8 Q20 1 27 9"/></svg><svg class="mb b4" viewBox="0 0 28 12" aria-hidden="true"><path d="M1 9 Q8 1 14 8 Q20 1 27 9"/></svg><svg class="mb b5" viewBox="0 0 28 12" aria-hidden="true"><path d="M1 9 Q8 1 14 8 Q20 1 27 9"/></svg><svg class="mb b6" viewBox="0 0 28 12" aria-hidden="true"><path d="M1 9 Q8 1 14 8 Q20 1 27 9"/></svg></div><div class="paper-card" data-ref="menuCard"></div></div>
 
       <div class="overlay pause hidden" data-ref="pause">
         <div class="paper-card slim">
@@ -683,6 +691,31 @@ export class HUD {
       // ahead so every position fight reads at a glance. Throttled like the
       // roster so it never rebuilds mid-frame more than ~5×/s.
       this.standingsEl.classList.toggle("hidden", s.standings.length === 0);
+
+      // Live position badge + race progress strip — mass race only. These were
+      // static markup once; now they follow the standings every frame.
+      const you = s.standings.find((r) => r.you);
+      const leader = s.standings[0];
+      const showRace = s.massRace && s.raceFinishM > 0 && Boolean(you) && s.standings.length > 0;
+      this.posBadgeEl.classList.toggle("hidden", !showRace);
+      this.raceProgEl.classList.toggle("hidden", !showRace);
+      if (showRace && you && leader) {
+        if (you.place !== this.lastPlace) {
+          this.lastPlace = you.place;
+          const suffix = you.place % 10 === 1 && you.place !== 11 ? "st" : you.place % 10 === 2 && you.place !== 12 ? "nd" : you.place % 10 === 3 && you.place !== 13 ? "rd" : "th";
+          this.posBadgeEl.innerHTML = `${you.place}<span class="pos-suffix">${suffix}</span>`;
+          this.posBadgeEl.classList.toggle("first", you.place === 1);
+          this.posBadgeEl.classList.toggle("top3", you.place > 1 && you.place <= 3);
+          this.posBadgeEl.classList.remove("pop");
+          void this.posBadgeEl.offsetWidth;
+          this.posBadgeEl.classList.add("pop");
+        }
+        const youF = Math.max(0, Math.min(1, you.distance / s.raceFinishM));
+        const leadF = Math.max(0, Math.min(1, leader.distance / s.raceFinishM));
+        this.setStyle(this.raceProgFill, "raceFill", "width", `${(youF * 100).toFixed(1)}%`);
+        this.setStyle(this.raceDotYou, "raceYou", "left", `${(youF * 100).toFixed(1)}%`);
+        this.setStyle(this.raceDotLeader, "raceLead", "left", `${(leadF * 100).toFixed(1)}%`);
+      }
       if (s.standings.length) {
         const nowS = performance.now();
         const key = s.standings.map((r) => `${r.id}${r.place}${Math.round(r.distance / 12)}${r.finished ? "F" : ""}`).join("|");
@@ -871,6 +904,11 @@ export class HUD {
     this.goalStrip = grab("goalStrip");
     this.goalPop = grab("goalPop");
     this.standingsEl = grab("standings");
+    this.posBadgeEl = grab("positionBadge");
+    this.raceProgEl = grab("raceProgress");
+    this.raceProgFill = grab("raceProgressFill");
+    this.raceDotYou = grab("raceDotYou");
+    this.raceDotLeader = grab("raceDotLeader");
     this.rosterBar = grab("rosterBar");
     this.draftMeter = grab("draftMeter");
     this.finishCd = grab("finishCd");
@@ -1455,7 +1493,7 @@ function renderMain(s: HudSnapshot): string {
         .join("")}</div>`
     : portal
       ? `<p class="portal-note">${s.portalName === "poki" ? "Poki" : "CrazyGames"} edition · portal rewards enabled</p>`
-      : `<button class="lock-chip" data-ui data-action="open-paywall">🔒 Pick your hills with Gold</button>`;
+      : `<button class="lock-chip" data-ui data-action="open-paywall">✦ Pick your hills with Gold</button>`;
   return `
     <header class="hero">
       <div class="hero-sun" aria-hidden="true"></div>
@@ -1484,12 +1522,12 @@ function renderMain(s: HudSnapshot): string {
         <span class="mode-desc">Race 40 pilots · duels · rooms</span>
       </button>
       <button class="mode-card-main pve" data-ui data-action="open-challenges">
-        <span class="mode-icon-lg">🎯</span>
+        <span class="mode-icon-lg">◎</span>
         <span class="mode-name">PVE</span>
         <span class="mode-desc">Daily challenge & storm gauntlet</span>
       </button>
       <button class="mode-card-main cup" data-ui data-action="open-cups">
-        <span class="mode-icon-lg">🏆</span>
+        <span class="mode-icon-lg">♛</span>
         <span class="mode-name">TOURNAMENT</span>
         <span class="mode-desc">Weekly cups — win exclusive gear</span>
       </button>
