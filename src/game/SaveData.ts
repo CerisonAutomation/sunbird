@@ -79,6 +79,8 @@ export type SaveState = {
   farthestIsland: number;
   biomesSeen: string[];
   tutorialRuns: number;
+  /** One-time interactive first-flight coach completed (dive/launch/soar). */
+  firstFlightDone: boolean;
   /** rolling flow-calibration estimate */
   skill: number;
   skillSamples: number;
@@ -177,6 +179,7 @@ function defaults(): SaveState {
     farthestIsland: 0,
     biomesSeen: [],
     tutorialRuns: 0,
+    firstFlightDone: false,
     skill: 0.25,
     skillSamples: 0,
     bestAltitude: 0,
@@ -336,6 +339,7 @@ export class SaveData {
         farthestIsland: num(p.farthestIsland),
         biomesSeen: strArr(p.biomesSeen),
         tutorialRuns: num(p.tutorialRuns),
+        firstFlightDone: Boolean(p.firstFlightDone),
         skill: p.skill === undefined ? 0.25 : num(p.skill),
         skillSamples: num(p.skillSamples),
         bestAltitude: num(p.bestAltitude),

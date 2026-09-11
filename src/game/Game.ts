@@ -27,6 +27,7 @@ import {
   type ChallengeMods,
 } from "./Challenges";
 import { bankMasteryRun, masteryPerks, masteryViews, NO_MASTERY_PERKS, type MasteryPerks } from "./Mastery";
+import { FirstFlight } from "./FirstFlight";
 import { campaignProgress, campaignViews, CAMPAIGN } from "./Campaign";
 import { monthKey, monthlyTheme, THEME_TRAIL_CLEARS, weeklyEvent } from "./Events";
 import { emptySquadState, SquadClient } from "./Squad";
@@ -250,6 +251,8 @@ export class Game {
   private recordBanner = "";
   private runGems = 0;
   private readonly powers = new PowerUps();
+  private coach: FirstFlight | null = null;
+  private coachDoneT = 0;
   private mode: ModeDef = modeById("daytrip");
   private modeId: ModeId = "daytrip";
   /** Permanent per-mode mastery perks (coin/daylight/fever/lift), refreshed each run. */
@@ -645,6 +648,27 @@ export class Game {
     );
 
     if (this.bird.justLaunched) this.onLaunch();
+
+    // First-flight coach: verify dive -> launch -> soar with real play signals.
+    if (this.coach && !this.coach.done) {
+      this.coach.update(dt, {
+        diving,
+        grounded: this.bird.grounded,
+        slope: this.terrain.slopeAt(this.bird.x),
+        justLaunched: this.bird.justLaunched,
+        airborne: !this.bird.grounded,
+      });
+      if (this.coach.done) {
+        this.save.state.firstFlightDone = true;
+        this.save.addCoins(50);
+        this.save.persist();
+        this.hud.toast("🕊 First flight complete · +50 coins — the sky is yours", "gold");
+        this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
+        this.coachDoneT = 3;
+      }
+    } else if (this.coachDoneT > 0) {
+      this.coachDoneT -= dt;
+    }
     if (this.bird.justLanded) this.onLanding();
 
     this.ghostRecorder.sample(dt, this.runTime, this.bird.x, this.bird.y, this.bird.rotation);
@@ -1260,6 +1284,15 @@ export class Game {
     }
   }
 
+  /** First-flight coach line takes priority over ambient hints. */
+  private coachHint(): string {
+    if (!this.coach) return "";
+    const v = this.coach.view();
+    if (v.step < 0 || !v.text) return "";
+    const pips = Array.from({ length: v.steps }, (_, i) => (i < v.step ? "●" : i === v.step ? "◉" : "○")).join(" ");
+    return `${pips}  ${v.text}`;
+  }
+
   private computeHint(): string {
     const novice = this.save.state.tutorialRuns < 3;
     if (this.hintTimer > (novice ? 26 : 8)) {
@@ -1417,6 +1450,10 @@ export class Game {
     this.eventRun = Boolean(opts?.event);
     this.challengeOutcome = "";
     this.resetRun(false);
+    // First ever flight: spin up the interactive dive/launch/soar coach.
+    if (!this.save.state.firstFlightDone && this.modeId === "daytrip" && !this.duelActive && !this.challengeRun && !this.eventRun) {
+      this.coach = new FirstFlight(false);
+    }
     // Modes reshape the clock; Race has no sunset at all.
     this.daylight =
       (this.mode.clock > 0 ? this.mode.clock : this.daylightMax()) *
@@ -3220,7 +3257,7 @@ export class Game {
       perfects: this.perfects,
       clouds: this.runClouds,
       zeniths: this.zeniths,
-      hint: this.state === "playing" ? this.hint : "",
+      hint: this.state === "playing" ? this.coachHint() || this.hint : "",
       magnetTimer: this.magnetTimer,
       shield: this.shield,
       boostTimer: this.boostTimer,
