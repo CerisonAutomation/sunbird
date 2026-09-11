@@ -10,9 +10,21 @@ npm i -g vercel
 vercel deploy --prod
 ```
 
-`vercel.json` is already configured: static build to `dist/`, SPA rewrite,
+`vercel.json` is already configured: static build to `dist/`, SPA rewrite
+(which excludes `/api` so the leaderboard functions aren't shadowed),
 immutable icon caching, `no-cache` on `sw.js`, and security headers.
-No serverless functions needed — the game is fully static.
+
+**Leaderboard on Vercel:** the `api/` directory ships two serverless functions
+(`GET /api/board`, `POST /api/score`) implementing `LEADERBOARD_API.md`.
+They persist to Vercel KV when `KV_REST_API_URL` + `KV_REST_API_TOKEN` are set,
+and fall back to an in-memory board otherwise (preview only, resets on cold
+start). To enable it:
+
+1. Create a KV store in the Vercel dashboard and add its `KV_REST_API_URL` +
+   `KV_REST_API_TOKEN` to the project environment.
+2. Set `VITE_LEADERBOARD_URL=/api` (same origin) in the build env and redeploy.
+3. Optionally set `VITE_LEADERBOARD_SALT` (build) and `LEADERBOARD_SALT`
+   (functions) to require HMAC-signed score submissions.
 
 **Multiplayer on Vercel:** the static frontend cannot host the WebSocket room
 server, so run the Rust `sunbird-server` on any WebSocket-capable host (a

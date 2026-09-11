@@ -20,10 +20,11 @@
     "build:vercel": "vite build",
     "gen-icons": "node scripts/gen-icons.mjs",
     "physcheck": "npx tsx scripts/physcheck.ts",
-    "lint": "eslint src scripts --max-warnings 0"
+    "lint": "eslint src scripts api --max-warnings 0"
   },
   "dependencies": {
     "@stripe/stripe-js": "^9.15.0",
+    "@vercel/kv": "^3.0.0",
     "clsx": "2.1.1",
     "react": "19.2.6",
     "react-dom": "19.2.6",

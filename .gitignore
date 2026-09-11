@@ -36,11 +36,6 @@ rust/target/
 .graph-it/
 .vercel
 
-# Cloudflare Workers backend
-backend/node_modules
-backend/.wrangler
-.wrangler/
-
 # Playwright MCP debug snapshots
 .playwright-mcp/
 server/social/sunbird-social-data/

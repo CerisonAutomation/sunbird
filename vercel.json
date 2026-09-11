@@ -58,7 +58,7 @@
   ],
   "rewrites": [
     {
-      "source": "/((?!icons/|fonts/|sw\\.js|manifest\\.webmanifest).*)",
+      "source": "/((?!icons/|fonts/|api/|sw\\.js|manifest\\.webmanifest).*)",
       "destination": "/index.html"
     }
   ]

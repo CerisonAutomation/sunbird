@@ -12,7 +12,7 @@
 - **Physics** — Fixed-step client simulation with skill-based launch windows
 - **Payments** — Stripe Payment Links (no backend required); portal builds strip all payment surfaces
 - **Multiplayer** — Self-hosted Rust room server ([rust/](./rust/)) with server-authoritative finish order
-- **Leaderboard** — On-device fallback + optional HTTP backend ([LEADERBOARD_API.md](./LEADERBOARD_API.md))
+- **Leaderboard** — Vercel Functions ([api/](./api/)) + Vercel KV, with on-device fallback ([LEADERBOARD_API.md](./LEADERBOARD_API.md))
 - **PWA** — Service worker (build-stamped cache) + Web App Manifest
 
 ## Quick Start
@@ -60,7 +60,8 @@ Copy `.env.example` → `.env.local`. All variables are optional — the game ru
 ## Deployment
 
 - **Frontend** — Vercel: `vercel deploy --prod` (config in `vercel.json`). See [DEPLOY.md](./DEPLOY.md).
-- **Backend** — Self-hosted Rust: `cargo build --release -p sunbird-server`. In-memory rooms cost nothing while empty. See [rust/README.md](./rust/README.md).
+- **Leaderboard** — Vercel Functions in `api/`, persisted in Vercel KV (optional; in-memory fallback for previews).
+- **Multiplayer** — Self-hosted Rust: `cargo build --release -p sunbird-server`. In-memory rooms cost nothing while empty. See [rust/README.md](./rust/README.md).
 - **Portals** — `npm run build:portals` produces submission-ready zips for Poki, CrazyGames, and 10+ generic HTML5 portals. Compliance matrix in [PORTAL_PUBLISHING.md](./PORTAL_PUBLISHING.md).
 
 ## Game Systems
