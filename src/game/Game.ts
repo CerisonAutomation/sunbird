@@ -3286,6 +3286,28 @@ export class Game {
       }
     }
     for (const e of net.drainEmotes()) this.massRace.showEmote(e.id, e.emote);
+    // Live multiplayer signals: surface presence changes as in-flight toasts
+    // so a connecting/leaving/finishing rival never goes unnoticed.
+    for (const e of net.drainEvents()) {
+      switch (e.type) {
+        case "join":
+          this.hud.toast(`🕊 ${e.name} joined the race`, "island");
+          this.audio.chirp();
+          break;
+        case "leave":
+          this.hud.toast(`👋 ${e.name} left`, "warn");
+          break;
+        case "ready":
+          this.hud.toast(`✅ ${e.name} is ready`, "cloud");
+          break;
+        case "finish":
+          this.hud.toast(`🏁 ${e.name} finished P${e.place}`, "gold");
+          break;
+        case "start":
+          this.hud.toast("🚦 Live race — GO!", "gold");
+          break;
+      }
+    }
     if (this.state === "playing" && this.massRace.active) {
       net.send(this.bird.x, this.bird.y, this.bird.rotation, Math.max(0, this.bird.x - this.startX));
     }
