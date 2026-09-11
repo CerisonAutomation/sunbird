@@ -1,0 +1,406 @@
+- generic:
+  - generic [aria-hidden]:
+    - generic:
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - navigation:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - link:
+                          - /url: /
+                        - generic:
+                          - button
+                          - button
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - link:
+                                - /url: /
+                              - generic: New
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - generic:
+                                    - generic:
+                                      - link:
+                                        - /url: /computer/tasks
+                                      - generic: Computer
+                                - generic:
+                                  - generic:
+                                    - generic:
+                                      - link:
+                                        - /url: /computer/artifacts
+                                      - generic: Artefacts
+                                - generic:
+                                  - generic:
+                                    - generic:
+                                      - link:
+                                        - /url: /computer/connectors
+                                      - generic: Customise
+                                - generic:
+                                  - generic:
+                                    - link:
+                                      - /url: /projects
+                                    - generic:
+                                      - generic:
+                                        - generic: Projects
+                                        - generic [ref=f22e1]:
+                                          - button [ref=f22e2] [cursor=pointer]
+                                          - button [ref=f22e6] [cursor=pointer]
+                                        - button [expanded] [ref=f22e10] [cursor=pointer]
+                                  - generic:
+                                    - generic:
+                                      - generic:
+                                        - generic:
+                                          - link:
+                                            - /url: /projects/chris-repos-mtExWC4gTH.MaO8tMH9.YQ
+                                          - generic: CHRIS REPOS
+                                      - generic:
+                                        - generic:
+                                          - link:
+                                            - /url: /projects/new-space-Z2.dXrNyTJClpxGMGEtkew
+                                          - generic: New Space
+                                      - generic:
+                                        - generic:
+                                          - link:
+                                            - /url: /projects/christianopropertymanagment-fYwe7YcVQMekNBWhdQGbaA
+                                          - generic: CHRISTIANOPROPERTYMANAGMENT
+                                      - generic:
+                                        - generic:
+                                          - link:
+                                            - /url: /projects/app-V3mi5pF3SaKBfwIcWypL4Q
+                                          - generic: APP
+                                      - generic:
+                                        - generic:
+                                          - link:
+                                            - /url: /projects/new-space-vfVy9duGSLySOthq7oVspQ
+                                          - generic: New Space
+                                      - generic:
+                                        - button:
+                                          - generic: Show more
+                                  - generic:
+                                    - link:
+                                      - /url: /library
+                                    - generic:
+                                      - generic:
+                                        - generic: Sessions
+                                        - button [expanded] [ref=f22e15] [cursor=pointer]
+                                  - generic:
+                                    - generic:
+                                      - generic:
+                                        - generic:
+                                          - link:
+                                            - /url: /search/70c50460-22ff-4610-b3f2-82bda32aae59
+                                          - generic: omniroute
+                                      - generic:
+                                        - generic:
+                                          - link:
+                                            - /url: /search/10e916e5-58ab-42b9-b0a3-dc6d5e0f8531
+                                          - generic: which is he best aor b and what else do you recommmendcvto prommpt this ready for deploying on all the major game companys
+                                      - generic:
+                                        - generic:
+                                          - link:
+                                            - /url: /search/7caee156-7829-4141-9cda-a9c3ab9fd589
+                                          - generic: WHICH IS BETTER AND GIVE ME APROMPT TO GET WHAT I WANT MORE PROMINANT BETTER PVP ECT
+                                      - generic:
+                                        - generic:
+                                          - link:
+                                            - /url: /search/3f0f8ba4-b81d-4436-a87c-0d15da2142cc
+                                          - generic: icant tell which is better
+                                      - generic:
+                                        - generic:
+                                          - link:
+                                            - /url: /search/55ea0cd9-4d41-434d-8516-f8ecfe7fa8b7
+                                          - generic: canyou convert this and give me the 3 in copy paste format
+                                      - generic:
+                                        - generic:
+                                          - link:
+                                            - /url: /search/545dc24f-c1f4-4e60-a13b-d50a90fa85b7
+                                          - generic: OPEN TODAY INTO THEIR OWN TABS
+                                      - generic:
+                                        - generic:
+                                          - link:
+                                            - /url: /search/03506a47-86e6-4127-a243-031557abe2a7
+                                          - generic: can you give me a prompt check convo past andthis feed and give a first prompt again
+                                      - generic:
+                                        - generic:
+                                          - link:
+                                            - /url: /search/cec3b777-ca62-4db5-aef3-3ea7b10c4c4e
+                                          - generic: "@Supabase Missing or inaccessible profiles columns from 001_schema.sql profile_private table for date of birth board_posts table board_comments table post_joins table likes table or authenticated policies matches table or mutual-like trigger policies conversations table or member policy messages.album_share_id from 004_chat_media.sql message_attachments from 004_chat_media.sql album_shares from 004_chat_media.sql message_reactions from 004_chat_media.sql private_albums from 004_chat_media.sql private_album_items album columns from 004_chat_media.sql PLEASEIFIX WITH MCP @Supabase"
+                                      - generic:
+                                        - generic:
+                                          - link:
+                                            - /url: /search/b5232485-2b27-4081-8f5e-cec1fd8976bb
+                                          - generic: how long does the db take to resume
+                                      - generic:
+                                        - generic:
+                                          - link:
+                                            - /url: /search/a686818b-3f93-4826-96fa-18da09a0fa3e
+                                          - generic: reply to this
+                                      - generic:
+                                        - generic:
+                                          - link:
+                                            - /url: /search/73efd579-8cfd-4cbf-98e2-491465c965d6
+                                          - generic: GIVEMEV ALL THE GAME COMPANIES FROM MY APP SUNBIRD LIKE CRAZYGAMES AND ALLL OTHER
+                                      - generic:
+                                        - generic:
+                                          - link:
+                                            - /url: /search/c258dc63-ff57-4a6c-95a7-eb1f4de5217e
+                                          - generic: "ROLE You are a principal product engineer, staff designer, and growth-minded mobile app architect. Build a production-ready, fully deployable MVP+ of a mobile-first gay dating and social app called NEXUS: “Find Your King”, inspired by the strongest practical patterns from modern queer social apps while remaining an original product with its own identity. Infer all missing decisions yourself and act. Do not stop to ask clarifying questions unless a decision is irreversible. No placeholders, no TODOs, no fake integrations, no mocked features presented as complete. PRIMARY GOAL Create a working, polished, end-to-end application that feels competitive with products like Grindr, ROMEO, and MACHOBB in the areas of discovery, filtering, privacy, travel, profile richness, matching, messaging, media sharing, events, moderation, and niche community support. STACK - Next.js latest stable App Router - TypeScript strict mode - Tailwind CSS + dark/light themes - SQLite for local/dev and easy self-hosting - Prisma-compatible data layer; if Prisma engine download/runtime fails, fall back automatically to a production-grade repository/service abstraction with better-sqlite3 without reducing functionality - NextAuth or hardened cookie-session auth; choose the lowest-friction local-first option that works - Zod validation everywhere - React Hook Form for forms - Server Actions or REST routes where most appropriate - PWA installable - Dockerfile + docker-compose for one-command local deployment - Health endpoint, structured logging, rate limiting, audit logs for moderation/admin actions PRODUCT POSITIONING NEXUS is not just a swipe app. It is a queer social discovery platform for dating, chats, nearby people, planned meetups, travel connections, and community-based matching. The tone should be premium, masculine, modern, dark-mode-first, but safe and respectful. It should support both broad discovery and niche identity/intimacy preferences without shaming language. TARGET UX - Mobile-first, thumb-friendly, polished like a real shipped product - Native-app feel with bottom nav, sheets, drawers, segmented controls, fast transitions - Works beautifully on desktop too - Distinctive branding and product identity, not a clone INFORMATION ARCHITECTURE Implement these main tabs / areas: 1. Home / Nearby 2. Explore / Travel 3. Likes / Visitors / Matches 4. Chats 5. Events / Plans 6. Profile / Settings 7. Admin / Moderation (protected) CORE FEATURES TO IMPLEMENT END-TO-END A. AUTH + ACCOUNT - Email/password sign-up and login - Password reset flow - Change password with current password verification - Session management - Optional onboarding wizard after first sign-in - Age gate (18+) - Terms/privacy consent checkboxes - Device/session list with sign-out-other-sessions B. PROFILE SYSTEM - Rich profile with: - display name - age / DOB with age shown, DOB hidden - bio / headline - height, weight, body type - ethnicity - gender expression / pronouns - relationship intent / looking for - tribe / community tags - position / role preference (optional, user-controlled) - interests / kinks / lifestyle tags as opt-in structured tags - city / area - verification badges state - online / recently active state with privacy controls - Multiple photos with: - public and private photos - reorder photos - set primary avatar - delete / replace - blurred-lock state for private albums - request private album access - approve / deny private album access - Profile completion score - Editable preferences and deal-breakers - Fake/demo verification pipeline UI with honest “manual review/local mode” wording unless fully automated C. DISCOVERY - Nearby grid sorted by distance / activity / compatibility - Cascade/card mode and compact grid mode - Advanced filters: - age range - distance radius - online now / recently active - looking for - tribe/community tags - body type - ethnicity - height / weight ranges - photo only - verified only - has private album - travel mode only - hosting / available to meet - Saved filter presets - Explore page for other cities - Travel mode: - set destination city - arrival window - visible in destination before travel date - switch back to local mode - Optional map view for nearby users and events - Respect privacy settings when showing distance and visibility D. SOCIAL SIGNALS - Like / tap / woof-style lightweight interest signal - Mutual like creates a match - Visitors / profile views log - Footprint controls: - show my visit - browse invisibly - hide visitors from others if invisible mode is on - Favorites / saved profiles - Notes on profiles (private to self) E. CHAT + MEDIA - 1:1 chat - Send text, emojis, and photos - Read states - Typing indicator via polling/websocket if feasible locally - Unread counts - Reply to message - Edit sent message - Unsend message - Delete for self - Optional disappearing photos/messages with expiry timer - Message templates / quick openers - Built-in message translation using local model - Safety warnings before sharing exact location or sensitive data - Media permissions and private album requests inside chat F. EVENTS + PLANS - Create local events and casual plans - Event proposals extracted from chat intent - Plan cards with date/time/place/intention - Mutual acceptance flow before confirming a meetup - RSVP states - Small map preview - Host / attendee list with privacy rules - Report event / cancel event / leave event G. LOCAL AI FEATURES ONLY No paid APIs, no cloud LLM dependencies, no required API keys. Use local/server-side open-source models with lazy loading and fallbacks. - Chat translation endpoint - Intent classifier for greetings, flirting, plan-making, explicit photo request, safety-risk cue - Smart reply chips based on conversation + user habits - Profile bio assistant that can rewrite tone locally - Safety assistant that detects risky patterns and suggests safer actions - Event extraction from conversation into structured proposal - Keep total model footprint practical for local self-hosting; document model sizes and fallbacks H. SAFETY + PRIVACY - Block user - Report user - Mute conversation - Hide distance - Approximate distance mode - Hide online status / appear offline - Incognito browsing mode - Screenshot warning UI for sensitive media - Sensitive-content blur toggle - App lock with PIN for local session re-entry if practical - Safety mode for travel / high-risk region behavior - Strong privacy wording: never imply absolute safety - Full consent-driven media/private album flows - Moderation queues for reports - Audit log of moderation actions I. NICHE COMMUNITY SUPPORT Make this product broad but capable of serving sub-communities better than generic apps. - Structured tags for communities / tribes - Opt-in explicitness controls - Profile visibility based on compatibility preferences - Content gating for explicit/sensitive media - Respectful terminology and toggleable exposure level - No stigmatizing copy J. PREMIUM-READY PRODUCT ARCHITECTURE Even if subscriptions are not fully wired to Stripe yet, architect feature gating cleanly. Implement a local feature-flag / plan system with Free and Plus tiers: Free examples: - basic filters - limited visitors history - limited favorites - standard travel preview Plus examples: - advanced filters - unlimited saved profiles - invisible browsing - extended visitors history - travel mode lead time - read receipts - message translation - disappearing media controls Do not fake billing completion. If payment is not integrated, provide a clean stubbed plan-management architecture and honest local/dev PLEASE MAKE THIS INTO FYK 10000000x BETTER CIOMPLETE PROMPT ALL INC"
+                                      - generic:
+                                        - generic:
+                                          - link:
+                                            - /url: /search/520d7e6a-fda0-4eb8-9fbf-3328d04b1677
+                                          - generic: thehustleblower
+                                      - generic:
+                                        - generic:
+                                          - link:
+                                            - /url: /search/ad64f259-65a2-48f5-9f25-8a1b7778f19b
+                                          - generic: SUNBIRD VERCEL
+                                      - generic:
+                                        - generic:
+                                          - link:
+                                            - /url: /search/08deca0a-1ea7-4141-9614-f91f20d8a86b
+                                          - generic: BEST GAME SOUNDS
+                                      - generic:
+                                        - generic:
+                                          - link:
+                                            - /url: /search/b7a3ef8e-45bd-4394-a3ea-d07dbd7ae19b
+                                          - generic: critque this game
+                                      - generic:
+                                        - generic:
+                                          - link:
+                                            - /url: /search/2cf2eb8f-0d4f-4cf8-be31-4934996ea3ab
+                                          - generic: tiny wings game
+                                      - generic:
+                                        - generic:
+                                          - link:
+                                            - /url: /search/38474da5-8705-4b5c-a8c4-6956b8d71a07
+                                          - generic: litte wing game
+                                      - generic:
+                                        - generic:
+                                          - link:
+                                            - /url: /search/3d141cc3-6cb1-40b8-8ac9-f4b188bda53f
+                                          - generic: area
+                                      - generic:
+                                        - generic:
+                                          - link:
+                                            - /url: /search/8d71671d-813f-495e-a5b8-ccceea7bf81e
+                                          - generic: whatdoes this mean
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - button:
+                                    - generic:
+                                      - generic:
+                                        - generic:
+                                          - generic:
+                                            - generic:
+                                              - generic:
+                                                - generic:
+                                                  - generic: cerison
+                                                  - generic: Pro
+                                - generic:
+                                  - generic:
+                                    - generic:
+                                      - generic:
+                                        - generic:
+                                          - button
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - generic:
+                                    - generic:
+                                      - button:
+                                        - generic: Add your team
+            - main:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - button
+                    - generic:
+                      - button
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - generic:
+                                    - generic [aria-hidden]: Search
+                                    - generic [aria-hidden]: Computer
+                                - generic:
+                                  - generic:
+                                    - generic:
+                                      - generic: What do you want to know?
+                                      - generic [aria-hidden]:
+                                        - generic: What
+                                        - generic: do
+                                        - generic: you
+                                        - generic: want
+                                        - generic: to
+                                        - generic: know?
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - generic:
+                                    - generic:
+                                      - generic:
+                                        - generic:
+                                          - generic:
+                                            - generic:
+                                              - generic:
+                                                - generic:
+                                                  - generic:
+                                                    - textbox:
+                                                      - paragraph
+                                                    - generic: Ask anything…
+                                                - generic:
+                                                  - generic:
+                                                    - button
+                                                    - generic:
+                                                      - generic:
+                                                        - generic:
+                                                          - button [pressed]:
+                                                            - generic: Search
+                                                      - generic:
+                                                        - generic:
+                                                          - generic:
+                                                            - button:
+                                                              - generic: Computer
+                                                - generic:
+                                                  - generic:
+                                                    - button:
+                                                      - generic: Model
+                                                  - generic:
+                                                    - button
+                                                  - button
+                                            - generic:
+                                              - generic:
+                                                - generic:
+                                                  - generic:
+                                                    - generic:
+                                                      - generic:
+                                                        - generic:
+                                                          - button:
+                                                            - generic: Work in a project
+  - dialog [ref=f22e20]:
+    - generic [ref=f22e21]:
+      - generic [ref=f22e22]:
+        - heading [level=2]
+      - generic [ref=f22e23]:
+        - generic [ref=f22e24]:
+          - navigation "Settings" [ref=f22e25]:
+            - textbox "Search settings" [active] [ref=f22e32]
+            - generic [ref=f22e33]:
+              - generic [ref=f22e34]:
+                - generic [ref=f22e35]: Account
+                - generic [ref=f22e39]:
+                  - button "Account" [ref=f22e42] [cursor=pointer]
+                  - button "Preferences" [ref=f22e50] [cursor=pointer]
+                  - button "Personalisation" [ref=f22e58] [cursor=pointer]
+                  - button "Memory settings" [ref=f22e66] [cursor=pointer]
+                  - button "Notifications" [ref=f22e74] [cursor=pointer]
+                  - button "Usage and credits" [ref=f22e82] [cursor=pointer]
+                  - button "Analytics" [ref=f22e90] [cursor=pointer]
+              - generic [ref=f22e96]:
+                - generic [ref=f22e97]: Computer
+                - generic [ref=f22e101]:
+                  - button "Configuration" [ref=f22e104] [cursor=pointer]
+                  - button "Connectors" [ref=f22e112] [cursor=pointer]
+                  - button "Skills" [ref=f22e123] [cursor=pointer]
+                  - button "Memory" [ref=f22e134] [cursor=pointer]
+                  - button "Credential vault" [ref=f22e145] [cursor=pointer]
+              - generic [ref=f22e151]:
+                - generic [ref=f22e152]: Other
+                - generic [ref=f22e156]:
+                  - button "Upgrade to Enterprise" [ref=f22e159] [cursor=pointer]
+                  - button "About Enterprise" [ref=f22e170] [cursor=pointer]
+                  - button "API Platform" [ref=f22e181] [cursor=pointer]
+          - main [ref=f22e190]:
+            - generic [ref=f22e201]:
+              - generic [ref=f22e202]:
+                - generic [ref=f22e203]: Account
+                - generic [ref=f22e208]:
+                  - generic [ref=f22e210]:
+                    - generic [ref=f22e211]: cerison
+                    - button "Change avatar" [ref=f22e219] [cursor=pointer]
+                  - generic [ref=f22e223]:
+                    - generic [ref=f22e224]: Full Name
+                    - button "Change full name" [ref=f22e227] [cursor=pointer]
+                  - generic [ref=f22e231]:
+                    - generic [ref=f22e232]:
+                      - generic [ref=f22e233]: Username
+                      - generic [ref=f22e234]: cerison
+                    - button "Change username" [ref=f22e236] [cursor=pointer]
+                  - generic [ref=f22e241]:
+                    - generic [ref=f22e242]: Email
+                    - generic [ref=f22e243]: cerisonbrown@gmail.com
+              - generic [ref=f22e244]:
+                - generic [ref=f22e245]: Your Subscription
+                - generic [ref=f22e251]:
+                  - generic [ref=f22e252]:
+                    - generic [ref=f22e253]:
+                      - generic [ref=f22e255]:
+                        - text: Thanks for subscribing to Perplexity
+                        - generic [ref=f22e256]: Pro
+                      - generic [ref=f22e260]:
+                        - text: Explore your new Pro features.
+                        - link "Learn more" [ref=f22e262] [cursor=pointer]:
+                          - /url: https://www.perplexity.com/help-center/en/articles/10352901-what-is-perplexity-pro
+                    - generic [ref=f22e264]:
+                      - button "Manage" [ref=f22e265] [cursor=pointer]
+                      - button "Transfer subscription" [ref=f22e268] [cursor=pointer]
+                      - button "Upgrade plan" [ref=f22e271] [cursor=pointer]
+                  - generic [ref=f22e274]:
+                    - generic [ref=f22e275]:
+                      - generic [ref=f22e276]: Pro Discord
+                      - generic [ref=f22e277]: Enjoy access to our Pro Discord Community
+                    - button "Go to Discord" [ref=f22e279] [cursor=pointer]
+              - generic [ref=f22e285]:
+                - generic [ref=f22e286]: Security
+                - generic [ref=f22e293]:
+                  - generic [ref=f22e294]:
+                    - generic [ref=f22e295]: Two-factor authentication
+                    - generic [ref=f22e296]: Add an extra layer of security to your account
+                  - button "Set up" [ref=f22e298] [cursor=pointer]
+              - generic [ref=f22e301]:
+                - generic [ref=f22e302]: System
+                - generic [ref=f22e307]:
+                  - generic [ref=f22e309]:
+                    - generic [ref=f22e310]: Support
+                    - button "Contact" [ref=f22e313] [cursor=pointer]
+                  - generic [ref=f22e317]:
+                    - generic [ref=f22e318]: You are signed in as cerison
+                    - button "Sign out" [ref=f22e321] [cursor=pointer]
+                  - generic [ref=f22e325]:
+                    - generic [ref=f22e326]:
+                      - generic [ref=f22e327]: Sign out of all sessions
+                      - generic [ref=f22e328]: Devices or browsers where you are signed in
+                    - button "Sign out of all sessions" [ref=f22e330] [cursor=pointer]
+                  - generic [ref=f22e334]:
+                    - generic [ref=f22e335]:
+                      - generic [ref=f22e336]: Data export
+                      - generic [ref=f22e337]: Request a copy of your personal data
+                    - button "Export my data" [ref=f22e339] [cursor=pointer]
+                  - generic [ref=f22e343]:
+                    - generic [ref=f22e344]:
+                      - generic [ref=f22e345]: Delete account
+                      - generic [ref=f22e346]: Permanently delete your account and data
+                    - button "Learn more" [ref=f22e348] [cursor=pointer]
+        - button "Close" [ref=f22e195] [cursor=pointer]

@@ -1171,10 +1171,24 @@ function renderMain(s: HudSnapshot): string {
     </div>
     ${seedPicker}
 
-    <button class="primary-btn fly-cta" data-ui data-action="pvp-practice">
-      <span class="fly-label">☀&nbsp;FLY</span>
-      <span class="fly-sub">HOLD to dive · RELEASE to soar</span>
-    </button>
+    <!-- 3 MAIN PLAY MODES -->
+    <div class="mode-cards" role="group" aria-label="Play modes">
+      <button class="mode-card-main" data-ui data-action="pvp-practice">
+        <span class="mode-icon-lg">☀</span>
+        <span class="mode-name">SOLO</span>
+        <span class="mode-desc">Free flight · Explore islands</span>
+      </button>
+      <button class="mode-card-main" data-ui data-action="pvp-ranked">
+        <span class="mode-icon-lg">⚔</span>
+        <span class="mode-name">PVP</span>
+        <span class="mode-desc">40-bird race · Rating on the line</span>
+      </button>
+      <button class="mode-card-main" data-ui data-action="open-live">
+        <span class="mode-icon-lg">🎯</span>
+        <span class="mode-name">PVE</span>
+        <span class="mode-desc">Missions · Challenges · Tournaments</span>
+      </button>
+    </div>
 
     <button class="rank-card" data-ui data-action="open-rank" aria-label="View Rival rank">
       <span class="rank-div">${s.rival.divisionIcon} ${s.rival.division}</span>
@@ -1184,12 +1198,12 @@ function renderMain(s: HudSnapshot): string {
         s.rival.nextNeeded > 0
           ? `${s.rival.nextNeeded} to ${s.rival.nextName}`
           : "Top division — defend it"
-      } · 🔥${s.rival.streak} streak · local rating</span>
+      } · 🔥${s.rival.streak} streak</span>
     </button>
 
-    <div class="pvp-modes" role="group" aria-label="Play modes">
-      <button class="pvp-mode rated" data-ui data-action="pvp-ranked"><i>🏆</i><b>Ranked 40</b><span>Rating moves</span></button>
-      <button class="pvp-mode" data-ui data-action="pvp-casual"><i>🐦</i><b>Casual 40</b><span>No rating</span></button>
+    <div class="pvp-modes" role="group" aria-label="PvP options">
+      <button class="pvp-mode rated" data-ui data-action="pvp-ranked"><i>🏆</i><b>Ranked</b><span>Rating moves</span></button>
+      <button class="pvp-mode" data-ui data-action="pvp-casual"><i>🐦</i><b>Casual</b><span>No rating</span></button>
       <button class="pvp-mode" data-ui data-action="versus"><i>👥</i><b>Local 2P</b><span>Same screen</span></button>
       <button class="pvp-mode" data-ui data-action="pvp-practice"><i>🌅</i><b>Practice</b><span>Empty skies</span></button>
     </div>

@@ -1,0 +1,720 @@
+- generic [ref=f9e1]:
+  - link "Skip to content" [ref=f9e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - generic [ref=f9e3]:
+    - complementary [ref=f9e5]:
+      - link "Skip to content" [ref=f9e6] [cursor=pointer]:
+        - /url: "#main-content"
+      - button [expanded] [ref=f9e11]:
+        - generic [aria-hidden]: chevron_left
+      - link "OmniRoute v3.8.51" [ref=f9e13] [cursor=pointer]:
+        - /url: /home
+        - generic [ref=f9e27]:
+          - heading "OmniRoute" [level=1] [ref=f9e28]
+          - generic [ref=f9e29]: v3.8.51
+      - generic [ref=f9e32]:
+        - generic:
+          - generic [aria-hidden]: search
+        - searchbox "Search" [ref=f9e33]
+      - navigation "Main navigation" [ref=f9e34]:
+        - link "home Home Dashboard overview" [ref=f9e36] [cursor=pointer]:
+          - /url: /home
+          - generic [ref=f9e37]: home
+          - generic [ref=f9e38]:
+            - generic [ref=f9e39]: Home
+            - generic [ref=f9e40]: Dashboard overview
+        - generic [ref=f9e41]:
+          - button "OmniProxy push_pin expand_more" [expanded] [ref=f9e42] [cursor=pointer]:
+            - generic [ref=f9e43]: OmniProxy
+            - button "push_pin" [ref=f9e44]
+            - generic: expand_more
+          - generic [ref=f9e45]:
+            - link "api Endpoints Your AI connection URLs" [ref=f9e46] [cursor=pointer]:
+              - /url: /dashboard/endpoint
+              - generic [ref=f9e47]: api
+              - generic [ref=f9e48]:
+                - generic [ref=f9e49]: Endpoints
+                - generic [ref=f9e50]: Your AI connection URLs
+            - link "vpn_key API Keys Manage API keys and access" [ref=f9e51] [cursor=pointer]:
+              - /url: /dashboard/api-manager
+              - generic [ref=f9e52]: vpn_key
+              - generic [ref=f9e53]:
+                - generic [ref=f9e54]: API Keys
+                - generic [ref=f9e55]: Manage API keys and access
+            - link "dns Providers Manage AI providers" [ref=f9e56] [cursor=pointer]:
+              - /url: /dashboard/providers
+              - generic [ref=f9e57]: dns
+              - generic [ref=f9e58]:
+                - generic [ref=f9e59]: Providers
+                - generic [ref=f9e60]: Manage AI providers
+            - link "deployed_code Embedded Services Optional local services" [ref=f9e61] [cursor=pointer]:
+              - /url: /dashboard/providers/services
+              - generic [ref=f9e62]: deployed_code
+              - generic [ref=f9e63]:
+                - generic [ref=f9e64]: Embedded Services
+                - generic [ref=f9e65]: Optional local services
+            - link "layers Combos Group providers for failover" [ref=f9e66] [cursor=pointer]:
+              - /url: /dashboard/combos
+              - generic [ref=f9e67]: layers
+              - generic [ref=f9e68]:
+                - generic [ref=f9e69]: Combos
+                - generic [ref=f9e70]: Group providers for failover
+            - link "account_tree Combo Studio Live routing cascade" [ref=f9e71] [cursor=pointer]:
+              - /url: /dashboard/combos/live
+              - generic [ref=f9e72]: account_tree
+              - generic [ref=f9e73]:
+                - generic [ref=f9e74]: Combo Studio
+                - generic [ref=f9e75]: Live routing cascade
+            - link "tune Provider Quota Track provider usage limits" [ref=f9e76] [cursor=pointer]:
+              - /url: /dashboard/quota
+              - generic [ref=f9e77]: tune
+              - generic [ref=f9e78]:
+                - generic [ref=f9e79]: Provider Quota
+                - generic [ref=f9e80]: Track provider usage limits
+            - link "pie_chart Quota Sharing Share provider quotas across keys" [ref=f9e81] [cursor=pointer]:
+              - /url: /dashboard/costs/quota-share
+              - generic [ref=f9e82]: pie_chart
+              - generic [ref=f9e83]:
+                - generic [ref=f9e84]: Quota Sharing
+                - generic [ref=f9e85]: Share provider quotas across keys
+            - generic [ref=f9e86]:
+              - generic [ref=f9e87]: Compression Context
+              - link "settings Compression Settings Global defaults" [ref=f9e90] [cursor=pointer]:
+                - /url: /dashboard/context/settings
+                - generic [ref=f9e91]: settings
+                - generic [ref=f9e92]:
+                  - generic [ref=f9e93]: Compression Settings
+                  - generic [ref=f9e94]: Global defaults
+              - link "hub Engine Combos Combine compression engines" [ref=f9e95] [cursor=pointer]:
+                - /url: /dashboard/context/combos
+                - generic [ref=f9e96]: hub
+                - generic [ref=f9e97]:
+                  - generic [ref=f9e98]: Engine Combos
+                  - generic [ref=f9e99]: Combine compression engines
+              - link "compress Caveman Prompt compression" [ref=f9e100] [cursor=pointer]:
+                - /url: /dashboard/context/caveman
+                - generic [ref=f9e101]: compress
+                - generic [ref=f9e102]:
+                  - generic [ref=f9e103]: Caveman
+                  - generic [ref=f9e104]: Prompt compression
+              - link "filter_alt RTK Output filtering" [ref=f9e105] [cursor=pointer]:
+                - /url: /dashboard/context/rtk
+                - generic [ref=f9e106]: filter_alt
+                - generic [ref=f9e107]:
+                  - generic [ref=f9e108]: RTK
+                  - generic [ref=f9e109]: Output filtering
+              - link "table_rows Headroom Tabular compaction" [ref=f9e110] [cursor=pointer]:
+                - /url: /dashboard/context/headroom
+                - generic [ref=f9e111]: table_rows
+                - generic [ref=f9e112]:
+                  - generic [ref=f9e113]: Headroom
+                  - generic [ref=f9e114]: Tabular compaction
+              - link "content_copy Session Dedup Cross-turn deduplication" [ref=f9e115] [cursor=pointer]:
+                - /url: /dashboard/context/session-dedup
+                - generic [ref=f9e116]: content_copy
+                - generic [ref=f9e117]:
+                  - generic [ref=f9e118]: Session Dedup
+                  - generic [ref=f9e119]: Cross-turn deduplication
+              - link "archive CCR Retrieve markers" [ref=f9e120] [cursor=pointer]:
+                - /url: /dashboard/context/ccr
+                - generic [ref=f9e121]: archive
+                - generic [ref=f9e122]:
+                  - generic [ref=f9e123]: CCR
+                  - generic [ref=f9e124]: Retrieve markers
+              - link "psychology LLMLingua Semantic pruning" [ref=f9e125] [cursor=pointer]:
+                - /url: /dashboard/context/llmlingua
+                - generic [ref=f9e126]: psychology
+                - generic [ref=f9e127]:
+                  - generic [ref=f9e128]: LLMLingua
+                  - generic [ref=f9e129]: Semantic pruning
+              - link "compress Lite Fast whitespace cleanup" [ref=f9e130] [cursor=pointer]:
+                - /url: /dashboard/context/lite
+                - generic [ref=f9e131]: compress
+                - generic [ref=f9e132]:
+                  - generic [ref=f9e133]: Lite
+                  - generic [ref=f9e134]: Fast whitespace cleanup
+              - link "speed Aggressive Summary and aging" [ref=f9e135] [cursor=pointer]:
+                - /url: /dashboard/context/aggressive
+                - generic [ref=f9e136]: speed
+                - generic [ref=f9e137]:
+                  - generic [ref=f9e138]: Aggressive
+                  - generic [ref=f9e139]: Summary and aging
+              - link "bolt Ultra Heuristic pruning" [ref=f9e140] [cursor=pointer]:
+                - /url: /dashboard/context/ultra
+                - generic [ref=f9e141]: bolt
+                - generic [ref=f9e142]:
+                  - generic [ref=f9e143]: Ultra
+                  - generic [ref=f9e144]: Heuristic pruning
+              - link "grain OmniGlyph Context as images" [ref=f9e145] [cursor=pointer]:
+                - /url: /dashboard/context/omniglyph
+                - generic [ref=f9e146]: grain
+                - generic [ref=f9e147]:
+                  - generic [ref=f9e148]: OmniGlyph
+                  - generic [ref=f9e149]: Context as images
+              - link "monitoring Compression Studio Live engine cascade" [ref=f9e150] [cursor=pointer]:
+                - /url: /dashboard/compression/studio
+                - generic [ref=f9e151]: monitoring
+                - generic [ref=f9e152]:
+                  - generic [ref=f9e153]: Compression Studio
+                  - generic [ref=f9e154]: Live engine cascade
+              - link "block Exclusions Per-model/endpoint bypass" [ref=f9e155] [cursor=pointer]:
+                - /url: /dashboard/compression/exclusions
+                - generic [ref=f9e156]: block
+                - generic [ref=f9e157]:
+                  - generic [ref=f9e158]: Exclusions
+                  - generic [ref=f9e159]: Per-model/endpoint bypass
+            - generic [ref=f9e160]:
+              - generic [ref=f9e161]: Tools
+              - link "terminal CLI Code Code tools pointing to OmniRoute" [ref=f9e164] [cursor=pointer]:
+                - /url: /dashboard/cli-code
+                - generic [ref=f9e165]: terminal
+                - generic [ref=f9e166]:
+                  - generic [ref=f9e167]: CLI Code
+                  - generic [ref=f9e168]: Code tools pointing to OmniRoute
+              - link "smart_toy CLI Agents Autonomous CLI agents" [ref=f9e169] [cursor=pointer]:
+                - /url: /dashboard/cli-agents
+                - generic [ref=f9e170]: smart_toy
+                - generic [ref=f9e171]:
+                  - generic [ref=f9e172]: CLI Agents
+                  - generic [ref=f9e173]: Autonomous CLI agents
+              - link "device_hub ACP Agents CLIs spawned by OmniRoute" [ref=f9e174] [cursor=pointer]:
+                - /url: /dashboard/acp-agents
+                - generic [ref=f9e175]: device_hub
+                - generic [ref=f9e176]:
+                  - generic [ref=f9e177]: ACP Agents
+                  - generic [ref=f9e178]: CLIs spawned by OmniRoute
+              - link "cloud Cloud Agents Manage cloud-based agents" [ref=f9e179] [cursor=pointer]:
+                - /url: /dashboard/cloud-agents
+                - generic [ref=f9e180]: cloud
+                - generic [ref=f9e181]:
+                  - generic [ref=f9e182]: Cloud Agents
+                  - generic [ref=f9e183]: Manage cloud-based agents
+              - link "account_tree Conductor CLI-agent fleet" [ref=f9e184] [cursor=pointer]:
+                - /url: /dashboard/conductor
+                - generic [ref=f9e185]: account_tree
+                - generic [ref=f9e186]:
+                  - generic [ref=f9e187]: Conductor
+                  - generic [ref=f9e188]: CLI-agent fleet
+              - link "account_tree Orchestration Live view of everything running" [ref=f9e189] [cursor=pointer]:
+                - /url: /dashboard/orchestration
+                - generic [ref=f9e190]: account_tree
+                - generic [ref=f9e191]:
+                  - generic [ref=f9e192]: Orchestration
+                  - generic [ref=f9e193]: Live view of everything running
+              - link "link Agent Bridge Intercept IDE agent traffic" [ref=f9e194] [cursor=pointer]:
+                - /url: /dashboard/tools/agent-bridge
+                - generic [ref=f9e195]: link
+                - generic [ref=f9e196]:
+                  - generic [ref=f9e197]: Agent Bridge
+                  - generic [ref=f9e198]: Intercept IDE agent traffic
+              - link "network_check Traffic Inspector Inspect request and response traffic from your apps" [ref=f9e199] [cursor=pointer]:
+                - /url: /dashboard/tools/traffic-inspector
+                - generic [ref=f9e200]: network_check
+                - generic [ref=f9e201]:
+                  - generic [ref=f9e202]: Traffic Inspector
+                  - generic [ref=f9e203]: Inspect request and response traffic from your apps
+              - link "travel_explore Discovery Scan providers for free access" [ref=f9e204] [cursor=pointer]:
+                - /url: /dashboard/discovery
+                - generic [ref=f9e205]: travel_explore
+                - generic [ref=f9e206]:
+                  - generic [ref=f9e207]: Discovery
+                  - generic [ref=f9e208]: Scan providers for free access
+            - generic [ref=f9e209]:
+              - generic [ref=f9e210]: Integrations
+              - link "api API Endpoints Expose custom endpoints" [ref=f9e213] [cursor=pointer]:
+                - /url: /dashboard/api-endpoints
+                - generic [ref=f9e214]: api
+                - generic [ref=f9e215]:
+                  - generic [ref=f9e216]: API Endpoints
+                  - generic [ref=f9e217]: Expose custom endpoints
+              - link "webhook Webhooks Get notified of events" [ref=f9e218] [cursor=pointer]:
+                - /url: /dashboard/webhooks
+                - generic [ref=f9e219]: webhook
+                - generic [ref=f9e220]:
+                  - generic [ref=f9e221]: Webhooks
+                  - generic [ref=f9e222]: Get notified of events
+              - link "cloud_upload Log export Ship call logs out" [ref=f9e223] [cursor=pointer]:
+                - /url: /dashboard/log-export
+                - generic [ref=f9e224]: cloud_upload
+                - generic [ref=f9e225]:
+                  - generic [ref=f9e226]: Log export
+                  - generic [ref=f9e227]: Ship call logs out
+            - link "dns Proxy HTTP proxy settings" [ref=f9e228] [cursor=pointer]:
+              - /url: /dashboard/system/proxy
+              - generic [ref=f9e229]: dns
+              - generic [ref=f9e230]:
+                - generic [ref=f9e231]: Proxy
+                - generic [ref=f9e232]: HTTP proxy settings
+        - button "Analytics push_pin expand_more" [ref=f9e234] [cursor=pointer]:
+          - generic [ref=f9e235]: Analytics
+          - button "push_pin" [ref=f9e236]
+          - generic: expand_more
+        - button "Costs push_pin expand_more" [ref=f9e238] [cursor=pointer]:
+          - generic [ref=f9e239]: Costs
+          - button "push_pin" [ref=f9e240]
+          - generic: expand_more
+        - button "Monitoring push_pin expand_more" [ref=f9e242] [cursor=pointer]:
+          - generic [ref=f9e243]: Monitoring
+          - button "push_pin" [ref=f9e244]
+          - generic: expand_more
+        - button "Agentic Features push_pin expand_more" [ref=f9e246] [cursor=pointer]:
+          - generic [ref=f9e247]: Agentic Features
+          - button "push_pin" [ref=f9e248]
+          - generic: expand_more
+        - button "Other Features push_pin expand_more" [ref=f9e250] [cursor=pointer]:
+          - generic [ref=f9e251]: Other Features
+          - button "push_pin" [ref=f9e252]
+          - generic: expand_more
+        - button "Configuration push_pin expand_more" [ref=f9e254] [cursor=pointer]:
+          - generic [ref=f9e255]: Configuration
+          - button "push_pin" [ref=f9e256]
+          - generic: expand_more
+        - button "Help push_pin expand_more" [ref=f9e258] [cursor=pointer]:
+          - generic [ref=f9e259]: Help
+          - button "push_pin" [ref=f9e260]
+          - generic: expand_more
+      - 'button "Remote settings sync status: Sync off" [ref=f9e310] [cursor=pointer]':
+        - generic [aria-hidden]: cloud_off
+        - generic [ref=f9e311]: Sync off
+      - generic [ref=f9e261]:
+        - button "restart_alt Restart" [ref=f9e262]:
+          - generic: restart_alt
+          - generic [ref=f9e263]: Restart
+        - button "power_settings_new Shutdown" [ref=f9e264]:
+          - generic: power_settings_new
+          - generic [ref=f9e265]: Shutdown
+    - main [ref=f9e266]:
+      - generic [ref=f9e267]:
+        - generic [ref=f9e268]:
+          - generic [ref=f9e269]: dns
+          - generic [ref=f9e271]:
+            - heading "Providers" [level=1] [ref=f9e272]
+            - paragraph [ref=f9e273]: Manage your AI provider connections
+        - generic [ref=f9e274]:
+          - button "Open quick navigation" [ref=f9e275]:
+            - generic: search
+            - generic [ref=f9e276]: Quick nav
+            - generic [ref=f9e277]: ⌘K
+          - button "English EN expand_more" [ref=f9e279]:
+            - img "English" [ref=f9e280]
+            - generic [ref=f9e281]: EN
+            - generic: expand_more
+          - button "Switch to dark mode" [ref=f9e282]:
+            - generic: dark_mode
+          - button "check_circle" [ref=f9e313]
+          - button "Logout" [ref=f9e283]:
+            - generic: logout
+      - generic [ref=f9e285]:
+        - navigation "Breadcrumb" [ref=f9e286]:
+          - link "Dashboard" [ref=f9e288] [cursor=pointer]:
+            - /url: /dashboard
+          - generic [ref=f9e289]:
+            - generic [aria-hidden] [ref=f9e290]: ›
+            - link "Providers" [ref=f9e291] [cursor=pointer]:
+              - /url: /dashboard/providers
+          - generic [ref=f9e292]:
+            - generic [aria-hidden] [ref=f9e293]: ›
+            - generic [ref=f9e294]: Perplexity-web
+        - generic [ref=f9e296]:
+          - generic [ref=f9e314]:
+            - link "arrow_back Back to Providers" [ref=f9e315] [cursor=pointer]:
+              - /url: /dashboard/providers
+              - generic [ref=f9e316]: arrow_back
+              - text: Back to Providers
+            - generic [ref=f9e317]:
+              - img "perplexity-web" [ref=f9e320]
+              - generic [ref=f9e322]:
+                - link "Perplexity Web (Pro/Max) open_in_new" [ref=f9e323] [cursor=pointer]:
+                  - /url: https://www.perplexity.ai
+                  - text: Perplexity Web (Pro/Max)
+                  - generic [ref=f9e324]: open_in_new
+                - paragraph [ref=f9e326]: 0 connections
+          - generic [ref=f9e327]:
+            - generic [ref=f9e328]:
+              - generic [ref=f9e329]:
+                - heading "Connections" [level=2] [ref=f9e330]
+                - button "vpn_lock Provider Proxy" [ref=f9e331]:
+                  - generic: vpn_lock
+                  - text: Provider Proxy
+              - button "Add" [ref=f9e333] [cursor=pointer]:
+                - generic [aria-hidden]: add
+                - text: Add
+            - generic [ref=f9e334]:
+              - generic [ref=f9e335]: key
+              - paragraph [ref=f9e337]: No connections yet
+              - paragraph [ref=f9e338]: Add your first connection to get started
+              - button "Add Connection" [ref=f9e340] [cursor=pointer]:
+                - generic [aria-hidden]: add
+                - text: Add Connection
+          - generic [ref=f9e341]:
+            - heading "Available Models" [level=2] [ref=f9e342]
+            - generic [ref=f9e343]:
+              - generic [ref=f9e344]:
+                - button "Import from /models" [disabled] [ref=f9e345]:
+                  - generic [aria-hidden]: download
+                  - text: Import from /models
+                - generic [ref=f9e346]: Add a connection to enable importing.
+              - generic [ref=f9e347]:
+                - generic [ref=f9e348]:
+                  - generic: search
+                  - textbox "Filter models..." [ref=f9e349]
+                - generic [ref=f9e350]:
+                  - button "All" [ref=f9e351]
+                  - button "Visible only" [ref=f9e352]
+                  - button "Hidden only" [ref=f9e353]
+                - generic [ref=f9e354]:
+                  - button "All" [ref=f9e355]
+                  - button "Free only" [ref=f9e356]
+                  - button "Paid only" [ref=f9e357]
+                - button "sort Free first" [ref=f9e358]:
+                  - generic: sort
+                  - generic [ref=f9e359]: Free first
+                - generic "When enabled, Test all hides non-transient failures from public catalogs such as /v1/models. Single-model tests never auto-hide." [ref=f9e360]:
+                  - checkbox "Auto-hide failed models" [ref=f9e361]
+                  - text: Auto-hide failed models
+                - button "science Test all models" [ref=f9e362]:
+                  - generic: science
+                  - generic [ref=f9e363]: Test all models
+                - button "visibility All" [disabled] [ref=f9e364]:
+                  - generic: visibility
+                  - generic [ref=f9e365]: All
+                - button "visibility_off Hide all" [ref=f9e366]:
+                  - generic: visibility_off
+                  - generic [ref=f9e367]: Hide all
+                - generic [ref=f9e368]: 11/11 active
+              - generic [ref=f9e369]:
+                - generic [ref=f9e370]:
+                  - generic [ref=f9e371]:
+                    - generic [ref=f9e372]: smart_toy
+                    - code [ref=f9e373]: pplx-web/pplx-auto
+                    - generic [ref=f9e374]: Built-in
+                    - generic "Click to set alias" [ref=f9e376] [cursor=pointer]: Perplexity Best
+                    - button "content_copy" [ref=f9e377]
+                  - generic [ref=f9e378]:
+                    - button "play_circle" [ref=f9e379]
+                    - button "visibility" [ref=f9e380]
+                    - button "tune Compatibility" [ref=f9e382]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f9e383]:
+                  - generic [ref=f9e384]:
+                    - generic [ref=f9e385]: smart_toy
+                    - code [ref=f9e386]: pplx-web/pplx-sonar
+                    - generic [ref=f9e387]: Built-in
+                    - generic "Click to set alias" [ref=f9e389] [cursor=pointer]: Sonar 2 (via Perplexity)
+                    - button "content_copy" [ref=f9e390]
+                  - generic [ref=f9e391]:
+                    - button "play_circle" [ref=f9e392]
+                    - button "visibility" [ref=f9e393]
+                    - button "tune Compatibility" [ref=f9e395]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f9e396]:
+                  - generic [ref=f9e397]:
+                    - generic [ref=f9e398]: smart_toy
+                    - code [ref=f9e399]: pplx-web/pplx-gpt-5.6-terra
+                    - generic [ref=f9e400]: Built-in
+                    - generic "Click to set alias" [ref=f9e402] [cursor=pointer]: GPT-5.6 Terra (via Perplexity)
+                    - button "content_copy" [ref=f9e403]
+                  - generic [ref=f9e404]:
+                    - button "play_circle" [ref=f9e405]
+                    - button "visibility" [ref=f9e406]
+                    - button "tune Compatibility" [ref=f9e408]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f9e409]:
+                  - generic [ref=f9e410]:
+                    - generic [ref=f9e411]: smart_toy
+                    - code [ref=f9e412]: pplx-web/pplx-gpt-5.6-sol
+                    - generic [ref=f9e413]: Built-in
+                    - generic "Click to set alias" [ref=f9e415] [cursor=pointer]: GPT-5.6 Sol (via Perplexity)
+                    - button "content_copy" [ref=f9e416]
+                  - generic [ref=f9e417]:
+                    - button "play_circle" [ref=f9e418]
+                    - button "visibility" [ref=f9e419]
+                    - button "tune Compatibility" [ref=f9e421]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f9e422]:
+                  - generic [ref=f9e423]:
+                    - generic [ref=f9e424]: smart_toy
+                    - code [ref=f9e425]: pplx-web/pplx-gemini
+                    - generic [ref=f9e426]: Built-in
+                    - generic "Click to set alias" [ref=f9e428] [cursor=pointer]: Gemini 3.7 Flash (via Perplexity)
+                    - button "content_copy" [ref=f9e429]
+                  - generic [ref=f9e430]:
+                    - button "play_circle" [ref=f9e431]
+                    - button "visibility" [ref=f9e432]
+                    - button "tune Compatibility" [ref=f9e434]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f9e435]:
+                  - generic [ref=f9e436]:
+                    - generic [ref=f9e437]: smart_toy
+                    - code [ref=f9e438]: pplx-web/pplx-sonnet
+                    - generic [ref=f9e439]: Built-in
+                    - generic "Click to set alias" [ref=f9e441] [cursor=pointer]: Claude Sonnet 5.0 (via Perplexity)
+                    - button "content_copy" [ref=f9e442]
+                  - generic [ref=f9e443]:
+                    - button "play_circle" [ref=f9e444]
+                    - button "visibility" [ref=f9e445]
+                    - button "tune Compatibility" [ref=f9e447]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f9e448]:
+                  - generic [ref=f9e449]:
+                    - generic [ref=f9e450]: smart_toy
+                    - code [ref=f9e451]: pplx-web/pplx-opus
+                    - generic [ref=f9e452]: Built-in
+                    - generic "Click to set alias" [ref=f9e454] [cursor=pointer]: Claude Opus 5.0 (via Perplexity)
+                    - button "content_copy" [ref=f9e455]
+                  - generic [ref=f9e456]:
+                    - button "play_circle" [ref=f9e457]
+                    - button "visibility" [ref=f9e458]
+                    - button "tune Compatibility" [ref=f9e460]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f9e461]:
+                  - generic [ref=f9e462]:
+                    - generic [ref=f9e463]: smart_toy
+                    - code [ref=f9e464]: pplx-web/pplx-glm
+                    - generic [ref=f9e465]: Built-in
+                    - generic "Click to set alias" [ref=f9e467] [cursor=pointer]: GLM-5.2 (via Perplexity)
+                    - button "content_copy" [ref=f9e468]
+                  - generic [ref=f9e469]:
+                    - button "play_circle" [ref=f9e470]
+                    - button "visibility" [ref=f9e471]
+                    - button "tune Compatibility" [ref=f9e473]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f9e474]:
+                  - generic [ref=f9e475]:
+                    - generic [ref=f9e476]: smart_toy
+                    - code [ref=f9e477]: pplx-web/pplx-kimi
+                    - generic [ref=f9e478]: Built-in
+                    - generic "Click to set alias" [ref=f9e480] [cursor=pointer]: Kimi K3 (via Perplexity)
+                    - button "content_copy" [ref=f9e481]
+                  - generic [ref=f9e482]:
+                    - button "play_circle" [ref=f9e483]
+                    - button "visibility" [ref=f9e484]
+                    - button "tune Compatibility" [ref=f9e486]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f9e487]:
+                  - generic [ref=f9e488]:
+                    - generic [ref=f9e489]: smart_toy
+                    - code [ref=f9e490]: pplx-web/pplx-grok-4.6
+                    - generic [ref=f9e491]: Built-in
+                    - generic "Click to set alias" [ref=f9e493] [cursor=pointer]: Grok 4.6 (via Perplexity)
+                    - button "content_copy" [ref=f9e494]
+                  - generic [ref=f9e495]:
+                    - button "play_circle" [ref=f9e496]
+                    - button "visibility" [ref=f9e497]
+                    - button "tune Compatibility" [ref=f9e499]:
+                      - generic: tune
+                      - text: Compatibility
+                - generic [ref=f9e500]:
+                  - generic [ref=f9e501]:
+                    - generic [ref=f9e502]: smart_toy
+                    - code [ref=f9e503]: pplx-web/pplx-nemotron
+                    - generic [ref=f9e504]: Built-in
+                    - generic "Click to set alias" [ref=f9e506] [cursor=pointer]: Nemotron 3 Ultra (via Perplexity)
+                    - button "content_copy" [ref=f9e507]
+                  - generic [ref=f9e508]:
+                    - button "play_circle" [ref=f9e509]
+                    - button "visibility" [ref=f9e510]
+                    - button "tune Compatibility" [ref=f9e512]:
+                      - generic: tune
+                      - text: Compatibility
+            - generic [ref=f9e513]:
+              - heading "tune Custom Models" [level=3] [ref=f9e514]:
+                - generic [ref=f9e515]: tune
+                - text: Custom Models
+              - paragraph [ref=f9e516]: Add model IDs not in the default list. These will be available for routing.
+              - generic [ref=f9e517]:
+                - generic [ref=f9e518]:
+                  - generic [ref=f9e519]:
+                    - generic [ref=f9e520]: Model ID
+                    - textbox "Model ID" [ref=f9e521]:
+                      - /placeholder: e.g. gpt-4.5-turbo
+                  - generic [ref=f9e522]:
+                    - generic [ref=f9e523]: Display Name
+                    - textbox "Display Name" [ref=f9e524]:
+                      - /placeholder: Optional
+                  - button "Add" [disabled] [ref=f9e525]:
+                    - generic [aria-hidden]: add
+                    - text: Add
+                - generic [ref=f9e526]:
+                  - generic [ref=f9e527]:
+                    - generic [ref=f9e528]: API Format
+                    - combobox "API Format" [ref=f9e529]:
+                      - option "Chat Completions" [selected]
+                      - option "Responses API"
+                      - option "Embeddings"
+                      - option "Rerank"
+                      - option "Audio Transcriptions"
+                      - option "Audio Speech"
+                      - option "Images Generations"
+                      - option "Video"
+                  - generic [ref=f9e530]:
+                    - generic [ref=f9e531]: Target Format
+                    - combobox "Target Format" [ref=f9e532]:
+                      - option "Default (auto)" [selected]
+                      - option "OpenAI Chat Completions"
+                      - option "OpenAI Responses API"
+                      - option "Anthropic Messages"
+                      - option "Gemini"
+                      - option "Antigravity"
+                  - generic [ref=f9e533]:
+                    - generic [ref=f9e534]: Supported endpoints
+                    - generic [ref=f9e535]:
+                      - generic [ref=f9e536] [cursor=pointer]:
+                        - checkbox "💬 Chat" [checked] [ref=f9e537]
+                        - text: 💬 Chat
+                      - generic [ref=f9e538] [cursor=pointer]:
+                        - checkbox "📐 Embeddings" [ref=f9e539]
+                        - text: 📐 Embeddings
+                      - generic [ref=f9e540] [cursor=pointer]:
+                        - checkbox "Rerank" [ref=f9e541]
+                        - text: Rerank
+                      - generic [ref=f9e542] [cursor=pointer]:
+                        - checkbox "🖼️ Images" [ref=f9e543]
+                        - text: 🖼️ Images
+                      - generic [ref=f9e544] [cursor=pointer]:
+                        - checkbox "🎬 Video" [ref=f9e545]
+                        - text: 🎬 Video
+                      - generic [ref=f9e546] [cursor=pointer]:
+                        - checkbox "🔊 Audio Speech" [ref=f9e547]
+                        - text: 🔊 Audio Speech
+                      - generic [ref=f9e548] [cursor=pointer]:
+                        - checkbox "🎙️ Audio Transcriptions" [ref=f9e549]
+                        - text: 🎙️ Audio Transcriptions
+                  - generic [ref=f9e550]:
+                    - generic "Manually flag this model as vision-capable when the provider's discovery metadata doesn't report an image input modality (common for self-hosted/local backends)." [ref=f9e552] [cursor=pointer]:
+                      - checkbox "👁️ Vision capable" [ref=f9e553]
+                      - text: 👁️ Vision capable
+                    - generic "Mark as free-tier (shown even when hide paid models is on)" [ref=f9e554] [cursor=pointer]:
+                      - checkbox "FREE" [ref=f9e555]
+                      - text: FREE
+              - paragraph [ref=f9e556]: No custom models added yet.
+          - generic [ref=f9e557]:
+            - heading "Playground" [level=2] [ref=f9e558]
+            - generic [ref=f9e559]:
+              - generic [ref=f9e561]:
+                - generic [ref=f9e562]: "Model:"
+                - combobox [disabled] [ref=f9e563]:
+                  - option "Loading..." [selected]
+              - generic [ref=f9e565]:
+                - generic [ref=f9e566]: forum
+                - paragraph [ref=f9e568]: Send a message to start the conversation
+                - paragraph [ref=f9e569]: Shift+Enter for newline · Enter to send
+              - generic [ref=f9e570]:
+                - textbox "Send…" [ref=f9e571]
+                - button "arrow_upward" [disabled] [ref=f9e572]
+          - generic [ref=f9e573]:
+            - heading "Param Filters" [level=2] [ref=f9e574]
+            - paragraph [ref=f9e575]:
+              - text: Strip or re-add request parameters before sending to this provider. Used to avoid 400 errors from providers that reject certain params (e.g. NVIDIA NIM rejects
+              - code [ref=f9e576]: thinking
+              - text: ).
+            - generic [ref=f9e577]:
+              - generic [ref=f9e578]: Blocked parameters
+              - textbox "thinking, reasoning_budget, … (comma-separated)" [ref=f9e579]
+              - paragraph [ref=f9e580]: These params are stripped from outgoing requests (denylist).
+            - generic [ref=f9e581]:
+              - generic [ref=f9e582]: Allowed parameters
+              - textbox "reasoning, … (comma-separated)" [ref=f9e583]
+              - paragraph [ref=f9e584]: These params are re-added after denylist stripping (only if the client sent them).
+            - generic [ref=f9e585]:
+              - generic [ref=f9e586] [cursor=pointer]:
+                - checkbox "Auto-learn from 400 errors" [ref=f9e587]
+                - generic [ref=f9e588]: Auto-learn from 400 errors
+              - paragraph [ref=f9e589]: "When enabled, if the upstream returns a 400 with \"Unsupported parameter: X\", the param is automatically added to the block list and the request retried."
+            - generic [ref=f9e590]:
+              - button "save Save Changes" [disabled] [ref=f9e591]:
+                - generic: save
+                - text: Save Changes
+              - button "delete Reset to Default" [ref=f9e592]:
+                - generic: delete
+                - text: Reset to Default
+          - generic [ref=f9e593]:
+            - heading "Web Tool Interception" [level=2] [ref=f9e594]
+            - paragraph [ref=f9e595]: Route this provider's native web_search / web_fetch tool calls through OmniRoute's own search and fetch endpoints instead of letting the provider run them natively. Off by default — existing behavior is unchanged.
+            - generic [ref=f9e596]:
+              - generic [ref=f9e597]:
+                - switch "Intercept web_search" [ref=f9e598] [cursor=pointer]
+                - generic [ref=f9e599]:
+                  - generic [ref=f9e600]: Intercept web_search
+                  - generic [ref=f9e601]: Rewrite native web_search tool calls to OmniRoute's /v1/search.
+              - generic [ref=f9e602]:
+                - switch "Intercept web_fetch" [ref=f9e603] [cursor=pointer]
+                - generic [ref=f9e604]:
+                  - generic [ref=f9e605]: Intercept web_fetch
+                  - generic [ref=f9e606]: Rewrite native web_fetch tool calls to OmniRoute's /v1/web/fetch.
+          - generic [ref=f9e607]:
+            - heading "Expose in Claude Code (claude/…)" [level=2] [ref=f9e608]
+            - paragraph [ref=f9e609]: Advertise this provider's models under claude/&lt;provider&gt;/&lt;model&gt; mirror ids so Claude Code's gateway model discovery can list them. Off by default — enabling this doubles catalog entries for all clients.
+            - generic [ref=f9e610]:
+              - generic [ref=f9e611]: Provider default
+              - combobox "Provider default" [ref=f9e612]:
+                - option "Inherit" [selected]
+                - option "On"
+                - option "Off"
+            - generic [ref=f9e613]:
+              - textbox "Model id (e.g. gpt-4o)" [ref=f9e614]
+              - button "Add override" [disabled] [ref=f9e615]
+          - dialog [ref=f9e618]:
+            - generic [ref=f9e619]:
+              - heading "Add Perplexity Web (Pro/Max) session cookie" [level=2] [ref=f9e625]
+              - button "Close" [active] [ref=f9e626]:
+                - generic [aria-hidden]: close
+            - generic [ref=f9e628]:
+              - link "Open www.perplexity.ai" [ref=f9e629] [cursor=pointer]:
+                - /url: https://www.perplexity.ai
+                - generic [aria-hidden] [ref=f9e630]: open_in_new
+                - text: Open www.perplexity.ai
+              - generic [ref=f9e631]:
+                - generic [ref=f9e632]: Name
+                - textbox "Name" [ref=f9e634]:
+                  - /placeholder: Production Key
+                  - text: main
+              - generic [ref=f9e636]:
+                - generic [ref=f9e637]: cookie
+                - generic [ref=f9e638]:
+                  - generic [ref=f9e639]:
+                    - paragraph [ref=f9e640]: How to get the session credential
+                    - paragraph [ref=f9e641]: Perplexity Web (Pro/Max) uses a browser web session instead of an API key.
+                  - paragraph [ref=f9e642]: "Required cookie: __Secure-next-auth.session-token"
+                  - list [ref=f9e643]:
+                    - listitem [ref=f9e644]:
+                      - text: Sign in to Perplexity Web (Pro/Max) in your browser.
+                      - link "Open www.perplexity.ai" [ref=f9e645] [cursor=pointer]:
+                        - /url: https://www.perplexity.ai
+                        - text: Open www.perplexity.ai
+                        - generic [aria-hidden] [ref=f9e646]: open_in_new
+                    - listitem [ref=f9e647]: "Fast path: install the Cookie Editor extension (chromewebstore.google.com → Cookie Editor), open it on the Perplexity Web (Pro/Max) tab, find __Secure-next-auth.session-token (select all numbered chunks if split), and click Export → Copy with the export format set to “Cookie header”."
+                    - listitem [ref=f9e648]: "Manual path: open the browser developer tools (F12 → Network), refresh the page, open an authenticated request, and copy the Cookie header value from Request Headers — omit the Cookie: prefix."
+                    - listitem [ref=f9e649]: Paste it here and check the connection. If it stops working, sign in again and replace it with a fresh value.
+                  - paragraph [ref=f9e650]: "Treat this like a password: it may access your signed-in web account until it expires or is revoked."
+              - generic [ref=f9e651]:
+                - generic [ref=f9e652]:
+                  - generic [ref=f9e653]: Session Cookie Label
+                  - textbox "Session Cookie Label" [ref=f9e655]:
+                    - /placeholder: __Secure-next-auth.session-token=...
+                  - paragraph [ref=f9e656]: "Required cookie: __Secure-next-auth.session-token. Paste the Cookie header value from your own signed-in Perplexity Web (Pro/Max) web session. Do not include the Cookie: prefix."
+                - button "Check cookie" [disabled] [ref=f9e658]
+              - button "Advanced Settings" [ref=f9e659]:
+                - generic [aria-hidden] [ref=f9e660]: ▶
+                - text: Advanced Settings
+              - generic [ref=f9e661]:
+                - generic [ref=f9e662]: Validation Model
+                - textbox "Validation Model" [ref=f9e664]:
+                  - /placeholder: e.g. meta-llama/llama-3.1-8b-instruct
+                - paragraph [ref=f9e665]: Model used to verify the API key. Leave blank to use the provider’s first available model.
+              - generic [ref=f9e666]:
+                - generic [ref=f9e667]: Priority
+                - spinbutton "Priority" [ref=f9e669]: "1"
+              - generic [ref=f9e670]:
+                - button "Save" [disabled] [ref=f9e671]
+                - button "Cancel" [ref=f9e672] [cursor=pointer]
+  - alert [ref=f9e309]

@@ -2415,6 +2415,50 @@ button {
    POPULAR GAME PATTERNS — From Brawl Stars, Fall Guys, etc.
    ============================================================ */
 
+/* ---------- 3 MAIN MODE CARDS ---------- */
+.mode-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin: 12px 0;
+}
+.mode-card-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 8px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.7));
+  border: 2px solid rgba(42, 28, 40, 0.08);
+  border-radius: 16px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: center;
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+  box-shadow: 0 4px 12px rgba(42, 28, 40, 0.08);
+}
+.mode-card-main:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(42, 28, 40, 0.12);
+  border-color: rgba(255, 107, 74, 0.3);
+}
+.mode-card-main:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 8px rgba(42, 28, 40, 0.08);
+}
+.mode-icon-lg { font-size: 32px; }
+.mode-name {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: 0.04em;
+}
+.mode-desc {
+  font-size: 11px;
+  color: #8a6a62;
+  line-height: 1.3;
+}
+
 /* ---------- 1. LARGE ANIMATED PLAY BUTTON ---------- */
 .fly-cta {
   width: 100%;
