@@ -1,4 +1,8 @@
-const CACHE = "sunbird-shell-v2";
+// Cache version is stamped at build time by vite.config.ts define() injection.
+// Falls back to a timestamp so local dev always busts stale caches.
+const BUILD_ID = typeof __SW_BUILD_ID__ !== 'undefined' ? __SW_BUILD_ID__ : Date.now().toString(36);
+const CACHE = `sunbird-shell-${BUILD_ID}`;
+
 const PRECACHE = [
   "/",
   "/index.html",
@@ -11,7 +15,11 @@ const PRECACHE = [
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(PRECACHE)).catch(() => undefined));
+  event.waitUntil(
+    caches.open(CACHE)
+      .then((cache) => cache.addAll(PRECACHE))
+      .catch(() => undefined)
+  );
   self.skipWaiting();
 });
 
@@ -26,7 +34,6 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
-  // Only cache same-origin requests to prevent cross-origin cache poisoning
   if (!event.request.url.startsWith(self.location.origin)) return;
   event.respondWith(
     caches.match(event.request).then(
@@ -43,7 +50,6 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
-// Real notification surface used by the daily-hills reminder (in-app while open).
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   event.waitUntil(self.clients.matchAll({ type: "window" }).then((list) => {
