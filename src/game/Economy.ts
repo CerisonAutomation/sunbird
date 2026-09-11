@@ -1,3 +1,6 @@
+export type SkinRarity = "starter" | "common" | "rare" | "epic" | "legendary" | "mythic";
+export type CollectionId = "starter" | "nature" | "elements" | "cosmic" | "seasonal" | "premium" | "tournament" | "achievement";
+
 export type SkinDef = {
   id: string;
   name: string;
@@ -13,6 +16,8 @@ export type SkinDef = {
   feverBonus: number;
   daylightBonus: number;
   magnetAlways: boolean;
+  rarity?: SkinRarity;
+  collection?: CollectionId;
 };
 
 export const SKINS: SkinDef[] = [
