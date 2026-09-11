@@ -26,7 +26,7 @@ import {
   CALENDAR_DAYS,
   type ChallengeMods,
 } from "./Challenges";
-import { bankMasteryRun, masteryViews } from "./Mastery";
+import { bankMasteryRun, masteryPerks, masteryViews, NO_MASTERY_PERKS, type MasteryPerks } from "./Mastery";
 import { campaignProgress, campaignViews, CAMPAIGN } from "./Campaign";
 import { monthKey, monthlyTheme, THEME_TRAIL_CLEARS, weeklyEvent } from "./Events";
 import { emptySquadState, SquadClient } from "./Squad";
@@ -252,6 +252,8 @@ export class Game {
   private readonly powers = new PowerUps();
   private mode: ModeDef = modeById("daytrip");
   private modeId: ModeId = "daytrip";
+  /** Permanent per-mode mastery perks (coin/daylight/fever/lift), refreshed each run. */
+  private masteryPerk: MasteryPerks = NO_MASTERY_PERKS;
   private maxAltitude = 0;
   private maxSpeed = 0;
   private lastLaunch: LaunchResult | null = null;
@@ -633,7 +635,7 @@ export class Game {
         fever: this.feverOn,
         speedMult: skin.speedMult * this.challengeMods.speedMult,
         boost: this.boostTimer > 0 || this.powers.boostOn(),
-        liftMult: this.powers.liftMult(),
+        liftMult: this.powers.liftMult() * this.masteryPerk.liftMult,
         // Slipstream: tucking behind a rival genuinely reduces your drag.
         dragMult: this.powers.dragMult() * this.massRace.draftFor(this.bird.x, this.bird.y),
         feather: this.powers.featherOn(),
@@ -890,6 +892,7 @@ export class Game {
             this.powers.coinMult() *
             (this.mode.id === "coinrush" ? 2 : 1) *
             this.challengeMods.coinMult *
+            this.masteryPerk.coinMult *
             (this.eventRun ? weeklyEvent().mods.coinMult : 1),
         );
         this.runCoins += value;
@@ -1117,7 +1120,7 @@ export class Game {
     const was = this.feverOn;
     this.feverOn = true;
     this.feverReached = true;
-    this.feverTimer = FEVER_DURATION + this.skin.feverBonus;
+    this.feverTimer = FEVER_DURATION + this.skin.feverBonus + this.masteryPerk.feverBonus;
     if (!was) {
       this.audio.feverOn();
       this.audio.setMusicMode("fever");
@@ -1682,7 +1685,13 @@ export class Game {
 
     // Mode mastery: every finished run banks progress; level-ups pay coins.
     const mastery = bankMasteryRun(this.save, this.modeId);
-    if (mastery) this.hud.toast(`${this.mode.icon} ${this.mode.name} mastery Lv.${mastery.level} · +${mastery.coins} coins`, "gold");
+    if (mastery) {
+      if (mastery.skill) {
+        this.hud.toast(`★ ${this.mode.name} MASTERED · skill unlocked: ${mastery.skill.name} (${mastery.skill.desc}) · +${mastery.coins} coins`, "gold");
+      } else {
+        this.hud.toast(`${this.mode.icon} ${this.mode.name} mastery Lv.${mastery.level} · +2% coins in mode · +${mastery.coins} coins`, "gold");
+      }
+    }
     const score = this.score();
     this.save.recordRun(stats.distance, this.runCoins, score, this.today, this.island, this.terrain.biomeAt(this.bird.x).id);
     this.save.addLifetimeZeniths(stats.zenith);
@@ -1791,6 +1800,7 @@ export class Game {
   }
 
   private resetRun(idle: boolean): void {
+    this.masteryPerk = masteryPerks(this.save, this.modeId);
     this.startX = 64;
     const y = this.terrain.heightAt(this.startX) + BIRD_RADIUS;
     this.bird.reset(this.startX, y);
@@ -2741,7 +2751,7 @@ export class Game {
   }
 
   private daylightMax(): number {
-    return (this.save.state.gold ? DAYLIGHT_MAX_GOLD : DAYLIGHT_MAX) + this.skin.daylightBonus;
+    return (this.save.state.gold ? DAYLIGHT_MAX_GOLD : DAYLIGHT_MAX) + this.skin.daylightBonus + this.masteryPerk.daylightBonus;
   }
 
   private applySkin(): void {
@@ -3198,7 +3208,7 @@ export class Game {
       coins: this.runCoins,
       daylight: this.daylight,
       daylightMax: this.daylightMax(),
-      fever: this.feverOn ? this.feverTimer / (FEVER_DURATION + this.skin.feverBonus) : this.perfectChain / FEVER_NEED,
+      fever: this.feverOn ? this.feverTimer / (FEVER_DURATION + this.skin.feverBonus + this.masteryPerk.feverBonus) : this.perfectChain / FEVER_NEED,
       feverOn: this.feverOn,
       multiplier: this.save.nestMultiplier() * (this.feverOn ? 2 : 1),
       bestDistance: st.bestDistance,

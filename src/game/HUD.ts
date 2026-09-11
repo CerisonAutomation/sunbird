@@ -279,6 +279,12 @@ export type MasteryRow = {
   level: number;
   nextAt: number | null;
   progress: number;
+  /** Active perk line ("+4% coins" or the signature skill when maxed). */
+  perk: string;
+  /** Signature level-5 skill this mode builds toward. */
+  skillName: string;
+  skillDesc: string;
+  maxed: boolean;
 };
 
 type ActionHandler = (action: string, id: string) => void;
@@ -1128,10 +1134,15 @@ function renderChallenges(s: HudSnapshot): string {
     <div class="mastery-list">
       ${s.mastery
         .map(
-          (m) => `<div class="mastery-row">
+          (m) => `<div class="mastery-row ${m.maxed ? "maxed" : ""}">
             <span class="m-icon">${m.icon}</span>
-            <div class="m-body"><b>${m.name}</b><em>${m.runs} runs${m.nextAt ? ` · next level at ${m.nextAt}` : " · maxed"}</em>
-            <div class="qb"><i style="width:${Math.round(m.progress * 100)}%"></i></div></div>
+            <div class="m-body"><b>${m.name}${m.maxed ? ` <span class="m-skill">★ ${m.skillName}</span>` : ""}</b>
+            <em>${
+              m.maxed
+                ? `Mastered · ${m.skillDesc} — always on in this mode`
+                : `${m.runs} runs · next level at ${m.nextAt}${m.perk ? ` · ${m.perk}` : ` · Lv.5 skill: ${m.skillName} (${m.skillDesc})`}`
+            }</em>
+            ${m.maxed ? "" : `<div class="qb"><i style="width:${Math.round(m.progress * 100)}%"></i></div>`}</div>
             <span class="m-stars">${"★".repeat(m.level)}${"☆".repeat(Math.max(0, 5 - m.level))}</span>
           </div>`,
         )

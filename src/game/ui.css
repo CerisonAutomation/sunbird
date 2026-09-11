@@ -2909,6 +2909,24 @@ button {
 .mastery-row .m-body b { display: block; font-size: 13px; }
 .mastery-row .m-body em { font-style: normal; font-size: 11px; color: #9a8a80; }
 .mastery-row .m-stars { color: #e8a020; font-size: 13px; letter-spacing: 1px; white-space: nowrap; }
+.mastery-row.maxed {
+  border: 1px solid rgba(232, 160, 32, 0.55);
+  background: linear-gradient(120deg, rgba(232, 160, 32, 0.14), rgba(255, 122, 69, 0.1));
+  box-shadow: 0 0 14px rgba(232, 160, 32, 0.18) inset;
+}
+.mastery-row.maxed .m-stars { text-shadow: 0 0 8px rgba(232, 160, 32, 0.8); }
+.mastery-row .m-skill {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #3a2410;
+  background: linear-gradient(120deg, #ffd76a, #ff9a4a);
+}
 .mastery-row .qb { margin-top: 3px; }
 
 /* ---------- DUELS ---------- */
