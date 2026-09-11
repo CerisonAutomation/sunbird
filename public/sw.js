@@ -1,4 +1,8 @@
-const CACHE = "sunbird-shell-v4";
+// Cache version is stamped at build time (vite closeBundle rewrites the
+// token in dist/sw.js). The raw token never ships: dev serves public/ but
+// never registers the SW from vite dev, and the fallback covers any edge.
+const BUILD_ID = "__SW_BUILD_ID__".includes("BUILD_ID") ? "dev" : "__SW_BUILD_ID__";
+const CACHE = `sunbird-shell-${BUILD_ID}`;
 const PRECACHE = [
   "/",
   "/index.html",

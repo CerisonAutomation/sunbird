@@ -34,7 +34,7 @@ describe("weekly events", () => {
 
   it("rolls progress windows forward and resets counters", () => {
     const d1 = new Date(2026, 0, 5);
-    let p = rollEventProgress(emptyEventProgress(), d1);
+    const p = rollEventProgress(emptyEventProgress(), d1);
     p.clearsThisWeek = 2;
     p.clearsThisMonth = 2;
     // same week: nothing resets

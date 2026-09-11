@@ -116,10 +116,13 @@ export const BOOST_EXTRA_SPEED = 42;
 export const HEADSTART_DISTANCE = 300;
 
 /* ---------- Stripe (see .env.example) ---------- */
-export const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? "";
-export const STRIPE_GOLD_LINK = import.meta.env.VITE_STRIPE_GOLD_LINK ?? "";
-export const STRIPE_VIP_LINK = import.meta.env.VITE_STRIPE_VIP_LINK ?? "";
-export const STRIPE_STARTER_LINK = import.meta.env.VITE_STRIPE_STARTER_LINK ?? "";
+// import.meta.env only exists under Vite — plain Node runners (tsx harnesses
+// like scripts/physcheck.ts) import this module too, so read it defensively.
+const ENV: Record<string, string | undefined> = (import.meta as unknown as { env?: Record<string, string> }).env ?? {};
+export const STRIPE_PUBLISHABLE_KEY = ENV.VITE_STRIPE_PUBLISHABLE_KEY ?? "";
+export const STRIPE_GOLD_LINK = ENV.VITE_STRIPE_GOLD_LINK ?? "";
+export const STRIPE_VIP_LINK = ENV.VITE_STRIPE_VIP_LINK ?? "";
+export const STRIPE_STARTER_LINK = ENV.VITE_STRIPE_STARTER_LINK ?? "";
 export const STRIPE_RETURN_KEY = "sunbird_stripe";
 
 export const VIP_DAYS = 30;

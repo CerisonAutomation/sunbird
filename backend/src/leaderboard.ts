@@ -40,11 +40,21 @@ const clampNum = (v: unknown, max: number): number => {
 
 const todayStr = (): string => new Date().toISOString().slice(0, 10);
 
+async function hmacHex(salt: string, msg: string): Promise<string> {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(salt), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(msg));
+  return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 export class LeaderboardDO implements DurableObject {
   private readonly sql: SqlStorage;
+  /** When LEADERBOARD_SALT is configured, unsigned submissions are rejected.
+   * Honest scope: the salt ships inside the client bundle, so this deters
+   * casual curl-spoofing — the plausibility gates below are the real teeth. */
+  private readonly salt: string;
 
-  constructor(state: DurableObjectState, _env: unknown) {
-    void _env;
+  constructor(state: DurableObjectState, env: unknown) {
+    this.salt = String((env as { LEADERBOARD_SALT?: string })?.LEADERBOARD_SALT ?? "");
     this.sql = state.storage.sql;
     this.sql.exec(`
       CREATE TABLE IF NOT EXISTS scores (
@@ -102,6 +112,21 @@ export class LeaderboardDO implements DurableObject {
 
       const deviceId = clean(body.deviceId, 64);
       if (!deviceId) return Response.json({ error: "deviceId required" }, { status: 400 });
+
+      // Signature gate (when configured): sig = HMAC-SHA256(salt, deviceId|distance|score).
+      if (this.salt) {
+        const expected = await hmacHex(this.salt, `${deviceId}|${clampNum(body.distance, 500_000)}|${clampNum(body.score, 5_000_000)}`);
+        if (clean(body.sig, 128) !== expected) {
+          return Response.json({ error: "bad signature" }, { status: 403 });
+        }
+      }
+
+      // Plausibility gates — server-enforceable physics limits. A legit run
+      // cannot post 100km, nor a score wildly out of line with its distance.
+      const dist = clampNum(body.distance, 500_000);
+      const score = clampNum(body.score, 5_000_000);
+      if (dist > 60_000) return Response.json({ error: "implausible distance" }, { status: 422 });
+      if (score > dist * 40 + 50_000) return Response.json({ error: "implausible score" }, { status: 422 });
 
       const row: Row = {
         deviceId,
