@@ -28,7 +28,8 @@ export type UiScreen =
   | "board"
   | "cups"
   | "live"
-  | "rank";
+  | "rank"
+  | "challenges";
 
 export type RivalCard = {
   rating: number;
@@ -211,6 +212,55 @@ export type HudSnapshot = {
   raceRated: boolean;
   ratingDelta: number;
   ratingBonus: number;
+  /* --- duels --- */
+  duel: { wins: number; losses: number; streak: number; bestStreak: number };
+  duelWas: "" | "won" | "lost";
+  duelDelta: number;
+  duelFoe: { name: string; tag: string; rating: number };
+  /* --- daily challenge / weekly gauntlet / calendar / mastery --- */
+  daily: DailyCard;
+  gauntlet: GauntletCard;
+  calendar: CalendarCard;
+  mastery: MasteryRow[];
+  challengeOutcome: string;
+};
+
+export type DailyCard = {
+  title: string;
+  modeName: string;
+  modeIcon: string;
+  modifierIcon: string;
+  modifierLabel: string;
+  modifierDesc: string;
+  metric: string;
+  target: number;
+  reward: number;
+  done: boolean;
+  dailiesDone: number;
+};
+
+export type GauntletCard = {
+  week: string;
+  stages: { index: number; label: string; modeName: string; modeIcon: string; metric: string; target: number; reward: number; done: boolean }[];
+  clearBonus: number;
+  cleared: boolean;
+  lifetimeClears: number;
+};
+
+export type CalendarCard = {
+  cycleDay: number;
+  claimedToday: boolean;
+  days: { day: number; label: string; claimed: boolean; today: boolean; milestone: boolean }[];
+};
+
+export type MasteryRow = {
+  modeId: string;
+  name: string;
+  icon: string;
+  runs: number;
+  level: number;
+  nextAt: number | null;
+  progress: number;
 };
 
 type ActionHandler = (action: string, id: string) => void;
@@ -352,6 +402,10 @@ export class HUD {
           <button data-ui data-action="emote" data-id="🔥">🔥</button>
           <button data-ui data-action="emote" data-id="😂">😂</button>
           <button data-ui data-action="emote" data-id="🫡">🫡</button>
+          <button data-ui data-action="emote" data-id="😱">😱</button>
+          <button data-ui data-action="emote" data-id="👑">👑</button>
+          <button data-ui data-action="emote" data-id="💨">💨</button>
+          <button data-ui data-action="emote" data-id="🤝">🤝</button>
         </div>
         <div class="mid-meta">
           <div class="island-chip" data-ref="island">Island 1</div>
@@ -734,6 +788,8 @@ export class HUD {
         return renderLive(s);
       case "rank":
         return renderRank(s);
+      case "challenges":
+        return renderChallenges(s);
       default:
         return renderMain(s);
     }
@@ -978,6 +1034,78 @@ function renderLive(s: HudSnapshot): string {
   `;
 }
 
+function renderChallenges(s: HudSnapshot): string {
+  const d = s.daily;
+  const g = s.gauntlet;
+  const c = s.calendar;
+  const daily = `
+    <div class="section-title">Daily challenge <small>resets at midnight</small></div>
+    <div class="daily-card ${d.done ? "done" : ""}">
+      <div class="daily-head"><span class="daily-icon">${d.modeIcon}</span><div><b>${d.title}</b><em>${d.modeName} · ${escapeHtml(d.metric)} ≥ ${d.target}</em></div><span class="pill coin">● ${d.reward}</span></div>
+      <div class="daily-mod"><b>${d.modifierIcon} ${d.modifierLabel}</b><span>${escapeHtml(d.modifierDesc)}</span></div>
+      ${
+        d.done
+          ? `<div class="reward-strip">✓ Complete · come back tomorrow (${d.dailiesDone} lifetime)</div>`
+          : `<button class="primary-btn" data-ui data-action="play-daily">☀ FLY THE CHALLENGE</button>`
+      }
+    </div>`;
+
+  const gauntlet = `
+    <div class="section-title">Weekly gauntlet <small>3 stages · resets Monday</small></div>
+    <div class="gauntlet">
+      ${g.stages
+        .map(
+          (st) => `<div class="g-stage ${st.done ? "done" : ""}">
+            <span class="g-num">${st.done ? "✓" : st.index + 1}</span>
+            <div class="g-body"><b>${st.modeIcon} ${escapeHtml(st.label)}</b><em>${st.modeName} · ${escapeHtml(st.metric)} ≥ ${st.target}</em></div>
+            ${st.done ? `<span class="tag on">Clear</span>` : `<button class="mini-btn" data-ui data-action="play-gauntlet" data-id="${st.index}">● ${st.reward}</button>`}
+          </div>`,
+        )
+        .join("")}
+      <div class="g-bonus ${g.cleared ? "done" : ""}">${g.cleared ? `🏆 Gauntlet cleared this week · +${g.clearBonus} paid` : `Clear all 3 → +${g.clearBonus} coins`}${g.lifetimeClears > 0 ? ` · ${g.lifetimeClears} lifetime clears` : ""}</div>
+    </div>`;
+
+  const calendar = `
+    <div class="section-title">Login calendar <small>day ${c.cycleDay || "—"} of 28</small></div>
+    <div class="cal-grid">
+      ${c.days
+        .map(
+          (day) =>
+            `<div class="cal-day ${day.claimed ? "claimed" : ""} ${day.today ? "today" : ""} ${day.milestone ? "milestone" : ""}"><span class="cal-num">${day.day}</span><span class="cal-r">${day.label}</span></div>`,
+        )
+        .join("")}
+    </div>
+    ${
+      c.claimedToday
+        ? `<div class="reward-strip">📅 Today's gift claimed — see you tomorrow</div>`
+        : `<button class="primary-btn" data-ui data-action="claim-calendar">📅 CLAIM TODAY'S GIFT</button>`
+    }`;
+
+  const mastery = `
+    <div class="section-title">Mode mastery <small>fly every mode</small></div>
+    <div class="mastery-list">
+      ${s.mastery
+        .map(
+          (m) => `<div class="mastery-row">
+            <span class="m-icon">${m.icon}</span>
+            <div class="m-body"><b>${m.name}</b><em>${m.runs} runs${m.nextAt ? ` · next level at ${m.nextAt}` : " · maxed"}</em>
+            <div class="qb"><i style="width:${Math.round(m.progress * 100)}%"></i></div></div>
+            <span class="m-stars">${"★".repeat(m.level)}${"☆".repeat(Math.max(0, 5 - m.level))}</span>
+          </div>`,
+        )
+        .join("")}
+    </div>`;
+
+  return `
+    ${head("Challenges", "back", `<span class="pill">☀ Daily · 🌩 Weekly</span>`)}
+    <p class="tagline">Same hills as everyone else today. Modifiers change how you fly them.</p>
+    ${daily}
+    ${gauntlet}
+    ${calendar}
+    ${mastery}
+  `;
+}
+
 function renderRank(s: HudSnapshot): string {
   const r = s.rival;
   const wl = r.wins + r.losses > 0 ? Math.round((r.wins / (r.wins + r.losses)) * 100) : 0;
@@ -1008,8 +1136,23 @@ function renderRank(s: HudSnapshot): string {
             .join("")}</div>`
         : `<p class="fineprint">No ranked races yet. Your first 40-bird finish sets the tone.</p>`
     }
+    <div class="section-title">Duels <small>ranked 1v1 · ±16 rating</small></div>
+    <div class="duel-card">
+      <div class="vs-stage slim">
+        <div class="vs-you"><span class="vs-bird">🐦</span><b>YOU</b><span class="vs-sub">${r.rating}</span></div>
+        <div class="vs-mark">VS</div>
+        <div class="vs-foes"><div class="vs-foe"><span class="vs-bird">🐤</span><b>${escapeHtml(s.duelFoe.name)}</b><span class="vs-sub">${escapeHtml(s.duelFoe.tag)} · ~${s.duelFoe.rating}</span></div></div>
+      </div>
+      <div class="rank-stats">
+        <div><span>Duel W–L</span><b>${s.duel.wins}–${s.duel.losses}</b></div>
+        <div><span>Streak</span><b>🔥${s.duel.streak}</b></div>
+        <div><span>Best</span><b>×${s.duel.bestStreak}</b></div>
+        <div><span>Prize</span><b>${s.duel.wins >= 10 ? "🪶 won" : `${s.duel.wins}/10`}</b></div>
+      </div>
+      <button class="primary-btn hero" data-ui data-action="pvp-duel"><span class="hero-label">⚔ DUEL</span><span class="hero-hint">1v1 · first to 3,000 m · win 10 for the Hummingbird</span></button>
+    </div>
     <button class="primary-btn race40 hero" data-ui data-action="pvp-ranked"><span class="hero-label">⚔ RACE RANKED</span><span class="hero-hint">climb or defend ${r.division}</span></button>
-    <p class="fineprint">Your rating changes based on how you finish in ranked 40-bird races. Climb divisions to prove your skill!</p>
+    <p class="fineprint">Your rating changes based on how you finish in ranked 40-bird races and duels. Reaching Sunbird Legend unlocks the Solstice bird. Seasons soft-reset monthly with a division reward.</p>
   `;
 }
 
@@ -1184,10 +1327,17 @@ function renderMain(s: HudSnapshot): string {
 
     <div class="pvp-modes" role="group" aria-label="Play modes">
       <button class="pvp-mode rated" data-ui data-action="pvp-ranked"><i>🏆</i><b>Ranked 40</b><span>Rating moves</span></button>
+      <button class="pvp-mode rated" data-ui data-action="pvp-duel"><i>⚔</i><b>Duel 1v1</b><span>±16 rating</span></button>
       <button class="pvp-mode" data-ui data-action="pvp-casual"><i>🐦</i><b>Casual 40</b><span>No rating</span></button>
       <button class="pvp-mode" data-ui data-action="versus"><i>👥</i><b>Local 2P</b><span>Same screen</span></button>
-      <button class="pvp-mode" data-ui data-action="pvp-practice"><i>🌅</i><b>Practice</b><span>Empty skies</span></button>
     </div>
+
+    <button class="daily-strip ${s.daily.done ? "done" : ""}" data-ui data-action="${s.daily.done ? "open-challenges" : "play-daily"}">
+      <span class="ds-icon">${s.daily.done ? "✓" : s.daily.modifierIcon}</span>
+      <span class="ds-body"><b>Daily · ${s.daily.title}</b><em>${s.daily.done ? "Complete — gauntlet & calendar inside" : `${s.daily.modifierLabel} · ${escapeHtml(s.daily.metric)} ≥ ${s.daily.target} · ● ${s.daily.reward}`}</em></span>
+      <span class="ds-go">${s.daily.done ? "›" : "FLY"}</span>
+    </button>
+    ${!s.calendar.claimedToday ? `<button class="cal-strip" data-ui data-action="claim-calendar">📅 Daily gift ready — day ${(s.calendar.cycleDay % 28) + 1} of 28 <b>CLAIM</b></button>` : ""}
 
     <div class="loadout-strip">
       <span class="loadout-bird">🪶 ${s.loadout.bird}</span>
@@ -1200,6 +1350,7 @@ function renderMain(s: HudSnapshot): string {
 
     <nav class="nav-grid compact">
       <button class="nav-btn" data-ui data-action="mode-select"><i>🎯</i><span>Modes</span></button>
+      <button class="nav-btn" data-ui data-action="open-challenges"><i>☀</i><span>Daily</span></button>
       <button class="nav-btn" data-ui data-action="open-live"><i>🐦</i><span>Race</span></button>
       <button class="nav-btn" data-ui data-action="open-board"><i>🌍</i><span>Board</span></button>
       <button class="nav-btn" data-ui data-action="open-cups"><i>🏆</i><span>Cups</span></button>
@@ -1246,7 +1397,8 @@ function renderMain(s: HudSnapshot): string {
   `;
 }
 
-function skinRarity(d: { goldOnly?: boolean; vipOnly?: boolean; price: number }): { key: string; label: string } {
+function skinRarity(d: { goldOnly?: boolean; vipOnly?: boolean; prizeOnly?: string; price: number }): { key: string; label: string } {
+  if (d.prizeOnly) return { key: "prize", label: "PRIZE" };
   if (d.vipOnly) return { key: "mythic", label: "MYTHIC" };
   if (d.goldOnly) return { key: "legendary", label: "LEGENDARY" };
   if (d.price >= 700) return { key: "epic", label: "EPIC" };
@@ -1273,6 +1425,7 @@ function renderSkinCard(v: SkinView, portal = false): string {
   let action: string;
   if (v.equipped) action = `<span class="tag on">✓ In use</span>`;
   else if (v.owned) action = `<button class="mini-btn" data-ui data-action="equip-skin" data-id="${d.id}">Equip</button>`;
+  else if (d.prizeOnly) action = `<span class="tag prize" title="${d.prizeOnly}">🏆 ${d.prizeOnly}</span>`;
   else if (v.locked && portal)
     action = `<span class="tag portal-lock">Portal event</span>`;
   else if (v.locked)
@@ -1415,6 +1568,7 @@ function renderScores(s: HudSnapshot): string {
 function rewardLabel(r: { kind: string; amount?: number; id?: string }): string {
   if (r.kind === "coins") return `● ${r.amount}`;
   if (r.kind === "skin") return `🪶 ${r.id}`;
+  if (r.kind === "trail") return `✨ ${r.id?.replace("trail_", "") ?? "trail"}`;
   return `🎁 ${r.id}`;
 }
 
@@ -1532,8 +1686,17 @@ function renderGameOver(s: HudSnapshot): string {
     s.raceRated && s.ratingDelta !== 0
       ? `<span class="rate-delta ${s.ratingDelta > 0 ? "up" : "down"}">${s.ratingDelta > 0 ? "+" : ""}${s.ratingDelta}</span>`
       : "";
+  const duelStrip =
+    s.duelWas !== ""
+      ? `<div class="race-hero ${s.duelWas === "won" ? "win" : ""}">
+           <div class="race-medal">${s.duelWas === "won" ? "⚔🥇" : "⚔"}</div>
+           <div class="race-place"><b>DUEL ${s.duelWas === "won" ? "WON" : "LOST"}</b><span>${s.duelWas === "won" ? "+" : ""}${s.duelDelta} rating → ${s.rival.rating}</span></div>
+           <div class="race-rating">Duel record ${s.duel.wins}–${s.duel.losses} · 🔥${s.duel.streak} streak<span class="race-rated-tag">ranked · local</span></div>
+         </div>
+         <button class="primary-btn race40 hero" data-ui data-action="pvp-duel"><span class="hero-label">⚔ REMATCH</span><span class="hero-hint">same rating band, fresh wings</span></button>`
+      : "";
   const raceStrip =
-    s.massRace && s.racePlace > 0
+    s.duelWas === "" && s.massRace && s.racePlace > 0
       ? `<div class="race-hero ${s.racePlace === 1 ? "win" : s.racePlace <= 3 ? "podium" : ""}">
            <div class="race-medal">${s.racePlace === 1 ? "🥇" : s.racePlace === 2 ? "🥈" : s.racePlace === 3 ? "🥉" : "🏁"}</div>
            <div class="race-place"><b>P${s.racePlace}</b><span>of ${s.raceField} pilots · ${s.raceFinishTime.toFixed(1)}s</span></div>
@@ -1569,6 +1732,8 @@ function renderGameOver(s: HudSnapshot): string {
     ${questTotal ? `<div class="reward-strip">Daily quest${s.claimedQuests.length > 1 ? "s" : ""} complete · +${questTotal} coins</div>` : ""}
     ${s.newlyCompleted.length ? `<div class="reward-strip nest">Nest upgraded → Lv.${s.nestLevel} · ×${s.nestMult.toFixed(2)} score</div>` : ""}
     ${s.nearMiss ? `<div class="nearmiss">${s.nearMiss}</div>` : ""}
+    ${s.challengeOutcome ? `<div class="reward-strip ${s.challengeOutcome.includes("missed") ? "nest" : ""}">${escapeHtml(s.challengeOutcome)}</div>` : ""}
+    ${duelStrip}
     ${raceStrip}
     <div class="reached-strip">Reached <b>${s.biomeEmoji} ${s.biomeName}</b> · Island ${s.island + 1}</div>
     <button class="play-again-btn" data-ui data-action="retry">✈ FLY AGAIN</button>

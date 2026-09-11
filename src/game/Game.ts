@@ -12,7 +12,20 @@ import { MassRace } from "./MassRace";
 import { FinishGate } from "./FinishGate";
 import { isMultiplayerConfigured, makeRoomCode, RealtimeClient } from "./Realtime";
 import { Leaderboard, loadPilotName, savePilotName, isLeaderboardOnline, type BoardMetric, type BoardPage, type BoardScope } from "./Leaderboard";
-import { Tournaments, TRAILS, type PrizeGrant } from "./Tournaments";
+import { Tournaments, TRAILS, weekKey, type PrizeGrant } from "./Tournaments";
+import {
+  dailyChallenge,
+  dailyDone,
+  modsFor,
+  NO_MODS,
+  stageDone,
+  weeklyGauntlet,
+  calendarReward,
+  calendarRewardLabel,
+  CALENDAR_DAYS,
+  type ChallengeMods,
+} from "./Challenges";
+import { bankMasteryRun, masteryViews } from "./Mastery";
 import { PowerUps } from "./PowerUps";
 import { Racer } from "./Racer";
 import {
@@ -46,8 +59,8 @@ import {
 } from "./constants";
 import { BOOSTS, GOLD, PROMO_CODES, SKINS, VIP, skinById, type BoostView, type SkinDef, type SkinView } from "./Economy";
 import { GhostPlayer, GhostRecorder } from "./Ghost";
-import { HUD, type CheckoutMode, type HudSnapshot, type LoadoutView, type RivalCard, type SeedMode, type UiScreen, type UiState } from "./HUD";
-import { divisionFor, featuredRivals, nextDivision } from "./pvp";
+import { HUD, type CalendarCard, type CheckoutMode, type DailyCard, type GauntletCard, type HudSnapshot, type LoadoutView, type RivalCard, type SeedMode, type UiScreen, type UiState } from "./HUD";
+import { divisionFor, duelOpponent, duelSkillFor, featuredRivals, nextDivision } from "./pvp";
 import { Input } from "./Input";
 import { clamp, dateSeed, formatDatePretty, lerp } from "./math";
 import { Missions, type MissionView, type QuestReward, type QuestView, type RunStats } from "./Missions";
@@ -203,6 +216,15 @@ export class Game {
   private lastRatingBonus = 0;
   private lastPlace = 0;
   private overtakeAcc = 0;
+  /** Ranked 1v1 duel: one seeded opponent, flat ±16 rating swing. */
+  private duelActive = false;
+  private duelResult: "" | "won" | "lost" = "";
+  private duelDelta = 0;
+  /** Which challenge (if any) the current run is flying under. */
+  private challengeRun: "" | "daily" | `gauntlet${number}` = "";
+  private challengeMods: ChallengeMods = NO_MODS;
+  /** End-of-run outcome line for the challenge strip on the results card. */
+  private challengeOutcome = "";
   private readonly flow = new FlowTuner();
   private readonly goals: SessionGoals;
   private nearMiss: NearMiss = { kind: "none", gap: 0, text: "" };
@@ -269,6 +291,8 @@ export class Game {
     this.pilotName = this.save.state.pilotName || loadPilotName(this.save.state.deviceId);
     this.save.state.pilotName = this.pilotName;
     if (this.cups.rollover()) this.save.persist();
+    // Ranked season rollover can also land between sessions.
+    const seasonEnd = this.save.ensureRankSeason();
     this.seed = this.today;
 
     host.classList.add("game-root");
@@ -408,6 +432,7 @@ export class Game {
       this.telemetry.track("portal_ready", { portal: adapter.name });
       this.bump();
     });
+    if (seasonEnd) this.hud.toast(`⚔ Ranked season over · ${seasonEnd.division} reward +${seasonEnd.coins} coins`, "gold");
     this.bump();
     this.pushHud();
   }
@@ -579,7 +604,7 @@ export class Game {
       {
         diving,
         fever: this.feverOn,
-        speedMult: skin.speedMult,
+        speedMult: skin.speedMult * this.challengeMods.speedMult,
         boost: this.boostTimer > 0 || this.powers.boostOn(),
         liftMult: this.powers.liftMult(),
         // Slipstream: tucking behind a rival genuinely reduces your drag.
@@ -766,7 +791,12 @@ export class Game {
     this.collect.update(dt, this.bird, this.terrain, magnetOn, this.elapsed, {
       onCoin: (x, y, gem) => {
         const base = gem ? 5 : 1;
-        const value = base * (this.save.state.gold ? 2 : 1) * this.powers.coinMult() * (this.mode.id === "coinrush" ? 2 : 1);
+        const value =
+          base *
+          (this.save.state.gold ? 2 : 1) *
+          this.powers.coinMult() *
+          (this.mode.id === "coinrush" ? 2 : 1) *
+          this.challengeMods.coinMult;
         this.runCoins += value;
         this.bonus += 4 * COIN_VALUE * value;
         this.awardXp(XP_RULES.coin);
@@ -835,7 +865,26 @@ export class Game {
 
         this.hud.toast(`FINISH · P${s.place} of ${s.total}`, s.place <= 3 ? "gold" : "island");
         if (better) this.hud.toast("New best placing!", "gold");
-        if (this.rankedRace) {
+        if (this.duelActive) {
+          const won = s.place === 1;
+          const res = this.save.recordDuelResult(won, this.today);
+          this.duelResult = won ? "won" : "lost";
+          this.duelDelta = res.delta;
+          this.lastRatingDelta = res.delta;
+          this.lastRatingBonus = 0;
+          this.hud.toast(
+            won ? `⚔ Duel won! +${res.delta} rating` : `⚔ Duel lost · ${res.delta} rating`,
+            won ? "gold" : "warn",
+          );
+          if (won && res.streak > 0 && res.streak % 5 === 0) this.hud.toast(`🔥 ${res.streak} duel wins in a row!`, "gold");
+          // Duel prize skin: 10 lifetime duel wins earns the Hummingbird.
+          if (this.save.state.duel.wins >= 10 && !this.save.state.ownedSkins.includes("hummingbird")) {
+            this.save.ownSkin("hummingbird");
+            this.hud.toast("🪶 Jewel Hummingbird unlocked — 10 duel wins!", "gold");
+          }
+          if (won && this.save.ownTrail("trail_duelist")) this.hud.toast("✨ Duelist trail unlocked!", "gold");
+          this.audio.purchase();
+        } else if (this.rankedRace) {
           const res = this.save.recordRivalResult(s.place, s.total, "massrace", this.today);
           this.lastRatingDelta = res.delta;
           this.lastRatingBonus = res.bonus;
@@ -844,6 +893,7 @@ export class Game {
             res.delta >= 0 ? "gold" : "warn",
           );
           this.audio.purchase();
+          this.checkDivisionPrize();
         } else {
           this.lastRatingDelta = 0;
           this.lastRatingBonus = 0;
@@ -1045,6 +1095,12 @@ export class Game {
   }
 
   private onPickup(kind: PickupKind, x: number, y: number): void {
+    if (this.challengeMods.noPowerups) {
+      // Pure Sky: the pickup pops visually but grants nothing.
+      this.particles.emitCollect(x, y);
+      this.hud.toast("Pure Sky — power-ups are inert", "info");
+      return;
+    }
     this.pickups += 1;
     this.bonus += 25;
     this.audio.powerup();
@@ -1121,6 +1177,15 @@ export class Game {
     this.trailFxAcc -= dt;
     if (this.trailFxAcc > 0) return;
     this.trailFxAcc = this.bird.speed() > 82 ? 0.028 : 0.055;
+    // Prize trails override the skin trail — they were earned, show them off.
+    const prize = this.save.state.activeTrail ? TRAILS[this.save.state.activeTrail] : undefined;
+    if (prize && prize.colors.length) {
+      this.hueT += 1;
+      const c = prize.colors[Math.floor(this.hueT) % prize.colors.length]!;
+      this.particles.emitSparkle(this.bird.x - 0.4, this.bird.y, c[0], c[1], c[2]);
+      if (this.bird.speed() > 68) this.particles.emitWingTrails(this.bird.x, this.bird.y, this.bird.speed());
+      return;
+    }
     const s = this.skin.id;
     if (s === "aurora") {
       this.hueT += 0.05;
@@ -1238,19 +1303,37 @@ export class Game {
 
   /* ------------------------------------------------------------- run flow */
 
-  private startRun(): void {
+  private startRun(opts?: { duel?: boolean; challenge?: "" | "daily" | `gauntlet${number}` }): void {
     this.exitVersus();
     this.mode = modeById(this.modeId);
+    // Duels and challenges only apply when their action explicitly asks for
+    // them; every other launch path resets to a plain run.
+    this.duelActive = Boolean(opts?.duel);
+    this.duelResult = "";
+    this.duelDelta = 0;
+    this.challengeRun = opts?.challenge ?? "";
+    this.challengeMods = this.challengeRun === "daily" ? modsFor(dailyChallenge(this.today).modifier.id) : NO_MODS;
+    this.challengeOutcome = "";
     this.resetRun(false);
     // Modes reshape the clock; Race has no sunset at all.
-    this.daylight = this.mode.clock > 0 ? this.mode.clock : this.daylightMax();
+    this.daylight = (this.mode.clock > 0 ? this.mode.clock : this.daylightMax()) * this.challengeMods.daylightMult;
     // Mass Race: build the 40-bird grid on the *same* seed so the field is
     // identical for anyone flying this race. Real players take over slots as
     // they join; unfilled slots keep flying as local squadron pilots.
     if (this.modeId === "massrace") {
-      this.massRace.spawn(this.roomSize, `${this.seed}:${this.modeId}:${this.roomSize}`, this.terrain, this.startX);
-      this.massRace.setFieldSkill(this.roomSkill === "ace" ? 1.25 : this.roomSkill === "chill" ? 0.7 : 1);
-      this.raceField = this.roomSize + 1;
+      const fieldSize = this.duelActive ? 1 : this.roomSize;
+      this.massRace.spawn(fieldSize, `${this.seed}:${this.modeId}:${fieldSize}`, this.terrain, this.startX);
+      if (this.duelActive) {
+        // Duel: one seeded opponent whose skill tracks your rating band.
+        const opp = duelOpponent(`${this.seed}:${this.today}`, this.save.state.rival.rating);
+        this.massRace.setFieldSkill(duelSkillFor(this.save.state.rival.rating));
+        const r = this.massRace.rivals[0];
+        if (r) r.name = opp.name;
+        this.hud.toast(`⚔ Duel vs ${opp.name} · first to the line`, "gold");
+      } else {
+        this.massRace.setFieldSkill(this.roomSkill === "ace" ? 1.25 : this.roomSkill === "chill" ? 0.7 : 1);
+      }
+      this.raceField = fieldSize + 1;
       this.racePlace = 0;
       this.raceFinishTime = 0;
       this.photoFinish = "";
@@ -1258,7 +1341,10 @@ export class Game {
       this.lastRatingBonus = 0;
       this.lastPlace = 0;
       this.overtakeAcc = 0;
-      this.connectRace();
+      // Duels are strictly 1v1 vs the seeded opponent — never let a stale
+      // room connection promote remote pilots into the field.
+      if (this.duelActive) this.disconnectRace();
+      else this.connectRace();
     } else {
       this.disconnectRace();
       this.massRace.clear();
@@ -1270,6 +1356,14 @@ export class Game {
 
     const armed = this.save.consumeArmedBoosts();
     for (const id of armed) this.applyBoost(id);
+    if (this.challengeRun === "daily") {
+      const c = dailyChallenge(this.today);
+      this.hud.toast(`${c.modifier.icon} ${c.title} · ${c.modifier.label}`, "quest");
+    } else if (this.challengeRun.startsWith("gauntlet")) {
+      const idx = Number(this.challengeRun.slice(8)) || 0;
+      const st = weeklyGauntlet(weekKey()).stages[idx];
+      if (st) this.hud.toast(`🌩 Gauntlet ${idx + 1}/3 · ${st.label}`, "quest");
+    }
     this.setState("playing");
     this.setScreen("main");
     this.camera.setIntro(0);
@@ -1355,6 +1449,15 @@ export class Game {
     this.bird.asleep = true;
     const stats = this.runStats();
 
+    // A duel abandoned short of the line is a loss — no free retries on rating.
+    if (this.duelActive && this.duelResult === "") {
+      const res = this.save.recordDuelResult(false, this.today);
+      this.duelResult = "lost";
+      this.duelDelta = res.delta;
+      this.lastRatingDelta = res.delta;
+      this.hud.toast(`⚔ Duel lost — never reached the line · ${res.delta} rating`, "warn");
+    }
+
     this.nearMiss = evaluateNearMiss(
       stats.distance,
       this.save.state.bestDistance,
@@ -1398,6 +1501,49 @@ export class Game {
 
     this.newlyCompleted = this.missions.applyRun(stats);
     this.claimedQuests = this.missions.claimQuests(this.today, stats);
+
+    // Daily challenge / weekly gauntlet resolution for flagged runs.
+    this.challengeOutcome = "";
+    if (this.challengeRun === "daily") {
+      const c = dailyChallenge(this.today);
+      if (dailyDone(stats, c) && this.save.completeDaily(this.today)) {
+        this.save.addCoins(c.reward);
+        this.challengeOutcome = `☀ Daily challenge complete · +${c.reward} coins`;
+        this.hud.toast(this.challengeOutcome, "gold");
+        this.audio.island();
+      } else if (!dailyDone(stats, c)) {
+        this.challengeOutcome = `Daily challenge missed — needed ${c.target} ${c.metric}`;
+      }
+    } else if (this.challengeRun.startsWith("gauntlet")) {
+      const idx = Number(this.challengeRun.slice(8)) || 0;
+      const g = weeklyGauntlet(weekKey());
+      const st = g.stages[idx];
+      if (st && stageDone(stats, st)) {
+        const res = this.save.completeGauntletStage(g.week, idx);
+        if (res) {
+          this.save.addCoins(st.reward);
+          this.challengeOutcome = `🌩 Gauntlet stage ${idx + 1} clear · +${st.reward} coins`;
+          this.hud.toast(this.challengeOutcome, "gold");
+          if (res === "clear") {
+            this.save.addCoins(g.clearBonus);
+            this.hud.toast(`🏆 GAUNTLET CLEARED · +${g.clearBonus} coins`, "gold");
+            if (this.save.ownTrail("trail_gauntlet")) this.hud.toast("✨ Stormline trail unlocked!", "gold");
+            // Gauntlet prize skin: 5 lifetime clears earns the Stormcrow.
+            if (this.save.state.challenges.gauntletsCleared >= 5 && !this.save.state.ownedSkins.includes("stormcrow")) {
+              this.save.ownSkin("stormcrow");
+              this.hud.toast("🪶 Stormcrow unlocked — 5 gauntlets cleared!", "gold");
+            }
+            this.audio.island();
+          }
+        }
+      } else if (st) {
+        this.challengeOutcome = `Gauntlet stage ${idx + 1} missed — needed ${st.target} ${st.metric}`;
+      }
+    }
+
+    // Mode mastery: every finished run banks progress; level-ups pay coins.
+    const mastery = bankMasteryRun(this.save, this.modeId);
+    if (mastery) this.hud.toast(`${this.mode.icon} ${this.mode.name} mastery Lv.${mastery.level} · +${mastery.coins} coins`, "gold");
     const score = this.score();
     this.save.recordRun(stats.distance, this.runCoins, score, this.today, this.island, this.terrain.biomeAt(this.bird.x).id);
     this.save.addLifetimeZeniths(stats.zenith);
@@ -1442,6 +1588,16 @@ export class Game {
     this.skipInterstitialOnce = false;
   }
 
+  /** Legend prize skin: reaching the top division earns the Solstice bird. */
+  private checkDivisionPrize(): void {
+    const div = divisionFor(this.save.state.rival.rating);
+    if (div.id === "legend" && !this.save.state.ownedSkins.includes("solstice")) {
+      this.save.ownSkin("solstice");
+      this.hud.toast("🪶 Solstice unlocked — welcome to Sunbird Legend!", "gold");
+      this.flash("perfect");
+    }
+  }
+
   private endAd(): void {
     this.save.recordAdImpression(this.save.state.runsPlayed);
     this.telemetry.track("ad_completed", { reason: this.adReason, left: this.save.adsLeftToday() });
@@ -1471,6 +1627,9 @@ export class Game {
     this.today = today;
     const reward = this.save.touchStreak(today, yesterday);
     const gift = this.save.claimVipDaily(today);
+    // Monthly ranked season rollover: soft reset + peak-division reward.
+    const seasonEnd = this.save.ensureRankSeason();
+    if (seasonEnd) this.hud.toast(`⚔ Ranked season over · ${seasonEnd.division} reward +${seasonEnd.coins} coins`, "gold");
     // Only swap hills while resting in the menu — a midnight rollover mid-run
     // must never yank the terrain out from under a live flight.
     if (this.state === "menu" && this.seedMode === "today") this.rebuildWorld(today);
@@ -1583,7 +1742,15 @@ export class Game {
       case "retry":
         if (this.state !== "ad" && this.state !== "continue") {
           if (this.portalEnabled()) void this.restartWithPortalBreak();
-          else this.startRun();
+          // Retrying keeps the flavour of the run you just flew: duels rematch,
+          // an unfinished challenge gets another attempt, plain runs stay plain.
+          else if (this.duelActive) this.startRun({ duel: true });
+          else if (this.challengeRun === "daily" && !this.save.isDailyDone(this.today)) this.startRun({ challenge: "daily" });
+          else if (this.challengeRun.startsWith("gauntlet")) {
+            const idx = Number(this.challengeRun.slice(8)) || 0;
+            if (!this.save.gauntletDone(weekKey()).includes(idx)) this.startRun({ challenge: this.challengeRun });
+            else this.startRun();
+          } else this.startRun();
         }
         break;
       case "pause":
@@ -1708,6 +1875,66 @@ export class Game {
         this.mode = modeById("massrace");
         this.rankedRace = true;
         this.startRun();
+        break;
+      case "pvp-duel":
+        this.roomCode = "";
+        this.modeId = "massrace";
+        this.mode = modeById("massrace");
+        this.rankedRace = false;
+        this.startRun({ duel: true });
+        break;
+      case "play-daily": {
+        const c = dailyChallenge(this.today);
+        if (this.save.isDailyDone(this.today)) {
+          this.hud.toast("Today's challenge is already complete — back tomorrow!", "info");
+          break;
+        }
+        this.modeId = c.mode;
+        this.mode = modeById(c.mode);
+        this.exitVersus();
+        this.startRun({ challenge: "daily" });
+        break;
+      }
+      case "play-gauntlet": {
+        const idx = Math.max(0, Math.min(2, parseInt(id || "0", 10) || 0));
+        const g = weeklyGauntlet(weekKey());
+        if (this.save.gauntletDone(g.week).includes(idx)) {
+          this.hud.toast("Stage already cleared this week", "info");
+          break;
+        }
+        const st = g.stages[idx]!;
+        this.modeId = st.mode;
+        this.mode = modeById(st.mode);
+        this.exitVersus();
+        this.startRun({ challenge: `gauntlet${idx}` as `gauntlet${number}` });
+        break;
+      }
+      case "claim-calendar": {
+        const day = this.save.claimCalendar(this.today);
+        if (day === 0) {
+          this.hud.toast("Today's gift is already claimed", "info");
+          break;
+        }
+        const r = calendarReward(day);
+        if (r.kind === "coins") {
+          this.save.addCoins(r.amount);
+          this.hud.toast(`📅 Day ${day} gift · +${r.amount} coins`, "gold");
+        } else if (r.kind === "boost") {
+          this.save.armBoost(r.id);
+          this.hud.toast(`📅 Day ${day} gift · boost armed for next flight`, "gold");
+        } else {
+          if (this.save.ownTrail(r.id)) this.hud.toast(`📅 Day ${day} gift · ✨ ${TRAILS[r.id]?.label ?? r.id} trail!`, "gold");
+          else {
+            this.save.addCoins(200);
+            this.hud.toast(`📅 Day ${day} · trail already owned, +200 coins instead`, "gold");
+          }
+        }
+        this.audio.purchase();
+        this.bump();
+        break;
+      }
+      case "open-challenges":
+        this.setScreen("challenges");
         break;
       case "room-size": {
         const n = Math.max(5, Math.min(40, parseInt(id || "40", 10) || 40));
@@ -1965,7 +2192,16 @@ export class Game {
   private goToMenu(): void {
     if (this.state === "playing" || this.state === "paused") {
       this.telemetry.track("run_abandon", { distance: Math.round(this.bird.x - this.startX) });
+      // Quitting a ranked duel mid-flight counts as the loss it is.
+      if (this.duelActive && this.duelResult === "" && !this.runRecorded && this.runTime > 3) {
+        const res = this.save.recordDuelResult(false, this.today);
+        this.hud.toast(`⚔ Duel forfeited · ${res.delta} rating`, "warn");
+      }
     }
+    this.duelActive = false;
+    this.duelResult = "";
+    this.challengeRun = "";
+    this.challengeMods = NO_MODS;
     this.resetRun(true);
     this.setState("menu");
     this.setScreen("main");
@@ -1975,6 +2211,10 @@ export class Game {
   private buySkin(id: string): void {
     const def = skinById(id);
     const st = this.save.state;
+    if (def.prizeOnly && !st.ownedSkins.includes(id)) {
+      this.hud.toast(`🏆 Earn it: ${def.prizeOnly}`, "info");
+      return;
+    }
     if ((def.goldOnly && !st.gold) || (def.vipOnly && !st.vip)) {
       this.setScreen("paywall");
       return;
@@ -2535,6 +2775,64 @@ export class Game {
     return `Hills of ${formatDatePretty(this.seed)}`;
   }
 
+  private dailyCard(): DailyCard {
+    const c = dailyChallenge(this.today);
+    const mode = modeById(c.mode);
+    return {
+      title: c.title,
+      modeName: mode.name,
+      modeIcon: mode.icon,
+      modifierIcon: c.modifier.icon,
+      modifierLabel: c.modifier.label,
+      modifierDesc: c.modifier.desc,
+      metric: c.metric,
+      target: c.target,
+      reward: c.reward,
+      done: this.save.isDailyDone(this.today),
+      dailiesDone: this.save.state.challenges.dailiesDone,
+    };
+  }
+
+  private gauntletCard(): GauntletCard {
+    const g = weeklyGauntlet(weekKey());
+    const done = this.save.gauntletDone(g.week);
+    return {
+      week: g.week,
+      stages: g.stages.map((st) => {
+        const mode = modeById(st.mode);
+        return {
+          index: st.index,
+          label: st.label,
+          modeName: mode.name,
+          modeIcon: mode.icon,
+          metric: st.metric,
+          target: st.target,
+          reward: st.reward,
+          done: done.includes(st.index),
+        };
+      }),
+      clearBonus: g.clearBonus,
+      cleared: done.length >= 3,
+      lifetimeClears: this.save.state.challenges.gauntletsCleared,
+    };
+  }
+
+  private calendarCard(): CalendarCard {
+    const cal = this.save.state.calendar;
+    const claimedToday = cal.lastClaim === this.today;
+    const days = [];
+    for (let d = 1; d <= CALENDAR_DAYS; d++) {
+      days.push({
+        day: d,
+        label: calendarRewardLabel(d),
+        claimed: d <= cal.cycleDay,
+        today: !claimedToday && d === (cal.cycleDay % CALENDAR_DAYS) + 1,
+        milestone: d % 7 === 0,
+      });
+    }
+    return { cycleDay: cal.cycleDay, claimedToday, days };
+  }
+
   private rivalCard(): RivalCard {
     const r = this.save.state.rival;
     const div = divisionFor(r.rating);
@@ -2575,8 +2873,22 @@ export class Game {
     return this.bird.x - gx;
   }
 
+  /** Challenge/calendar/mastery cards, rebuilt only when the UI version bumps. */
+  private cardCache: { daily: DailyCard; gauntlet: GauntletCard; calendar: CalendarCard; mastery: ReturnType<typeof masteryViews> } = {
+    daily: { title: "", modeName: "", modeIcon: "", modifierIcon: "", modifierLabel: "", modifierDesc: "", metric: "", target: 0, reward: 0, done: false, dailiesDone: 0 },
+    gauntlet: { week: "", stages: [], clearBonus: 0, cleared: false, lifetimeClears: 0 },
+    calendar: { cycleDay: 0, claimedToday: false, days: [] },
+    mastery: [],
+  };
+
   private refreshViews(): void {
     const st = this.save.state;
+    this.cardCache = {
+      daily: this.dailyCard(),
+      gauntlet: this.gauntletCard(),
+      calendar: this.calendarCard(),
+      mastery: masteryViews(this.save),
+    };
     const stats = this.state === "menu" ? null : this.runStats();
     this.missionViews = this.missions.view(stats);
     this.questViews = this.missions.questView(this.today, stats);
@@ -2759,6 +3071,15 @@ export class Game {
       raceRated: this.rankedRace,
       ratingDelta: this.lastRatingDelta,
       ratingBonus: this.lastRatingBonus,
+      duel: { ...st.duel },
+      duelWas: this.duelResult,
+      duelDelta: this.duelDelta,
+      duelFoe: duelOpponent(`${this.seed}:${this.today}`, st.rival.rating),
+      daily: this.cardCache.daily,
+      gauntlet: this.cardCache.gauntlet,
+      calendar: this.cardCache.calendar,
+      mastery: this.cardCache.mastery,
+      challengeOutcome: this.challengeOutcome,
       showTutorialHand: this.state === "playing" && st.tutorialRuns < 2 && this.hintTimer < 2.6 && !this.input.diving,
     };
     this.hud.update(snap);

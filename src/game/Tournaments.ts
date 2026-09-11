@@ -316,4 +316,27 @@ export const TRAILS: Record<string, { label: string; colors: [number, number, nu
       [0.95, 0.7, 1],
     ],
   },
+  trail_star: {
+    label: "Starfall",
+    colors: [
+      [1, 1, 0.85],
+      [0.8, 0.85, 1],
+      [1, 0.9, 0.55],
+    ],
+  },
+  trail_duelist: {
+    label: "Duelist",
+    colors: [
+      [1, 0.35, 0.3],
+      [1, 0.7, 0.25],
+    ],
+  },
+  trail_gauntlet: {
+    label: "Stormline",
+    colors: [
+      [0.6, 0.5, 1],
+      [0.35, 0.85, 1],
+      [0.9, 0.95, 1],
+    ],
+  },
 };

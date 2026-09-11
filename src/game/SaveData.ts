@@ -9,7 +9,7 @@ import {
   VIP_DAYS,
 } from "./constants";
 import { dateSeed } from "./math";
-import { defaultRival, ratingDelta, streakBonus, type RivalMatch, type RivalState } from "./pvp";
+import { defaultRival, rankSeasonId, ratingDelta, RIVAL_BASE_RATING, seasonReward, softResetRating, streakBonus, type RivalMatch, type RivalState } from "./pvp";
 import { seasonId } from "./SeasonPass";
 import { emptyTournamentState, type TournamentState } from "./Tournaments";
 
@@ -94,6 +94,32 @@ export type SaveState = {
   /** On-device Rival rating for the simulated 40-bird field. Local only —
    *  never synced, never presented as a server rank. */
   rival: RivalState;
+  /** Head-to-head duel record (local ranked 1v1). */
+  duel: DuelState;
+  /** Monthly ranked season bookkeeping: soft reset + peak-division reward. */
+  rankSeason: { id: string; peak: number };
+  /** Daily challenge / weekly gauntlet completion state. */
+  challenges: ChallengeState;
+  /** 28-day login calendar, separate from the streak. */
+  calendar: { cycleDay: number; lastClaim: string };
+  /** Runs flown per mode, feeding mode mastery levels. */
+  mastery: Record<string, number>;
+};
+
+export type DuelState = {
+  wins: number;
+  losses: number;
+  streak: number;
+  bestStreak: number;
+};
+
+export type ChallengeState = {
+  dailyDate: string;
+  dailyDone: boolean;
+  dailiesDone: number;
+  gauntletWeek: string;
+  gauntletDone: number[];
+  gauntletsCleared: number;
 };
 
 const DEFAULT_SETTINGS: Settings = {
@@ -157,6 +183,11 @@ function defaults(): SaveState {
     bestPlace: 0,
     racesRun: 0,
     rival: defaultRival(),
+    duel: { wins: 0, losses: 0, streak: 0, bestStreak: 0 },
+    rankSeason: { id: rankSeasonId(), peak: RIVAL_BASE_RATING },
+    challenges: { dailyDate: "", dailyDone: false, dailiesDone: 0, gauntletWeek: "", gauntletDone: [], gauntletsCleared: 0 },
+    calendar: { cycleDay: 0, lastClaim: "" },
+    mastery: {},
   };
 }
 
@@ -320,6 +351,33 @@ export class SaveData {
         bestPlace: num(p.bestPlace),
         racesRun: num(p.racesRun),
         rival: parseRival(p.rival),
+        duel:
+          p.duel && typeof p.duel === "object"
+            ? { wins: num(p.duel.wins), losses: num(p.duel.losses), streak: num(p.duel.streak), bestStreak: num(p.duel.bestStreak) }
+            : { wins: 0, losses: 0, streak: 0, bestStreak: 0 },
+        rankSeason:
+          p.rankSeason && typeof p.rankSeason.id === "string"
+            ? { id: p.rankSeason.id, peak: num(p.rankSeason.peak) || RIVAL_BASE_RATING }
+            : { id: rankSeasonId(), peak: RIVAL_BASE_RATING },
+        challenges:
+          p.challenges && typeof p.challenges === "object"
+            ? {
+                dailyDate: String(p.challenges.dailyDate ?? ""),
+                dailyDone: Boolean(p.challenges.dailyDone),
+                dailiesDone: num(p.challenges.dailiesDone),
+                gauntletWeek: String(p.challenges.gauntletWeek ?? ""),
+                gauntletDone: numArr(p.challenges.gauntletDone),
+                gauntletsCleared: num(p.challenges.gauntletsCleared),
+              }
+            : d.challenges,
+        calendar:
+          p.calendar && typeof p.calendar === "object"
+            ? { cycleDay: num(p.calendar.cycleDay), lastClaim: String(p.calendar.lastClaim ?? "") }
+            : d.calendar,
+        mastery:
+          p.mastery && typeof p.mastery === "object" && !Array.isArray(p.mastery)
+            ? Object.fromEntries(Object.entries(p.mastery as Record<string, unknown>).map(([k, v]) => [k, num(v)]))
+            : {},
       };
     } catch {
       return d;
@@ -398,6 +456,7 @@ export class SaveData {
     const delta = ratingDelta(p, f);
     const won = p <= Math.max(1, Math.ceil(f * 0.25));
     r.rating = Math.max(0, r.rating + delta);
+    this.state.rankSeason.peak = Math.max(this.state.rankSeason.peak, r.rating);
     if (won) {
       r.wins += 1;
       r.streak += 1;
@@ -415,6 +474,105 @@ export class SaveData {
     }
     this.persist();
     return { delta, bonus, streak: r.streak };
+  }
+
+  /**
+   * Monthly ranked season rollover: soft-reset the rating toward base and pay
+   * a coin reward for the peak division reached last season.
+   * @returns the reward paid, or null when no rollover happened.
+   */
+  ensureRankSeason(): { coins: number; division: string } | null {
+    const id = rankSeasonId();
+    if (this.state.rankSeason.id === id) return null;
+    const reward = seasonReward(this.state.rankSeason.peak);
+    this.state.rival.rating = softResetRating(this.state.rival.rating);
+    this.state.rival.streak = 0;
+    this.state.rankSeason = { id, peak: this.state.rival.rating };
+    this.state.wallet += reward.coins;
+    this.state.totalCoins += reward.coins;
+    this.persist();
+    return { coins: reward.coins, division: reward.division.name };
+  }
+
+  /** Head-to-head duel result. Rating swing is a flat ±16 vs the duelist. */
+  recordDuelResult(won: boolean, date: string): { delta: number; streak: number } {
+    const d = this.state.duel;
+    const delta = won ? 16 : -16;
+    this.state.rival.rating = Math.max(0, this.state.rival.rating + delta);
+    this.state.rankSeason.peak = Math.max(this.state.rankSeason.peak, this.state.rival.rating);
+    if (won) {
+      d.wins += 1;
+      d.streak += 1;
+      d.bestStreak = Math.max(d.bestStreak, d.streak);
+    } else {
+      d.losses += 1;
+      d.streak = 0;
+    }
+    this.state.rival.matches.push({ place: won ? 1 : 2, field: 2, mode: "duel", date, won });
+    if (this.state.rival.matches.length > 8) this.state.rival.matches.splice(0, this.state.rival.matches.length - 8);
+    this.persist();
+    return { delta, streak: d.streak };
+  }
+
+  /** Marks today's daily challenge complete. @returns false if already done. */
+  completeDaily(date: string): boolean {
+    const c = this.state.challenges;
+    if (c.dailyDate === date && c.dailyDone) return false;
+    c.dailyDate = date;
+    c.dailyDone = true;
+    c.dailiesDone += 1;
+    this.persist();
+    return true;
+  }
+
+  isDailyDone(date: string): boolean {
+    const c = this.state.challenges;
+    return c.dailyDate === date && c.dailyDone;
+  }
+
+  /** Marks a gauntlet stage done. @returns "stage" | "clear" | null. */
+  completeGauntletStage(week: string, index: number): "stage" | "clear" | null {
+    const c = this.state.challenges;
+    if (c.gauntletWeek !== week) {
+      c.gauntletWeek = week;
+      c.gauntletDone = [];
+    }
+    if (c.gauntletDone.includes(index)) return null;
+    c.gauntletDone.push(index);
+    const cleared = c.gauntletDone.length >= 3;
+    if (cleared) c.gauntletsCleared += 1;
+    this.persist();
+    return cleared ? "clear" : "stage";
+  }
+
+  gauntletDone(week: string): number[] {
+    const c = this.state.challenges;
+    return c.gauntletWeek === week ? [...c.gauntletDone] : [];
+  }
+
+  /** Claims today's login-calendar day. @returns the new cycle day, or 0. */
+  claimCalendar(today: string): number {
+    const c = this.state.calendar;
+    if (c.lastClaim === today) return 0;
+    c.lastClaim = today;
+    c.cycleDay = (c.cycleDay % 28) + 1;
+    this.persist();
+    return c.cycleDay;
+  }
+
+  /** Counts a run toward per-mode mastery. @returns the new run count. */
+  addMasteryRun(modeId: string): number {
+    const n = (this.state.mastery[modeId] ?? 0) + 1;
+    this.state.mastery[modeId] = n;
+    this.persist();
+    return n;
+  }
+
+  ownTrail(id: string): boolean {
+    if (this.state.tournaments.trails.includes(id)) return false;
+    this.state.tournaments.trails.push(id);
+    this.persist();
+    return true;
   }
 
   equipTrail(id: string): void {

@@ -126,7 +126,7 @@ export const ADS_PER_DAY = 4;
 export const AD_MIN_RUN_GAP = 2;
 
 /* ---------- Season pass ---------- */
-export const SEASON_TIERS = 20;
+export const SEASON_TIERS = 50;
 export const SEASON_XP_PER_TIER = 260;
 export const VIP_DAILY_GIFT = 25;
 

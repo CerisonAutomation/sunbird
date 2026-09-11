@@ -1,4 +1,4 @@
-const CACHE = "sunbird-shell-v2";
+const CACHE = "sunbird-shell-v3";
 const PRECACHE = [
   "/",
   "/index.html",

@@ -166,3 +166,48 @@ export function escapeHtml(v: string): string {
 export function defaultRival(): RivalState {
   return { rating: RIVAL_BASE_RATING, wins: 0, losses: 0, streak: 0, bestStreak: 0, matches: [] };
 }
+
+/* ------------------------------------------------------------- seasons */
+
+/** Ranked seasons roll monthly, matching the Nest Pass cadence. */
+export function rankSeasonId(d = new Date()): string {
+  return `R${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/**
+ * Soft reset applied at each season rollover: ratings drift halfway back to
+ * base so climbing stays meaningful without erasing a season of work.
+ */
+export function softResetRating(rating: number): number {
+  return Math.round((Math.max(0, rating) + RIVAL_BASE_RATING) / 2);
+}
+
+/** End-of-season coin reward for the peak division reached. */
+export function seasonReward(peakRating: number): { coins: number; division: Division } {
+  const div = divisionFor(peakRating);
+  const idx = DIVISIONS.findIndex((d) => d.id === div.id);
+  return { coins: 60 + idx * 70, division: div };
+}
+
+/* --------------------------------------------------------------- duels */
+
+/**
+ * Duel matchmaking (local): map the player's rating onto an opponent skill
+ * multiplier so a Legend faces a genuinely sharper pilot than a Fledgling.
+ */
+export function duelSkillFor(rating: number): number {
+  const r = Math.max(0, rating);
+  return Math.min(1.4, Math.max(0.55, 0.6 + (r - RIVAL_BASE_RATING) / 800));
+}
+
+/** Deterministic duel opponent for a given seed + rating band. */
+export function duelOpponent(seed: string, rating: number): { name: string; tag: string; rating: number } {
+  const picks = featuredRivals(`${seed}:duel`, 1);
+  const base = picks[0] ?? { name: "Kestrel", tag: "steady wings" };
+  // Opponent rating shown in the lobby: your band, ± a small seeded offset.
+  let h = 5381;
+  const s = `${seed}:duelr`;
+  for (let i = 0; i < s.length; i++) h = (h * 33) ^ s.charCodeAt(i);
+  const jitter = ((h >>> 0) % 121) - 60;
+  return { ...base, rating: Math.max(0, Math.round(rating + jitter)) };
+}
