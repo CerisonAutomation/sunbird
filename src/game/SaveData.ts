@@ -583,6 +583,12 @@ export class SaveData {
     const reward = 20 * Math.min(7, Math.max(1, s.days));
     this.state.wallet += reward;
     this.state.totalCoins += reward;
+    // Comeback bonus: players returning after 3+ days get extra coins
+    if (s.last !== yesterday && s.days === 1) {
+      const comebackBonus = 50;
+      this.state.wallet += comebackBonus;
+      this.state.totalCoins += comebackBonus;
+    }
     this.persist();
     return reward;
   }
