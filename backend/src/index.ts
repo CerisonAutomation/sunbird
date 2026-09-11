@@ -108,6 +108,17 @@ export default {
       return board.fetch(`https://do/board${url.search}`).then(withCors);
     }
 
+    if (url.pathname === "/ghost") {
+      if (request.method === "POST") {
+        const body = await request.text();
+        if (body.length > 262_144) return json({ error: "payload too large" }, 413);
+        return board
+          .fetch("https://do/ghost", { method: "POST", body, headers: { "content-type": "application/json" } })
+          .then(withCors);
+      }
+      return board.fetch(`https://do/ghost${url.search}`).then(withCors);
+    }
+
     if (url.pathname === "/telemetry") {
       if (request.method === "POST") {
         const body = await request.text();

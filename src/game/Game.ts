@@ -64,6 +64,7 @@ import {
 } from "./constants";
 import { BOOSTS, COLLECTIONS, GOLD, PROMO_CODES, SHOP_TRAILS, SKINS, STARTER_PACK, VIP, dailyDealBoost, skinById, type BoostView, type ShopTrailView, type SkinDef, type SkinView } from "./Economy";
 import { GhostPlayer, GhostRecorder } from "./Ghost";
+import { fetchRivalGhost, publishGhost } from "./GhostNet";
 import { HUD, type CalendarCard, type CheckoutMode, type DailyCard, type GauntletCard, type HudSnapshot, type LoadoutView, type RivalCard, type SeedMode, type UiScreen, type UiState } from "./HUD";
 import { divisionFor, duelOpponent, duelSkillFor, featuredRivals, nextDivision, seasonReward } from "./pvp";
 import { Input } from "./Input";
@@ -123,6 +124,12 @@ export class Game {
   private readonly telemetry = new Telemetry();
   private readonly ghostRecorder = new GhostRecorder();
   private readonly ghostPlayer = new GhostPlayer();
+  /** Network rival ghost (async PvP on the daily seed) — amber silhouette. */
+  private readonly rivalGhostPlayer = new GhostPlayer();
+  private rivalGhostName = "";
+  private rivalGhostPassed = false;
+  /** Run counter — guards async ghost loads against arriving mid-next-run. */
+  private runEpoch = 0;
   private readonly livingBg = new LivingBackground();
   private terrain: TerrainSystem;
   private collect: Collectibles;
@@ -384,6 +391,8 @@ export class Game {
     this.bird = new Bird();
     this.bird.addTo(this.scene);
     this.ghostPlayer.addTo(this.scene);
+    this.rivalGhostPlayer.addTo(this.scene);
+    this.rivalGhostPlayer.setTint(0xffc86a, 0xffe8b0);
     this.scene.add(this.livingBg);
 
     this.camera = new CameraRig(1);
@@ -712,6 +721,15 @@ export class Game {
     if (this.bird.justLanded) this.onLanding();
 
     this.ghostRecorder.sample(dt, this.runTime, this.bird.x, this.bird.y, this.bird.rotation);
+    if (this.rivalGhostPlayer.active) {
+      const rx = this.rivalGhostPlayer.update(this.runTime, dt);
+      if (rx !== null && !this.rivalGhostPassed && this.bird.x > rx + 0.5 && this.runTime > 4) {
+        this.rivalGhostPassed = true;
+        this.hud.toast(`👻 Passed ${this.rivalGhostName}'s flight!`, "gold");
+        this.audio.ding();
+        this.bonus += 60;
+      }
+    }
     if (this.ghostPlayer.active) {
       const gx = this.ghostPlayer.update(this.runTime, dt);
       if (gx !== null) {
@@ -1772,6 +1790,17 @@ export class Game {
     this.flow.noteRun(stats.distance, this.perfects, this.launch.goods + this.launch.greats + this.launch.perfects, this.save);
     this.terrain.setDifficulty(this.flow.difficulty());
 
+    // Publish this flight to the ghost network (daily seed only, best-per-
+    // pilot kept server-side; silent no-op without a backend).
+    if (this.seedMode === "today" && !this.versus && stats.distance > 100) {
+      void publishGhost({
+        seed: this.seed,
+        deviceId: this.save.state.deviceId,
+        name: this.racedName(),
+        distance: stats.distance,
+        samples: this.ghostRecorder.snapshot(),
+      });
+    }
     const beatGhost = this.ghostRecorder.commit(this.seed, stats.distance);
     if (beatGhost) {
       this.hud.toast("New personal ghost recorded", "gold");
@@ -2051,7 +2080,24 @@ export class Game {
     this.lastBiomeId = idle ? "" : this.terrain.biomeAt(this.startX).id;
     this.ghostRecorder.reset();
     this.ghostPlayer.reset();
-    if (!idle) this.ghostPlayer.load(this.seed);
+    this.rivalGhostPlayer.reset();
+    this.rivalGhostPlayer.loadRecord(null);
+    this.rivalGhostPassed = false;
+    this.runEpoch += 1;
+    if (!idle) {
+      this.ghostPlayer.load(this.seed);
+      // Async PvP: chase a REAL player's flight on today's hills. Arrives
+      // quietly a moment into the run; a dead backend costs nothing.
+      if (this.seedMode === "today" && !this.versus && !this.massRace.active) {
+        const epoch = this.runEpoch;
+        void fetchRivalGhost(this.seed, this.save.state.deviceId, this.save.state.bestDistance).then((rg) => {
+          if (!rg || this.disposed || epoch !== this.runEpoch || this.state !== "playing") return;
+          this.rivalGhostName = rg.name;
+          this.rivalGhostPlayer.loadRecord({ seed: this.seed, distance: rg.distance, samples: rg.samples });
+          this.hud.toast(`👻 ${rg.name} flew ${Math.round(rg.distance)} m here — chase them`, "quest");
+        });
+      }
+    }
     this.launch.reset();
     this.powers.reset();
     this.runGems = 0;

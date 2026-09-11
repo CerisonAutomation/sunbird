@@ -69,6 +69,16 @@ export class LeaderboardDO implements DurableObject {
         date     TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_scores_date ON scores(date);
+      CREATE TABLE IF NOT EXISTS ghosts (
+        seed     TEXT NOT NULL,
+        deviceId TEXT NOT NULL,
+        name     TEXT NOT NULL,
+        distance INTEGER NOT NULL,
+        samples  TEXT NOT NULL,
+        date     TEXT NOT NULL,
+        PRIMARY KEY (seed, deviceId)
+      );
+      CREATE INDEX IF NOT EXISTS idx_ghosts_seed ON ghosts(seed, distance);
       CREATE TABLE IF NOT EXISTS telemetry (
         day  TEXT NOT NULL,
         k    TEXT NOT NULL,
@@ -81,6 +91,75 @@ export class LeaderboardDO implements DurableObject {
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
+
+    if (url.pathname === "/ghost" && request.method === "POST") {
+      // Async PvP: publish your best daily-seed flight as a replayable ghost.
+      let body: Record<string, unknown>;
+      try {
+        body = (await request.json()) as Record<string, unknown>;
+      } catch {
+        return Response.json({ error: "invalid json" }, { status: 400 });
+      }
+      const seed = clean(typeof body.seed === "string" ? body.seed : "", 32);
+      const deviceId = clean(typeof body.deviceId === "string" ? body.deviceId : "", 64);
+      const name = clean(typeof body.name === "string" ? body.name : "", 24) || "Pilot";
+      const distance = Math.floor(Number(body.distance) || 0);
+      if (!seed || !deviceId) return Response.json({ error: "seed and deviceId required" }, { status: 400 });
+      if (distance <= 0 || distance > 60_000) return Response.json({ error: "implausible distance" }, { status: 422 });
+      if (!Array.isArray(body.samples) || body.samples.length < 5) {
+        return Response.json({ error: "samples required" }, { status: 400 });
+      }
+      // Cap replay weight: 1500 samples of [t,x,y,rot] is ~7 min of flight.
+      const samples = (body.samples as unknown[]).slice(0, 1500).filter(
+        (s) => Array.isArray(s) && s.length === 4 && (s as unknown[]).every((n) => typeof n === "number" && Number.isFinite(n as number)),
+      );
+      if (samples.length < 5) return Response.json({ error: "samples malformed" }, { status: 400 });
+      const packed = JSON.stringify(samples);
+      if (packed.length > 131_072) return Response.json({ error: "replay too large" }, { status: 413 });
+      // Keep only each pilot's best flight per seed.
+      const prev = this.sql
+        .exec("SELECT distance FROM ghosts WHERE seed = ? AND deviceId = ?", seed, deviceId)
+        .toArray() as { distance: number }[];
+      if (prev.length > 0 && prev[0]!.distance >= distance) {
+        return Response.json({ ok: true, kept: "previous" });
+      }
+      this.sql.exec(
+        `INSERT INTO ghosts (seed, deviceId, name, distance, samples, date) VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(seed, deviceId) DO UPDATE SET name = excluded.name, distance = excluded.distance,
+           samples = excluded.samples, date = excluded.date`,
+        seed,
+        deviceId,
+        name,
+        distance,
+        packed,
+        todayStr(),
+      );
+      return Response.json({ ok: true, kept: "new" });
+    }
+
+    if (url.pathname === "/ghost" && request.method === "GET") {
+      // Serve the rival ghost closest to (just above) the requester's best —
+      // a target you can realistically chase, never your own flight back.
+      const seed = clean(url.searchParams.get("seed"), 32);
+      const device = clean(url.searchParams.get("device"), 64);
+      const near = Math.max(0, Math.floor(Number(url.searchParams.get("near")) || 0));
+      if (!seed) return Response.json({ error: "seed required" }, { status: 400 });
+      const rows = this.sql
+        .exec(
+          `SELECT deviceId, name, distance, samples FROM ghosts
+           WHERE seed = ? AND deviceId != ?
+           ORDER BY ABS(distance - ?) ASC LIMIT 5`,
+          seed,
+          device,
+          Math.round(near * 1.15) + 150,
+        )
+        .toArray() as { deviceId: string; name: string; distance: number; samples: string }[];
+      if (rows.length === 0) return Response.json({ ghost: null });
+      const pick = rows[Math.floor(Math.random() * rows.length)]!;
+      return Response.json({
+        ghost: { name: pick.name, distance: pick.distance, samples: JSON.parse(pick.samples) as unknown },
+      });
+    }
 
     if (url.pathname === "/telemetry" && request.method === "POST") {
       // Aggregate-only product counters. No per-device rows are stored; the
