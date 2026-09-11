@@ -31,6 +31,30 @@ describe("skin catalogue", () => {
   it("skinById falls back to the starter", () => {
     expect(skinById("nope").id).toBe("sunbird");
   });
+
+  it("perk copy never promises unimplemented powers", () => {
+    // If a perk string sells weather immunity or stealth, the skin MUST carry
+    // the implementing flag that Weather.ts actually reads. No fiction.
+    for (const s of SKINS) {
+      const perk = s.perk.toLowerCase();
+      if (perk.includes("weather") || perk.includes("storm-proof")) {
+        expect(s.weatherProof, `${s.id} sells weather immunity but has no weatherProof flag`).toBe(true);
+      }
+      if (perk.includes("stealth")) {
+        expect(s.stealth, `${s.id} sells stealth but has no stealth flag`).toBe(true);
+      }
+      // And the reverse: hidden powers must be advertised.
+      if (s.weatherProof) expect(perk).toMatch(/weather|storm/);
+      if (s.stealth) expect(perk).toContain("stealth");
+    }
+  });
+
+  it("every skin belongs to a known collection — no uncategorized wall", () => {
+    for (const s of SKINS) {
+      expect(s.collection, `${s.id} has no collection — it would vanish from the grouped shop`).toBeDefined();
+      expect(["starter", "nature", "elements", "cosmic", "seasonal", "premium", "tournament", "achievement"]).toContain(s.collection);
+    }
+  });
 });
 
 describe("season pass", () => {

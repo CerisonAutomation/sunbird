@@ -7,7 +7,7 @@ import type { BoardMetric, BoardPage, BoardScope } from "./Leaderboard";
 import type { TournamentView } from "./Tournaments";
 import type { RosterBird, Standing } from "./MassRace";
 import { VIP_DAILY_GIFT } from "./constants";
-import type { BoostView, ShopTrailView, SkinView } from "./Economy";
+import { COLLECTIONS, type BoostView, type ShopTrailView, type SkinView } from "./Economy";
 import { formatDistance } from "./math";
 import type { MissionView, QuestReward, QuestView } from "./Missions";
 import type { CampaignChapterView } from "./Campaign";
@@ -1608,6 +1608,29 @@ function skinStatBars(d: { speedMult: number; feverBonus: number; daylightBonus:
     .join("")}${d.magnetAlways ? `<span class="sk-stat mag">🧲 always-on</span>` : ""}</div>`;
 }
 
+/** Group the 60+ bird wall into browsable collections with owned counters. */
+function renderSkinCollections(s: HudSnapshot): string {
+  const portal = s.portalName !== "none";
+  const byId = new Map<string, SkinView[]>();
+  for (const v of s.skins) {
+    const cid = v.def.collection ?? "starter";
+    if (!byId.has(cid)) byId.set(cid, []);
+    byId.get(cid)!.push(v);
+  }
+  return COLLECTIONS.filter((c) => byId.has(c.id))
+    .map((c) => {
+      const skins = byId.get(c.id)!;
+      const got = skins.filter((v) => v.owned).length;
+      const complete = got === skins.length;
+      return `<div class="collection ${complete ? "complete" : ""}">
+        <div class="coll-head"><span class="coll-icon">${c.icon}</span><b>${c.name}</b>
+        <span class="coll-count">${complete ? "✓ complete" : `${got}/${skins.length}`}</span></div>
+        <div class="skin-grid">${skins.map((v) => renderSkinCard(v, portal)).join("")}</div>
+      </div>`;
+    })
+    .join("");
+}
+
 function renderSkinCard(v: SkinView, portal = false): string {
   const d = v.def;
   const rarity = skinRarity(d);
@@ -1664,7 +1687,7 @@ function renderShop(s: HudSnapshot): string {
     ${head("Shop", "back", `<span class="pill coin">● ${s.wallet}</span>`)}
     <p class="tagline">Birds change how you fly. Boosts arm for exactly one flight — spend them where they count.</p>
     <div class="section-title">Birds <small>${owned}/${s.skins.length} owned</small></div>
-    <div class="skin-grid">${s.skins.map((skin) => renderSkinCard(skin, s.portalName !== "none")).join("")}</div>
+    ${renderSkinCollections(s)}
     <div class="section-title">Boosts <small>${armed} armed for your next flight</small></div>
     <div class="boost-list">${s.boosts.map((b) => renderBoostRow(b, s.wallet)).join("")}</div>
     <div class="section-title">Trails <small>cosmetic — yours forever</small></div>

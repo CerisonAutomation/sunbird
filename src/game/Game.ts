@@ -1866,6 +1866,9 @@ export class Game {
     this.versusGrace = 5;
     this.collect.reset();
     this.weather.reset();
+    // Skin-borne weather perks: weatherproof birds fly warded, stealth birds slip past hazards.
+    this.weather.ward = this.skin.weatherProof ?? false;
+    this.weather.stealth = this.skin.stealth ?? false;
     this.particles.clear();
     this.terrain.update(this.startX);
     if (idle) this.camera.setIntro(1);

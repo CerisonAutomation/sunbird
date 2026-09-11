@@ -309,6 +309,29 @@ button {
 }
 
 /* ---------- shop ---------- */
+.collection { margin-bottom: 14px; }
+.coll-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 2px 0 7px;
+  font-size: 13px;
+}
+.coll-head .coll-icon { font-size: 15px; }
+.coll-head b { letter-spacing: 0.3px; }
+.coll-head .coll-count {
+  margin-left: auto;
+  font-size: 11px;
+  color: #9a8a80;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 8px;
+  border-radius: 9px;
+}
+.collection.complete .coll-count {
+  color: #3a2410;
+  font-weight: 800;
+  background: linear-gradient(120deg, #ffd76a, #ff9a4a);
+}
 .skin-grid {
   display: grid;
   /* minmax(0, 1fr): tracks may shrink below min-content so long labels can
