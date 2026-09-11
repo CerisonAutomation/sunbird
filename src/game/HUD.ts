@@ -573,7 +573,7 @@ export class HUD {
                 (r) =>
                   `<span class="rb ${r.you ? "you" : ""} ${r.remote ? "remote" : ""} ${r.finished ? "done" : ""}" ` +
                   `style="left:${(r.progress * 100).toFixed(1)}%;--h:${Math.round(r.hue * 360)}" ` +
-                  `title="#${r.place} ${escapeHtml(r.name)}${r.remote ? " · live" : ""}">${r.emote ? `<b class="rb-emote">${r.emote}</b>` : ""}</span>`,
+                  `title="#${r.place} ${escapeHtml(r.name)}${r.remote ? " · live" : ""}">${r.emote ? `<b class="rb-emote">${escapeHtml(r.emote)}</b>` : ""}</span>`,
               )
               .join("")}</div>`;
         }
@@ -1381,7 +1381,7 @@ function renderCheckout(s: HudSnapshot): string {
       <label>Card number<input data-ui value="4242 4242 4242 4242" readonly /></label>
       <div class="two"><label>Expiry<input data-ui value="12 / 29" readonly /></label><label>CVC<input data-ui value="123" readonly /></label></div>
       <label>Name on card<input data-ui value="Sunbird Tester" readonly /></label>
-      ${s.checkoutError ? `<p class="error">${s.checkoutError}</p>` : ""}
+      ${s.checkoutError ? `<p class="error">${escapeHtml(s.checkoutError)}</p>` : ""}
       <button class="primary-btn gold ${s.checkoutBusy ? "busy" : ""}" data-ui data-action="checkout-pay" ${s.checkoutBusy ? "disabled" : ""}>${s.checkoutBusy ? "Processing…" : `Pay ${item.price}`}</button>
       <p class="fineprint">Sandbox card · no real charge. Connect Stripe in .env to go live.</p>
     </div>

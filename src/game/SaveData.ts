@@ -576,6 +576,8 @@ export class SaveData {
   touchStreak(today: string, yesterday: string): number {
     const s = this.state.streak;
     if (s.claimedDate === today) return 0;
+    // Check for comeback BEFORE overwriting s.last
+    const isComeback = s.last !== yesterday && s.last !== today && s.days > 0;
     if (s.last === yesterday) s.days += 1;
     else if (s.last !== today) s.days = 1;
     s.last = today;
@@ -583,8 +585,8 @@ export class SaveData {
     const reward = 20 * Math.min(7, Math.max(1, s.days));
     this.state.wallet += reward;
     this.state.totalCoins += reward;
-    // Comeback bonus: players returning after 3+ days get extra coins
-    if (s.last !== yesterday && s.days === 1) {
+    // Comeback bonus: only when returning after missing days (not day 1)
+    if (isComeback) {
       const comebackBonus = 50;
       this.state.wallet += comebackBonus;
       this.state.totalCoins += comebackBonus;
