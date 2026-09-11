@@ -1,6 +1,8 @@
 import { GAP_START } from "./constants";
 
 export type DecoKind = "tree" | "palm" | "pine" | "spire" | "crystal" | "cactus";
+/** Rare monument props placed ~1 chunk in 8 (see TerrainSystem.placeDecor). */
+export type LandmarkKind = "ancient" | "stones" | "arch";
 export type HazardKind = "none" | "gust" | "storm";
 
 export type BiomeDef = {

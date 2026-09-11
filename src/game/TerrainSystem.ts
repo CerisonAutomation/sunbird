@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { biomeForIsland, gapEndFor, rampPeakFor, tierForIsland, type BiomeDef, type DecoKind } from "./Biomes";
+import { biomeForIsland, gapEndFor, rampPeakFor, tierForIsland, type BiomeDef, type DecoKind, type LandmarkKind } from "./Biomes";
 import {
   CHUNK_RES,
   CHUNK_SIZE,
@@ -54,7 +54,7 @@ export class TerrainSystem {
   private readonly mat: THREE.MeshLambertMaterial;
   private readonly farMats: THREE.MeshBasicMaterial[] = [];
   private readonly farMeshes: THREE.Mesh[] = [];
-  private readonly decoParts = new Map<DecoKind, DecoPart[]>();
+  private readonly decoParts = new Map<DecoKind | LandmarkKind, DecoPart[]>();
   private scatterParts: DecoPart[] = [];
   private farCenter = -9999;
   private farIsland = -1;
@@ -612,6 +612,30 @@ export class TerrainSystem {
         if (hexv === 0xff7a2a || hexv === 0xffb020) p.mat.emissive.setHex(0x662200);
       }
     }
+    // Landmarks — rare one-off monuments (~1 chunk in 8) that make every
+    // stretch of the world feel hand-placed instead of tiled. Built from the
+    // same cheap primitives + shared Lambert materials as the normal props.
+    this.decoParts.set("ancient", [
+      { geo: new THREE.CylinderGeometry(0.55, 0.9, 4.4, 7), mat: lam(0x5a3e2a), y: 2.2, s: 1 },
+      { geo: new THREE.IcosahedronGeometry(2.6, 0), mat: lam(0x2f7d4b), y: 5.6, s: 1 },
+      { geo: new THREE.IcosahedronGeometry(1.7, 0), mat: lam(0x3f9a5c), y: 7.0, s: 1 },
+      { geo: new THREE.IcosahedronGeometry(0.8, 0), mat: lam(0xffd76a), y: 8.1, s: 1 }, // sunlit crown
+      { geo: new THREE.SphereGeometry(0.22, 6, 5), mat: lam(0xff6a8a), y: 4.6, s: 1 }, // hanging bloom
+    ]);
+    this.decoParts.set("stones", [
+      { geo: new THREE.BoxGeometry(0.7, 2.6, 0.5), mat: lam(0x8a8078), y: 1.3, s: 1 },
+      { geo: new THREE.BoxGeometry(0.6, 2.1, 0.45), mat: lam(0x9a9088), y: 1.05, s: 1 },
+      { geo: new THREE.BoxGeometry(0.5, 1.7, 0.4), mat: lam(0x7a7068), y: 0.85, s: 1 },
+      { geo: new THREE.SphereGeometry(0.2, 6, 5), mat: lam(0x9ad8ff), y: 2.9, s: 1 }, // wisp light
+    ]);
+    this.decoParts.set("arch", [
+      { geo: new THREE.TorusGeometry(2.2, 0.34, 6, 10, Math.PI), mat: lam(0xc8a26a), y: 0.4, s: 1 },
+      { geo: new THREE.BoxGeometry(0.7, 0.5, 0.7), mat: lam(0xb08a52), y: 0.25, s: 1 },
+      { geo: new THREE.SphereGeometry(0.18, 6, 5), mat: lam(0xffb020), y: 2.9, s: 1 }, // keystone glint
+    ]);
+    this.decoParts.get("stones")![3]!.mat.emissive.setHex(0x224466);
+    this.decoParts.get("arch")![2]!.mat.emissive.setHex(0x663300);
+
     // Small ground scatter shared across biomes: rocks + tufts fill the gaps
     // between the big props so the ground never looks empty.
     this.scatterParts = [
@@ -626,13 +650,20 @@ export class TerrainSystem {
     const biome = this.biomeAt(x0 + CHUNK_SIZE / 2);
     const parts = this.decoParts.get(biome.deco);
     if (!parts) return;
-    const count = Math.round(7 * biome.decoDensity);
+    // Per-chunk personality: density breathes chunk to chunk (sparse plains,
+    // crowded groves) instead of a uniform 7-per-chunk carpet.
+    const densJitter = 0.55 + hash01(id, this.seedN + 501) * 0.9;
+    const count = Math.round(7 * biome.decoDensity * densJitter);
     const placements: { x: number; y: number; z: number; s: number; rot: number }[] = [];
+    // Grove chunks (~1 in 5): props cluster tightly around one anchor point,
+    // reading as a copse or an oasis rather than even scatter.
+    const grove = hash01(id, this.seedN + 502) < 0.2;
+    const groveX = x0 + (0.25 + hash01(id, this.seedN + 503) * 0.5) * CHUNK_SIZE;
     for (let i = 0; i < count; i++) {
       const r1 = hash01(id * 131 + i * 7, this.seedN + 301);
       const r2 = hash01(id * 131 + i * 7, this.seedN + 302);
       const r3 = hash01(id * 131 + i * 7, this.seedN + 303);
-      const x = x0 + r1 * CHUNK_SIZE;
+      const x = grove ? groveX + (r1 - 0.5) * CHUNK_SIZE * 0.22 : x0 + r1 * CHUNK_SIZE;
       if (this.isOcean(x) || x < 30) continue;
       const slope = Math.abs(this.slopeAt(x));
       if (slope > 0.55) continue;
@@ -663,6 +694,40 @@ export class TerrainSystem {
       }
     };
     emit(parts, placements);
+
+    // Landmarks: roughly one chunk in eight gets a single monument, chosen by
+    // hash so the same seed always rebuilds the same world.
+    if (hash01(id, this.seedN + 601) < 0.125) {
+      const kinds: LandmarkKind[] = ["ancient", "stones", "arch"];
+      const kind = kinds[Math.floor(hash01(id, this.seedN + 602) * kinds.length) % kinds.length]!;
+      const lmParts = this.decoParts.get(kind);
+      const lx0 = x0 + (0.3 + hash01(id, this.seedN + 603) * 0.4) * CHUNK_SIZE;
+      const llx = this.localX(lx0);
+      if (
+        lmParts &&
+        !this.isOcean(lx0) &&
+        lx0 >= 30 &&
+        Math.abs(this.slopeAt(lx0)) <= 0.5 &&
+        !(llx > RAMP_START - 10 && llx < GAP_START)
+      ) {
+        const behind = hash01(id, this.seedN + 604) < 0.7;
+        const spot = {
+          x: lx0,
+          y: this.heightAt(lx0) - 0.2,
+          z: behind ? -6 - hash01(id, this.seedN + 605) * 4 : 6 + hash01(id, this.seedN + 605) * 3,
+          s: 0.9 + hash01(id, this.seedN + 606) * 0.4,
+          rot: hash01(id, this.seedN + 607) * Math.PI * 2,
+        };
+        emit(lmParts, [spot]);
+        // Stone circles get flanking stones for the henge silhouette.
+        if (kind === "stones") {
+          emit(lmParts, [
+            { ...spot, x: lx0 - 3.2, s: spot.s * 0.7, rot: spot.rot + 1.1 },
+            { ...spot, x: lx0 + 3.4, s: spot.s * 0.65, rot: spot.rot + 2.3 },
+          ]);
+        }
+      }
+    }
 
     // Second pass: small scatter (rocks / tufts / glints) between the props.
     const scatter: { x: number; y: number; z: number; s: number; rot: number }[] = [];

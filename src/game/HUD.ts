@@ -885,6 +885,8 @@ export class HUD {
     this.menuEl = grab("menu");
     // Living painted sky with the depth flock — sits behind the paper card.
     this.menuEl.insertBefore(this.menuSky.host, this.menuEl.firstChild);
+    // Hero-bird overlay: appended last so the sunbird swoops over the card.
+    this.menuEl.appendChild(this.menuSky.heroHost);
     if (typeof ResizeObserver !== "undefined") {
       new ResizeObserver(() => this.menuSky.resize(this.menuEl.clientWidth, this.menuEl.clientHeight)).observe(this.menuEl);
     }
