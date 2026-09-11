@@ -3359,13 +3359,13 @@ button {
 .mode-card-main:active .mi { transform: scale(0.92); }
 .hero-bird {
   position: absolute;
-  top: 6px;
+  top: 4px;
   left: 50%;
-  width: 84px;
-  height: 84px;
-  margin-left: -42px;
-  border-radius: 22px;
-  box-shadow: 0 6px 18px rgba(120, 60, 20, 0.35), 0 0 0 3px rgba(255, 255, 255, 0.55);
+  width: 96px;
+  height: 96px;
+  margin-left: -48px;
+  overflow: visible;
+  filter: drop-shadow(0 6px 14px rgba(120, 60, 20, 0.35));
   animation: heroBob 3.4s ease-in-out infinite;
   z-index: 2;
 }

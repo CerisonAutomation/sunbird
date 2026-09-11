@@ -159,6 +159,11 @@ export class GameAudio {
     this.music?.setBiome(style);
   }
 
+  /** 0..1 — adaptive music intensity (speed/altitude/fever/danger/combos). */
+  setMusicIntensity(v: number): void {
+    this.music?.setIntensity(v);
+  }
+
   duckMusic(amount = 0.4, release = 0.5): void {
     this.music?.duck(amount, release);
   }
@@ -348,6 +353,14 @@ export class GameAudio {
   boing(): void {
     this.tone(220, 0.28, "sine", 0.12, 660);
     this.tone(330, 0.22, "triangle", 0.06, 880);
+  }
+
+  /** Balloon bounce: a taut rubber pop + a springy upward slide. */
+  balloon(): void {
+    this.noiseBurst(0.06, 2600, 0.16);
+    this.tone(220, 0.1, "sine", 0.12, 260);
+    this.tone(392, 0.2, "sine", 0.1, 660);
+    this.tone(523.25, 0.22, "triangle", 0.08, 880);
   }
 
   /** Short triumphant fanfare for surprise windfalls. */

@@ -84,8 +84,9 @@ type ServerMsg =
   | { type: "start"; at: number; seed: string }
   | { type: "error"; message: string };
 
-/** Protocol-v1 gateway: exists now, but no production room may be opened until
- * the Rust authoritative service reaches Phase 3. */
+/** Protocol-v1 gateway: live alongside the Rust authoritative service. The
+ * browser still speaks the legacy simple protocol today, which the Rust server
+ * serves on `/ws`; v1 (`/v1/ws`) is the migration target. */
 export type ProtocolGatewayInfo = {
   supportedVersion: number;
   enabled: boolean;
@@ -96,8 +97,8 @@ export type ProtocolGatewayInfo = {
 export function protocolGatewayInfo(): ProtocolGatewayInfo {
   return {
     supportedVersion: PROTOCOL_VERSION,
-    enabled: false,
-    reason: "authoritative-rooms-pending-phase-3",
+    enabled: true,
+    reason: "authoritative-rooms-live",
   };
 }
 

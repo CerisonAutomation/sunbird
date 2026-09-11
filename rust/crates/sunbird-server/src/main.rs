@@ -1,5 +1,6 @@
 mod auth;
 mod config;
+mod legacy;
 mod metrics;
 mod rooms;
 mod ws;
@@ -38,6 +39,7 @@ struct Shared {
     protocol_limits: Limits,
     state: Arc<RuntimeState>,
     rooms: Arc<rooms::RoomManager>,
+    legacy_rooms: Arc<legacy::LegacyRooms>,
 }
 
 struct RuntimeState {
@@ -70,12 +72,15 @@ async fn main() -> anyhow::Result<()> {
 
     let room_manager = Arc::new(rooms::RoomManager::new());
     ws::spawn_sweeper(room_manager.clone());
+    let legacy_rooms = Arc::new(legacy::LegacyRooms::new());
+    legacy::spawn_tick(legacy_rooms.clone());
     let shared = Arc::new(Shared {
         issuer: auth::SeatTokenIssuer::new(&config.reconnect_secret, config.reconnect_grace),
         protocol_limits: Limits::current(),
         config,
         state: Arc::new(RuntimeState::new()),
         rooms: room_manager,
+        legacy_rooms,
     });
     let listener = TcpListener::bind(bind_addr).await.with_context(|| format!("cannot bind {bind_addr}"))?;
     let bound = listener.local_addr().context("failed to resolve listener address")?;
@@ -121,8 +126,13 @@ fn build_app(shared: SharedState, shutdown_rx: watch::Receiver<bool>) -> Router 
     // The WebSocket route carries its own state (the room registry) so the
     // socket task never needs the whole Shared config.
     let ws_router = Router::new().route("/v1/ws", get(ws::ws_handler)).with_state(shared.rooms.clone());
+    // The legacy simple-protocol socket the browser ships with today.
+    let legacy_router = Router::new()
+        .route("/ws", get(legacy::legacy_ws_handler))
+        .with_state(shared.legacy_rooms.clone());
     Router::new()
         .merge(ws_router)
+        .merge(legacy_router)
         .route("/health", get(health))
         .route("/healthz", get(health))
         .route("/ready", get(ready))
@@ -353,6 +363,7 @@ mod tests {
             protocol_limits: Limits::current(),
             state: Arc::new(RuntimeState::new()),
             rooms: Arc::new(rooms::RoomManager::new()),
+            legacy_rooms: Arc::new(legacy::LegacyRooms::new()),
         })
     }
 

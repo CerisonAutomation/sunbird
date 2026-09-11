@@ -21,11 +21,15 @@ export type CollectEvents = {
   onCoin: (x: number, y: number, gem: boolean) => void;
   onCloud: (kind: CloudKind, x: number, y: number) => void;
   onPickup: (kind: PickupKind, x: number, y: number) => void;
+  onRing: (x: number, y: number) => void;
+  onBalloon: (x: number, y: number) => void;
 };
 
 type Coin = { x: number; y: number; taken: boolean; gem: boolean; slot: number };
 type Cloud = { kind: CloudKind; x: number; y: number; z: number; taken: boolean; sprite: THREE.Sprite; phase: number; drift: number };
 type Pickup = { kind: PickupKind; x: number; y: number; taken: boolean; mesh: THREE.Mesh; phase: number };
+type Ring = { x: number; y: number; r: number; taken: boolean; slot: number };
+type Balloon = { x: number; y: number; taken: boolean; root: THREE.Group; phase: number; drift: number };
 
 export const PICKUP_STYLE: Record<PickupKind, { color: number; emissive: number; icon: string; label: string }> = {
   sun: { color: 0xffd24a, emissive: 0xff8a00, icon: "☀", label: "Sunlight" },
@@ -41,6 +45,9 @@ export const PICKUP_STYLE: Record<PickupKind, { color: number; emissive: number;
 
 const MAX_COINS = 512;
 const MAX_GEMS = 96;
+const MAX_RINGS = 72;
+const MAX_BALLOONS = 24;
+const BALLOON_COLORS = [0xff6b6b, 0xffc14a, 0x6ad8ff, 0xb18cff, 0x7fe8a0];
 const coinDummy = new THREE.Object3D();
 
 const CLOUD_TINT: Record<CloudKind, string> = {
@@ -70,6 +77,16 @@ export class Collectibles {
   private readonly pickupGeo: THREE.IcosahedronGeometry;
   private readonly pickupMats = new Map<PickupKind, THREE.MeshLambertMaterial>();
   private readonly cloudTex = new Map<CloudKind, THREE.CanvasTexture>();
+  private readonly ringPool: Ring[] = [];
+  private readonly activeRings: Ring[] = [];
+  private readonly ringGeo: THREE.TorusGeometry;
+  private readonly ringMat: THREE.MeshLambertMaterial;
+  private readonly ringMesh: THREE.InstancedMesh;
+  private ringCursor = 0;
+  private readonly balloonPool: Balloon[] = [];
+  private readonly activeBalloons: Balloon[] = [];
+  private readonly balloonMats: THREE.MeshLambertMaterial[] = [];
+  private readonly knotMat: THREE.MeshLambertMaterial;
   private readonly seedN: number;
   private readonly seedStr: string;
   private spawnedUntil = -1;
@@ -102,6 +119,24 @@ export class Collectibles {
       this.pickupMats.set(k, new THREE.MeshLambertMaterial({ color: s.color, emissive: s.emissive, flatShading: true }));
     }
     for (const k of Object.keys(CLOUD_TINT) as CloudKind[]) this.cloudTex.set(k, makeCloudTexture(CLOUD_TINT[k]));
+
+    // Sky rings: floating hoops on the high line. A torus is created in the
+    // XY plane; rotating it about Y turns the hole to face the bird's +x
+    // heading so every instance reads as a gate to thread.
+    this.ringGeo = new THREE.TorusGeometry(4.4, 0.34, 10, 44);
+    this.ringGeo.rotateY(Math.PI / 2);
+    this.ringMat = new THREE.MeshLambertMaterial({ color: 0xffcf3e, emissive: 0x7a4200 });
+    this.ringMesh = new THREE.InstancedMesh(this.ringGeo, this.ringMat, MAX_RINGS);
+    this.ringMesh.count = MAX_RINGS;
+    this.ringMesh.frustumCulled = false;
+    this.group.add(this.ringMesh);
+    for (let i = 0; i < MAX_RINGS; i++) this.hideRingSlot(i);
+    this.ringMesh.instanceMatrix.needsUpdate = true;
+
+    this.knotMat = new THREE.MeshLambertMaterial({ color: 0x7a4a20 });
+    for (const c of BALLOON_COLORS) {
+      this.balloonMats.push(new THREE.MeshLambertMaterial({ color: c, emissive: 0x1a0a00 }));
+    }
   }
 
   /** Render layer, so split-screen players only see their own pickups. */
@@ -126,9 +161,20 @@ export class Collectibles {
       p.taken = true;
       p.mesh.visible = false;
     }
+    for (const r of this.activeRings) {
+      r.taken = true;
+      this.hideRing(r);
+    }
+    for (const b of this.activeBalloons) {
+      b.taken = true;
+      b.root.visible = false;
+    }
+    this.ringMesh.instanceMatrix.needsUpdate = true;
     this.activeCoins.length = 0;
     this.activeClouds.length = 0;
     this.activePickups.length = 0;
+    this.activeRings.length = 0;
+    this.activeBalloons.length = 0;
   }
 
   update(dt: number, bird: Bird, terrain: TerrainSystem, magnetOn: boolean, time: number, ev: CollectEvents): void {
@@ -210,6 +256,46 @@ export class Collectibles {
         ev.onPickup(p.kind, p.x, p.y);
       }
     }
+
+    for (let i = this.activeRings.length - 1; i >= 0; i--) {
+      const r = this.activeRings[i]!;
+      if (r.taken || r.x < bird.x - 40) {
+        r.taken = true;
+        this.hideRing(r);
+        this.activeRings.splice(i, 1);
+        continue;
+      }
+      this.writeRing(r, time);
+      // Threading the gate: crossing the ring's plane while inside its radius.
+      if (Math.abs(bird.x - r.x) < 2.2 && Math.abs(bird.y - r.y) < r.r - 0.4) {
+        r.taken = true;
+        this.hideRing(r);
+        this.activeRings.splice(i, 1);
+        ev.onRing(r.x, r.y);
+      }
+    }
+    this.ringMesh.instanceMatrix.needsUpdate = true;
+
+    for (let i = this.activeBalloons.length - 1; i >= 0; i--) {
+      const b = this.activeBalloons[i]!;
+      if (b.taken || b.x < bird.x - 40) {
+        b.taken = true;
+        b.root.visible = false;
+        this.activeBalloons.splice(i, 1);
+        continue;
+      }
+      b.phase += dt;
+      b.x += b.drift * dt;
+      b.root.position.set(b.x, b.y + Math.sin(b.phase * 1.4) * 1.1, 0);
+      b.root.rotation.z = Math.sin(b.phase * 0.9) * 0.06;
+      // Pop on contact — a soft reward that launches you back into the sky.
+      if (Math.hypot(bird.x - b.x, bird.y - b.y) < 4.4) {
+        b.taken = true;
+        b.root.visible = false;
+        this.activeBalloons.splice(i, 1);
+        ev.onBalloon(b.x, b.y);
+      }
+    }
   }
 
   dispose(): void {
@@ -221,6 +307,15 @@ export class Collectibles {
     for (const m of this.pickupMats.values()) m.dispose();
     for (const t of this.cloudTex.values()) t.dispose();
     for (const c of this.cloudPool) (c.sprite.material as THREE.Material).dispose();
+    this.ringGeo.dispose();
+    this.ringMat.dispose();
+    for (const b of this.balloonPool) {
+      b.root.traverse((o) => {
+        if (o instanceof THREE.Mesh) o.geometry.dispose();
+      });
+    }
+    for (const m of this.balloonMats) m.dispose();
+    this.knotMat.dispose();
   }
 
   /* --------------------------------------------------------------- spawning */
@@ -279,16 +374,29 @@ export class Collectibles {
       }
 
       // Sky rewards: gems and clouds live where only a good launch reaches.
-      if (rng.next() < 0.38) {
+      if (rng.next() < 0.5) {
         const tier = rng.next();
         const alt = tier < 0.55 ? ALT_SKY : tier < 0.86 ? ALT_CLOUDS : ALT_HIGH;
         const jitter = rng.range(-14, 22);
         const z = rng.range(-18, 12);
         this.placeCloud(this.pickCloudKind(rng, alt), x + rng.range(-10, 10), hh + alt + jitter, rng.next() * 6, rng.range(-1.5, 1.5), z);
       }
-      if (rng.next() < 0.1) {
+      if (rng.next() < 0.13) {
         const alt = rng.next() < 0.5 ? ALT_CLOUDS : ALT_HIGH;
         this.placeCoin(x + rng.range(-6, 6), hh + alt + rng.range(0, 30), true);
+      }
+
+      // Sky rings: golden hoops threaded along the high line. They sit between
+      // the cloud bands so a good launch (or a brave dive-climb) reaches them.
+      if (rng.next() < 0.16) {
+        const alt = 26 + rng.range(0, 52);
+        this.placeRing(x + rng.range(-8, 8), hh + alt, 4.4);
+      }
+
+      // Balloons: rare, up in the cloud layer — pop one for a huge bounce.
+      if (rng.next() < 0.07) {
+        const alt = ALT_CLOUDS + rng.range(-6, 30);
+        this.placeBalloon(x + rng.range(-12, 12), hh + alt, rng.next() * 6, rng.range(-1, 1));
       }
 
       // Power-ups sit on crests and just past ramps so they reward good lines.
@@ -414,6 +522,88 @@ export class Collectibles {
     coinDummy.scale.setScalar(0.001);
     coinDummy.updateMatrix();
     mesh.setMatrixAt(slot, coinDummy.matrix);
+  }
+
+  private placeRing(x: number, y: number, r: number): void {
+    const ring = this.allocRing();
+    ring.x = x;
+    ring.y = y;
+    ring.r = r;
+    ring.taken = false;
+    this.writeRing(ring, 0);
+    this.activeRings.push(ring);
+  }
+
+  private allocRing(): Ring {
+    const idle = this.ringPool.find((r) => r.taken);
+    if (idle) return idle;
+    const slot = this.ringCursor++;
+    if (slot >= MAX_RINGS) {
+      const fallback = this.ringPool.find((r) => r.taken);
+      if (fallback) return fallback;
+      return { x: 0, y: -9999, r: 4.4, taken: true, slot: -1 };
+    }
+    const ring: Ring = { x: 0, y: 0, r: 4.4, taken: true, slot };
+    this.ringPool.push(ring);
+    return ring;
+  }
+
+  private writeRing(r: Ring, time: number): void {
+    if (r.slot < 0) return;
+    const pulse = 1 + Math.sin(time * 3 + r.x * 0.2) * 0.06;
+    coinDummy.position.set(r.x, r.y, 0);
+    coinDummy.rotation.set(0, 0, 0);
+    coinDummy.scale.setScalar(pulse);
+    coinDummy.updateMatrix();
+    this.ringMesh.setMatrixAt(r.slot, coinDummy.matrix);
+  }
+
+  private hideRing(r: Ring): void {
+    if (r.slot < 0) return;
+    this.hideRingSlot(r.slot);
+  }
+
+  private hideRingSlot(slot: number): void {
+    coinDummy.position.set(0, -9999, 0);
+    coinDummy.rotation.set(0, 0, 0);
+    coinDummy.scale.setScalar(0.001);
+    coinDummy.updateMatrix();
+    this.ringMesh.setMatrixAt(slot, coinDummy.matrix);
+  }
+
+  private placeBalloon(x: number, y: number, phase: number, drift: number): void {
+    // Hard cap keeps the balloon pool bounded even under dense spawn windows.
+    if (this.activeBalloons.length >= MAX_BALLOONS) return;
+    const b = this.allocBalloon();
+    b.x = x;
+    b.y = y;
+    b.phase = phase;
+    b.drift = drift;
+    b.taken = false;
+    b.root.visible = true;
+    b.root.position.set(x, y, 0);
+    this.activeBalloons.push(b);
+  }
+
+  private allocBalloon(): Balloon {
+    const idle = this.balloonPool.find((b) => b.taken || !b.root.visible);
+    if (idle) return idle;
+    const root = new THREE.Group();
+    const mat = this.balloonMats[this.balloonPool.length % this.balloonMats.length]!;
+    const body = new THREE.Mesh(new THREE.SphereGeometry(2.1, 14, 12), mat);
+    body.position.y = 2.1;
+    body.castShadow = true;
+    const knot = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.8, 6), this.knotMat);
+    knot.rotation.x = Math.PI;
+    knot.position.y = 0.4;
+    const string = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 5, 5), this.knotMat);
+    string.position.y = -2.3;
+    root.add(body, knot, string);
+    root.traverse((o) => o.layers.set(this.layer));
+    this.group.add(root);
+    const b: Balloon = { x: 0, y: 0, taken: true, root, phase: 0, drift: 0 };
+    this.balloonPool.push(b);
+    return b;
   }
 
   private allocCloud(kind: CloudKind): Cloud {

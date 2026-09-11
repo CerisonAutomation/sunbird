@@ -133,6 +133,9 @@ export class Music {
   private biome: BiomeMusicStyle = "bright";
   private transpose = 0;
   private lastCutoff = 9000;
+  /** 0..1 — continuous intensity (speed / altitude / fever / danger / combos). */
+  private intensity = 0;
+  private intensityTarget = 0;
 
   private readonly bus: GainNode;
   private readonly filter: BiquadFilterNode;
@@ -144,6 +147,7 @@ export class Music {
   private readonly whistleGain: GainNode;
   private readonly padGain: GainNode;
   private readonly lullabyGain: GainNode;
+  private readonly tensionGain: GainNode;
   private readonly noise: AudioBuffer;
   private lullabyStep = 0;
   private baseLevel = 0;
@@ -178,6 +182,7 @@ export class Music {
     this.whistleGain = mk(0);
     this.padGain = mk(0);
     this.lullabyGain = mk(0);
+    this.tensionGain = mk(0);
 
     const len = ctx.sampleRate;
     this.noise = ctx.createBuffer(1, len, ctx.sampleRate);
@@ -193,10 +198,27 @@ export class Music {
 
   setNight(t: number): void {
     this.night = Math.max(0, Math.min(1, t));
-    const cutoff = BIOME_MIX[this.biome].cutoff - this.night * 4200;
+    this.recomputeCutoff(0.6);
+  }
+
+  /** Continuous intensity — opens the filter and adds a tension hat layer. */
+  setIntensity(v: number): void {
+    const t = Math.max(0, Math.min(1, v));
+    if (Math.abs(t - this.intensityTarget) < 0.01) return;
+    this.intensityTarget = t;
+    const now = this.ctx.currentTime;
+    // The tension layer rides up quickly for responsiveness, decays a touch
+    // slower so a big moment lingers after the peak.
+    const style = BIOME_MIX[this.biome];
+    this.tensionGain.gain.setTargetAtTime(t * 0.5 * style.perc, now, t > this.intensity ? 0.1 : 0.4);
+    this.recomputeCutoff(0.3);
+  }
+
+  private recomputeCutoff(ramp: number): void {
+    const cutoff = BIOME_MIX[this.biome].cutoff - this.night * 4200 + this.intensityTarget * 3200;
     if (Math.abs(cutoff - this.lastCutoff) < 12) return;
     this.lastCutoff = cutoff;
-    this.filter.frequency.setTargetAtTime(cutoff, this.ctx.currentTime, 0.6);
+    this.filter.frequency.setTargetAtTime(cutoff, this.ctx.currentTime, ramp);
   }
 
   setLevel(level: number): void {
@@ -240,8 +262,9 @@ export class Music {
     // subtle underneath play, gone in fever where percussion drives.
     this.padGain.gain.setTargetAtTime(m === "menu" ? 0.16 : m === "play" ? 0.08 : 0, t, 0.8);
     this.lullabyGain.gain.setTargetAtTime(m === "sleep" ? 0.3 : 0, t, 0.6);
-    this.filter.frequency.setTargetAtTime(style.cutoff - this.night * 4200, t, 0.55);
-    this.lastCutoff = style.cutoff - this.night * 4200;
+    const cutoff = style.cutoff - this.night * 4200 + this.intensityTarget * 3200;
+    this.filter.frequency.setTargetAtTime(cutoff, t, 0.55);
+    this.lastCutoff = cutoff;
     this.bpm = m === "fever" ? style.fever : style.bpm;
 
     if (this.mode === "off" && m !== "off") this.start();
@@ -260,6 +283,8 @@ export class Music {
 
   private tick(): void {
     if (this.ctx.state !== "running") return;
+    // Smooth the intensity so the hat layer swells instead of stuttering.
+    this.intensity += (this.intensityTarget - this.intensity) * 0.12;
     while (this.nextTime < this.ctx.currentTime + LOOKAHEAD) {
       if (this.mode === "sleep") this.scheduleLullaby(this.nextTime);
       else this.scheduleStep(this.nextTime);
@@ -331,6 +356,15 @@ export class Music {
       // Storm: relentless — kicks on every other eighth, like weather that won't quit.
       if (this.mode === "storm" && (this.step === 2 || this.step === 6)) this.kick(t, 0.55);
       if (this.step === 7 && this.bar % 2 === 1) this.shaker(t + beat * 0.22, 0.4);
+
+      // Tension layer: offbeat hats that swell with intensity, so the music
+      // climbs with speed, altitude and fever (SSX-style adaptive scoring).
+      if (this.intensity > 0.05 && this.step % 2 === 1) {
+        this.hat(t, 0.1 + this.intensity * 0.28, 6400 + this.intensity * 2600);
+      }
+      if (this.intensity > 0.6 && (this.step === 2 || this.step === 6)) {
+        this.hat(t + beat * 0.5, 0.08 + (this.intensity - 0.6) * 0.3, 8200);
+      }
     }
 
     // Whistle (fever)
@@ -561,6 +595,25 @@ export class Music {
     g.connect(this.percGain);
     src.start(t);
     src.stop(t + 0.1);
+  }
+
+  /** Bright, short hi-hat — the intensity layer's heartbeat. */
+  private hat(t: number, vel: number, freq: number): void {
+    const src = this.ctx.createBufferSource();
+    src.buffer = this.noise;
+    src.playbackRate.value = 1 + Math.random() * 0.08;
+    const f = this.ctx.createBiquadFilter();
+    f.type = "highpass";
+    f.frequency.value = freq;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.14 * vel, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.045);
+    src.connect(f);
+    f.connect(g);
+    g.connect(this.tensionGain);
+    src.start(t);
+    src.stop(t + 0.06);
   }
 
   private kick(t: number, vel: number): void {

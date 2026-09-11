@@ -12,6 +12,7 @@ import { dateSeed } from "./math";
 import { defaultRival, rankSeasonId, ratingDelta, RIVAL_BASE_RATING, seasonReward, softResetRating, streakBonus, type RivalMatch, type RivalState } from "./pvp";
 import { seasonId } from "./season";
 import { emptyTournamentState, type TournamentState } from "./Tournaments";
+import { emptySocialState, type SocialState } from "./SocialSystem";
 
 export type HighScore = {
   date: string;
@@ -120,6 +121,8 @@ export type SaveState = {
   campaignClaimed: string[];
   /** Weekly-event / monthly-theme progress windows. */
   events: { week: string; clearsThisWeek: number; month: string; clearsThisMonth: number; claimedTrailMonth: string };
+  /** Local-first social graph (friends, clubs, DMs, challenges, replays). */
+  social: SocialState;
 };
 
 export type DuelState = {
@@ -214,6 +217,7 @@ function defaults(): SaveState {
     mastery: {},
     campaignClaimed: [],
     events: { week: "", clearsThisWeek: 0, month: "", clearsThisMonth: 0, claimedTrailMonth: "" },
+    social: emptySocialState(),
   };
 }
 
@@ -228,6 +232,23 @@ function strArr(v: unknown): string[] {
 
 function numArr(v: unknown): number[] {
   return Array.isArray(v) ? v.map(Number).filter((n) => Number.isFinite(n)) : [];
+}
+
+function parseSocial(v: unknown): SocialState {
+  const d = emptySocialState();
+  if (!v || typeof v !== "object") return d;
+  const p = v as Partial<SocialState>;
+  return {
+    friends: Array.isArray(p.friends) ? (p.friends as SocialState["friends"]) : d.friends,
+    pendingRequests: strArr(p.pendingRequests),
+    incomingRequests: strArr(p.incomingRequests),
+    blocked: strArr(p.blocked),
+    club: p.club ?? null,
+    dmThreads: Array.isArray(p.dmThreads) ? (p.dmThreads as SocialState["dmThreads"]) : d.dmThreads,
+    challenges: Array.isArray(p.challenges) ? (p.challenges as SocialState["challenges"]) : d.challenges,
+    savedReplays: Array.isArray(p.savedReplays) ? (p.savedReplays as SocialState["savedReplays"]) : d.savedReplays,
+    socialQuestsClaimed: strArr(p.socialQuestsClaimed),
+  };
 }
 
 function parseRival(v: unknown): RivalState {
@@ -421,6 +442,7 @@ export class SaveData {
                 claimedTrailMonth: String((p.events as Record<string, unknown>).claimedTrailMonth ?? ""),
               }
             : d.events,
+        social: parseSocial(p.social),
       };
     } catch {
       return d;

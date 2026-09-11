@@ -272,6 +272,10 @@ export class Game {
   private goalPopT = 0;
   private recordBanner = "";
   private runGems = 0;
+  private runRings = 0;
+  private ringChain = 0;
+  private ringChainTimer = 0;
+  private runBalloons = 0;
   private readonly powers = new PowerUps();
   private coach: FirstFlight | null = null;
   private mode: ModeDef = modeById("daytrip");
@@ -973,7 +977,15 @@ export class Game {
       },
       onCloud: (kind, x, y) => this.onCloud(kind, x, y),
       onPickup: (kind, x, y) => this.onPickup(kind, x, y),
+      onRing: (x, y) => this.onRing(x, y),
+      onBalloon: (x, y) => this.onBalloon(x, y),
     });
+
+    // Ring chain cools off if the player eases off the sky line.
+    if (this.ringChainTimer > 0) {
+      this.ringChainTimer -= dt;
+      if (this.ringChainTimer <= 0) this.ringChain = 0;
+    }
 
     if (this.feverOn) {
       this.feverTimer -= dt;
@@ -1283,6 +1295,51 @@ export class Game {
     if (cb) this.bird.vx += 6;
   }
 
+  /** Threading a sky ring: a speed surge + score that scales with the chain. */
+  private onRing(x: number, y: number): void {
+    this.runRings += 1;
+    this.ringChainTimer = 2.8;
+    this.ringChain += 1;
+    const chainBonus = Math.min(4, this.ringChain) * 8;
+    const pts = 30 + chainBonus;
+    this.bonus += pts;
+    this.awardXp(XP_RULES.cloud);
+    this.audio.boing();
+    this.bird.vx += 8 + Math.min(14, this.ringChain * 2);
+    this.particles.burstRing(x, y, 0xffd76a);
+    this.particles.emitSonicBoom(x, y);
+    if (this.ringChain >= 3) {
+      this.particles.emitConfetti(x, y + 2);
+      this.hud.toast(`RING CHAIN ×${this.ringChain} +${pts}`, "gold");
+      this.flash("fever");
+      this.audio.fanfare();
+    } else {
+      this.hud.toast(`Through the ring +${pts}`, "gold");
+    }
+    this.haptic([20, 10, 30]);
+    this.telemetry.track("ring", { chain: this.ringChain });
+  }
+
+  /** Balloon pop: a springy launch back into the sky — pure, silly reward. */
+  private onBalloon(x: number, y: number): void {
+    this.runBalloons += 1;
+    this.bird.vy = Math.max(this.bird.vy, 46);
+    this.bird.vx += 18;
+    this.bird.grounded = false;
+    this.bird.inWater = false;
+    this.bonus += 150;
+    this.awardXp(XP_RULES.zenith);
+    this.audio.balloon();
+    this.particles.emitConfetti(x, y + 1);
+    this.particles.burstRing(x, y, 0xff6b6b);
+    this.camera.punch(6);
+    this.shake(0.3);
+    this.hud.toast("🎈 Balloon bounce! +150", "gold");
+    this.flash("fever");
+    this.haptic([20, 10, 40, 20, 60]);
+    this.telemetry.track("balloon", {});
+  }
+
   private checkZenith(): void {
     const vy = this.bird.vy;
     if (!this.bird.grounded && !this.bird.asleep && this.prevVy > 0 && vy <= 0) {
@@ -1451,6 +1508,7 @@ export class Game {
 
     const dayT = Math.max(0, Math.min(1, this.daylight / this.daylightMax()));
     this.audio.update(rawDt, this.bird.speed(), diving, this.bird.grounded, this.feverOn, dayT, playing, this.weather.gust);
+    this.audio.setMusicIntensity(this.musicIntensity());
 
     const size = this.renderer.getSize(this.tmpSize);
     this.renderer.setViewport(0, 0, size.x, size.y);
@@ -1499,6 +1557,7 @@ export class Game {
     this.applyWorldLook(lead.bird.x, lead.bird.altitude);
     this.terrain.update(lead.bird.x);
     this.audio.update(rawDt, lead.bird.speed(), playing && this.input.diving, lead.bird.grounded, false, 1, playing, 0);
+    this.audio.setMusicIntensity(playing ? Math.min(1, lead.bird.speed() / 90 * 0.5 + Math.min(1, lead.bird.altitude / ALT_HIGH) * 0.3) : 0);
 
     const size = this.renderer.getSize(this.tmpSize);
     const vertical = size.x / Math.max(1, size.y) >= 1.25;
@@ -2002,6 +2061,10 @@ export class Game {
     this.runClouds = 0;
     this.zeniths = 0;
     this.pickups = 0;
+    this.runRings = 0;
+    this.ringChain = 0;
+    this.ringChainTimer = 0;
+    this.runBalloons = 0;
     this.pendingXp = 0;
     this.xpFlush = 0;
     this.trailFxAcc = 0;
@@ -3420,6 +3483,17 @@ export class Game {
     };
   }
 
+  /** 0..1 — continuous musical intensity from the moment-to-moment flight. */
+  private musicIntensity(): number {
+    if (this.state !== "playing") return 0;
+    const speed = Math.min(1, this.bird.speed() / 90);
+    const alt = Math.min(1, this.bird.altitude / ALT_HIGH);
+    const fever = this.feverOn ? 1 : 0;
+    const danger = 1 - Math.max(0, Math.min(1, this.daylight / this.daylightMax()));
+    const chain = Math.min(1, this.ringChain / 4);
+    return Math.min(1, speed * 0.35 + alt * 0.22 + fever * 0.3 + danger * 0.12 + chain * 0.12);
+  }
+
   private score(): number {
     return (this.scoreAccum + this.bonus) * this.save.nestMultiplier();
   }
@@ -3613,6 +3687,8 @@ export class Game {
       perfects: this.perfects,
       clouds: this.runClouds,
       zeniths: this.zeniths,
+      rings: this.runRings,
+      balloons: this.runBalloons,
       hint: this.state === "playing" ? this.coachHint() || this.hint : "",
       magnetTimer: this.magnetTimer,
       shield: this.shield,

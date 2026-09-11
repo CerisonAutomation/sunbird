@@ -57,13 +57,14 @@ export default defineConfig({
     host: true,
     allowedHosts: true,
     // Real multiplayer: the browser talks to the SAME origin (/mp) and vite
-    // tunnels it to the Workers room server. No hardcoded hosts anywhere.
+    // tunnels it to the Rust room server (sunbird-server) listening on the
+    // legacy `/ws` socket. No hardcoded hosts anywhere.
     proxy: {
       "/mp": {
-        target: "http://localhost:8787",
+        target: "http://localhost:8080",
         ws: true,
         changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/mp/, ""),
+        rewrite: (p) => p.replace(/^\/mp/, "/ws"),
       },
     },
   },

@@ -165,6 +165,16 @@ export class Racer {
         if (kind === "shield") this.powers.shield = Math.min(2, this.powers.shield + 1);
         ev.onPickup(kind, x, y, this);
       },
+      onRing: () => {
+        // AI pilots thread rings too — same small surge, keeps the field honest.
+        this.bird.vx += 8;
+      },
+      onBalloon: () => {
+        // Same bounce as the player, so a balloon never gifts an unfair lead.
+        this.bird.vy = Math.max(this.bird.vy, 42);
+        this.bird.vx += 14;
+        this.bird.grounded = false;
+      },
     });
 
     const sp = this.bird.speed();

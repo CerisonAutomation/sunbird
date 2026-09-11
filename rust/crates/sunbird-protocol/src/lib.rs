@@ -210,8 +210,7 @@ pub enum ProtocolError {
 pub enum ValidationError {
     #[error("unsupported protocol version {0}")]
     UnsupportedVersion(u32),
-    #[error("UTF-8 message is not valid JSON")
-    ]
+    #[error("UTF-8 message is not valid JSON")]
     InvalidJson,
     #[error("JSON parse failed: {0}")]
     Parse(#[from] serde_json::Error),
