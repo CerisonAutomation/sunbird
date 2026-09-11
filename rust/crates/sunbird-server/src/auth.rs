@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Context, Result};
-use hmac::{digest::KeyInit, Hmac, Mac};
+use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::time::Duration;
