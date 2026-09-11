@@ -2,7 +2,8 @@ use anyhow::{anyhow, Context, Result};
 use hmac::{digest::KeyInit, Hmac, Mac};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
-use time::{Duration, OffsetDateTime};
+use std::time::Duration;
+use time::OffsetDateTime;
 use uuid::Uuid;
 
 pub const TOKEN_PREFIX_V1: &str = "sb1";
@@ -100,8 +101,8 @@ impl SeatTokenIssuer {
     }
 
     fn sign(&self, payload: &[u8]) -> Result<String> {
-        let mut mac =
-            HmacSha256::new_from_slice(&self.key).map_err(|_| anyhow!("invalid signing key"))?;
+        let mut mac = <HmacSha256 as Mac>::new_from_slice(&self.key)
+            .map_err(|_| anyhow!("invalid signing key"))?;
         mac.update(payload);
         Ok(hex::encode(mac.finalize().into_bytes()))
     }
@@ -127,7 +128,7 @@ mod tests {
     #[test]
     fn issue_and_verify() {
         let issuer =
-            SeatTokenIssuer::new(b"01234567890123456789012345678901", Duration::minutes(5));
+            SeatTokenIssuer::new(b"01234567890123456789012345678901", Duration::from_secs(300));
         let player = Uuid::new_v4();
         let room = Uuid::new_v4();
         let seat = Uuid::new_v4();
@@ -142,7 +143,7 @@ mod tests {
     #[test]
     fn tampered_token_rejected() {
         let issuer =
-            SeatTokenIssuer::new(b"01234567890123456789012345678901", Duration::minutes(5));
+            SeatTokenIssuer::new(b"01234567890123456789012345678901", Duration::from_secs(300));
         let token = issuer
             .issue(Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4(), 1)
             .expect("issue");
@@ -154,7 +155,7 @@ mod tests {
     #[test]
     fn wrong_prefix_rejected() {
         let issuer =
-            SeatTokenIssuer::new(b"01234567890123456789012345678901", Duration::minutes(5));
+            SeatTokenIssuer::new(b"01234567890123456789012345678901", Duration::from_secs(300));
         assert!(issuer.verify("sb0.x.y").is_err());
     }
 }

@@ -94,6 +94,7 @@ impl Room {
 }
 
 /// Outcome of a successful join.
+#[derive(Debug)]
 pub struct JoinOutcome {
     pub grant: SeatGrant,
     pub room: RoomPublic,

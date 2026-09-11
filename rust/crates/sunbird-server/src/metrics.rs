@@ -23,7 +23,7 @@ async fn metrics_handler() -> Response {
     match Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, TEXT_CONTENT_TYPE)
-        .body(render())
+        .body(axum::body::Body::from(render()))
     {
         Ok(response) => response,
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),

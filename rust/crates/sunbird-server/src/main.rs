@@ -97,7 +97,7 @@ async fn main() -> anyhow::Result<()> {
     *shared.state.started_at_unix.write() = time::OffsetDateTime::now_utc().unix_timestamp();
 
     if let Some(metrics_bind) = shared.config.metrics_bind {
-        let metrics_app = metrics_endpoint_app();
+        let metrics_app = metrics::metrics_endpoint_app();
         let metrics_listener = TcpListener::bind(metrics_bind)
             .await
             .with_context(|| format!("cannot bind metrics address {metrics_bind}"))?;
@@ -167,7 +167,10 @@ fn build_app(shared: SharedState, shutdown_rx: watch::Receiver<bool>) -> Router 
         .route("/v1/degrade", get(degrade_status))
         .route("/v1/rooms", get(room_stats))
         .layer(TraceLayer::new_for_http())
-        .layer(TimeoutLayer::new(Duration::from_secs(3)))
+        .layer(TimeoutLayer::with_status_code(
+            StatusCode::REQUEST_TIMEOUT,
+            Duration::from_secs(3),
+        ))
         .layer(RequestBodyLimitLayer::new(MAX_JSON_PAYLOAD_BYTES))
         .layer(cors)
         .layer(axum::middleware::from_fn(move |request, next| {
@@ -250,7 +253,7 @@ async fn metrics_plain() -> Response {
     match Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, metrics::TEXT_CONTENT_TYPE)
-        .body(metrics::render())
+        .body(axum::body::Body::from(metrics::render()))
     {
         Ok(response) => response,
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
