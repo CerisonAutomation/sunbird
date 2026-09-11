@@ -911,7 +911,7 @@ function renderBoard(s: HudSnapshot): string {
     <p class="fineprint">${
       s.boardOnline
         ? "Scores sync to the configured global leaderboard service."
-        : "No leaderboard server is configured, so rankings are stored on this device only. Set VITE_LEADERBOARD_URL to go worldwide."
+        : "Rankings are stored locally. Fly well to climb the leaderboard!"
     }</p>
   `;
 }
@@ -931,7 +931,7 @@ function renderLive(s: HudSnapshot): string {
     <div class="vs-stage" aria-label="You versus the featured rivals">
       <div class="vs-you"><span class="vs-bird">🐦</span><b>YOU</b><span class="vs-sub">${s.rival.divisionIcon} ${s.rival.division} · ${s.rival.rating}</span></div>
       <div class="vs-mark">VS</div>
-      <div class="vs-foes">${featured.map((r) => `<div class="vs-foe"><span class="vs-bird">🐤</span><b>${escapeHtml(r.name)}</b><span class="vs-sub">${escapeHtml(r.tag)} · simulated</span></div>`).join("")}</div>
+      <div class="vs-foes">${featured.map((r) => `<div class="vs-foe"><span class="vs-bird">🐤</span><b>${escapeHtml(r.name)}</b><span class="vs-sub">${escapeHtml(r.tag)}</span></div>`).join("")}</div>
     </div>
 
     <div class="lobby-rules">
@@ -973,7 +973,7 @@ function renderLive(s: HudSnapshot): string {
     <p class="fineprint">${
       s.multiplayerLive
         ? "Connected to the configured race server. Finish order is decided server-side."
-        : "Practice field: rivals are simulated locally on identical physics and a shared seed. Set VITE_MULTIPLAYER_URL for real players — see LEADERBOARD_API.md."
+        : "Race against AI pilots on today's hills. Each pilot flies the same terrain with unique skill levels."
     }</p>
   `;
 }
@@ -982,7 +982,7 @@ function renderRank(s: HudSnapshot): string {
   const r = s.rival;
   const wl = r.wins + r.losses > 0 ? Math.round((r.wins / (r.wins + r.losses)) * 100) : 0;
   return `
-    ${head("Rival Rank", "back", `<span class="pill">● On-device</span>`)}
+    ${head("Rival Rank", "back", `<span class="pill">● Local</span>`)}
     <div class="rank-hero">
       <div class="rank-div-big">${r.divisionIcon}</div>
       <div class="rank-hero-num">${r.rating}</div>
@@ -1009,7 +1009,7 @@ function renderRank(s: HudSnapshot): string {
         : `<p class="fineprint">No ranked races yet. Your first 40-bird finish sets the tone.</p>`
     }
     <button class="primary-btn race40 hero" data-ui data-action="pvp-ranked"><span class="hero-label">⚔ RACE RANKED</span><span class="hero-hint">climb or defend ${r.division}</span></button>
-    <p class="fineprint">Rival rating lives on this device and moves only with ranked 40-bird finishes. No server rank exists in this build.</p>
+    <p class="fineprint">Your rating changes based on how you finish in ranked 40-bird races. Climb divisions to prove your skill!</p>
   `;
 }
 
@@ -1166,9 +1166,9 @@ function renderMain(s: HudSnapshot): string {
     </div>
     ${seedPicker}
 
-    <button class="primary-btn fly-cta pvp-hero" data-ui data-action="pvp-ranked">
-      <span class="fly-label">⚔&nbsp;PLAY&nbsp;PVP</span>
-      <span class="fly-sub">40-bird field · first across the gate wins</span>
+    <button class="primary-btn fly-cta" data-ui data-action="pvp-practice">
+      <span class="fly-label">☀&nbsp;FLY</span>
+      <span class="fly-sub">HOLD to dive · RELEASE to soar</span>
     </button>
 
     <button class="rank-card" data-ui data-action="open-rank" aria-label="View Rival rank">
@@ -1335,7 +1335,7 @@ function renderPaywall(s: HudSnapshot): string {
     <div class="redeem"><input data-ui data-ref="redeem" placeholder="Promo code" maxlength="16" autocomplete="off" /><button class="mini-btn" data-ui data-action="redeem">Redeem</button></div>
     <button class="ghost-btn" data-ui data-action="restore">Restore purchase</button>
     ${s.restoreMessage ? `<p class="note">${s.restoreMessage}</p>` : ""}
-    <p class="fineprint">${stripeGold ? "Payments are processed securely by Stripe." : "Demo storefront — nothing is charged."} Set <code>VITE_STRIPE_GOLD_LINK</code> / <code>VITE_STRIPE_VIP_LINK</code> to go live with real Stripe Payment Links — see .env.example.</p>
+    <p class="fineprint">${stripeGold ? "Payments are processed securely by Stripe." : "Unlock premium features to enhance your flights!"}</p>
   `;
 }
 
@@ -1499,7 +1499,7 @@ function renderAccount(s: HudSnapshot): string {
       <button class="mini-btn" data-ui data-action="import-cloud">Import</button>
       ${s.cloudMessage ? `<p class="note">${s.cloudMessage}</p>` : ""}
     </div>
-    <p class="fineprint">Cloud save codes are generated on this device — hook up a real account backend to sync automatically.</p>
+    <p class="fineprint">Copy your save code to transfer progress between devices.</p>
   `;
 }
 
