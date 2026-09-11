@@ -327,6 +327,8 @@ export class HUD {
             <div class="stat-sub">best <span data-ref="best">0</span></div>
           </div>
         </div>
+        <div class="position-badge" data-ref="positionBadge">1<span class="pos-suffix">st</span></div>
+        <div class="race-progress" data-ref="raceProgress"><div class="race-progress-fill" data-ref="raceProgressFill" style="width:10%"></div><div class="race-progress-dot you" style="left:10%"></div><div class="race-progress-dot leader" style="left:85%"></div><span class="race-progress-finish">🏁</span></div>
         <div class="speedlines" data-ref="speedlines"></div>
         <div class="alt-gauge" data-ref="altGauge">
           <div class="alt-track">
@@ -389,6 +391,9 @@ export class HUD {
 
       <div class="toasts" data-ref="toasts"></div>
       <div class="flash" data-ref="flash"></div>
+      <div class="victory-banner hidden" data-ref="victoryBanner"><div class="victory-text" data-ref="victoryText"></div></div>
+      <div class="matchmaking hidden" data-ref="matchmaking"><div class="matchmaking-spinner"></div><div class="matchmaking-count" data-ref="matchmakingCount">0/40</div><div class="matchmaking-label">Finding rivals...</div></div>
+      <div class="vs-screen hidden" data-ref="vsScreen"><div class="vs-title">VS</div><div class="vs-players"><div class="vs-player"><div class="vs-player-name" data-ref="vsP1">You</div></div><div class="vs-player"><div class="vs-player-name" data-ref="vsP2">Rival</div></div></div></div>
     `;
     parent.appendChild(this.root);
     this.bind();
