@@ -1,11 +1,10 @@
 /**
  * @deprecated EXPERIMENTAL NODE PROTOTYPE — NOT FOR PRODUCTION.
  *
- * The self-hostable production backend now lives in `rust/` (the
- * `sunbird-server` crate serves this exact simple protocol on `GET /ws`),
- * with `backend/` (Cloudflare Workers + Durable Objects) as the managed
- * alternative. This file remains only as a plain-Node protocol reference;
- * it is not part of any deployment artifact.
+ * The self-hostable production backend lives in `rust/` (the
+ * `sunbird-server` crate serves this exact simple protocol on `GET /ws`).
+ * This file remains only as a plain-Node protocol reference and in-memory
+ * leaderboard reference; it is not part of any deployment artifact.
  *
  *   npm i ws
  *   node server/sunbird-server.mjs

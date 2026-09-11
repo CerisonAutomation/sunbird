@@ -14,17 +14,19 @@ vercel deploy --prod
 immutable icon caching, `no-cache` on `sw.js`, and security headers.
 No serverless functions needed — the game is fully static.
 
-**Multiplayer on Vercel:** deploy the Workers backend separately (it cannot
-run on Vercel — it needs Durable Objects):
+**Multiplayer on Vercel:** the static frontend cannot host the WebSocket room
+server, so run the Rust `sunbird-server` on any WebSocket-capable host (a
+small VPS, Fly.io, Railway, etc.):
 
 ```bash
-cd backend && npx wrangler deploy
+cargo build --release -p sunbird-server
+./target/release/sunbird-server   # serves GET /ws on :8080
 ```
 
 Then set the env var in the Vercel project settings:
 
 ```
-VITE_MULTIPLAYER_URL=wss://sunbird-mp.<your-account>.workers.dev
+VITE_MULTIPLAYER_URL=wss://mp.example.com
 ```
 
 and redeploy. Without it the game runs in solo/practice mode with local

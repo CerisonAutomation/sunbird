@@ -21,7 +21,7 @@ tokens, room registry, and a WebSocket transport for live rooms.
 | `GET /v1/degrade` | capability gate for the browser |
 | `GET /v1/rooms` | ops snapshot: rooms/seats/started counts |
 | `GET /v1/ws` | WebSocket — protocol v1 join/leave/ready/heartbeat/reconnect |
-| `GET /ws` | WebSocket — legacy simple protocol (`state`/`emote`/`ready`/`finish`), the self-hostable replacement for the Cloudflare Workers backend and `server/sunbird-server.mjs` |
+| `GET /ws` | WebSocket — legacy simple protocol (`state`/`emote`/`ready`/`finish`), the self-hostable room server the browser ships with |
 
 ## Room semantics
 

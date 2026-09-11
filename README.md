@@ -11,8 +11,8 @@
 - **Bundler** — Vite 7 + Tailwind CSS v4
 - **Physics** — Fixed-step client simulation with skill-based launch windows
 - **Payments** — Stripe Payment Links (no backend required); portal builds strip all payment surfaces
-- **Multiplayer** — Cloudflare Workers + Durable Objects room server ([backend/](./backend/)) with server-authoritative finish order
-- **Leaderboard** — On-device fallback + optional Workers backend ([LEADERBOARD_API.md](./LEADERBOARD_API.md))
+- **Multiplayer** — Self-hosted Rust room server ([rust/](./rust/)) with server-authoritative finish order
+- **Leaderboard** — On-device fallback + optional HTTP backend ([LEADERBOARD_API.md](./LEADERBOARD_API.md))
 - **PWA** — Service worker (build-stamped cache) + Web App Manifest
 
 ## Quick Start
@@ -20,10 +20,10 @@
 ```bash
 npm ci
 npm run dev            # game on :5173
-cd backend && npm ci && npx wrangler dev   # optional: multiplayer rooms on :8787
+cargo run --release -p sunbird-server   # optional: multiplayer rooms on :8080
 ```
 
-Open `http://localhost:5173`. The dev server proxies `/mp` to the room server.
+Open `http://localhost:5173`. The dev server proxies `/mp` to the Rust room server.
 
 ## Environment Variables
 
@@ -52,15 +52,15 @@ Copy `.env.example` → `.env.local`. All variables are optional — the game ru
 | `npm run typecheck` | TypeScript type-check without emit |
 | `npm test` | Run Vitest unit tests |
 | `npm run verify` | typecheck + test + build |
-| `npm run lint` | ESLint over src, scripts, backend |
-| `npm run test:mp` | Two-client multiplayer smoke test (needs backend running) |
+| `npm run lint` | ESLint over src, scripts |
+| `npm run test:mp` | Two-client multiplayer smoke test (needs the room server running) |
 | `npm run physcheck` | Physics determinism harness |
 | `npm run gen-icons` | Regenerate PWA icons |
 
 ## Deployment
 
 - **Frontend** — Vercel: `vercel deploy --prod` (config in `vercel.json`). See [DEPLOY.md](./DEPLOY.md).
-- **Backend** — Cloudflare Workers: `cd backend && npx wrangler deploy`. Free-tier friendly (WebSocket hibernation; rooms cost nothing while empty).
+- **Backend** — Self-hosted Rust: `cargo build --release -p sunbird-server`. In-memory rooms cost nothing while empty. See [rust/README.md](./rust/README.md).
 - **Portals** — `npm run build:portals` produces submission-ready zips for Poki, CrazyGames, and 10+ generic HTML5 portals. Compliance matrix in [PORTAL_PUBLISHING.md](./PORTAL_PUBLISHING.md).
 
 ## Game Systems

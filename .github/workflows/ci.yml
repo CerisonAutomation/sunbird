@@ -42,20 +42,6 @@ jobs:
           path: dist/
           retention-days: 14
 
-  backend:
-    name: Backend typecheck
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-        working-directory: backend
-      - run: npx tsc --noEmit
-        working-directory: backend
-
   build-itch:
     name: Build (itch.io single-file)
     runs-on: ubuntu-latest

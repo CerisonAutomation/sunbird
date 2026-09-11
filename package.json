@@ -20,7 +20,7 @@
     "build:vercel": "vite build",
     "gen-icons": "node scripts/gen-icons.mjs",
     "physcheck": "npx tsx scripts/physcheck.ts",
-    "lint": "eslint src scripts backend/src --max-warnings 0"
+    "lint": "eslint src scripts --max-warnings 0"
   },
   "dependencies": {
     "@stripe/stripe-js": "^9.15.0",

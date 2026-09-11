@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * Multiplayer smoke test: two real WebSocket clients join the same public
- * Durable Object room (via the vite /mp proxy or a direct worker URL) and
- * must see each other + exchange live state frames within 4 seconds.
+ * room (via the vite /mp proxy, backed by the Rust `sunbird-server` on /ws)
+ * and must see each other + exchange live state frames within 4 seconds.
  *
  *   node scripts/mp-smoke.mjs [ws://localhost:5173/mp]
  */
