@@ -532,6 +532,7 @@ export class Game {
   private frame(now: number): void {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.loop);
+    try {
     const raw = Math.min(0.1, (now - this.last) / 1000);
     this.last = now;
     if (this.hidden) return;
@@ -625,6 +626,9 @@ export class Game {
     this.input.pollGamepads();
     this.render(simDt, raw);
     this.pushHud();
+    } catch (err) {
+      console.error("Sunbird frame error:", err);
+    }
   }
 
   private menuTick(dt: number): void {

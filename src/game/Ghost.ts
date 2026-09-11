@@ -31,10 +31,30 @@ export class GhostRecorder {
     const record: GhostRecord = { seed, distance, samples: this.samples };
     try {
       localStorage.setItem(KEY_PREFIX + seed, JSON.stringify(record));
+      // Evict old ghosts to prevent localStorage quota exhaustion.
+      GhostRecorder.evictOld();
     } catch {
       /* quota */
     }
+    this.samples = [];
     return true;
+  }
+
+  /** Remove ghosts older than 30 days, keeping the 10 most recent. */
+  private static evictOld(): void {
+    const cutoff = Date.now() - 30 * 86_400_000;
+    const entries: { key: string; ts: number }[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(KEY_PREFIX)) {
+        const ts = parseInt(key.slice(KEY_PREFIX.length), 10) || 0;
+        entries.push({ key, ts });
+      }
+    }
+    entries.sort((a, b) => b.ts - a.ts);
+    for (let i = 10; i < entries.length; i++) {
+      if (entries[i]!.ts < cutoff) localStorage.removeItem(entries[i]!.key);
+    }
   }
 
   static load(seed: string): GhostRecord | null {
@@ -46,7 +66,7 @@ export class GhostRecorder {
       return {
         seed,
         distance: Number(parsed.distance) || 0,
-        samples: parsed.samples as Sample[],
+        samples: (parsed.samples as Sample[]).slice(0, GHOST_MAX_SAMPLES),
       };
     } catch {
       return null;

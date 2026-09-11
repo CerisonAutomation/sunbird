@@ -1,5 +1,61 @@
-import { useEffect, useRef, useState } from "react";
+import { Component, type ErrorInfo, type ReactNode, useEffect, useRef, useState } from "react";
 import { Game } from "./game/Game";
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
+  state = { error: null as string | null };
+
+  static getDerivedStateFromError(error: Error): { error: string } {
+    return { error: error.message };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo): void {
+    console.error("Sunbird error boundary:", error, info.componentStack);
+  }
+
+  render(): ReactNode {
+    if (this.state.error) {
+      return (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            display: "grid",
+            placeItems: "center",
+            background: "#1a1430",
+            color: "#fff6e8",
+            fontFamily: "sans-serif",
+            padding: 24,
+            textAlign: "center",
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 42, marginBottom: 8 }}>🌤</div>
+            <h1 style={{ margin: "0 0 8px", fontSize: 22 }}>Something went wrong</h1>
+            <p style={{ opacity: 0.7, fontSize: 14, maxWidth: 420, margin: "0 auto 16px" }}>
+              {this.state.error}
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                font: "inherit",
+                border: "none",
+                borderRadius: 12,
+                padding: "10px 18px",
+                background: "#ff7a45",
+                color: "#fff",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Try again
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export default function App() {
   const ref = useRef<HTMLDivElement>(null);
@@ -71,5 +127,9 @@ export default function App() {
     );
   }
 
-  return <div ref={ref} className="game-root" />;
+  return (
+    <ErrorBoundary>
+      <div ref={ref} className="game-root" />
+    </ErrorBoundary>
+  );
 }

@@ -522,7 +522,7 @@ export class HUD {
   }
 
   readValue(ref: string): string {
-    const el = this.root.querySelector(`[data-ref="${ref}"]`) as HTMLInputElement | HTMLTextAreaElement | null;
+    const el = this.root.querySelector(`[data-ref="${CSS.escape(ref)}"]`) as HTMLInputElement | HTMLTextAreaElement | null;
     return el?.value ?? "";
   }
 
@@ -621,7 +621,7 @@ export class HUD {
         this.powerStrip.innerHTML = s.powers
           .map(
             (p) =>
-              `<span class="pu" title="${p.label}"><i>${p.icon}</i><b style="width:${Math.max(0, Math.min(1, p.time / p.total)) * 100}%"></b><u>${Math.ceil(p.time)}</u></span>`,
+              `<span class="pu" title="${escapeHtml(p.label)}"><i>${escapeHtml(p.icon)}</i><b style="width:${Math.max(0, Math.min(1, p.time / p.total)) * 100}%"></b><u>${Math.ceil(p.time)}</u></span>`,
           )
           .join("");
       }
@@ -829,7 +829,11 @@ export class HUD {
     window.setTimeout(() => this.flashEl.classList.remove("show"), 280);
   }
 
+  private resizeObs: ResizeObserver | null = null;
+
   dispose(): void {
+    this.resizeObs?.disconnect();
+    this.menuSky.dispose();
     this.root.remove();
   }
 
@@ -915,7 +919,8 @@ export class HUD {
     // Hero-bird overlay: appended last so the sunbird swoops over the card.
     this.menuEl.appendChild(this.menuSky.heroHost);
     if (typeof ResizeObserver !== "undefined") {
-      new ResizeObserver(() => this.menuSky.resize(this.menuEl.clientWidth, this.menuEl.clientHeight)).observe(this.menuEl);
+      this.resizeObs = new ResizeObserver(() => this.menuSky.resize(this.menuEl.clientWidth, this.menuEl.clientHeight));
+      this.resizeObs.observe(this.menuEl);
     }
     this.menuCard = grab("menuCard");
     this.pauseEl = grab("pause");

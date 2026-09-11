@@ -151,7 +151,9 @@ const DEFAULT_SETTINGS: Settings = {
 };
 
 function makeDeviceId(): string {
-  return `d${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  return `d${Date.now().toString(36)}${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
 }
 
 function codeFromId(id: string): string {
@@ -868,7 +870,12 @@ export class SaveData {
       const json = decodeURIComponent(escape(atob(code.trim())));
       const parsed = JSON.parse(json) as Partial<SaveState>;
       if (typeof parsed !== "object" || parsed === null || !("deviceId" in parsed)) return false;
-      localStorage.setItem(SAVE_KEY, JSON.stringify(parsed));
+      // Whitelist only known fields to prevent injection of arbitrary keys.
+      const allowed: Record<string, unknown> = {};
+      for (const k of Object.keys(defaults())) {
+        if (k in parsed) (allowed as Record<string, unknown>)[k] = (parsed as Record<string, unknown>)[k];
+      }
+      localStorage.setItem(SAVE_KEY, JSON.stringify(allowed));
       this.state = this.load();
       return true;
     } catch {

@@ -112,7 +112,6 @@ export class Bird {
     this.lidMat = new THREE.MeshLambertMaterial({ color: 0xff7a45 });
 
     this.squash.add(this.makeBody());
-    this.root.add(this.squash);
 
     this.lidL = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), this.lidMat);
     this.lidR = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), this.lidMat);
