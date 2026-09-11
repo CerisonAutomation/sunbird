@@ -244,8 +244,11 @@ export class GameAudio {
   }
 
   sleep(): void {
-    this.tone(392, 0.35, "sine", 0.09, 196);
-    this.tone(329.63, 0.5, "triangle", 0.06, 164.81);
+    // A real sting, not a shrug: falling minor line over a low drone.
+    this.tone(392, 0.4, "sine", 0.1, 196);
+    this.tone(329.63, 0.55, "triangle", 0.07, 164.81);
+    this.tone(98, 1.4, "sine", 0.07, 92);
+    this.tone(311.13, 0.8, "sine", 0.05, 155.56);
   }
 
   island(): void {

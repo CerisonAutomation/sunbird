@@ -3942,3 +3942,31 @@ button:focus-visible, .toggle:focus-visible {
   font-weight: 800;
 }
 .menu-hero-layer.hidden { opacity: 0; visibility: hidden; }
+
+/* Rematch stands out from the soft buttons — it is the retention seam. */
+.soft-btn.rematch {
+  background: linear-gradient(135deg, #3a7bd5, #5a9be8);
+  color: #fff;
+  border-color: transparent;
+}
+
+/* Incoming rival challenge: persistent, impossible to miss, zero taps. */
+.rival-banner {
+  margin: 10px auto 2px;
+  max-width: 340px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #fff0e0, #ffe2c4);
+  border: 1.5px solid #e8a020;
+  color: #7a4a10;
+  font-size: 14px;
+  line-height: 1.35;
+  box-shadow: 0 4px 14px rgba(232, 160, 32, 0.25);
+  animation: rivalPulse 2.4s ease-in-out infinite;
+}
+@keyframes rivalPulse {
+  50% { box-shadow: 0 4px 22px rgba(232, 160, 32, 0.45); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rival-banner { animation: none; }
+}

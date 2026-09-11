@@ -108,6 +108,8 @@ export type HudSnapshot = {
   adTotal: number;
   adReason: "continue" | "interstitial";
   seedLabel: string;
+  /** Active incoming rival challenge: "name|distance", or "" when none. */
+  rivalBanner: string;
   seedMode: SeedMode;
   wallet: number;
   streakDays: number;
@@ -1542,6 +1544,7 @@ function renderMain(s: HudSnapshot): string {
     <div class="hero-meta">
       <span class="pill seed-pill">${s.seedLabel}</span>
     </div>
+    ${s.rivalBanner ? renderRivalBanner(s.rivalBanner) : ""}
     ${seedPicker}
 
     <!-- MAIN PLAY MODES: 1P · PVP · PVE · TOURNAMENT -->
@@ -1723,6 +1726,11 @@ function renderSkinCard(v: SkinView, portal = false): string {
   return `<div class="skin-card r-${rarity.key} ${v.equipped ? "equipped" : ""} ${v.owned ? "owned" : ""}">
     <span class="rarity">${rarity.label}</span>${swatch}
     <div class="sk-name">${d.name}</div><div class="sk-perk">${d.perk}</div>${skinStatBars(d)}${action}</div>`;
+}
+
+function renderRivalBanner(banner: string): string {
+  const [name, dist] = banner.split("|");
+  return `<div class="rival-banner">🥊 <b>${escapeHtml(name)}</b> challenged you — beat <b>${escapeHtml(dist)} m</b> on their hills. Hold to fly.</div>`;
 }
 
 function renderBoostRow(v: BoostView, wallet: number): string {
@@ -2059,6 +2067,8 @@ function renderGameOver(s: HudSnapshot): string {
     ${raceStrip}
     <div class="reached-strip">Reached <b>${s.biomeEmoji} ${s.biomeName}</b> · Island ${s.island + 1}</div>
     <button class="play-again-btn" data-ui data-action="retry">✈ FLY AGAIN</button>
+    ${s.massRace && s.racePlace > 0 ? `<button class="soft-btn wide rematch" data-ui data-action="rematch">🔁 Rematch — same stakes</button>` : ""}
+    <button class="soft-btn wide" data-ui data-action="throw-challenge">🥊 Challenge a rival on these hills</button>
     <button class="soft-btn wide" data-ui data-action="share" ${s.shareBusy ? "disabled" : ""}>${s.shareBusy ? "Preparing…" : "📤 Share this flight"}</button>
     <div class="btn-row">
       <button class="soft-btn" data-ui data-action="open-shop">🛍 Shop</button>

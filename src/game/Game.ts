@@ -83,6 +83,7 @@ import {
 import { SaveData } from "./SaveData";
 import { SeasonPass, seasonId, seasonLabel, XP_RULES } from "./SeasonPass";
 import { buildShareCard, shareOrDownload } from "./Social";
+import { buildChallengeUrl, readChallengeFromUrl, type RivalChallenge } from "./Challenge";
 import { initPlatform, isPortalBuild, portalTarget, type PlatformAdapter } from "../sdk/platform";
 import { LivingBackground } from "./LivingBackground";
 import { Sky } from "./Sky";
@@ -236,6 +237,8 @@ export class Game {
   private mmDeadline = 0;
   /** Deferred launch options for when the search resolves. */
   private mmOpts: { ranked: boolean; storm: boolean } | null = null;
+  /** The last launched match's options — powers the one-tap Rematch button. */
+  private lastMatchOpts: { ranked: boolean; storm: boolean } | null = null;
   /** Stormfront mode: PvE hazards×PvP race hybrid — everyone flies the gauntlet. */
   private stormfront = false;
   /** True once the DO's official finish place has been folded in this race. */
@@ -247,6 +250,9 @@ export class Game {
   private challengeMods: ChallengeMods = NO_MODS;
   /** End-of-run outcome line for the challenge strip on the results card. */
   private challengeOutcome = "";
+  /** Incoming rival challenge (#rival= link): fly their seed, beat their mark. */
+  private rival: RivalChallenge | null = null;
+  private rivalResult: "" | "won" | "lost" = "";
   /** Weekly live event: current run flies under the event modifiers. */
   private eventRun = false;
   /** Squad (friends/clubs/chat) client + last action notice. */
@@ -388,6 +394,16 @@ export class Game {
     this.resetRun(true);
     this.camera.setIntro(1);
     this.audio.setMusicMode("menu");
+
+    // Rival links: #rival=seed.distance.name → same hills, their mark.
+    const rival = readChallengeFromUrl();
+    if (rival) {
+      this.rival = rival;
+      this.rebuildWorld(rival.seed);
+      this.seedMode = "random";
+      this.hud.toast(`🥊 ${rival.name} challenged you: beat ${rival.distance} m on their hills`, "quest");
+      this.telemetry.track("rival_received", { distance: rival.distance });
+    }
 
     this.onFocus = () => {
       if (this.checkoutWaiting && this.screen === "checkout") {
@@ -1594,6 +1610,11 @@ export class Game {
   private onDaylightOut(): void {
     this.bird.asleep = true;
     this.daylight = 0;
+    // Death drama: the sun wins in slow motion. Reuses the zenith slow-mo
+    // plumbing so time restores itself automatically.
+    this.timeScale = 0.35;
+    this.zenithTimer = 1.1;
+    this.camera.punch(0.5);
     this.audio.sleep();
     this.audio.setMusicMode("sleep");
     this.flash("sleep");
@@ -1689,6 +1710,24 @@ export class Game {
 
     // Daily challenge / weekly gauntlet resolution for flagged runs.
     this.challengeOutcome = "";
+    // Rival verdict first: same seed, straight distance comparison. Runs on
+    // ANY run flown on the rival's hills (the recipient shouldn't need to
+    // find a special mode — the link already set the world).
+    if (this.rival && this.seed === this.rival.seed && this.rivalResult === "") {
+      const won = stats.distance >= this.rival.distance;
+      this.rivalResult = won ? "won" : "lost";
+      if (won) {
+        const bounty = 150;
+        this.save.addCoins(bounty);
+        this.challengeOutcome = `🥊 Challenge won! Out-flew ${this.rival.name} (${this.rival.distance} m) · +${bounty} coins`;
+        this.hud.toast(this.challengeOutcome, "gold");
+        this.audio.island();
+      } else {
+        this.challengeOutcome = `🥊 ${this.rival.name} still leads — ${Math.round(stats.distance)} m of ${this.rival.distance} m`;
+        this.hud.toast("Their mark stands. Fly again.", "warn");
+      }
+      this.telemetry.track("rival_settled", { won });
+    }
     if (this.challengeRun === "daily") {
       const c = dailyChallenge(this.today);
       if (dailyDone(stats, c) && this.save.completeDaily(this.today)) {
@@ -2362,6 +2401,23 @@ export class Game {
       case "import-cloud":
         this.importCloud();
         break;
+      case "throw-challenge": {
+        // Challenge link: this exact seed + this run's distance. Every player
+        // becomes a course designer with a posted time.
+        const dist = Math.max(1, Math.round(this.lastRunDistance()));
+        const url = buildChallengeUrl(this.seed, dist, this.pilotName);
+        void navigator.clipboard
+          .writeText(`Beat ${dist} m on my hills → ${url}`)
+          .then(() => this.hud.toast("🥊 Challenge link copied — send it to a rival", "gold"))
+          .catch(() => this.hud.toast(url, "info"));
+        this.telemetry.track("rival_thrown", { distance: dist });
+        break;
+      }
+      case "rematch":
+        // Same stakes, zero menu round-trips — back through the honest
+        // search so live pilots can seat into the new field.
+        if (this.state === "gameover" && this.lastMatchOpts) this.beginMatchmaking(this.lastMatchOpts);
+        break;
       case "share":
         void this.shareRun();
         break;
@@ -2991,6 +3047,7 @@ export class Game {
   }
 
   private launchMatch(opts: { ranked: boolean; storm: boolean }): void {
+    this.lastMatchOpts = opts;
     this.modeId = "massrace";
     this.mode = modeById("massrace");
     this.rankedRace = opts.ranked;
@@ -3225,6 +3282,10 @@ export class Game {
     this.uiVersion += 1;
   }
 
+  private lastRunDistance(): number {
+    return Math.max(0, this.bird.x - this.startX);
+  }
+
   private runStats(): RunStats {
     return {
       clouds: this.runClouds,
@@ -3432,6 +3493,7 @@ export class Game {
       adTotal: this.ads.duration,
       adReason: this.adReason,
       seedLabel: this.seedLabel(),
+      rivalBanner: this.rival && this.rivalResult === "" ? `${this.rival.name}|${this.rival.distance}` : "",
       seedMode: this.seedMode,
       wallet: st.wallet,
       streakDays: st.streak.days,
