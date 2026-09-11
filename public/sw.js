@@ -1,4 +1,4 @@
-const CACHE = "sunbird-shell-v3";
+const CACHE = "sunbird-shell-v4";
 const PRECACHE = [
   "/",
   "/index.html",
@@ -8,6 +8,12 @@ const PRECACHE = [
   "/icons/apple-touch-icon.png",
   "/icons/favicon-32.png",
   "/icons/favicon-64.png",
+  "/fonts/fredoka-latin-500-normal.woff2",
+  "/fonts/fredoka-latin-600-normal.woff2",
+  "/fonts/fredoka-latin-700-normal.woff2",
+  "/fonts/atkinson-hyperlegible-latin-400-normal.woff2",
+  "/fonts/atkinson-hyperlegible-latin-400-italic.woff2",
+  "/fonts/atkinson-hyperlegible-latin-700-normal.woff2",
 ];
 
 self.addEventListener("install", (event) => {

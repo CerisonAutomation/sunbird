@@ -68,6 +68,8 @@ export type SaveState = {
   settings: Settings;
   quests: { date: string; claimed: string[] };
   streak: { last: string; days: number; claimedDate: string };
+  /** Collection ids whose completion bonus has been paid. */
+  claimedCollections: string[];
   redeemedCodes: string[];
   runsPlayed: number;
   lifetime: LifetimeStats;
@@ -168,6 +170,7 @@ function defaults(): SaveState {
     settings: { ...DEFAULT_SETTINGS },
     quests: { date: "", claimed: [] },
     streak: { last: "", days: 0, claimedDate: "" },
+    claimedCollections: [],
     redeemedCodes: [],
     runsPlayed: 0,
     lifetime: { distance: 0, coins: 0, zeniths: 0, ghostBeats: 0 },
@@ -338,6 +341,7 @@ export class SaveData {
         referralRedeemed: Boolean(p.referralRedeemed),
         farthestIsland: num(p.farthestIsland),
         biomesSeen: strArr(p.biomesSeen),
+        claimedCollections: strArr(p.claimedCollections),
         tutorialRuns: num(p.tutorialRuns),
         firstFlightDone: Boolean(p.firstFlightDone),
         skill: p.skill === undefined ? 0.25 : num(p.skill),

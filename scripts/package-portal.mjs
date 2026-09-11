@@ -30,6 +30,7 @@ const html = readFileSync(path.join(src, "index.html"), "utf8")
   .replace(/^\s*<link rel="manifest"[^>]*>\n?/m, "");
 writeFileSync(path.join(stage, "index.html"), html);
 cpSync(path.join(src, "icons"), path.join(stage, "icons"), { recursive: true });
+cpSync(path.join(src, "fonts"), path.join(stage, "fonts"), { recursive: true });
 const zip = `sunbird-${portal}.zip`;
 rmSync(zip, { force: true });
 execSync(`cd ${stage} && zip -qr ../${zip} .`);

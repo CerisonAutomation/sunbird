@@ -1670,9 +1670,10 @@ function renderSkinCollections(s: HudSnapshot): string {
       const skins = byId.get(c.id)!;
       const got = skins.filter((v) => v.owned).length;
       const complete = got === skins.length;
+      const bonus = 100 + skins.length * 25;
       return `<div class="collection ${complete ? "complete" : ""}">
         <div class="coll-head"><span class="coll-icon">${c.icon}</span><b>${c.name}</b>
-        <span class="coll-count">${complete ? "✓ complete" : `${got}/${skins.length}`}</span></div>
+        <span class="coll-count">${complete ? "✓ complete" : `${got}/${skins.length} · set bonus ● ${bonus}`}</span></div>
         <div class="skin-grid">${skins.map((v) => renderSkinCard(v, portal)).join("")}</div>
       </div>`;
     })

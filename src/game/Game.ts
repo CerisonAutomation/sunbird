@@ -62,7 +62,7 @@ import {
   ZENITH_DURATION,
   ZENITH_SLOWMO,
 } from "./constants";
-import { BOOSTS, GOLD, PROMO_CODES, SHOP_TRAILS, SKINS, VIP, dailyDealBoost, skinById, type BoostView, type ShopTrailView, type SkinDef, type SkinView } from "./Economy";
+import { BOOSTS, COLLECTIONS, GOLD, PROMO_CODES, SHOP_TRAILS, SKINS, VIP, dailyDealBoost, skinById, type BoostView, type ShopTrailView, type SkinDef, type SkinView } from "./Economy";
 import { GhostPlayer, GhostRecorder } from "./Ghost";
 import { HUD, type CalendarCard, type CheckoutMode, type DailyCard, type GauntletCard, type HudSnapshot, type LoadoutView, type RivalCard, type SeedMode, type UiScreen, type UiState } from "./HUD";
 import { divisionFor, duelOpponent, duelSkillFor, featuredRivals, nextDivision } from "./pvp";
@@ -2966,6 +2966,21 @@ export class Game {
     const tiers = this.cups.claimedTiers();
     if (tiers.includes("gold") || tiers.includes("diamond")) grant("champion", "Champion unlocked — gold cup claimed!");
     if (tiers.includes("diamond")) grant("legendary", "Legendary unlocked — diamond cup claimed!");
+
+    // Collection completion bonuses: finishing a themed set pays real coins,
+    // once per collection. The shop header shows progress toward each.
+    for (const c of COLLECTIONS) {
+      if (st.claimedCollections.includes(c.id)) continue;
+      const members = SKINS.filter((k) => (k.collection ?? "starter") === c.id);
+      if (members.length < 2) continue; // starter isn't a chase
+      if (!members.every((k) => st.ownedSkins.includes(k.id))) continue;
+      st.claimedCollections.push(c.id);
+      const bonus = 100 + members.length * 25;
+      this.save.addCoins(bonus);
+      this.save.persist();
+      this.hud.toast(`${c.icon} ${c.name} collection complete · +${bonus} coins`, "gold");
+      this.audio.fanfare();
+    }
   }
 
   private applyPrize(grant: PrizeGrant): void {
