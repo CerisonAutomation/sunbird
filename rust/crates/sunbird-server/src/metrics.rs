@@ -1,3 +1,9 @@
+use axum::{
+    http::{header, StatusCode},
+    response::{IntoResponse, Response},
+    routing::get,
+    Router,
+};
 use metrics::{counter, describe_counter, describe_gauge, gauge, histogram};
 use metrics_exporter_prometheus::PrometheusBuilder;
 use std::sync::OnceLock;
@@ -5,6 +11,24 @@ use std::sync::OnceLock;
 pub const TEXT_CONTENT_TYPE: &str = "text/plain; version=0.0.4; charset=utf-8";
 
 static RECORDER: OnceLock<metrics_exporter_prometheus::PrometheusHandle> = OnceLock::new();
+
+/// Standalone Prometheus scrape listener, bound to `SUNBIRD_METRICS_BIND_ADDR`
+/// when configured. Kept separate from the main service so ops metrics stay
+/// reachable even while the primary port is saturated.
+pub fn metrics_endpoint_app() -> Router {
+    Router::new().route("/metrics", get(metrics_handler))
+}
+
+async fn metrics_handler() -> Response {
+    match Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, TEXT_CONTENT_TYPE)
+        .body(render())
+    {
+        Ok(response) => response,
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
 
 pub fn install() -> metrics_exporter_prometheus::PrometheusHandle {
     if let Some(handle) = RECORDER.get() {
