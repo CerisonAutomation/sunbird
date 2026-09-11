@@ -13,7 +13,7 @@ import { dateSeed } from "./math";
  *    as if they were worldwide results.
  */
 
-const API = (import.meta.env.VITE_LEADERBOARD_URL ?? "").replace(/\/$/, "");
+const API = (import.meta.env.VITE_LEADERBOARD_URL ?? (import.meta.env.DEV ? "/mp" : "")).replace(/\/$/, "");
 const KEY = "sunbird.board.v1";
 const NAME_KEY = "sunbird.pilotname";
 

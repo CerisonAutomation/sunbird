@@ -437,7 +437,7 @@ export class HUD {
           <button data-ui data-action="emote" data-id="👋">👋</button>
           <button data-ui data-action="emote" data-id="🔥">🔥</button>
           <button data-ui data-action="emote" data-id="😂">😂</button>
-          <button data-ui data-action="emote" data-id="🫡">🫡</button>
+          <button data-ui data-action="emote" data-id="👋">👋</button>
           <button data-ui data-action="emote" data-id="😱">😱</button>
           <button data-ui data-action="emote" data-id="👑">👑</button>
           <button data-ui data-action="emote" data-id="💨">💨</button>
@@ -1065,9 +1065,9 @@ function renderLive(s: HudSnapshot): string {
   return `
     ${head("Race Lobby", "back", status)}
     <div class="vs-stage" aria-label="You versus the featured rivals">
-      <div class="vs-you"><span class="vs-bird">🐦</span><b>YOU</b><span class="vs-sub">${s.rival.divisionIcon} ${s.rival.division} · ${s.rival.rating}</span></div>
+      <div class="vs-you"><span class="vs-swatch" style="--body:#ff7a45;--wing:#ff9a62;--belly:#ffe6c4"><i class="w"></i><i class="b"></i><i class="e"></i></span><b>YOU</b><span class="vs-sub">${s.rival.divisionIcon} ${s.rival.division} · ${s.rival.rating}</span></div>
       <div class="vs-mark">VS</div>
-      <div class="vs-foes">${featured.map((r) => `<div class="vs-foe"><span class="vs-bird">🐤</span><b>${escapeHtml(r.name)}</b><span class="vs-sub">${escapeHtml(r.tag)}</span></div>`).join("")}</div>
+      <div class="vs-foes">${featured.map((r) => `<div class="vs-foe"><span class="vs-swatch" style="--body:#8a9bb0;--wing:#a8b8c8;--belly:#e8eef4"><i class="w"></i><i class="b"></i><i class="e"></i></span><b>${escapeHtml(r.name)}</b><span class="vs-sub">${escapeHtml(r.tag)}</span></div>`).join("")}</div>
     </div>
 
     <div class="lobby-rules">
@@ -1330,7 +1330,7 @@ function renderRank(s: HudSnapshot): string {
     <div class="rank-stats">
       <div><span>W–L</span><b>${r.wins}–${r.losses}</b></div>
       <div><span>Win rate</span><b>${wl}%</b></div>
-      <div><span>Streak</span><b>🔥${r.streak}</b></div>
+      <div><span>Streak</span><b class="streak-b ${r.streak > 0 ? "lit" : ""}"><svg viewBox="0 0 24 24" class="fl"><path d="M12 2C13 6 17 8 17 13a5 5 0 0 1-10 0c0-2 1-3.4 2-4.6 0 1.6.6 2.6 1.8 3 -.4-3.4 1.4-6.6 1.2-9.4z" fill="currentColor"/></svg>${r.streak}</b></div>
       <div><span>Best</span><b>×${r.bestStreak}</b></div>
     </div>
     <div class="section-title">Recent races <small>this device only</small></div>
@@ -1348,13 +1348,13 @@ function renderRank(s: HudSnapshot): string {
     <div class="section-title">Duels <small>ranked 1v1 · ±16 rating</small></div>
     <div class="duel-card">
       <div class="vs-stage slim">
-        <div class="vs-you"><span class="vs-bird">🐦</span><b>YOU</b><span class="vs-sub">${r.rating}</span></div>
+        <div class="vs-you"><span class="vs-swatch" style="--body:#ff7a45;--wing:#ff9a62;--belly:#ffe6c4"><i class="w"></i><i class="b"></i><i class="e"></i></span><b>YOU</b><span class="vs-sub">${r.rating}</span></div>
         <div class="vs-mark">VS</div>
-        <div class="vs-foes"><div class="vs-foe"><span class="vs-bird">🐤</span><b>${escapeHtml(s.duelFoe.name)}</b><span class="vs-sub">${escapeHtml(s.duelFoe.tag)} · ~${s.duelFoe.rating}</span></div></div>
+        <div class="vs-foes"><div class="vs-foe"><span class="vs-swatch" style="--body:#8a9bb0;--wing:#a8b8c8;--belly:#e8eef4"><i class="w"></i><i class="b"></i><i class="e"></i></span><b>${escapeHtml(s.duelFoe.name)}</b><span class="vs-sub">${escapeHtml(s.duelFoe.tag)} · ~${s.duelFoe.rating}</span></div></div>
       </div>
       <div class="rank-stats">
         <div><span>Duel W–L</span><b>${s.duel.wins}–${s.duel.losses}</b></div>
-        <div><span>Streak</span><b>🔥${s.duel.streak}</b></div>
+        <div><span>Streak</span><b class="streak-b ${s.duel.streak > 0 ? "lit" : ""}"><svg viewBox="0 0 24 24" class="fl"><path d="M12 2C13 6 17 8 17 13a5 5 0 0 1-10 0c0-2 1-3.4 2-4.6 0 1.6.6 2.6 1.8 3 -.4-3.4 1.4-6.6 1.2-9.4z" fill="currentColor"/></svg>${s.duel.streak}</b></div>
         <div><span>Best</span><b>×${s.duel.bestStreak}</b></div>
         <div><span>Prize</span><b>${s.duel.wins >= 10 ? "🪶 won" : `${s.duel.wins}/10`}</b></div>
       </div>
@@ -1588,8 +1588,8 @@ function renderMain(s: HudSnapshot): string {
       <button class="nav-btn" data-ui data-action="open-live"><i>🐦</i><span>Race</span></button>
       <button class="nav-btn" data-ui data-action="open-board"><i>🌍</i><span>Board</span></button>
       <button class="nav-btn" data-ui data-action="open-cups"><i>🏆</i><span>Cups</span></button>
-      <button class="nav-btn" data-ui data-action="open-shop"><i>🛍</i><span>Shop</span></button>
-      <button class="nav-btn" data-ui data-action="open-pass"><i>🎟</i><span>Pass ${s.season.tier}</span></button>
+      <button class="nav-btn" data-ui data-action="open-shop"><i><svg viewBox="0 0 24 24" class="ti"><path d="M6 8h12l-1.2 12H7.2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 8V6a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="2"/></svg></i><span>Shop</span></button>
+      <button class="nav-btn" data-ui data-action="open-pass"><i><svg viewBox="0 0 24 24" class="ti"><path d="M4 9a2 2 0 0 0 0 6v3h16v-3a2 2 0 0 1 0-6V6H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><line x1="14" y1="6" x2="14" y2="18" stroke="currentColor" stroke-width="2" stroke-dasharray="2 2.4"/></svg></i><span>Pass ${s.season.tier}</span></button>
       <button class="nav-btn" data-ui data-action="open-trophies"><i>🏅</i><span>${s.trophyCounts.unlocked}/${s.trophyCounts.total}</span></button>
       <button class="nav-btn" data-ui data-action="open-rank"><i>⚔</i><span>Rank</span></button>
       <button class="nav-btn" data-ui data-action="open-campaign"><i>🧭</i><span>Story ${s.campaignDone}/${s.campaignTotal}</span></button>
@@ -1602,11 +1602,11 @@ function renderMain(s: HudSnapshot): string {
 
     <!-- Bottom Tab Navigation (Popular Game Pattern) -->
     <nav class="bottom-tabs" data-ref="bottomTabs">
-      <button class="tab-item active" data-ui data-action="pvp-practice"><span class="tab-icon">☀</span><span class="tab-label">Fly</span></button>
-      <button class="tab-item" data-ui data-action="open-rank"><span class="tab-icon">⚔</span><span class="tab-label">Rank</span></button>
-      <button class="tab-item" data-ui data-action="open-shop"><span class="tab-icon">🛍</span><span class="tab-label">Shop</span></button>
-      <button class="tab-item" data-ui data-action="open-pass"><span class="tab-icon">🎟</span><span class="tab-label">Pass</span></button>
-      <button class="tab-item" data-ui data-action="open-settings"><span class="tab-icon">⚙</span><span class="tab-label">More</span></button>
+      <button class="tab-item" data-ui data-action="open-rank"><span class="tab-icon"><svg viewBox="0 0 24 24" class="ti"><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="5" x2="17" y2="17"/><line x1="19" y1="5" x2="7" y2="17"/><line x1="15.5" y1="18.5" x2="18.5" y2="15.5"/><line x1="5.5" y1="15.5" x2="8.5" y2="18.5"/></g></svg></span><span class="tab-label">Rank</span></button>
+      <button class="tab-item" data-ui data-action="open-shop"><span class="tab-icon"><svg viewBox="0 0 24 24" class="ti"><path d="M6 8h12l-1.2 12H7.2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 8V6a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="2"/></svg></span><span class="tab-label">Shop</span></button>
+      <button class="tab-fly" data-ui data-action="pvp-practice" aria-label="Fly now"><span class="fly-disc"><svg viewBox="0 0 24 24" class="fi"><circle cx="12" cy="11" r="4.2" fill="currentColor"/><g stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="12" y1="2.5" x2="12" y2="5"/><line x1="12" y1="17" x2="12" y2="19.5"/><line x1="3.5" y1="11" x2="6" y2="11"/><line x1="18" y1="11" x2="20.5" y2="11"/><line x1="5.9" y1="4.9" x2="7.7" y2="6.7"/><line x1="16.3" y1="15.3" x2="18.1" y2="17.1"/><line x1="18.1" y1="4.9" x2="16.3" y2="6.7"/><line x1="7.7" y1="15.3" x2="5.9" y2="17.1"/></g></svg></span><span class="tab-label fly-label">Fly</span></button>
+      <button class="tab-item" data-ui data-action="open-pass"><span class="tab-icon"><svg viewBox="0 0 24 24" class="ti"><path d="M4 9a2 2 0 0 0 0 6v3h16v-3a2 2 0 0 1 0-6V6H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><line x1="14" y1="6" x2="14" y2="18" stroke="currentColor" stroke-width="2" stroke-dasharray="2 2.4"/></svg></span><span class="tab-label">Pass</span></button>
+      <button class="tab-item" data-ui data-action="open-settings"><span class="tab-icon"><svg viewBox="0 0 24 24" class="ti"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span><span class="tab-label">More</span></button>
     </nav>
 
     ${
@@ -1870,7 +1870,7 @@ function renderPass(s: HudSnapshot): string {
           return `<div class="tier-card ${t.unlocked ? "unlocked" : ""}">
             <div class="tier-num">Lv.${t.tier}</div>
             <button class="tier-reward free ${t.freeClaimed ? "claimed" : ""}" data-ui data-action="${canFree ? "claim-pass-free" : ""}" data-id="${t.tier}" ${canFree ? "" : "disabled"}>${rewardLabel(t.free)}</button>
-            <button class="tier-reward premium ${t.premiumClaimed ? "claimed" : ""} ${t.premiumLocked ? "locked" : ""}" data-ui data-action="${canPremium ? "claim-pass-premium" : ""}" data-id="${t.tier}" ${canPremium ? "" : "disabled"}>${t.premiumLocked ? "✦" : rewardLabel(t.premium)}</button>
+            <button class="tier-reward premium ${t.premiumClaimed ? "claimed" : ""} ${t.premiumLocked ? "locked" : ""}" data-ui data-action="${canPremium ? "claim-pass-premium" : ""}" data-id="${t.tier}" ${canPremium ? "" : "disabled"}>${rewardLabel(t.premium)}${t.premiumLocked ? `<i class="lock-badge">✦</i>` : ""}</button>
           </div>`;
         })
         .join("")}
@@ -2060,7 +2060,7 @@ function renderAd(s: HudSnapshot): string {
   return `
     <div class="ad-label">Sponsored break · ${s.adReason === "continue" ? "earning your second wind" : "between flights"}</div>
     <div class="ad-creative">
-      <div class="ad-logo">🪺</div>
+      <div class="ad-logo">☀️</div>
       <h3>Nest Deluxe</h3>
       <p>Sleep deeper. Fly farther. The premium nest for discerning sunbirds.</p>
       <span class="ad-cta">Learn more</span>

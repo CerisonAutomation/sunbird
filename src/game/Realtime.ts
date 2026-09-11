@@ -17,7 +17,10 @@ import { PROTOCOL_VERSION } from "./protocol/v1";
  *    which one you are in.
  */
 
-const URL_BASE = (import.meta.env.VITE_MULTIPLAYER_URL ?? "").trim();
+// Dev default: the vite /mp proxy is always present (vite.config.ts), so
+// local multiplayer Just Works without an env file. Production must opt in
+// via VITE_MULTIPLAYER_URL (portals ship with it explicitly emptied).
+const URL_BASE = (import.meta.env.VITE_MULTIPLAYER_URL ?? (import.meta.env.DEV ? "/mp" : "")).trim();
 
 /** Outbound state rate. 15 Hz is plenty given client-side interpolation. */
 const SEND_HZ = 15;

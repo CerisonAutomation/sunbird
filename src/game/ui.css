@@ -3376,3 +3376,63 @@ button {
 .hero { padding-top: 64px; }
 .hero-sun { opacity: 0.55; }
 @media (prefers-reduced-motion: reduce) { .hero-bird { animation: none; } }
+
+/* ---------- roast-fix: tofu-proof icons, swatches, pass clarity ---------- */
+.tab-icon .ti, .nav-btn i .ti { width: 20px; height: 20px; display: inline-block; vertical-align: -3px; }
+.vs-swatch {
+  position: relative;
+  display: inline-block;
+  width: 34px;
+  height: 26px;
+  margin-bottom: 4px;
+}
+.vs-swatch .b { position: absolute; inset: 4px 2px 2px 2px; border-radius: 60% 55% 50% 60%; background: var(--body); }
+.vs-swatch .w { position: absolute; top: 0; left: 8px; width: 16px; height: 12px; border-radius: 60% 80% 30% 70%; background: var(--wing); transform: rotate(-14deg); z-index: 1; }
+.vs-swatch .e { position: absolute; right: 3px; bottom: 4px; width: 9px; height: 8px; border-radius: 50%; background: var(--belly); }
+.streak-b { display: inline-flex; align-items: center; gap: 2px; }
+.streak-b .fl { width: 13px; height: 13px; color: #c9bcb2; }
+.streak-b.lit .fl { color: #ff7a2a; filter: drop-shadow(0 0 3px rgba(255, 140, 40, 0.6)); }
+.tier-reward.premium { position: relative; }
+.tier-reward.premium.locked { opacity: 0.75; }
+.tier-reward.premium .lock-badge {
+  position: absolute;
+  top: -5px;
+  right: -4px;
+  font-style: normal;
+  font-size: 10px;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  border-radius: 50%;
+  background: linear-gradient(120deg, #ffd76a, #ff9a4a);
+  color: #3a2410;
+  box-shadow: 0 1px 3px rgba(80, 40, 10, 0.35);
+}
+
+/* raised center Fly button in bottom tab bar */
+.tab-fly {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  margin-top: -22px;
+  padding: 0 10px 4px;
+}
+.tab-fly .fly-disc {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(140deg, #ffb03a, #ff6b3a);
+  box-shadow: 0 6px 16px rgba(230, 90, 30, 0.45), inset 0 -3px 0 rgba(150, 50, 10, 0.25), 0 0 0 4px rgba(255, 246, 232, 0.95);
+  transition: transform 0.12s;
+}
+.tab-fly:active .fly-disc { transform: scale(0.92); }
+.tab-fly .fi { width: 26px; height: 26px; }
+.tab-fly .fly-label { font-size: 10px; font-weight: 700; color: #ff6b4a; letter-spacing: 0.04em; }

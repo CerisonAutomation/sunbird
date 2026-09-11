@@ -1259,7 +1259,7 @@ export class Game {
         break;
       case "wingboost":
         this.particles.burstRing(x, y, 0xffa8e0);
-        this.hud.toast("Wing Boost 🪽 Super Lift", "power");
+        this.hud.toast("Wing Boost 🕊 Super Lift", "power");
         break;
       case "feather":
         this.particles.burstRing(x, y, 0xfff0c0);
