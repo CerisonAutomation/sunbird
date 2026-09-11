@@ -3920,3 +3920,24 @@ button:focus-visible, .toggle:focus-visible {
   transition: opacity 0.5s ease;
 }
 .menu-hero-layer.on { opacity: 1; }
+
+/* ---------- matchmaking search + stormfront ---------- */
+.matchmaking { gap: 12px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.mm-cancel { width: auto; padding: 8px 22px; margin-top: 6px; }
+.pvp-modes { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 460px) { .pvp-modes { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.pvp-mode.storm {
+  border-color: rgba(90, 110, 200, 0.55);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 60%),
+    linear-gradient(180deg, #e8ecff, #cdd6f6);
+  box-shadow: var(--elev-1), 0 0 14px -5px rgba(90, 110, 200, 0.55);
+}
+.storm-cta {
+  border-color: rgba(90, 110, 200, 0.5);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 55%),
+    linear-gradient(180deg, #e8ecff, #ccd5f4);
+  color: #33406e;
+  font-weight: 800;
+}

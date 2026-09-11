@@ -230,6 +230,14 @@ export class Game {
   private overtakeAcc = 0;
   /** Ranked 1v1 duel: one seeded opponent, flat ±16 rating swing. */
   private duelActive = false;
+  /** Matchmaking search deadline (wall-clock ms; 0 = not searching). Wall
+   *  clock, not frame dt — frame time is capped at 100 ms, so on slow
+   *  devices an accumulated-dt countdown runs slower than real time. */
+  private mmDeadline = 0;
+  /** Deferred launch options for when the search resolves. */
+  private mmOpts: { ranked: boolean; storm: boolean } | null = null;
+  /** Stormfront mode: PvE hazards×PvP race hybrid — everyone flies the gauntlet. */
+  private stormfront = false;
   private duelResult: "" | "won" | "lost" = "";
   private duelDelta = 0;
   /** Which challenge (if any) the current run is flying under. */
@@ -502,6 +510,7 @@ export class Game {
 
     this.handleHotkeys();
     this.pumpNetwork(raw);
+    this.pumpMatchmaking(raw);
     this.dayTick(raw);
     this.adaptQuality(raw);
     // Club chat: light polling only while the Squad screen is on screen.
@@ -1434,7 +1443,7 @@ export class Game {
 
   /* ------------------------------------------------------------- run flow */
 
-  private startRun(opts?: { duel?: boolean; challenge?: "" | "daily" | `gauntlet${number}`; event?: boolean }): void {
+  private startRun(opts?: { duel?: boolean; challenge?: "" | "daily" | `gauntlet${number}`; event?: boolean; storm?: boolean }): void {
     this.exitVersus();
     this.mode = modeById(this.modeId);
     // Duels and challenges only apply when their action explicitly asks for
@@ -1445,6 +1454,8 @@ export class Game {
     this.challengeRun = opts?.challenge ?? "";
     this.challengeMods = this.challengeRun === "daily" ? modsFor(dailyChallenge(this.today).modifier.id) : NO_MODS;
     this.eventRun = Boolean(opts?.event);
+    // Stormfront survives only through launchMatch(); any other entry resets.
+    if (!opts?.storm) this.stormfront = false;
     this.challengeOutcome = "";
     this.resetRun(false);
     // First ever flight: spin up the interactive dive/launch/soar coach.
@@ -1460,7 +1471,9 @@ export class Game {
       (this.mode.clock > 0 ? this.mode.clock : this.daylightMax()) *
       this.challengeMods.daylightMult *
       (this.eventRun ? weeklyEvent().mods.daylightMult : 1);
-    this.weather.windMult = this.eventRun ? weeklyEvent().mods.windMult : 1;
+    this.weather.windMult = (this.eventRun ? weeklyEvent().mods.windMult : 1) * (this.stormfront ? 1.7 : 1);
+    this.weather.stormfront = this.stormfront;
+    if (this.stormfront) this.hud.toast("⛈ STORMFRONT — same storm for every pilot. Survive and outfly.", "warn");
     // Mass Race: build the 40-bird grid on the *same* seed so the field is
     // identical for anyone flying this race. Real players take over slots as
     // they join; unfilled slots keep flying as local squadron pilots.
@@ -2076,11 +2089,13 @@ export class Game {
       }
       case "quick-match":
       case "pvp-ranked":
-        this.roomCode = "";
-        this.modeId = "massrace";
-        this.mode = modeById("massrace");
-        this.rankedRace = true;
-        this.startRun();
+        this.beginMatchmaking({ ranked: true, storm: false });
+        break;
+      case "pvp-storm":
+        this.beginMatchmaking({ ranked: true, storm: true });
+        break;
+      case "mm-cancel":
+        this.cancelMatchmaking();
         break;
       case "pvp-duel":
         this.roomCode = "";
@@ -2253,11 +2268,7 @@ export class Game {
         this.bump();
         break;
       case "pvp-casual":
-        this.roomCode = "";
-        this.modeId = "massrace";
-        this.mode = modeById("massrace");
-        this.rankedRace = false;
-        this.startRun();
+        this.beginMatchmaking({ ranked: false, storm: false });
         break;
       case "pvp-practice":
         this.exitVersus();
@@ -2900,6 +2911,71 @@ export class Game {
   }
 
   /* ------------------------------------------------------- live multiplayer */
+
+  /* ------------------------------------------------------- matchmaking */
+
+  /**
+   * Honest search phase (the pattern every live racer uses):
+   *  1. connect to the public room and WAIT — up to MM_WINDOW seconds;
+   *  2. if enough real pilots are seated, launch immediately;
+   *  3. on timeout, launch anyway — remaining slots backfill with
+   *     leaderboard ghosts + squadron pilots, clearly labeled.
+   * Cancelable at any moment; canceling never kicks you from the room.
+   */
+  private static readonly MM_WINDOW = 8;
+  private static readonly MM_LAUNCH_AT = 4; // enough humans → go now
+
+  private beginMatchmaking(opts: { ranked: boolean; storm: boolean }): void {
+    this.roomCode = "";
+    if (!isMultiplayerConfigured()) {
+      // No server configured: skip the theater, launch with bots honestly.
+      this.launchMatch(opts);
+      return;
+    }
+    this.mmOpts = opts;
+    this.mmDeadline = performance.now() + Game.MM_WINDOW * 1000;
+    this.preseatLobby();
+    this.hud.setMatchmaking(true, this.liveCount(), this.roomSize, Game.MM_WINDOW);
+    this.bump();
+  }
+
+  private cancelMatchmaking(): void {
+    this.mmDeadline = 0;
+    this.mmOpts = null;
+    this.hud.setMatchmaking(false, 0, this.roomSize, 0);
+    this.bump();
+  }
+
+  private liveCount(): number {
+    const info = this.net?.info();
+    return info && this.net?.connected ? Math.max(0, info.count - 1) : 0;
+  }
+
+  /** Called every frame while a search is active. */
+  private pumpMatchmaking(_raw: number): void {
+    if (this.mmDeadline <= 0 || !this.mmOpts) return;
+    const secsLeft = (this.mmDeadline - performance.now()) / 1000;
+    const live = this.liveCount();
+    this.hud.setMatchmaking(true, live, this.roomSize, Math.max(0, secsLeft));
+    const enough = live + 1 >= Math.min(Game.MM_LAUNCH_AT, this.roomSize + 1);
+    if (enough || secsLeft <= 0) {
+      const opts = this.mmOpts;
+      this.mmOpts = null;
+      this.mmDeadline = 0;
+      this.hud.setMatchmaking(false, live, this.roomSize, 0);
+      if (live > 0) this.hud.toast(`${live} live pilot${live === 1 ? "" : "s"} in the field`, "gold");
+      else this.hud.toast("No live pilots right now — flying player ghosts", "info");
+      this.launchMatch(opts);
+    }
+  }
+
+  private launchMatch(opts: { ranked: boolean; storm: boolean }): void {
+    this.modeId = "massrace";
+    this.mode = modeById("massrace");
+    this.rankedRace = opts.ranked;
+    this.stormfront = opts.storm;
+    this.startRun({ storm: opts.storm });
+  }
 
   /** Pre-seats the lobby so the Race screen shows live pilots immediately. */
   private preseatLobby(): void {

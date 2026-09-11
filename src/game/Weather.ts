@@ -28,6 +28,10 @@ export class Weather {
   stealth = false;
   /** Weekly-event wind multiplier (Storm Surge doubles gust push). */
   windMult = 1;
+  /** Stormfront Royale: every biome behaves like a storm biome — gusts fire
+   *  everywhere and ash clouds spawn on every island. Same seed → identical
+   *  gauntlet for the whole field. */
+  stormfront = false;
   inThermal = false;
   private readonly thermals: Thermal[] = [];
   private readonly storms: Storm[] = [];
@@ -121,7 +125,7 @@ export class Weather {
     this.wasInThermal = this.inThermal;
 
     // gusts
-    if (biome.hazard === "gust") {
+    if (biome.hazard === "gust" || this.stormfront) {
       this.gustTimer -= dt;
       if (this.gustPhase === "calm" && this.gustTimer <= 0) {
         this.gustPhase = "blowing";

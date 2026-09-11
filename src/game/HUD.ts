@@ -343,6 +343,9 @@ export class HUD {
   private raceDotLeader!: HTMLElement;
   private lastPlace = 0;
   private rosterBar!: HTMLElement;
+  private matchmakingEl!: HTMLElement;
+  private matchmakingCount!: HTMLElement;
+  private matchmakingLabel!: HTMLElement;
   private draftMeter!: HTMLElement;
   private finishCd!: HTMLElement;
   private lastFinishCd = "";
@@ -480,11 +483,22 @@ export class HUD {
       <div class="toasts" data-ref="toasts"></div>
       <div class="flash" data-ref="flash"></div>
       <div class="victory-banner hidden" data-ref="victoryBanner"><div class="victory-text" data-ref="victoryText"></div></div>
-      <div class="matchmaking hidden" data-ref="matchmaking"><div class="matchmaking-spinner"></div><div class="matchmaking-count" data-ref="matchmakingCount">0/40</div><div class="matchmaking-label">Finding rivals...</div></div>
+      <div class="matchmaking hidden" data-ref="matchmaking"><div class="matchmaking-spinner"></div><div class="matchmaking-count" data-ref="matchmakingCount">0 pilots</div><div class="matchmaking-label" data-ref="matchmakingLabel">Searching for live pilots…</div><button class="soft-btn mm-cancel" data-ui data-action="mm-cancel">Cancel</button></div>
       <div class="vs-screen hidden" data-ref="vsScreen"><div class="vs-title">VS</div><div class="vs-players"><div class="vs-player"><div class="vs-player-name" data-ref="vsP1">You</div></div><div class="vs-player"><div class="vs-player-name" data-ref="vsP2">Rival</div></div></div></div>
     `;
     parent.appendChild(this.root);
     this.bind();
+  }
+
+  /** Matchmaking overlay: live pilot count + honest countdown to backfill. */
+  setMatchmaking(on: boolean, live: number, _field: number, secsLeft: number): void {
+    this.matchmakingEl.classList.toggle("hidden", !on);
+    if (!on) return;
+    this.matchmakingCount.textContent = `${live} live pilot${live === 1 ? "" : "s"}`;
+    this.matchmakingLabel.textContent =
+      secsLeft > 0.5
+        ? `Searching… player ghosts fill the field in ${Math.ceil(secsLeft)}s`
+        : "Launching…";
   }
 
   onAction(handler: ActionHandler): void {
@@ -912,6 +926,9 @@ export class HUD {
     this.powerStrip = grab("powerStrip");
     this.countdownEl = grab("countdown");
     this.versusBar = grab("versusBar");
+    this.matchmakingEl = grab("matchmaking");
+    this.matchmakingCount = grab("matchmakingCount");
+    this.matchmakingLabel = grab("matchmakingLabel");
     this.goalStrip = grab("goalStrip");
     this.goalPop = grab("goalPop");
     this.standingsEl = grab("standings");
@@ -1100,6 +1117,7 @@ function renderLive(s: HudSnapshot): string {
 
     <button class="primary-btn race40 hero" data-ui data-action="quick-match"><span class="hero-label">⚡ START RACE</span><span class="hero-hint">ranked · rating on the line</span></button>
     <button class="soft-btn wide" data-ui data-action="pvp-casual">Casual start · no rating change</button>
+    <button class="soft-btn wide storm-cta" data-ui data-action="pvp-storm">⛈ Stormfront Royale · PvE storm × PvP race</button>
 
     <div class="race-grid">
       <div class="race-card">
@@ -1560,6 +1578,7 @@ function renderMain(s: HudSnapshot): string {
       <button class="pvp-mode rated" data-ui data-action="pvp-ranked"><i>🏆</i><b>Ranked 40</b><span>Rating moves</span></button>
       <button class="pvp-mode rated" data-ui data-action="pvp-duel"><i>⚔</i><b>Duel 1v1</b><span>±16 rating</span></button>
       <button class="pvp-mode" data-ui data-action="pvp-casual"><i>🐦</i><b>Casual 40</b><span>No rating</span></button>
+      <button class="pvp-mode storm" data-ui data-action="pvp-storm"><i>⛈</i><b>Stormfront</b><span>PvE × PvP</span></button>
       <button class="pvp-mode" data-ui data-action="versus"><i>👥</i><b>Local 2P</b><span>Same screen</span></button>
     </div>
 

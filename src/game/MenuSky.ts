@@ -25,9 +25,25 @@ type Flocker = {
   flapRate: number;
   drift: number;
   depth: number;
+  /** Body plumage — distant birds are tinted silhouettes, near ones show color. */
+  color: string;
+  belly: string;
 };
 
-const FLOCK_SIZE = 12;
+const FLOCK_SIZE = 18;
+
+/** Plumages drawn from the shop's actual skin palette — the flock reads as
+ *  other players' birds crossing the valley, not abstract chevrons. */
+const PLUMAGES: [string, string][] = [
+  ["#ff7a45", "#ffe6c4"], // sunbird
+  ["#4a90d8", "#d8ecff"], // kingfisher
+  ["#d84a5a", "#ffd8dc"], // cardinal
+  ["#3a3f4a", "#e8eef4"], // storm swift
+  ["#2fae6a", "#d8ffe8"], // lorikeet
+  ["#8a5ad8", "#e8d8ff"], // magpie violet
+  ["#e8a020", "#fff2d0"], // goldfinch
+  ["#e86aa8", "#ffe0ee"], // rose finch
+];
 const TRAIL_LEN = 16;
 
 export class MenuSky {
@@ -85,6 +101,7 @@ export class MenuSky {
 
     for (let i = 0; i < FLOCK_SIZE; i++) {
       const depth = i / (FLOCK_SIZE - 1);
+      const plumage = PLUMAGES[i % PLUMAGES.length]!;
       this.birds.push({
         x: Math.random(),
         y: 0.06 + depth * 0.34 + Math.random() * 0.16,
@@ -94,6 +111,8 @@ export class MenuSky {
         flapRate: 7 + Math.random() * 3.5,
         drift: 0.012 + Math.random() * 0.02,
         depth,
+        color: plumage[0],
+        belly: plumage[1],
       });
     }
   }
@@ -385,14 +404,36 @@ export class MenuSky {
     const y = bird.y * h + Math.sin(this.time * 0.9 + bird.flap * 0.15) * (h * 0.004);
     const size = 8 * bird.scale;
     const flap = Math.sin(bird.flap) * 0.7;
-    const shade = 0.42 + bird.depth * 0.3;
-    ctx.strokeStyle = `rgba(28, 42, 62, ${shade})`;
-    ctx.lineWidth = Math.max(1.2, size * 0.16);
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(x - size, y + flap * size * 0.42);
-    ctx.quadraticCurveTo(x - size * 0.4, y - size * 0.3, x, y);
-    ctx.quadraticCurveTo(x + size * 0.4, y - size * 0.3, x + size, y + flap * size * 0.42);
-    ctx.stroke();
+
+    // Near half of the flock: small colored bodies (other pilots' plumage).
+    // Far half: classic dark chevron silhouettes for depth.
+    if (bird.depth > 0.45) {
+      ctx.fillStyle = bird.color;
+      ctx.beginPath();
+      ctx.ellipse(x, y, size * 0.5, size * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = bird.belly;
+      ctx.beginPath();
+      ctx.ellipse(x + size * 0.1, y + size * 0.1, size * 0.26, size * 0.14, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = bird.color;
+      ctx.lineWidth = Math.max(1.4, size * 0.18);
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(x - size, y + flap * size * 0.42);
+      ctx.quadraticCurveTo(x - size * 0.4, y - size * 0.34, x, y - size * 0.08);
+      ctx.quadraticCurveTo(x + size * 0.4, y - size * 0.34, x + size, y + flap * size * 0.42);
+      ctx.stroke();
+    } else {
+      const shade = 0.42 + bird.depth * 0.3;
+      ctx.strokeStyle = `rgba(28, 42, 62, ${shade})`;
+      ctx.lineWidth = Math.max(1.2, size * 0.16);
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(x - size, y + flap * size * 0.42);
+      ctx.quadraticCurveTo(x - size * 0.4, y - size * 0.3, x, y);
+      ctx.quadraticCurveTo(x + size * 0.4, y - size * 0.3, x + size, y + flap * size * 0.42);
+      ctx.stroke();
+    }
   }
 }
