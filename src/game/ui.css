@@ -2073,7 +2073,10 @@ button {
 @media (max-width: 640px) {
   .roster-bar { width: 96vw; top: 4px; }
   .roster-track { height: 18px; }
-  .emote-wheel button { width: 34px; height: 34px; font-size: 16px; }
+  .emote-wheel button { width: 44px; height: 44px; font-size: 18px; }
+  .icon-btn { width: 44px; height: 44px; }
+  .mini-btn { min-height: 44px; padding: 8px 14px; }
+  .tab-item { min-width: 56px; padding: 6px 12px; }
 }
 .play-hud.versus .roster-bar,
 .play-hud.versus .draft-meter,

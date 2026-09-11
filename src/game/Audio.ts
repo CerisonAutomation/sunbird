@@ -8,6 +8,7 @@ import { Music, type BiomeMusicStyle, type MusicMode } from "./Music";
  */
 export class GameAudio {
   private ctx: AudioContext | null = null;
+  private noiseBuffer: AudioBuffer | null = null;
   private master: GainNode | null = null;
   private sfxBus: GainNode | null = null;
   private reverbSend: GainNode | null = null;
@@ -51,6 +52,12 @@ export class GameAudio {
     this.sfxBus = this.ctx.createGain();
     this.sfxBus.gain.value = this.muted ? 0 : 0.75 * this.sfxVol;
     this.sfxBus.connect(this.master);
+
+    // Pre-allocate noise buffer for reuse (avoids per-call allocation)
+    const noiseLen = Math.floor(this.ctx.sampleRate * 0.5);
+    this.noiseBuffer = this.ctx.createBuffer(1, noiseLen, this.ctx.sampleRate);
+    const noiseData = this.noiseBuffer.getChannelData(0);
+    for (let i = 0; i < noiseLen; i++) noiseData[i] = (Math.random() * 2 - 1) * (1 - i / noiseLen);
 
     const convolver = this.ctx.createConvolver();
     convolver.buffer = this.makeImpulse(1.8, 2.3);
@@ -337,9 +344,10 @@ export class GameAudio {
   private noiseBurst(dur: number, freq: number, gain: number): void {
     if (!this.ctx || !this.sfxBus || this.muted || !this.started) return;
     const len = Math.floor(this.ctx.sampleRate * dur);
-    const buffer = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    // Reuse pre-allocated noise buffer when duration fits, otherwise create new
+    const buffer = (this.noiseBuffer && len <= this.noiseBuffer.length)
+      ? this.noiseBuffer
+      : this.ctx.createBuffer(1, len, this.ctx.sampleRate);
     const src = this.ctx.createBufferSource();
     src.buffer = buffer;
     const filter = this.ctx.createBiquadFilter();
