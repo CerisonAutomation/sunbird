@@ -73,53 +73,8 @@ export function streakBonus(streak: number): number {
   return Math.min(60, 10 * streak);
 }
 
-export type PvpMode = {
-  id: "ranked" | "casual" | "local" | "practice";
-  name: string;
-  icon: string;
-  blurb: string;
-  scope: string;
-  rated: boolean;
-};
 
-export const PVP_MODES: PvpMode[] = [
-  {
-    id: "ranked",
-    name: "Ranked 40",
-    icon: "🏆",
-    blurb: "Full field. Your on-device Rival rating moves with every finish.",
-    scope: "Solo · simulated field",
-    rated: true,
-  },
-  {
-    id: "casual",
-    name: "Casual 40",
-    icon: "🐦",
-    blurb: "Same pack, zero pressure. Rating frozen — fly loose.",
-    scope: "Solo · simulated field",
-    rated: false,
-  },
-  {
-    id: "local",
-    name: "Local Versus",
-    icon: "👥",
-    blurb: "Two pilots, one screen. Pass-and-play or split input.",
-    scope: "Local · 2 players",
-    rated: false,
-  },
-  {
-    id: "practice",
-    name: "Practice",
-    icon: "🌅",
-    blurb: "Empty skies. Learn the hills with no pack and no clock.",
-    scope: "Solo · no rivals",
-    rated: false,
-  },
-];
 
-export function pvpModeLabel(id: string): string {
-  return PVP_MODES.find((m) => m.id === id)?.name ?? "Ranked 40";
-}
 
 const RIVAL_NAMES = [
   "Aria", "Kestrel", "Nomi", "Tavi", "Wren", "Bex", "Juno", "Pike", "Sable", "Fen",
@@ -157,11 +112,6 @@ export function medalFor(place: number): string {
   return `#${place}`;
 }
 
-export function escapeHtml(v: string): string {
-  return v.replace(/[&<>"']/g, (c) =>
-    c === "&" ? "&amp;" : c === "<" ? "&lt;" : c === ">" ? "&gt;" : c === '"' ? "&quot;" : "&#39;",
-  );
-}
 
 export function defaultRival(): RivalState {
   return { rating: RIVAL_BASE_RATING, wins: 0, losses: 0, streak: 0, bestStreak: 0, matches: [] };

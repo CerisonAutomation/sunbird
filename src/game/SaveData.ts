@@ -10,7 +10,7 @@ import {
 } from "./constants";
 import { dateSeed } from "./math";
 import { defaultRival, rankSeasonId, ratingDelta, RIVAL_BASE_RATING, seasonReward, softResetRating, streakBonus, type RivalMatch, type RivalState } from "./pvp";
-import { seasonId } from "./SeasonPass";
+import { seasonId } from "./season";
 import { emptyTournamentState, type TournamentState } from "./Tournaments";
 
 export type HighScore = {

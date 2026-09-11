@@ -1,5 +1,7 @@
 import { SEASON_TIERS, SEASON_XP_PER_TIER } from "./constants";
 import type { SaveData } from "./SaveData";
+import { seasonId } from "./season";
+export { seasonId, seasonLabel } from "./season";
 
 export type SeasonReward =
   | { kind: "coins"; amount: number }
@@ -45,15 +47,9 @@ function buildTiers(): TierDef[] {
 
 export const SEASON_TIER_DEFS = buildTiers();
 
-export function seasonId(date = new Date()): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-}
 
-export function seasonLabel(id: string): string {
-  const [y, m] = id.split("-").map(Number);
-  const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-  return `${months[(m ?? 1) - 1]} ${y}`;
-}
+
+
 
 /** XP is granted live from gameplay events (coins, clouds, perfects, islands, zeniths, distance). */
 export const XP_RULES = {

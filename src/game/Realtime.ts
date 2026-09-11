@@ -89,6 +89,7 @@ export type ProtocolGatewayInfo = {
   reason: string;
 };
 
+// ts-prune-ignore-next -- phase-2 surface, mirrored by rust/crates/sunbird-protocol
 export function protocolGatewayInfo(): ProtocolGatewayInfo {
   return {
     supportedVersion: PROTOCOL_VERSION,

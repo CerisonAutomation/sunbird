@@ -8,6 +8,7 @@ import type { TournamentView } from "./Tournaments";
 import type { RosterBird, Standing } from "./MassRace";
 import { VIP_DAILY_GIFT } from "./constants";
 import { COLLECTIONS, type BoostView, type ShopTrailView, type SkinView } from "./Economy";
+import { MenuSky } from "./MenuSky";
 import { formatDistance } from "./math";
 import type { MissionView, QuestReward, QuestView } from "./Missions";
 import type { CampaignChapterView } from "./Campaign";
@@ -309,6 +310,7 @@ export class HUD {
   private feverFill!: HTMLElement;
   private hintEl!: HTMLElement;
   private menuEl!: HTMLElement;
+  private readonly menuSky = new MenuSky();
   private menuCard!: HTMLElement;
   private pauseEl!: HTMLElement;
   private contEl!: HTMLElement;
@@ -460,7 +462,7 @@ export class HUD {
         <div class="hand" data-ref="hand">☝</div>
       </div>
 
-      <div class="overlay menu hidden" data-ref="menu"><div class="menu-sky" aria-hidden="true"><span class="msun"></span><span class="mcloud c1"></span><span class="mcloud c2"></span><span class="mcloud c3"></span><svg class="mb b1" viewBox="0 0 28 12" aria-hidden="true"><path d="M1 9 Q8 1 14 8 Q20 1 27 9"/></svg><svg class="mb b2" viewBox="0 0 28 12" aria-hidden="true"><path d="M1 9 Q8 1 14 8 Q20 1 27 9"/></svg><svg class="mb b3" viewBox="0 0 28 12" aria-hidden="true"><path d="M1 9 Q8 1 14 8 Q20 1 27 9"/></svg><svg class="mb b4" viewBox="0 0 28 12" aria-hidden="true"><path d="M1 9 Q8 1 14 8 Q20 1 27 9"/></svg><svg class="mb b5" viewBox="0 0 28 12" aria-hidden="true"><path d="M1 9 Q8 1 14 8 Q20 1 27 9"/></svg><svg class="mb b6" viewBox="0 0 28 12" aria-hidden="true"><path d="M1 9 Q8 1 14 8 Q20 1 27 9"/></svg></div><div class="paper-card" data-ref="menuCard"></div></div>
+      <div class="overlay menu hidden" data-ref="menu"><div class="paper-card" data-ref="menuCard"></div></div>
 
       <div class="overlay pause hidden" data-ref="pause">
         <div class="paper-card slim">
@@ -513,6 +515,8 @@ export class HUD {
     this.playHud.classList.toggle("versus", s.versus);
     const menuVisible = s.state === "menu" || (s.state === "gameover" && s.screen !== "main");
     this.menuEl.classList.toggle("hidden", !menuVisible);
+    if (menuVisible) this.menuSky.resize(this.menuEl.clientWidth, this.menuEl.clientHeight);
+    this.menuSky.setActive(menuVisible);
     this.pauseEl.classList.toggle("hidden", s.state !== "paused");
     this.contEl.classList.toggle("hidden", s.state !== "continue");
     this.adEl.classList.toggle("hidden", s.state !== "ad");
@@ -879,6 +883,11 @@ export class HUD {
     this.feverFill = grab("feverFill");
     this.hintEl = grab("hint");
     this.menuEl = grab("menu");
+    // Living painted sky with the depth flock — sits behind the paper card.
+    this.menuEl.insertBefore(this.menuSky.host, this.menuEl.firstChild);
+    if (typeof ResizeObserver !== "undefined") {
+      new ResizeObserver(() => this.menuSky.resize(this.menuEl.clientWidth, this.menuEl.clientHeight)).observe(this.menuEl);
+    }
     this.menuCard = grab("menuCard");
     this.pauseEl = grab("pause");
     this.contEl = grab("continue");

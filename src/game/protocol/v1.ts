@@ -106,6 +106,7 @@ function typedError(data: unknown): ServerError {
   return { code: "invalidMessage", reason: "server error variant is unrecognized" };
 }
 
+// ts-prune-ignore-next -- phase-2 wire codec, consumed when authoritative rooms land
 export function encodeClientMessage(message: ClientMessage): string {
   assertVersion(message.version);
   if (message.type === "join") {
@@ -121,6 +122,7 @@ export function encodeClientMessage(message: ClientMessage): string {
   return encoded;
 }
 
+// ts-prune-ignore-next -- phase-2 wire codec, consumed when authoritative rooms land
 export function parseServerJsonFrame(frame: string | Uint8Array): ServerMessage {
   const text = typeof frame === "string" ? frame : new TextDecoder().decode(frame);
   requireBytesAtOrBelow(byteLength(text), MAX_JSON_PAYLOAD_BYTES);
