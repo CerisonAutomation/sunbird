@@ -103,6 +103,9 @@ mod tests {
 
     #[test]
     fn metrics_render_contains_names() {
+        // Install the recorder first: a counter incremented before the
+        // global recorder exists is a silent no-op.
+        install();
         note_health();
         let body = render();
         assert!(body.contains("sunbird_health_requests_total"));
