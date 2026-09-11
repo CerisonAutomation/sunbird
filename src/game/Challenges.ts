@@ -24,8 +24,8 @@ export type Modifier = {
 export const MODIFIERS: Modifier[] = [
   { id: "pure_sky", label: "Pure Sky", desc: "Power-ups are inert. Skill only.", icon: "🕊" },
   { id: "short_day", label: "Short Day", desc: "Only 65% of the usual daylight.", icon: "🌗" },
-  { id: "heavy_wings", label: "Heavy Wings", desc: "Top speed cut by 5%.", icon: "🪨" },
-  { id: "gold_rush", label: "Gold Rush", desc: "Every coin counts double.", icon: "🪙" },
+  { id: "heavy_wings", label: "Heavy Wings", desc: "Top speed cut by 5%.", icon: "⛰️" },
+  { id: "gold_rush", label: "Gold Rush", desc: "Every coin counts double.", icon: "💰" },
 ];
 
 export type ChallengeMods = {

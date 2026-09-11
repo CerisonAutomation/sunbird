@@ -34,7 +34,7 @@ export type Division = {
 
 export const DIVISIONS: Division[] = [
   { id: "fledgling", name: "Fledgling", icon: "🐣", min: 0, max: 1099 },
-  { id: "glider", name: "Glider", icon: "🪶", min: 1100, max: 1249 },
+  { id: "glider", name: "Glider", icon: "🐦", min: 1100, max: 1249 },
   { id: "racer", name: "Sky Racer", icon: "🌤️", min: 1250, max: 1399 },
   { id: "ace", name: "Sky Ace", icon: "⚡", min: 1400, max: 1549 },
   { id: "legend", name: "Sunbird Legend", icon: "👑", min: 1550, max: 1_000_000 },

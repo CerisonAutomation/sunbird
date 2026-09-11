@@ -34,7 +34,7 @@ export const PICKUP_STYLE: Record<PickupKind, { color: number; emissive: number;
   shield: { color: 0x5ad8ff, emissive: 0x0a5a8a, icon: "🛡", label: "Sea Shield" },
   longglide: { color: 0x7fe8c8, emissive: 0x0a6a58, icon: "🪁", label: "Long Glide" },
   wingboost: { color: 0xffa8e0, emissive: 0x8a1060, icon: "🕊", label: "Wing Boost" },
-  feather: { color: 0xfff0c0, emissive: 0x6a5a10, icon: "🪶", label: "Feather" },
+  feather: { color: 0xfff0c0, emissive: 0x6a5a10, icon: "🐦", label: "Feather" },
   goldenwings: { color: 0xffd76a, emissive: 0xa06000, icon: "✨", label: "Golden Wings" },
   cloudboost: { color: 0xc8e8ff, emissive: 0x2a5a8a, icon: "☁", label: "Cloud Boost" },
 };

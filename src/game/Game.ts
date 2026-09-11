@@ -998,7 +998,7 @@ export class Game {
           // Duel prize skin: 10 lifetime duel wins earns the Hummingbird.
           if (this.save.state.duel.wins >= 10 && !this.save.state.ownedSkins.includes("hummingbird")) {
             this.save.ownSkin("hummingbird");
-            this.hud.toast("🪶 Jewel Hummingbird unlocked — 10 duel wins!", "gold");
+            this.hud.toast("🐦 Jewel Hummingbird unlocked — 10 duel wins!", "gold");
           }
           if (won && this.save.ownTrail("trail_duelist")) this.hud.toast("✨ Duelist trail unlocked!", "gold");
           this.audio.purchase();
@@ -1263,7 +1263,7 @@ export class Game {
         break;
       case "feather":
         this.particles.burstRing(x, y, 0xfff0c0);
-        this.hud.toast("Feather 🪶 Butter Landings", "power");
+        this.hud.toast("Feather 🐦 Butter Landings", "power");
         break;
       case "goldenwings":
         this.particles.burstRing(x, y, 0xffd76a);
@@ -1686,7 +1686,7 @@ export class Game {
             // Gauntlet prize skin: 5 lifetime clears earns the Stormcrow.
             if (this.save.state.challenges.gauntletsCleared >= 5 && !this.save.state.ownedSkins.includes("stormcrow")) {
               this.save.ownSkin("stormcrow");
-              this.hud.toast("🪶 Stormcrow unlocked — 5 gauntlets cleared!", "gold");
+              this.hud.toast("🐦 Stormcrow unlocked — 5 gauntlets cleared!", "gold");
             }
             this.audio.island();
           }
@@ -1779,7 +1779,7 @@ export class Game {
     const div = divisionFor(this.save.state.rival.rating);
     if (div.id === "legend" && !this.save.state.ownedSkins.includes("solstice")) {
       this.save.ownSkin("solstice");
-      this.hud.toast("🪶 Solstice unlocked — welcome to Sunbird Legend!", "gold");
+      this.hud.toast("🐦 Solstice unlocked — welcome to Sunbird Legend!", "gold");
       this.flash("perfect");
     }
   }
@@ -2956,7 +2956,7 @@ export class Game {
     const grant = (id: string, msg: string): void => {
       if (st.ownedSkins.includes(id)) return;
       this.save.ownSkin(id);
-      this.hud.toast(`🪶 ${msg}`, "gold");
+      this.hud.toast(`🐦 ${msg}`, "gold");
       this.audio.fanfare();
     };
     if (st.lifetime.ghostBeats >= 10) grant("ghost", "Ghost unlocked — 10 ghost wins!");

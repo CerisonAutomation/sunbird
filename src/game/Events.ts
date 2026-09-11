@@ -44,7 +44,7 @@ const WEEKLY_POOL: Omit<WeeklyEvent, "id" | "week">[] = [
   },
   {
     name: "Feather Week",
-    icon: "🪶",
+    icon: "🐦",
     desc: "Gravity took the week off — float like a rumour",
     mods: { coinMult: 1, gravityMult: 0.82, windMult: 1, daylightMult: 1 },
     target: 2600,

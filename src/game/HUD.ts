@@ -1092,7 +1092,7 @@ function renderLive(s: HudSnapshot): string {
     </div>
 
     <div class="loadout-card">
-      <div class="loadout-row"><span>🪶 ${s.loadout.bird}</span><span>${s.loadout.trail}</span><span>🎒 ${s.loadout.boosts} armed</span></div>
+      <div class="loadout-row"><span>🐦 ${s.loadout.bird}</span><span>${s.loadout.trail}</span><span>🎒 ${s.loadout.boosts} armed</span></div>
       <button class="mini-btn" data-ui data-action="open-shop">Change loadout</button>
     </div>
 
@@ -1273,7 +1273,7 @@ function renderSquad(s: HudSnapshot): string {
       sq.friends.length
         ? `<div class="friend-list">${sq.friends
             .map(
-              (f) => `<div class="friend-row"><span class="fr-name">🪶 ${escapeHtml(f.name)}</span><span class="fr-code">${escapeHtml(f.code)}</span><button class="mini-btn ghost" data-ui data-action="squad-remove" data-id="${escapeHtml(f.code)}">✕</button></div>`,
+              (f) => `<div class="friend-row"><span class="fr-name">🐦 ${escapeHtml(f.name)}</span><span class="fr-code">${escapeHtml(f.code)}</span><button class="mini-btn ghost" data-ui data-action="squad-remove" data-id="${escapeHtml(f.code)}">✕</button></div>`,
             )
             .join("")}</div>`
         : `<div class="empty-note">No friends yet — swap codes! Yours is <b>${escapeHtml(sq.myCode || "…")}</b></div>`
@@ -1356,7 +1356,7 @@ function renderRank(s: HudSnapshot): string {
         <div><span>Duel W–L</span><b>${s.duel.wins}–${s.duel.losses}</b></div>
         <div><span>Streak</span><b class="streak-b ${s.duel.streak > 0 ? "lit" : ""}"><svg viewBox="0 0 24 24" class="fl"><path d="M12 2C13 6 17 8 17 13a5 5 0 0 1-10 0c0-2 1-3.4 2-4.6 0 1.6.6 2.6 1.8 3 -.4-3.4 1.4-6.6 1.2-9.4z" fill="currentColor"/></svg>${s.duel.streak}</b></div>
         <div><span>Best</span><b>×${s.duel.bestStreak}</b></div>
-        <div><span>Prize</span><b>${s.duel.wins >= 10 ? "🪶 won" : `${s.duel.wins}/10`}</b></div>
+        <div><span>Prize</span><b>${s.duel.wins >= 10 ? "🐦 won" : `${s.duel.wins}/10`}</b></div>
       </div>
       <button class="primary-btn hero" data-ui data-action="pvp-duel"><span class="hero-label">⚔ DUEL</span><span class="hero-hint">1v1 · first to 3,000 m · win 10 for the Hummingbird</span></button>
     </div>
@@ -1574,7 +1574,7 @@ function renderMain(s: HudSnapshot): string {
     ${!s.calendar.claimedToday ? `<button class="cal-strip" data-ui data-action="claim-calendar">📅 Daily gift ready — day ${(s.calendar.cycleDay % 28) + 1} of 28 <b>CLAIM</b></button>` : ""}
 
     <div class="loadout-strip">
-      <span class="loadout-bird">🪶 ${s.loadout.bird}</span>
+      <span class="loadout-bird">🐦 ${s.loadout.bird}</span>
       <span class="loadout-trail">${s.loadout.trail}</span>
       <span class="loadout-boost">🎒 ${s.loadout.boosts} armed</span>
       <button class="mini-btn" data-ui data-action="open-shop">Loadout</button>
@@ -1850,7 +1850,7 @@ function renderScores(s: HudSnapshot): string {
 
 function rewardLabel(r: { kind: string; amount?: number; id?: string }): string {
   if (r.kind === "coins") return `● ${r.amount}`;
-  if (r.kind === "skin") return `🪶 ${r.id}`;
+  if (r.kind === "skin") return `🐦 ${r.id}`;
   if (r.kind === "trail") return `✨ ${r.id?.replace("trail_", "") ?? "trail"}`;
   return `🎁 ${r.id}`;
 }
@@ -1858,9 +1858,9 @@ function rewardLabel(r: { kind: string; amount?: number; id?: string }): string 
 function renderPass(s: HudSnapshot): string {
   const pct = Math.min(100, (s.season.have / s.season.need) * 100);
   return `
-    ${head(`Nest Pass · ${s.season.label}`, "back", `<span class="pill">Lv.${s.season.tier}/${s.season.maxTier}</span>`)}
+    ${head("Nest Pass", "back", `<span class="pill">Lv.${s.season.tier}/${s.season.maxTier}</span>`)}
     <div class="pass-progress"><i style="width:${pct}%"></i></div>
-    <p class="tagline">Fly to earn XP. Gold unlocks the premium track.</p>
+    <p class="tagline">${s.season.label} — fly to earn XP. Gold unlocks the premium track.</p>
     ${!s.gold ? `<button class="upsell" data-ui data-action="open-paywall"><div><b>✦ Unlock premium rewards</b><span>Double the tier rewards with Gold</span></div><span class="mini-btn gold">Unlock</span></button>` : ""}
     <div class="tier-track">
       ${s.season.tiers

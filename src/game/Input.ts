@@ -100,7 +100,11 @@ export class Input {
   }
 
   private isInteractive(target: EventTarget | null): boolean {
-    if (!(target instanceof HTMLElement)) return false;
+    // Element, not HTMLElement: clicks land on inline <svg>/<path> icons
+    // inside buttons, and those are SVGElements. Treating them as
+    // non-interactive made the input layer pointer-capture the event and
+    // swallow the tap.
+    if (!(target instanceof Element)) return false;
     if (target.matches("input, textarea, select, a")) return true;
     const btn = target.closest<HTMLElement>("button, [data-action]");
     if (btn) {

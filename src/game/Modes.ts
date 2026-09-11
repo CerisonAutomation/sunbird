@@ -60,7 +60,7 @@ export const MODES: ModeDef[] = [
     id: "coinrush",
     name: "Coin Rush",
     blurb: "Sixty seconds. Every coin counts double.",
-    icon: "🪙",
+    icon: "💰",
     clock: 60,
     finish: 0,
     scoreBy: "coins",
