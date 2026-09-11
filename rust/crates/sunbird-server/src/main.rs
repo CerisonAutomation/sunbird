@@ -175,7 +175,7 @@ fn build_app(shared: SharedState, shutdown_rx: watch::Receiver<bool>) -> Router 
         .layer(cors)
         .layer(axum::middleware::from_fn(
             move |request, next: axum::middleware::Next| {
-                let mut rx = shutdown_rx.clone();
+                let rx = shutdown_rx.clone();
                 async move {
                     if *rx.borrow() {
                         return StatusCode::SERVICE_UNAVAILABLE.into_response();
@@ -453,7 +453,7 @@ mod tests {
 
     #[test]
     fn protocol_config_limits_payload_precondition() {
-        assert!(MAX_JSON_PAYLOAD_BYTES > 1024);
+        const { assert!(MAX_JSON_PAYLOAD_BYTES > 1024) };
         let too_large = vec![b' '; MAX_JSON_PAYLOAD_BYTES + 1];
         assert!(parse_client_message(&too_large, MAX_JSON_PAYLOAD_BYTES).is_err());
     }

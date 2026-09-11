@@ -77,8 +77,8 @@ fn register_descriptions() {
 fn seed_core_metrics() {
     gauge!("sunbird_service_ready").set(1.0);
     gauge!("sunbird_rooms_active").set(0.0);
-    histogram!("sunbird_tick_duration_seconds");
-    histogram!("sunbird_snapshot_bytes");
+    let _ = histogram!("sunbird_tick_duration_seconds");
+    let _ = histogram!("sunbird_snapshot_bytes");
 }
 
 pub fn note_health() {

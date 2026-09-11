@@ -468,7 +468,7 @@ fn frame(msg: &Out) -> String {
 /* ----------------------------- ws transport ----------------------------- */
 
 #[derive(Deserialize)]
-struct LegacyQuery {
+pub struct LegacyQuery {
     #[serde(default)]
     device: Option<String>,
     #[serde(default)]
@@ -562,7 +562,7 @@ async fn writer_task(mut sink: SplitSink<WebSocket, Message>, mut rx: mpsc::Rece
 /* ------------------------------- parsing ------------------------------- */
 
 fn identity_from(params: LegacyQuery) -> Identity {
-    let id = sanitize_opt(params.device, 64).unwrap_or_else(|| anon_id());
+    let id = sanitize_opt(params.device, 64).unwrap_or_else(anon_id);
     let name = sanitize_opt(params.name, MAX_NAME).unwrap_or_else(|| "Pilot".to_string());
     let skin = sanitize_opt(params.skin, MAX_SKIN).unwrap_or_else(|| "sunbird".to_string());
     let hue = params

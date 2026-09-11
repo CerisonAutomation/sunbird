@@ -60,6 +60,7 @@ impl Config {
         })
     }
 
+    #[allow(dead_code)] // used by tests to build a self-contained config
     pub fn development_default() -> Self {
         Self {
             environment: Environment::Development,

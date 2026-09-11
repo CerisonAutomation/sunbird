@@ -68,6 +68,9 @@ impl SeatTokenIssuer {
         Ok(format!("{TOKEN_PREFIX_V1}.{payload64}.{signature}"))
     }
 
+    /// Verifies a seat token. Wired to the reconnect handshake in a later
+    /// phase; kept public now so the token format stays exercised by tests.
+    #[allow(dead_code)]
     pub fn verify(&self, token: &str) -> Result<SeatClaims> {
         let mut parts = token.splitn(3, '.');
         let prefix = parts
@@ -110,6 +113,7 @@ impl SeatTokenIssuer {
 
 type HmacSha256 = Hmac<Sha256>;
 
+#[allow(dead_code)] // only reachable via `verify` (see above)
 fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
     let length = left.len().max(right.len());
     let mut diff = (left.len() ^ right.len()) as u8;
