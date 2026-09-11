@@ -7,7 +7,6 @@ import type { BoardMetric, BoardPage, BoardScope } from "./Leaderboard";
 import type { TournamentView } from "./Tournaments";
 import type { RosterBird, Standing } from "./MassRace";
 import { VIP_DAILY_GIFT } from "./constants";
-import { MenuSky } from "./MenuSky";
 import type { BoostView, SkinView } from "./Economy";
 import { formatDistance } from "./math";
 import type { MissionView, QuestReward, QuestView } from "./Missions";
@@ -28,7 +27,28 @@ export type UiScreen =
   | "modes"
   | "board"
   | "cups"
-  | "live";
+  | "live"
+  | "rank";
+
+export type RivalCard = {
+  rating: number;
+  division: string;
+  divisionIcon: string;
+  wins: number;
+  losses: number;
+  streak: number;
+  bestStreak: number;
+  nextName: string;
+  nextNeeded: number;
+  progress: number;
+  matches: { place: number; field: number; mode: string; date: string; won: boolean }[];
+};
+
+export type LoadoutView = {
+  bird: string;
+  trail: string;
+  boosts: number;
+};
 
 export type AtlasEntry = {
   island: number;
@@ -58,10 +78,6 @@ export type HudSnapshot = {
   feverOn: boolean;
   multiplier: number;
   bestDistance: number;
-  /** Personal best as it stood before this flight. */
-  prevBestDistance: number;
-  /** True for a player's first couple of flights. */
-  firstRun: boolean;
   score: number;
   island: number;
   perfects: number;
@@ -179,12 +195,22 @@ export type HudSnapshot = {
   roomCode: string;
   roomCount: number;
   roomCapacity: number;
+  roomSize: number;
+  roomSkill: string;
+  roomMuted: boolean;
+  roomRivals: { id: string; name: string; skill: number; hue: number }[];
   netState: string;
   netError: string;
   draft: number;
   finishRemaining: number;
   nemesis: string;
   photoFinish: string;
+  rival: RivalCard;
+  loadout: LoadoutView;
+  lobbyRivals: { name: string; tag: string }[];
+  raceRated: boolean;
+  ratingDelta: number;
+  ratingBonus: number;
 };
 
 type ActionHandler = (action: string, id: string) => void;
@@ -221,7 +247,6 @@ export class HUD {
   private biomeChip!: HTMLElement;
   private speedLines!: HTMLElement;
   private handEl!: HTMLElement;
-  private speedReadout!: HTMLElement;
   private altGauge!: HTMLElement;
   private altFill!: HTMLElement;
   private altBird!: HTMLElement;
@@ -240,6 +265,9 @@ export class HUD {
   private emoteWheel!: HTMLElement;
   private lastStandings = "";
   private lastRoster = "";
+  private lastRosterAt = 0;
+  private lastStandingsAt = 0;
+  private lastVersusKey = "";
   private lastGoals = "";
   private lastGoalPop = "";
   private lastPowers = "";
@@ -247,27 +275,34 @@ export class HUD {
   private lastCountdown = "";
   private lastCombo = -1;
   private lastBiome = "";
+  /** Per-frame text write memoization: DOM writes only when content changes. */
+  private readonly textCache = new Map<string, string>();
+  private readonly styleCache = new Map<string, string>();
+
+  private setText(el: HTMLElement, key: string, value: string): void {
+    if (this.textCache.get(key) === value) return;
+    this.textCache.set(key, value);
+    el.textContent = value;
+  }
+
+  private setStyle(el: HTMLElement, key: string, prop: "width" | "height" | "opacity" | "left" | "bottom", value: string): void {
+    const ck = `${key}:${prop}`;
+    if (this.styleCache.get(ck) === value) return;
+    this.styleCache.set(ck, value);
+    el.style[prop] = value;
+  }
+
+  /** Flush caches when a full re-render happens so we don't skip first writes. */
+  private flushCaches(): void {
+    this.textCache.clear();
+    this.styleCache.clear();
+  }
   private contTimerEl: HTMLElement | null = null;
   private adBarEl: HTMLElement | null = null;
   private adSkipEl: HTMLButtonElement | null = null;
   private lastKey = "";
   private lastHint = "";
   private lastChips = "";
-  private readonly menuSky = new MenuSky();
-  private readonly skyResize: ResizeObserver;
-  private readonly live = {
-    distance: -1,
-    coins: -1,
-    island: -1,
-    mult: -1,
-    sun: -1,
-    sunLow: false,
-    fever: -1,
-    altFill: -1,
-    altRead: -1,
-    altZone: -1,
-    speed: -1,
-  };
 
   constructor(parent: HTMLElement) {
     this.root = document.createElement("div");
@@ -332,7 +367,6 @@ export class HUD {
           <div class="fever-bar"><div class="fever-fill" data-ref="feverFill"></div></div>
         </div>
         <button class="icon-btn pause-btn" data-ui data-action="pause" aria-label="Pause">❙❙</button>
-        <div class="speed-readout" data-ref="speedReadout"><fast>0</fast><em>km/h</em></div>
         <div class="combo" data-ref="combo"></div>
         <div class="hint" data-ref="hint"></div>
         <div class="hand" data-ref="hand">☝</div>
@@ -343,12 +377,9 @@ export class HUD {
       <div class="overlay pause hidden" data-ref="pause">
         <div class="paper-card slim">
           <h2>Paused</h2>
-          <p class="tagline">Your flight is waiting. The daylight timer is stopped.</p>
-          <button class="primary-btn hero" data-ui data-action="resume" aria-label="Resume flight — press P or Escape"><span class="hero-label">Resume flight</span><span class="hero-hint">P or Esc</span></button>
-          <div class="btn-row">
-            <button class="soft-btn wide2" data-ui data-action="open-settings">⚙ Settings</button>
-            <button class="ghost-btn wide2" data-ui data-action="menu">End flight</button>
-          </div>
+          <p class="tagline">The sun waits for no bird.</p>
+          <button class="primary-btn" data-ui data-action="resume">Resume</button>
+          <button class="ghost-btn" data-ui data-action="menu">Give up</button>
         </div>
       </div>
 
@@ -359,16 +390,8 @@ export class HUD {
       <div class="toasts" data-ref="toasts"></div>
       <div class="flash" data-ref="flash"></div>
     `;
-    // Living bird-flight backdrop, painted beneath every overlay.
-    this.root.insertBefore(this.menuSky.host, this.root.firstChild);
     parent.appendChild(this.root);
     this.bind();
-
-    this.skyResize = new ResizeObserver(() => {
-      this.menuSky.resize(this.root.clientWidth, this.root.clientHeight);
-    });
-    this.skyResize.observe(this.root);
-    this.menuSky.resize(parent.clientWidth || window.innerWidth, parent.clientHeight || window.innerHeight);
   }
 
   onAction(handler: ActionHandler): void {
@@ -390,46 +413,26 @@ export class HUD {
     const key = `${s.state}|${s.screen}|${s.version}`;
     if (key !== this.lastKey) {
       this.lastKey = key;
+      this.flushCaches();
       this.renderStatic(s);
     }
 
     const inPlay = s.state === "playing" || s.state === "paused" || s.state === "continue";
-    // The living backdrop only runs on the shell; never while racing.
-    this.menuSky.setActive(s.state === "menu" || s.state === "gameover");
     this.playHud.classList.toggle("hidden", !inPlay);
     this.playHud.classList.toggle("versus", s.versus);
-    // The shell card hosts every non-race screen. Paused gameplay can open
-    // Settings/Scoreboard over the pause card without dead actions.
-    const menuVisible = s.state === "menu" || (s.state === "gameover" && s.screen !== "main") || (s.state === "paused" && s.screen !== "main");
+    const menuVisible = s.state === "menu" || (s.state === "gameover" && s.screen !== "main");
     this.menuEl.classList.toggle("hidden", !menuVisible);
-    this.pauseEl.classList.toggle("hidden", !(s.state === "paused" && s.screen === "main"));
+    this.pauseEl.classList.toggle("hidden", s.state !== "paused");
     this.contEl.classList.toggle("hidden", s.state !== "continue");
     this.adEl.classList.toggle("hidden", s.state !== "ad");
     this.overEl.classList.toggle("hidden", !(s.state === "gameover" && s.screen === "main"));
 
     if (inPlay) {
-      // Every write below is guarded: the HUD runs at frame rate, so unchanged
-      // values must never touch the DOM. This removes the main style/layout
-      // churn identified in review.
-      const roundedDistance = Math.round(s.distance);
-      if (roundedDistance !== this.live.distance) {
-        this.live.distance = roundedDistance;
-        this.distanceEl.textContent = formatDistance(s.distance);
-      }
-      if (s.coins !== this.live.coins) {
-        this.live.coins = s.coins;
-        this.coinsEl.textContent = String(s.coins);
-        this.bestEl.textContent = formatDistance(s.bestDistance);
-      }
-      if (s.island !== this.live.island) {
-        this.live.island = s.island;
-        this.islandEl.textContent = `Island ${s.island + 1}`;
-      }
-      const mult10 = Math.round(s.multiplier * 10);
-      if (mult10 !== this.live.mult) {
-        this.live.mult = mult10;
-        this.multEl.textContent = `×${s.multiplier.toFixed(1)}`;
-      }
+      this.setText(this.distanceEl, "dist", formatDistance(s.distance));
+      this.setText(this.coinsEl, "coins", String(s.coins));
+      this.setText(this.bestEl, "best", formatDistance(s.bestDistance));
+      this.setText(this.islandEl, "island", `Island ${s.island + 1}`);
+      this.setText(this.multEl, "mult", `×${s.multiplier.toFixed(1)}`);
       this.goldChip.classList.toggle("hidden", !s.gold);
       this.vipChip.classList.toggle("hidden", !s.vip);
       if (this.vipChip.textContent !== `♛ VIP · ${s.vipDaysLeft}d`) this.vipChip.textContent = `♛ VIP · ${s.vipDaysLeft}d`;
@@ -438,35 +441,23 @@ export class HUD {
       } else {
         this.ghostChip.classList.remove("hidden");
         const ahead = s.ghostDelta >= 0;
-        const label = `👻 ${ahead ? "+" : ""}${Math.round(s.ghostDelta)}m`;
-        if (this.ghostChip.textContent !== label) this.ghostChip.textContent = label;
+        this.ghostChip.textContent = `👻 ${ahead ? "+" : ""}${Math.round(s.ghostDelta)}m`;
         this.ghostChip.classList.toggle("ahead", ahead);
         this.ghostChip.classList.toggle("behind", !ahead);
       }
 
       const day = Math.min(1, s.daylight / s.daylightMax);
-      const dayPct = Math.round(day * 100);
-      if (dayPct !== this.live.sun) {
-        this.live.sun = dayPct;
-        this.sunFill.style.width = `${Math.max(2, dayPct)}%`;
-        this.sunKnob.style.left = `${dayPct}%`;
-      }
-      const low = day < 0.28;
-      if (low !== this.live.sunLow) {
-        this.live.sunLow = low;
-        this.sunFill.classList.toggle("low", low);
-      }
+      this.setStyle(this.sunFill, "sunFill", "width", `${Math.max(2, day * 100)}%`);
+      this.setStyle(this.sunKnob, "sunKnob", "left", `${day * 100}%`);
+      this.sunFill.classList.toggle("low", day < 0.28);
 
       this.feverWrap.classList.toggle("on", s.feverOn);
-      const feverPct = Math.round(Math.max(0, Math.min(1, s.fever)) * 100);
-      if (feverPct !== this.live.fever) {
-        this.live.fever = feverPct;
-        this.feverFill.style.width = `${feverPct}%`;
-      }
+      this.setStyle(this.feverFill, "feverFill", "width", `${Math.max(0, Math.min(1, s.fever)) * 100}%`);
 
-      // Only environment states live here; timed power-ups have their own
-      // labeled rail, so they are no longer duplicated in two places.
       const chips: string[] = [];
+      if (s.boostTimer > 0) chips.push(`<span class="pchip boost">🚀 boost</span>`);
+      if (s.magnetTimer > 0) chips.push(`<span class="pchip magnet">🧲 ${Math.ceil(s.magnetTimer)}s</span>`);
+      if (s.shield > 0) chips.push(`<span class="pchip shield">🛡 ×${s.shield}</span>`);
       if (s.gust > 0.3) chips.push(`<span class="pchip gust">🌬 headwind — dive!</span>`);
       if (s.inThermal) chips.push(`<span class="pchip thermal">♨ thermal — release!</span>`);
       const html = chips.join("");
@@ -486,29 +477,14 @@ export class HUD {
         this.lastBiome = biomeTxt;
         this.biomeChip.textContent = biomeTxt;
       }
-      const speedPct = Math.round(Math.max(0, (s.speedNorm - 0.55) * 1.6) * 100);
-      if (speedPct !== this.live.speed) {
-        this.live.speed = speedPct;
-        this.speedLines.style.opacity = String(speedPct / 100);
-      }
+      this.setStyle(this.speedLines, "speedlines", "opacity", String(Math.max(0, (s.speedNorm - 0.55) * 1.6)));
 
       // altitude gauge (log-ish so low hops still read, big launches still climb)
       const aN = Math.min(1, Math.pow(s.altitude / 340, 0.65));
-      const altPct = Math.round(aN * 1000) / 10;
-      if (altPct !== this.live.altFill) {
-        this.live.altFill = altPct;
-        this.altFill.style.height = `${altPct}%`;
-        this.altBird.style.bottom = `calc(${altPct}% - 9px)`;
-      }
-      const altMetres = Math.round(s.altitude);
-      if (altMetres !== this.live.altRead) {
-        this.live.altRead = altMetres;
-        this.altRead.textContent = `${altMetres} m`;
-      }
-      if (s.altZone !== this.live.altZone) {
-        this.live.altZone = s.altZone;
-        this.altGauge.dataset.zone = String(s.altZone);
-      }
+      this.setStyle(this.altFill, "altFill", "height", `${aN * 100}%`);
+      this.setStyle(this.altBird, "altBird", "bottom", `calc(${aN * 100}% - 9px)`);
+      this.setText(this.altRead, "altRead", `${Math.round(s.altitude)} m`);
+      this.altGauge.dataset.zone = String(s.altZone);
 
       const bannerKey = `${s.launchBanner}|${s.launchBannerT > 0}`;
       if (bannerKey !== this.lastBanner) {
@@ -558,26 +534,43 @@ export class HUD {
         this.goalPop.className = `goal-pop ${s.goalPop ? "show" : ""}`;
       }
 
-      // Top-of-screen bird roster: every pilot in the race as a live pip.
+      // Top-of-screen bird roster: every pilot as a live bird pip on the race
+      // line, with your place badge and the gap to the leader. Rebuilds are
+      // throttled to ~6 Hz and quantized so 41 pips don't churn the DOM.
       const showRoster = s.roster.length > 0;
       this.rosterBar.classList.toggle("hidden", !showRoster);
       if (showRoster) {
-        const rkey = s.roster.map((r) => `${r.id}${Math.round(r.progress * 90)}${r.emote}`).join("|");
-        if (rkey !== this.lastRoster) {
+        const now = performance.now();
+        const rkey = s.roster
+          .map((r) => `${r.id}${Math.round(r.progress * 50)}${r.finished ? "F" : ""}${r.emote}`)
+          .join("|");
+        if (rkey !== this.lastRoster && now - this.lastRosterAt > 150) {
           this.lastRoster = rkey;
+          this.lastRosterAt = now;
           const leader = s.roster[0];
+          const you = s.roster.find((r) => r.you);
+          const span = Math.max(1, s.raceFinish || 3000);
+          const gapM =
+            leader && you && !you.finished
+              ? Math.max(0, Math.round((leader.progress - you.progress) * span))
+              : 0;
+          const placeTxt = you ? `P${you.place}` : "–";
+          const gapTxt = !you || you.finished ? "FINISHED" : you.place === 1 ? "LEADER" : `-${gapM}m`;
           this.rosterBar.innerHTML =
-            `<div class="roster-track">${s.roster
-              .map(
-                (r) => `<span class="rb ${r.you ? "you" : ""} ${r.remote ? "remote" : ""} ${r.finished ? "done" : ""}"
-                  style="left:${(r.progress * 100).toFixed(1)}%;--h:${Math.round(r.hue * 360)}"
-                  title="${escapeHtml(r.name)}">${r.emote ? `<b class="rb-emote">${escapeHtml(r.emote)}</b>` : ""}</span>`,
-              )
-              .join("")}</div>` +
-            `<div class="roster-meta"><span class="rm-lead">👑 ${escapeHtml(leader ? leader.name : "—")}</span>` +
+            `<div class="roster-top"><span class="rp-place ${you && you.place <= 3 ? "podium" : ""}">${placeTxt}</span>` +
+            `<span class="rm-lead">👑 ${escapeHtml(leader ? leader.name : "—")}</span>` +
+            `<span class="rm-gap">${gapTxt}</span>` +
             `<span class="rm-count">${s.roster.length} birds</span>` +
             `${s.roomCode ? `<span class="rm-room">ROOM ${escapeHtml(s.roomCode)}</span>` : ""}` +
-            `<span class="rm-net ${s.netState}">${s.multiplayerLive ? s.netState : "solo field"}</span></div>`;
+            `<span class="rm-net ${s.netState}">${s.multiplayerLive ? s.netState : "practice"}</span></div>` +
+            `<div class="roster-track" role="img" aria-label="Live race positions">${s.roster
+              .map(
+                (r) =>
+                  `<span class="rb ${r.you ? "you" : ""} ${r.remote ? "remote" : ""} ${r.finished ? "done" : ""}" ` +
+                  `style="left:${(r.progress * 100).toFixed(1)}%;--h:${Math.round(r.hue * 360)}" ` +
+                  `title="#${r.place} ${escapeHtml(r.name)}${r.remote ? " · live" : ""}">${r.emote ? `<b class="rb-emote">${r.emote}</b>` : ""}</span>`,
+              )
+              .join("")}</div>`;
         }
       }
 
@@ -603,36 +596,46 @@ export class HUD {
       }
       this.emoteWheel.classList.toggle("hidden", !s.massRace);
 
-      // Live 40-bird standings ticker.
+      // Live standings ticker: leaders plus your row, with gaps to the car
+      // ahead so every position fight reads at a glance. Throttled like the
+      // roster so it never rebuilds mid-frame more than ~5×/s.
       this.standingsEl.classList.toggle("hidden", s.standings.length === 0);
       if (s.standings.length) {
-        const key = s.standings.map((r) => `${r.id}${r.place}${Math.round(r.distance / 4)}`).join("|");
-        if (key !== this.lastStandings) {
+        const nowS = performance.now();
+        const key = s.standings.map((r) => `${r.id}${r.place}${Math.round(r.distance / 12)}${r.finished ? "F" : ""}`).join("|");
+        if (key !== this.lastStandings && nowS - this.lastStandingsAt > 200) {
           this.lastStandings = key;
-          this.standingsEl.innerHTML = s.standings
-            .map(
-              (r) => `<div class="st-row ${r.you ? "you" : ""} ${r.kind === "remote" ? "remote" : ""}">
-                <span class="st-p">${r.place}</span>
+          this.lastStandingsAt = nowS;
+          const top = s.standings[0];
+          this.standingsEl.innerHTML =
+            `<div class="st-head"><span>LIVE</span><span>${s.standings.length} shown</span></div>` +
+            s.standings
+              .map((r) => {
+                const gap = top && r.place > top.place ? `-${Math.max(0, Math.round(top.distance - r.distance))}m` : r.finished ? "🏁" : "—";
+                return `<div class="st-row ${r.you ? "you" : ""} ${r.kind === "remote" ? "remote" : ""} ${r.place <= 3 ? "p" + r.place : ""}">
+                <span class="st-p">${r.place <= 3 ? ["🥇", "🥈", "🥉"][r.place - 1] : r.place}</span>
                 <span class="st-n">${escapeHtml(r.name)}${r.kind === "remote" ? " ⇄" : ""}</span>
-                <span class="st-d">${Math.round(r.distance)}m</span>
-              </div>`,
-            )
-            .join("");
+                <span class="st-d">${r.you || r.place <= 3 ? `${Math.round(r.distance)}m` : gap}</span>
+              </div>`;
+              })
+              .join("");
         }
       }
 
+      // Local 2P race bar: memoized so it writes only when rounded progress moves.
       this.versusBar.classList.toggle("hidden", !s.versus);
       if (s.versus && s.p1Stats && s.p2Stats) {
         const pct = (d: number): number => Math.min(100, (d / s.raceFinish) * 100);
-        this.versusBar.innerHTML =
-          `<div class="vs-row p1"><span>P1</span><i><b style="width:${pct(s.p1Stats.distance)}%"></b></i><em>${Math.round(s.p1Stats.distance)}m</em></div>` +
-          `<div class="vs-row p2"><span>P2</span><i><b style="width:${pct(s.p2Stats.distance)}%"></b></i><em>${Math.round(s.p2Stats.distance)}m</em></div>`;
+        const vkey = `${Math.round(pct(s.p1Stats.distance))}|${Math.round(pct(s.p2Stats.distance))}`;
+        if (vkey !== this.lastVersusKey) {
+          this.lastVersusKey = vkey;
+          const lead1 = s.p1Stats.distance >= s.p2Stats.distance;
+          this.versusBar.innerHTML =
+            `<div class="vs-row p1 ${lead1 ? "lead" : ""}"><span>P1${lead1 ? " 👑" : ""}</span><i><b style="width:${pct(s.p1Stats.distance)}%"></b></i><em>${Math.round(s.p1Stats.distance)}m</em></div>` +
+            `<div class="vs-row p2 ${lead1 ? "" : "lead"}"><span>P2${lead1 ? "" : " 👑"}</span><i><b style="width:${pct(s.p2Stats.distance)}%"></b></i><em>${Math.round(s.p2Stats.distance)}m</em></div>`;
+        }
       }
       this.handEl.classList.toggle("show", s.showTutorialHand);
-      // Speed readout — converts game speed to km/h for player feedback.
-      const speedKmh = Math.round(s.speedNorm * 120);
-      const speedFast = this.speedReadout.querySelector("fast");
-      if (speedFast && speedFast.textContent !== String(speedKmh)) speedFast.textContent = String(speedKmh);
       if (html !== this.lastChips) {
         this.lastChips = html;
         this.powersEl.innerHTML = html;
@@ -680,14 +683,12 @@ export class HUD {
   }
 
   dispose(): void {
-    this.skyResize.disconnect();
-    this.menuSky.dispose();
     this.root.remove();
   }
 
   private renderStatic(s: HudSnapshot): void {
     if (s.state === "menu" || (s.state === "gameover" && s.screen !== "main")) {
-      this.menuCard.className = `paper-card ${s.screen === "shop" || s.screen === "pass" ? "wide" : ""}`;
+      this.menuCard.className = `paper-card ${s.screen === "main" ? "menu-hero" : s.screen === "shop" || s.screen === "pass" ? "wide" : ""}`;
       this.menuCard.innerHTML = this.renderScreen(s);
     }
     if (s.state === "gameover") this.overCard.innerHTML = renderGameOver(s);
@@ -731,6 +732,8 @@ export class HUD {
         return renderCups(s);
       case "live":
         return renderLive(s);
+      case "rank":
+        return renderRank(s);
       default:
         return renderMain(s);
     }
@@ -783,7 +786,6 @@ export class HUD {
     this.draftMeter = grab("draftMeter");
     this.finishCd = grab("finishCd");
     this.emoteWheel = grab("emoteWheel");
-    this.speedReadout = grab("speedReadout");
   }
 }
 
@@ -799,6 +801,19 @@ function head(title: string, backAction = "back", right = ""): string {
 
 function upsellStrip(): string {
   return `<button class="upsell" data-ui data-action="open-paywall"><div><b>✦ Sunbird Gold &amp; VIP</b><span>2× coins · no breaks · Phoenix &amp; Aurora skins · Nest Pass</span></div><span class="mini-btn gold">See</span></button>`;
+}
+
+function renderMissions(list: MissionView[], newly: string[] = []): string {
+  return `<div class="missions"><div class="mission-head">Nest missions</div>${list
+    .map((m) => {
+      const fresh = newly.includes(m.def.id);
+      return `<div class="mission ${m.done ? "done" : ""} ${fresh ? "fresh" : ""}">
+        <span class="check">${m.done ? "✓" : ""}</span>
+        <div><div class="mt">${m.def.title}</div><div class="md">${m.def.desc}</div></div>
+        <span class="mp">${Math.min(m.progress, m.def.target)}/${m.def.target}</span>
+      </div>`;
+    })
+    .join("")}</div>`;
 }
 
 function renderQuests(list: QuestView[]): string {
@@ -853,18 +868,30 @@ function renderBoard(s: HudSnapshot): string {
       ? `<span class="board-badge warn">Offline — showing cached</span>`
       : `<span class="board-badge live">Live global</span>`;
 
+  const medals = ["🥇", "🥈", "🥉"];
   const rows =
     page && page.entries.length
-      ? page.entries
+      ? `<div class="board-podium">${page.entries
+          .slice(0, 3)
+          .map(
+            (e, i) => `<div class="pod p${i + 1} ${e.you ? "you" : ""}">
+              <span class="pod-medal">${medals[i]}</span>
+              <span class="pod-name">${escapeHtml(e.name)}</span>
+              <span class="pod-val">${fmt(e.value)}</span>
+            </div>`,
+          )
+          .join("")}</div>` +
+        page.entries
+          .slice(3)
           .map(
             (e, i) => `<div class="board-row ${e.you ? "you" : ""}">
-              <span class="bp">${i + 1}</span>
+              <span class="bp">${i + 4}</span>
               <span class="bn">${escapeHtml(e.name)}</span>
               <span class="bv">${fmt(e.value)}</span>
             </div>`,
           )
           .join("")
-      : `<div class="board-row empty">${s.boardLoading ? "Loading…" : "No flights recorded yet"}</div>`;
+      : `<div class="board-row empty">${s.boardLoading ? "Loading…" : "No flights recorded yet — be the first wing on the board"}</div>`;
 
   return `
     ${head("Leaderboard", "back", status)}
@@ -892,45 +919,97 @@ function renderBoard(s: HudSnapshot): string {
 function renderLive(s: HudSnapshot): string {
   const status = s.multiplayerLive
     ? s.netState === "racing" || s.netState === "lobby"
-      ? `<span class="board-badge live">Connected</span>`
+      ? `<span class="board-badge live">● Connected</span>`
       : s.netState === "connecting"
         ? `<span class="board-badge warn">Connecting…</span>`
         : `<span class="board-badge warn">${escapeHtml(s.netError || "Offline")}</span>`
-    : `<span class="board-badge local">Practice field</span>`;
+    : `<span class="board-badge local">Solo field · practice</span>`;
 
+  const featured = s.lobbyRivals.slice(0, 3);
   return `
-    ${head("Match Race", "back", status)}
-    <p class="tagline">A 40-bird grid on today's hills. Beat the pack's pace and learn slipstream lines.</p>
-
-    <button class="primary-btn race40" data-ui data-action="quick-match">⚡ Quick match</button>
-
-    <div class="section-title">Friend room</div>
-    <div class="sheet">
-      <div class="code-row">
-        <span>${s.roomCode ? `Your room: <b>${escapeHtml(s.roomCode)}</b>` : "Host a room and share the code"}</span>
-        <button class="mini-btn gold" data-ui data-action="host-room">Host</button>
-      </div>
-      <div class="redeem">
-        <input data-ui data-ref="roomCode" maxlength="5" placeholder="CODE" autocomplete="off" style="text-transform:uppercase" />
-        <button class="mini-btn" data-ui data-action="join-room">Join</button>
-      </div>
-      ${s.roomCount > 0 ? `<p class="note">${s.roomCount} / ${s.roomCapacity} birds in room</p>` : ""}
+    ${head("Race Lobby", "back", status)}
+    <div class="vs-stage" aria-label="You versus the featured rivals">
+      <div class="vs-you"><span class="vs-bird">🐦</span><b>YOU</b><span class="vs-sub">${s.rival.divisionIcon} ${s.rival.division} · ${s.rival.rating}</span></div>
+      <div class="vs-mark">VS</div>
+      <div class="vs-foes">${featured.map((r) => `<div class="vs-foe"><span class="vs-bird">🐤</span><b>${escapeHtml(r.name)}</b><span class="vs-sub">${escapeHtml(r.tag)} · simulated</span></div>`).join("")}</div>
     </div>
 
-    <div class="section-title">How the pack works</div>
-    <div class="field-guide">
-      <div class="fg-row"><b>🌀 Slipstream</b> Tuck in just behind another bird to cut drag. <em>Hunt, draft, then break out.</em></div>
-      <div class="fg-row"><b>👑 Roster bar</b> Every bird appears along the top. Yours is gold.</div>
-      <div class="fg-row"><b>👋 Emotes</b> Tap an emote to taunt the pack mid-flight.</div>
-      <div class="fg-row"><b>📸 Photo finish</b> Cross within a wing-length and the game names your rival.</div>
+    <div class="lobby-rules">
+      <span><b>3,000 m</b> gate</span><span class="dot"></span>
+      <span><b>41</b> birds</span><span class="dot"></span>
+      <span>Same hills · same wind</span>
     </div>
 
-    ${s.nemesis ? `<div class="reward-strip nest">Rival: <b>${escapeHtml(s.nemesis)}</b> beat you last race — settle it.</div>` : ""}
+    <div class="loadout-card">
+      <div class="loadout-row"><span>🪶 ${s.loadout.bird}</span><span>${s.loadout.trail}</span><span>🎒 ${s.loadout.boosts} armed</span></div>
+      <button class="mini-btn" data-ui data-action="open-shop">Change loadout</button>
+    </div>
+
+    <button class="primary-btn race40 hero" data-ui data-action="quick-match"><span class="hero-label">⚡ START RACE</span><span class="hero-hint">ranked · rating on the line</span></button>
+    <button class="soft-btn wide" data-ui data-action="pvp-casual">Casual start · no rating change</button>
+
+    <div class="race-grid">
+      <div class="race-card">
+        <div class="race-card-h"><b>Private room</b><span>race friends</span></div>
+        <div class="code-row big">
+          <span class="code">${s.roomCode ? escapeHtml(s.roomCode) : "— — — — —"}</span>
+          <button class="mini-btn gold" data-ui data-action="host-room">${s.roomCode ? "New" : "Host"}</button>
+        </div>
+        <div class="redeem">
+          <input data-ui data-ref="roomCode" maxlength="5" placeholder="CODE" autocomplete="off" style="text-transform:uppercase" />
+          <button class="mini-btn" data-ui data-action="join-room">Join</button>
+        </div>
+      </div>
+      <div class="race-card how">
+        <div class="race-card-h"><b>Race craft</b><span>win the pack</span></div>
+        <div class="race-tip"><b>🌀 Draft</b><span>Tuck behind a rival to cut drag, then slingshot past.</span></div>
+        <div class="race-tip"><b>👑 Roster</b><span>Every bird rides the top rail — you are gold.</span></div>
+        <div class="race-tip"><b>📸 Finish</b><span>Cross within a wing-length for a photo finish.</span></div>
+      </div>
+    </div>
+
+    ${s.nemesis ? `<div class="reward-strip nest nemesis">Rival: <b>${escapeHtml(s.nemesis)}</b> beat you last race. <button class="mini-btn gold" data-ui data-action="quick-match">Settle it</button></div>` : ""}
+    <button class="ghost-btn" data-ui data-action="menu">Back out</button>
     <p class="fineprint">${
       s.multiplayerLive
-        ? "Connected to the race service. Finish order is decided by the server."
-        : "No race service is configured, so the 40-bird field is simulated locally. These are practice bots, not live players."
+        ? "Connected to the configured race server. Finish order is decided server-side."
+        : "Practice field: rivals are simulated locally on identical physics and a shared seed. Set VITE_MULTIPLAYER_URL for real players — see LEADERBOARD_API.md."
     }</p>
+  `;
+}
+
+function renderRank(s: HudSnapshot): string {
+  const r = s.rival;
+  const wl = r.wins + r.losses > 0 ? Math.round((r.wins / (r.wins + r.losses)) * 100) : 0;
+  return `
+    ${head("Rival Rank", "back", `<span class="pill">● On-device</span>`)}
+    <div class="rank-hero">
+      <div class="rank-div-big">${r.divisionIcon}</div>
+      <div class="rank-hero-num">${r.rating}</div>
+      <div class="rank-hero-div">${r.division}</div>
+      <div class="rank-bar big"><i style="width:${Math.round(r.progress * 100)}%"></i></div>
+      <div class="rank-hero-next">${r.nextNeeded > 0 ? `${r.nextNeeded} rating to ${r.nextName}` : "Top division — defend it"}</div>
+    </div>
+    <div class="rank-stats">
+      <div><span>W–L</span><b>${r.wins}–${r.losses}</b></div>
+      <div><span>Win rate</span><b>${wl}%</b></div>
+      <div><span>Streak</span><b>🔥${r.streak}</b></div>
+      <div><span>Best</span><b>×${r.bestStreak}</b></div>
+    </div>
+    <div class="section-title">Recent races <small>this device only</small></div>
+    ${
+      r.matches.length
+        ? `<div class="match-list">${[...r.matches]
+            .reverse()
+            .map(
+              (m) =>
+                `<div class="match-row ${m.won ? "won" : ""}"><span class="m-place">${m.won ? "🏅" : ""}P${m.place}</span><span class="m-meta">of ${m.field} · ${escapeHtml(m.mode)}</span><span class="m-date">${escapeHtml(m.date)}</span></div>`,
+            )
+            .join("")}</div>`
+        : `<p class="fineprint">No ranked races yet. Your first 40-bird finish sets the tone.</p>`
+    }
+    <button class="primary-btn race40 hero" data-ui data-action="pvp-ranked"><span class="hero-label">⚔ RACE RANKED</span><span class="hero-hint">climb or defend ${r.division}</span></button>
+    <p class="fineprint">Rival rating lives on this device and moves only with ranked 40-bird finishes. No server rank exists in this build.</p>
   `;
 }
 
@@ -976,39 +1055,22 @@ function renderCups(s: HudSnapshot): string {
   `;
 }
 
-const MODE_TAGS: Record<string, { tag: string; reward: string }> = {
-  daytrip: { tag: "Solo · endless", reward: "Unlocks islands, coins and Nest levels" },
-  race: { tag: "Solo · timed", reward: "Best race time saved on this device" },
-  zenith: { tag: "Solo · score attack", reward: "Feeds altitude records and cups" },
-  distance: { tag: "Solo · timed", reward: "Best distance saved on this device" },
-  coinrush: { tag: "Solo · timed", reward: "Fast coin farming for the shop" },
-  perfect: { tag: "Solo · skill", reward: "Trains launch timing; scores cups" },
-  endless: { tag: "Solo · escalating", reward: "Highest score ceiling for veterans" },
-  massrace: { tag: "Practice grid · local", reward: "Rivals are simulated birds, not players" },
-};
-
 function renderModes(s: HudSnapshot): string {
   return `
     ${head("Game modes")}
-    <p class="tagline">Every mode runs on the same hills and shares your unlocks. Pick the pressure you want.</p>
+    <p class="tagline">Same hills, different pressure. Every mode shares your unlocks.</p>
     <div class="mode-list">
       ${s.modes
-        .map((m) => {
-          const meta = MODE_TAGS[m.id] ?? { tag: "Solo", reward: "Shares your progression" };
-          return `<button class="mode-card ${m.id === s.modeId ? "on" : ""}" data-ui data-action="pick-mode" data-id="${m.id}">
+        .map(
+          (m) => `<button class="mode-card ${m.id === s.modeId ? "on" : ""}" data-ui data-action="pick-mode" data-id="${m.id}">
             <span class="mode-icon">${m.icon}</span>
-            <span class="mode-body">
-              <b>${m.name}<span class="mode-tag">${meta.tag}</span></b>
-              <em>${m.blurb}</em>
-              <i class="mode-reward">${meta.reward}</i>
-            </span>
+            <span class="mode-body"><b>${m.name}</b><em>${m.blurb}</em></span>
             <span class="mode-meta">${m.finish ? `${m.finish / 1000} km` : m.clock ? `${m.clock}s` : "∞"}</span>
-          </button>`;
-        })
+          </button>`,
+        )
         .join("")}
     </div>
-    <button class="soft-btn wide" data-ui data-action="versus">👥 Local 2-player race (same device)</button>
-    <p class="fineprint">Progress is stored on this device. Nothing here competes with live players.</p>
+    <button class="soft-btn wide" data-ui data-action="versus">👥 Local 2-player race</button>
   `;
 }
 
@@ -1017,14 +1079,25 @@ function renderVersusResult(s: HudSnapshot): string {
   const b = s.p2Stats!;
   const row = (label: string, x: number, y: number, fmt: (n: number) => string): string => {
     const win = x === y ? 0 : x > y ? 1 : 2;
-    return `<div class="vs-stat"><span class="${win === 1 ? "w" : ""}">${fmt(x)}</span><em>${label}</em><span class="${win === 2 ? "w" : ""}">${fmt(y)}</span></div>`;
+    const max = Math.max(x, y, 1);
+    return `<div class="vs-stat">
+      <span class="${win === 1 ? "w" : ""}">${fmt(x)}</span>
+      <em>${label}<i class="vs-bars"><b class="l" style="width:${Math.round((x / max) * 100)}%"></b><b class="r" style="width:${Math.round((y / max) * 100)}%"></b></i></em>
+      <span class="${win === 2 ? "w" : ""}">${fmt(y)}</span>
+    </div>`;
   };
   const time = (r: RacerStats): string => (r.finishedAt > 0 ? `${r.finishedAt.toFixed(1)}s` : "DNF");
+  const margin =
+    a.finishedAt > 0 && b.finishedAt > 0 ? Math.abs(a.finishedAt - b.finishedAt).toFixed(1) + "s" : "by distance";
   return `
-    <div class="vs-crown">${s.versusWinner === 1 ? "🥇 PLAYER 1 WINS" : "🥇 PLAYER 2 WINS"}</div>
-    <div class="vs-head"><span class="p1">P1</span><span class="p2">P2</span></div>
+    <div class="vs-hero ${s.versusWinner === 1 ? "p1win" : "p2win"}">
+      <span class="vs-crown-big">🏆</span>
+      <div class="vs-winner">PLAYER ${s.versusWinner} WINS</div>
+      <div class="vs-margin">by ${margin} · same device, same hills</div>
+    </div>
+    <div class="vs-head"><span class="p1">🟠 P1 · SPACE / left half</span><span class="p2">P2 · ENTER / right half 🔵</span></div>
     <div class="vs-stats">
-      <div class="vs-stat"><span>${time(a)}</span><em>race time</em><span>${time(b)}</span></div>
+      <div class="vs-stat time"><span>${time(a)}</span><em>race time</em><span>${time(b)}</span></div>
       ${row("distance", a.distance, b.distance, (n) => `${Math.round(n)}m`)}
       ${row("max altitude", a.maxAltitude, b.maxAltitude, (n) => `${Math.round(n)}m`)}
       ${row("perfect ramps", a.perfects, b.perfects, (n) => String(n))}
@@ -1032,7 +1105,7 @@ function renderVersusResult(s: HudSnapshot): string {
       ${row("coins", a.coins, b.coins, (n) => String(n))}
       ${row("top speed", a.topSpeed, b.topSpeed, (n) => `${Math.round(n)}`)}
     </div>
-    <button class="primary-btn" data-ui data-action="versus">Rematch</button>
+    <button class="primary-btn hero" data-ui data-action="versus"><span class="hero-label">REMATCH</span><span class="hero-hint">swap sides for fairness</span></button>
     <button class="ghost-btn" data-ui data-action="menu">Menu</button>
   `;
 }
@@ -1064,92 +1137,82 @@ function renderAtlas(s: HudSnapshot): string {
   `;
 }
 
-/**
- * One compact objectives block instead of three stacked lists. The menu was
- * previously the longest screen in the game; this keeps the single open loop
- * visible without burying the primary call to action.
- */
-function renderObjectives(s: HudSnapshot): string {
-  const rows: string[] = [];
-  let lead: SessionGoal | null = null;
-  for (const g of s.sessionGoals) {
-    if (g.done) continue;
-    if (!lead || g.progress / g.target > lead.progress / lead.target) lead = g;
-  }
-  if (lead) {
-    rows.push(
-      `<div class="obj"><span class="obj-k">Goal</span><span class="obj-t">${escapeHtml(lead.label)}</span><span class="obj-v">${Math.min(lead.progress, lead.target)}/${lead.target}</span></div>`,
-    );
-  }
-  const quest = s.quests.find((q) => !q.claimed);
-  if (quest) {
-    rows.push(
-      `<div class="obj"><span class="obj-k">Daily</span><span class="obj-t">${escapeHtml(quest.def.label)}</span><span class="obj-v">● ${quest.def.reward}</span></div>`,
-    );
-  }
-  const mission = s.missions.find((m) => !m.done);
-  if (mission) {
-    rows.push(
-      `<div class="obj"><span class="obj-k">Nest</span><span class="obj-t">${mission.def.desc}</span><span class="obj-v">${Math.min(mission.progress, mission.def.target)}/${mission.def.target}</span></div>`,
-    );
-  }
-  if (rows.length === 0) return "";
-  return `<div class="objectives">${rows.join("")}</div>`;
-}
-
 function renderMain(s: HudSnapshot): string {
   const portal = s.portalName !== "none";
-  const seedOptions: { id: SeedMode; label: string }[] = [
+  const modes: { id: SeedMode; label: string }[] = [
     { id: "today", label: "Today" },
     { id: "yesterday", label: "Yesterday" },
     { id: "random", label: "Wild" },
   ];
-  const seedPicker = portal
-    ? `<p class="portal-note">${s.portalName === "poki" ? "Poki" : "CrazyGames"} edition · portal rewards enabled</p>`
-    : s.gold
-      ? `<div class="seg">${seedOptions
-          .map((m) => `<button data-ui data-action="seed-${m.id}" class="${s.seedMode === m.id ? "on" : ""}">${m.label}</button>`)
-          .join("")}</div>`
-      : `<button class="lock-chip" data-ui data-action="open-paywall">🔒 Choose your hills with Gold</button>`;
-
-  const best = formatDistance(s.bestDistance);
-  const today = formatDistance(s.todayBest);
-
+  const seedPicker = !portal && s.gold
+    ? `<div class="seg">${modes
+        .map((m) => `<button data-ui data-action="seed-${m.id}" class="${s.seedMode === m.id ? "on" : ""}">${m.label}</button>`)
+        .join("")}</div>`
+    : portal
+      ? `<p class="portal-note">${s.portalName === "poki" ? "Poki" : "CrazyGames"} edition · portal rewards enabled</p>`
+      : `<button class="lock-chip" data-ui data-action="open-paywall">🔒 Pick your hills with Gold</button>`;
   return `
-    <div class="brand">
-      <div class="logo-mark">✶</div>
-      <h1>SUNBIRD</h1>
-      <p class="tagline">Hold to dive. Release to soar. Reach the next island before the sun goes down.</p>
+    <header class="hero">
+      <div class="hero-sun" aria-hidden="true"></div>
+      <div class="hero-title">
+        <span class="hero-kicker">chase the daylight</span>
+        <h1>SUNBIRD</h1>
+        <p class="hero-sub">Dive the valleys · ride the ridgeline · outrun the sunset</p>
+      </div>
+    </header>
+
+    <div class="hero-meta">
+      <span class="pill seed-pill">${s.seedLabel}</span>
     </div>
-    <p class="seed">${s.seedLabel}</p>
     ${seedPicker}
-    <button class="primary-btn hero" data-ui data-action="start" aria-label="Take flight — hold anywhere">
-      <span class="hero-label">Take flight</span>
-      <span class="hero-hint">hold anywhere</span>
+
+    <button class="primary-btn fly-cta pvp-hero" data-ui data-action="pvp-ranked">
+      <span class="fly-label">⚔&nbsp;PLAY&nbsp;PVP</span>
+      <span class="fly-sub">40-bird field · first across the gate wins</span>
     </button>
-    <div class="how">
-      <span><b>HOLD</b> dive &amp; build speed</span>
-      <span class="dot"></span>
-      <span><b>RELEASE</b> at the crest to launch</span>
+
+    <button class="rank-card" data-ui data-action="open-rank" aria-label="View Rival rank">
+      <span class="rank-div">${s.rival.divisionIcon} ${s.rival.division}</span>
+      <span class="rank-num">${s.rival.rating}</span>
+      <span class="rank-bar"><i style="width:${Math.round(s.rival.progress * 100)}%"></i></span>
+      <span class="rank-sub">${
+        s.rival.nextNeeded > 0
+          ? `${s.rival.nextNeeded} to ${s.rival.nextName}`
+          : "Top division — defend it"
+      } · 🔥${s.rival.streak} streak · local rating</span>
+    </button>
+
+    <div class="pvp-modes" role="group" aria-label="Play modes">
+      <button class="pvp-mode rated" data-ui data-action="pvp-ranked"><i>🏆</i><b>Ranked 40</b><span>Rating moves</span></button>
+      <button class="pvp-mode" data-ui data-action="pvp-casual"><i>🐦</i><b>Casual 40</b><span>No rating</span></button>
+      <button class="pvp-mode" data-ui data-action="versus"><i>👥</i><b>Local 2P</b><span>Same screen</span></button>
+      <button class="pvp-mode" data-ui data-action="pvp-practice"><i>🌅</i><b>Practice</b><span>Empty skies</span></button>
     </div>
-    ${
-      s.firstRun
-        ? `<div class="firstrun"><b>First flight?</b> Chain downhills to stay fast — the sun meter is your clock.</div>`
-        : ""
-    }
-    <div class="stat-strip">
-      <div><span>Best</span><b>${best}</b></div>
-      <div><span>Today</span><b>${today}</b></div>
-      <div><span>Streak</span><b>${s.streakDays}d</b></div>
-      <div><span>Nest</span><b>×${s.nestMult.toFixed(2)}</b></div>
+
+    <div class="loadout-strip">
+      <span class="loadout-bird">🪶 ${s.loadout.bird}</span>
+      <span class="loadout-trail">${s.loadout.trail}</span>
+      <span class="loadout-boost">🎒 ${s.loadout.boosts} armed</span>
+      <button class="mini-btn" data-ui data-action="open-shop">Loadout</button>
     </div>
-    <div class="menu-grid">
-      <button class="tile" data-ui data-action="mode-select"><span class="tile-icon">🎯</span><span class="tile-body"><b>Game modes</b><em>Race, Zenith, Coin Rush…</em></span></button>
-      <button class="tile" data-ui data-action="versus"><span class="tile-icon">👥</span><span class="tile-body"><b>2 Player</b><em>Local split screen</em></span></button>
-      <button class="tile" data-ui data-action="open-live"><span class="tile-icon">🐦</span><span class="tile-body"><b>Mass Race</b><em>40-bird practice grid</em></span></button>
-      <button class="tile" data-ui data-action="open-cups"><span class="tile-icon">🏆</span><span class="tile-body"><b>Weekly cups</b><em>Local divisions</em></span></button>
-    </div>
-    ${renderObjectives(s)}
+
+    <div class="how"><div><b>HOLD</b> to dive</div><div class="dot"></div><div><b>RELEASE</b> to glide</div></div>
+
+    <nav class="nav-grid compact">
+      <button class="nav-btn" data-ui data-action="mode-select"><i>🎯</i><span>Modes</span></button>
+      <button class="nav-btn" data-ui data-action="open-live"><i>🐦</i><span>Race</span></button>
+      <button class="nav-btn" data-ui data-action="open-board"><i>🌍</i><span>Board</span></button>
+      <button class="nav-btn" data-ui data-action="open-cups"><i>🏆</i><span>Cups</span></button>
+      <button class="nav-btn" data-ui data-action="open-shop"><i>🛍</i><span>Shop</span></button>
+      <button class="nav-btn" data-ui data-action="open-pass"><i>🎟</i><span>Pass ${s.season.tier}</span></button>
+      <button class="nav-btn" data-ui data-action="open-trophies"><i>🏅</i><span>${s.trophyCounts.unlocked}/${s.trophyCounts.total}</span></button>
+      <button class="nav-btn" data-ui data-action="open-rank"><i>⚔</i><span>Rank</span></button>
+      <button class="nav-btn" data-ui data-action="open-atlas"><i>🗺</i><span>Atlas</span></button>
+      <button class="nav-btn" data-ui data-action="open-scores"><i>📈</i><span>Scores</span></button>
+      <button class="nav-btn" data-ui data-action="open-account"><i>👤</i><span>Account</span></button>
+      <button class="nav-btn" data-ui data-action="open-settings" aria-label="Settings"><i>⚙</i><span>Settings</span></button>
+    </nav>
+
     ${
       !portal && s.vipExpiredNotice
         ? `<div class="expire-strip">♛ VIP has lapsed — the Aurora bird stays yours, perks are paused.
@@ -1157,54 +1220,82 @@ function renderMain(s: HudSnapshot): string {
              <button class="mini-btn ghost" data-ui data-action="vip-dismiss">Later</button></div>`
         : ""
     }
-    <div class="menu-foot">
+
+    <div class="wallet-row">
       <span class="pill coin">● ${s.wallet}</span>
+      <span class="pill">🔥 ${s.streakDays}-day streak</span>
+      <span class="pill">Nest Lv.${s.nestLevel} · ×${s.nestMult.toFixed(2)}</span>
+       ${!portal && s.gold ? '<span class="pill gold">✦ Gold</span>' : ""}
+       ${!portal && s.vip ? '<span class="pill vip">♛ VIP</span>' : ""}
       <span class="pill skill">${s.skillLabel}</span>
-      ${!portal && s.gold ? '<span class="pill gold">✦ Gold</span>' : ""}
-      ${!portal && s.vip ? '<span class="pill vip">♛ VIP</span>' : ""}
     </div>
-    <div class="menu-links">
-      <button data-ui data-action="open-shop">Shop</button>
-      <button data-ui data-action="open-pass">Pass</button>
-      <button data-ui data-action="open-trophies">Trophies</button>
-      <button data-ui data-action="open-board">Scores</button>
-      <button data-ui data-action="open-atlas">Atlas</button>
-      ${!portal && (!s.gold || !s.vip) ? '<button data-ui data-action="open-paywall">✦ Gold</button>' : ""}
-      <button data-ui data-action="open-account">Account</button>
-      <button data-ui data-action="open-settings" aria-label="Settings">Settings</button>
-    </div>
+
+    ${renderGoalList(s.sessionGoals)}
+    ${renderQuests(s.quests)}
+    ${renderMissions(s.missions)}
+    <div class="menu-stats"><div>Best <b>${formatDistance(s.bestDistance)}</b></div><div>Today <b>${formatDistance(s.todayBest)}</b></div></div>
   `;
+}
+
+function skinRarity(d: { goldOnly?: boolean; vipOnly?: boolean; price: number }): { key: string; label: string } {
+  if (d.vipOnly) return { key: "mythic", label: "MYTHIC" };
+  if (d.goldOnly) return { key: "legendary", label: "LEGENDARY" };
+  if (d.price >= 700) return { key: "epic", label: "EPIC" };
+  if (d.price >= 400) return { key: "rare", label: "RARE" };
+  if (d.price > 0) return { key: "common", label: "COMMON" };
+  return { key: "starter", label: "STARTER" };
+}
+
+function skinStatBars(d: { speedMult: number; feverBonus: number; daylightBonus: number; magnetAlways: boolean }): string {
+  const bars: [string, number, string][] = [
+    ["SPD", Math.min(100, Math.round(((d.speedMult - 1) / 0.08) * 100)), `${d.speedMult > 1 ? "+" : ""}${Math.round((d.speedMult - 1) * 100)}%`],
+    ["FVR", Math.min(100, Math.round((d.feverBonus / 5) * 100)), d.feverBonus > 0 ? `+${d.feverBonus}s` : "—"],
+    ["SUN", Math.min(100, Math.round((d.daylightBonus / 12) * 100)), d.daylightBonus > 0 ? `+${d.daylightBonus}s` : "—"],
+  ];
+  return `<div class="sk-stats">${bars
+    .map(([k, pct, val]) => `<span class="sk-stat"><em>${k}</em><i><b style="width:${pct}%"></b></i><u>${val}</u></span>`)
+    .join("")}${d.magnetAlways ? `<span class="sk-stat mag">🧲 always-on</span>` : ""}</div>`;
 }
 
 function renderSkinCard(v: SkinView, portal = false): string {
   const d = v.def;
+  const rarity = skinRarity(d);
   const swatch = `<div class="bird-swatch" style="--body:${hex(d.body)};--wing:${hex(d.wing)};--belly:${hex(d.belly)}"><i class="w"></i><i class="b"></i><i class="e"></i></div>`;
   let action: string;
-  if (v.equipped) action = `<span class="tag on">Equipped</span>`;
+  if (v.equipped) action = `<span class="tag on">✓ In use</span>`;
   else if (v.owned) action = `<button class="mini-btn" data-ui data-action="equip-skin" data-id="${d.id}">Equip</button>`;
   else if (v.locked && portal)
     action = `<span class="tag portal-lock">Portal event</span>`;
   else if (v.locked)
     action = `<button class="mini-btn ${v.lockReason === "vip" ? "vip" : "gold"}" data-ui data-action="open-paywall">${v.lockReason === "vip" ? "♛ VIP" : "✦ Gold"}</button>`;
-  else action = `<button class="mini-btn ${v.affordable ? "" : "off"}" data-ui data-action="buy-skin" data-id="${d.id}">● ${d.price}</button>`;
-  return `<div class="skin-card ${v.equipped ? "equipped" : ""}">${swatch}<div class="sk-name">${d.name}</div><div class="sk-perk">${d.perk}</div>${action}</div>`;
+  else
+    action = `<button class="mini-btn ${v.affordable ? "" : "off"}" data-ui data-action="buy-skin" data-id="${d.id}">● ${d.price}</button>`;
+  return `<div class="skin-card r-${rarity.key} ${v.equipped ? "equipped" : ""} ${v.owned ? "owned" : ""}">
+    <span class="rarity">${rarity.label}</span>${swatch}
+    <div class="sk-name">${d.name}</div><div class="sk-perk">${d.perk}</div>${skinStatBars(d)}${action}</div>`;
 }
 
-function renderBoostRow(v: BoostView): string {
+function renderBoostRow(v: BoostView, wallet: number): string {
   const d = v.def;
+  const missing = Math.max(0, d.price - wallet);
   const action = v.armed
     ? `<span class="tag on">Armed ✓</span>`
-    : `<button class="mini-btn ${v.affordable ? "" : "off"}" data-ui data-action="buy-boost" data-id="${d.id}">● ${d.price}</button>`;
-  return `<div class="boost-row ${v.armed ? "armed" : ""}"><span class="bi">${d.icon}</span><div><div class="mt">${d.name}</div><div class="md">${d.desc}</div></div>${action}</div>`;
+    : v.affordable
+      ? `<button class="mini-btn" data-ui data-action="buy-boost" data-id="${d.id}">● ${d.price}</button>`
+      : `<span class="tag need">Need ${missing}●</span>`;
+  return `<div class="boost-row ${v.armed ? "armed" : ""}"><span class="bi">${d.icon}</span><div><div class="mt">${d.name}<span class="boost-once">one flight</span></div><div class="md">${d.desc}</div></div>${action}</div>`;
 }
 
 function renderShop(s: HudSnapshot): string {
+  const owned = s.skins.filter((v) => v.owned).length;
+  const armed = s.boosts.filter((v) => v.armed).length;
   return `
     ${head("Shop", "back", `<span class="pill coin">● ${s.wallet}</span>`)}
-    <div class="section-title">Birds</div>
+    <p class="tagline">Birds change how you fly. Boosts arm for exactly one flight — spend them where they count.</p>
+    <div class="section-title">Birds <small>${owned}/${s.skins.length} owned</small></div>
     <div class="skin-grid">${s.skins.map((skin) => renderSkinCard(skin, s.portalName !== "none")).join("")}</div>
-    <div class="section-title">Boosts <small>armed for your next flight</small></div>
-    <div class="boost-list">${s.boosts.map(renderBoostRow).join("")}</div>
+    <div class="section-title">Boosts <small>${armed} armed for your next flight</small></div>
+    <div class="boost-list">${s.boosts.map((b) => renderBoostRow(b, s.wallet)).join("")}</div>
     ${s.portalName === "none" && !(s.gold && s.vip) ? upsellStrip() : ""}
     <p class="fineprint">Earn coins by flying, daily quests, streaks and the Nest Pass.</p>
   `;
@@ -1226,14 +1317,14 @@ function renderPaywall(s: HudSnapshot): string {
   return `
     ${head("Gold &amp; VIP")}
     <div class="gold-hero"><div class="gold-badge">✦</div><div class="gold-price">${s.goldPrice}<small> one-time</small></div></div>
-    <ul class="feature-list">${s.goldFeatures.map((f) => `<li>${escapeHtml(f)}</li>`).join("")}</ul>
+    <ul class="feature-list">${s.goldFeatures.map((f) => `<li>${f}</li>`).join("")}</ul>
     ${
       s.gold
         ? `<div class="owned-banner">You own Gold. Thank you, sunbird ✦</div>`
         : `<button class="primary-btn gold" data-ui data-action="gold-buy">Unlock Gold · ${s.goldPrice}</button>`
     }
       <div class="gold-hero vip"><div class="gold-badge vip">♛</div><div class="gold-price">${s.vipPrice}<small> per month</small></div></div>
-    <ul class="feature-list">${s.vipFeatures.map((f) => `<li>${escapeHtml(f)}</li>`).join("")}</ul>
+    <ul class="feature-list">${s.vipFeatures.map((f) => `<li>${f}</li>`).join("")}</ul>
     ${
       s.vip
         ? `<div class="owned-banner vip">VIP active — ${s.vipDaysLeft} day${s.vipDaysLeft === 1 ? "" : "s"} left${
@@ -1290,33 +1381,25 @@ function renderSettings(s: HudSnapshot): string {
   const sPct = Math.round((s.settings.sfxVolume ?? 0.9) * 100);
   return `
     ${head("Settings")}
-    <p class="section-note">Audio</p>
     ${toggle("Sound Effects", "mute", !s.settings.mute)}
     <div class="setting-row"><span>SFX Volume</span><button class="mini-btn" data-ui data-action="set-sfx-vol">${s.settings.mute ? "Muted" : `${sPct}%`}</button></div>
     ${toggle("Music", "music", s.settings.music)}
     <div class="setting-row"><span>Music Volume</span><button class="mini-btn" data-ui data-action="set-music-vol">${!s.settings.music ? "Off" : `${mPct}%`}</button></div>
-    <p class="section-note">Device</p>
     ${toggle("Haptics", "haptics", s.settings.haptics)}
     ${toggle("Reduce motion", "motion", s.settings.reduceMotion)}
     <div class="setting-row"><span>Render quality</span><button class="mini-btn" data-ui data-action="set-quality">${s.settings.quality.toUpperCase()}</button></div>
-    ${s.canInstall ? `<button class="soft-btn wide" data-ui data-action="install-app">⬇ Install Sunbird</button>` : ""}
-    <p class="section-note">Save data</p>
     <div class="setting-row"><span>Flights flown</span><b>${s.runsPlayed}</b></div>
+    ${s.canInstall ? `<button class="soft-btn wide" data-ui data-action="install-app">⬇ Install Sunbird</button>` : ""}
     <button class="ghost-btn danger" data-ui data-action="reset-progress">${s.resetArmed ? "Tap again to erase everything" : "Reset progress"}</button>
-    <p class="fineprint">Sunbird · ${s.seedLabel}</p>
+    <p class="fineprint">Sunbird 2.5 Pro · ${s.seedLabel}</p>
   `;
 }
 
 function renderScores(s: HudSnapshot): string {
   return `
-    ${head("High glides", "back", `<span class="pill">${s.runsPlayed} flights</span>`)}
-    <p class="tagline">Your personal records, stored on this device.</p>
-    <div class="stat-strip dual">
-      <div><span>Best ever</span><b>${formatDistance(s.bestDistance)}</b></div>
-      <div><span>Today</span><b>${formatDistance(s.todayBest)}</b></div>
-    </div>
-    <h3 class="table-title">Recent glides</h3>
+    ${head("High glides")}
     ${renderScoreTable(s.highScores)}
+    <div class="menu-stats"><div>Today's best <b>${formatDistance(s.todayBest)}</b></div><div>Flights <b>${s.runsPlayed}</b></div></div>
   `;
 }
 
@@ -1409,7 +1492,7 @@ function renderAccount(s: HudSnapshot): string {
     <div class="section-title">Cloud save</div>
     <div class="sheet">
       <p class="tagline">Copy this code to move your progress to another device.</p>
-      <textarea class="cloud-box" data-ui data-ref="cloudExport" readonly rows="3">${escapeHtml(s.cloudCode)}</textarea>
+      <textarea class="cloud-box" data-ui data-ref="cloudExport" readonly rows="3">${s.cloudCode}</textarea>
       <button class="mini-btn" data-ui data-action="copy-cloud">Copy code</button>
       <p class="tagline" style="margin-top:10px">Paste a code from another device to restore it here:</p>
       <textarea class="cloud-box" data-ui data-ref="cloudImport" rows="3" placeholder="Paste save code…"></textarea>
@@ -1436,31 +1519,38 @@ function renderGoalList(goals: SessionGoal[]): string {
 function renderGameOver(s: HudSnapshot): string {
   if (s.versus && s.p1Stats && s.p2Stats) return renderVersusResult(s);
   const questTotal = s.claimedQuests.reduce((a, q) => a + q.reward, 0);
+  const deltaTxt =
+    s.raceRated && s.ratingDelta !== 0
+      ? `<span class="rate-delta ${s.ratingDelta > 0 ? "up" : "down"}">${s.ratingDelta > 0 ? "+" : ""}${s.ratingDelta}</span>`
+      : "";
   const raceStrip =
     s.massRace && s.racePlace > 0
-      ? `<div class="race-result ${s.racePlace === 1 ? "win" : ""}">
-           <span class="rr-place">P${s.racePlace}</span>
-           <span class="rr-of">of ${s.raceField} pilots</span>
-           <span class="rr-time">${s.raceFinishTime.toFixed(1)}s</span>
+      ? `<div class="race-hero ${s.racePlace === 1 ? "win" : s.racePlace <= 3 ? "podium" : ""}">
+           <div class="race-medal">${s.racePlace === 1 ? "🥇" : s.racePlace === 2 ? "🥈" : s.racePlace === 3 ? "🥉" : "🏁"}</div>
+           <div class="race-place"><b>P${s.racePlace}</b><span>of ${s.raceField} pilots · ${s.raceFinishTime.toFixed(1)}s</span></div>
+           <div class="race-bar"><i style="width:${Math.round((1 - (s.racePlace - 1) / Math.max(1, s.raceField)) * 100)}%"></i></div>
+           ${
+             s.raceRated
+               ? `<div class="race-rating">Rival rating ${s.rival.rating} ${deltaTxt}<span class="race-rated-tag">ranked · local</span></div>`
+               : `<div class="race-rating"><span class="race-rated-tag">casual · rating frozen</span></div>`
+           }
+           ${
+             s.rival.streak >= 2
+               ? `<div class="race-streak">🔥 ${s.rival.streak}-race win streak${s.ratingBonus > 0 ? ` · +${s.ratingBonus}● streak bonus` : ""}</div>`
+               : ""
+           }
          </div>
-         ${s.photoFinish ? `<div class="reward-strip">📸 ${escapeHtml(s.photoFinish)}</div>` : ""}
-         ${s.nemesis ? `<button class="soft-btn wide" data-ui data-action="race-40">🔁 Rematch — beat ${escapeHtml(s.nemesis)}</button>` : ""}`
+         ${s.photoFinish ? `<div class="reward-strip photo">📸 ${escapeHtml(s.photoFinish)}</div>` : ""}
+         <button class="primary-btn race40 hero" data-ui data-action="${s.raceRated ? "pvp-ranked" : "pvp-casual"}"><span class="hero-label">🔁 REMATCH</span><span class="hero-hint">${s.nemesis ? `settle it with ${escapeHtml(s.nemesis)}` : "same field · same hills"}</span></button>
+         <button class="soft-btn wide" data-ui data-action="open-live">Find new match</button>`
       : "";
-  const isBest = s.distance > s.prevBestDistance && s.distance > 0;
-  const delta = Math.round(s.distance - s.prevBestDistance);
-  const outcome = isBest
-    ? s.prevBestDistance > 0
-      ? `<div class="outcome best"><span class="outcome-k">New personal best</span><span class="outcome-v">+${delta} m</span></div>`
-      : `<div class="outcome best"><span class="outcome-k">First flight logged</span><span class="outcome-v">${formatDistance(s.distance)}</span></div>`
-    : `<div class="outcome"><span class="outcome-k">Flight over</span><span class="outcome-v">${delta} m vs your best</span></div>`;
   return `
     <div class="zzz">z z z</div>
-    <h2>Sunset</h2>
-    <p class="tagline">The daylight ran out — gliding speed set your final distance.</p>
-    ${outcome}
+    <h2>Sunbird sleeps</h2>
+    <p class="tagline">The daylight ran out.</p>
     <div class="over-stats">
-      <div class="primary"><span>Distance</span><b>${formatDistance(s.distance)}</b></div>
-      <div class="primary"><span>Score</span><b>${Math.floor(s.score).toLocaleString()}</b></div>
+      <div><span>Distance</span><b>${formatDistance(s.distance)}</b></div>
+      <div><span>Score</span><b>${Math.floor(s.score).toLocaleString()}</b></div>
       <div><span>Coins</span><b>${s.coins}</b></div>
       <div><span>Perfects</span><b>${s.perfects}</b></div>
       <div><span>Zeniths</span><b>${s.zeniths}</b></div>
@@ -1472,16 +1562,19 @@ function renderGameOver(s: HudSnapshot): string {
     ${s.nearMiss ? `<div class="nearmiss">${s.nearMiss}</div>` : ""}
     ${raceStrip}
     <div class="reached-strip">Reached <b>${s.biomeEmoji} ${s.biomeName}</b> · Island ${s.island + 1}</div>
-    <button class="primary-btn big hero" data-ui data-action="retry" aria-label="Fly again — hold anywhere or press R"><span class="hero-label">Fly again</span><span class="hero-hint">hold anywhere · R</span></button>
-    <div class="btn-row">
-      <button class="soft-btn wide2" data-ui data-action="mode-select">🎯 Change mode</button>
-      <button class="soft-btn wide2" data-ui data-action="menu">🏠 Menu</button>
-    </div>
+    <button class="primary-btn big" data-ui data-action="retry">Fly again <small>hold anywhere · R</small></button>
     <button class="soft-btn wide" data-ui data-action="share" ${s.shareBusy ? "disabled" : ""}>${s.shareBusy ? "Preparing…" : "📤 Share this flight"}</button>
+    <div class="btn-row">
+      <button class="soft-btn" data-ui data-action="open-shop">🛍 Shop</button>
+      <button class="soft-btn" data-ui data-action="open-pass">🎟 Pass</button>
+      <button class="soft-btn" data-ui data-action="open-atlas">🗺 Atlas</button>
+      <button class="soft-btn" data-ui data-action="menu">Menu</button>
+    </div>
+    ${s.portalName === "none" && !(s.gold && s.vip) ? upsellStrip() : ""}
     ${renderGoalList(s.sessionGoals)}
     ${renderQuests(s.quests)}
-    ${s.portalName === "none" && !(s.gold && s.vip) ? upsellStrip() : ""}
-    <h3 class="table-title">Your best glides</h3>
+    ${renderMissions(s.missions, s.newlyCompleted)}
+    <h3 class="table-title">High glides</h3>
     ${renderScoreTable(s.highScores.slice(0, 5))}
   `;
 }

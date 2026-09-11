@@ -289,7 +289,6 @@ export class Sky {
     this.sunLight.shadow.camera.top = 80;
     this.sunLight.shadow.camera.bottom = -80;
     this.sunLight.shadow.bias = -0.0006;
-    this.sunLight.shadow.normalBias = 0.02;
 
     this.palette = { farA: new THREE.Color(), farB: new THREE.Color(), farC: new THREE.Color() };
   }

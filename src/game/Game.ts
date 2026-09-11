@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { Achievements, type AchievementView } from "./Achievements";
+import { Achievements } from "./Achievements";
 import { GameAudio } from "./Audio";
 import { BIOMES, biomeForIsland } from "./Biomes";
 import { Bird, type BirdStepOpts } from "./Bird";
@@ -12,7 +12,7 @@ import { MassRace } from "./MassRace";
 import { FinishGate } from "./FinishGate";
 import { isMultiplayerConfigured, makeRoomCode, RealtimeClient } from "./Realtime";
 import { Leaderboard, loadPilotName, savePilotName, isLeaderboardOnline, type BoardMetric, type BoardPage, type BoardScope } from "./Leaderboard";
-import { Tournaments, TRAILS, type PrizeGrant, type TournamentView } from "./Tournaments";
+import { Tournaments, TRAILS, type PrizeGrant } from "./Tournaments";
 import { PowerUps } from "./PowerUps";
 import { Racer } from "./Racer";
 import {
@@ -46,10 +46,9 @@ import {
 } from "./constants";
 import { BOOSTS, GOLD, PROMO_CODES, SKINS, VIP, skinById, type BoostView, type SkinDef, type SkinView } from "./Economy";
 import { GhostPlayer, GhostRecorder } from "./Ghost";
-import { HUD, type CheckoutMode, type HudSnapshot, type SeedMode, type UiScreen, type UiState } from "./HUD";
+import { HUD, type CheckoutMode, type HudSnapshot, type LoadoutView, type RivalCard, type SeedMode, type UiScreen, type UiState } from "./HUD";
+import { divisionFor, featuredRivals, nextDivision } from "./pvp";
 import { Input } from "./Input";
-// PvP system available for future integration
-// import { divisionFor, featuredRivals, nextDivision, ratingDelta, streakBonus } from "./pvp";
 import { clamp, dateSeed, formatDatePretty, lerp } from "./math";
 import { Missions, type MissionView, type QuestReward, type QuestView, type RunStats } from "./Missions";
 import { ParticleFX } from "./ParticleFX";
@@ -67,6 +66,7 @@ import { SaveData } from "./SaveData";
 import { SeasonPass, seasonId, seasonLabel, XP_RULES } from "./SeasonPass";
 import { buildShareCard, shareOrDownload } from "./Social";
 import { initPlatform, isPortalBuild, portalTarget, type PlatformAdapter } from "../sdk/platform";
+import { LivingBackground } from "./LivingBackground";
 import { Sky } from "./Sky";
 import { Telemetry } from "./Telemetry";
 import { TerrainSystem } from "./TerrainSystem";
@@ -104,6 +104,7 @@ export class Game {
   private readonly telemetry = new Telemetry();
   private readonly ghostRecorder = new GhostRecorder();
   private readonly ghostPlayer = new GhostPlayer();
+  private readonly livingBg = new LivingBackground();
   private terrain: TerrainSystem;
   private collect: Collectibles;
   private weather: Weather;
@@ -116,21 +117,6 @@ export class Game {
   private uiVersion = 0;
   private viewsVersion = -1;
   private missionViews: MissionView[] = [];
-  // Derived view caches — recomputed only when the UI version changes instead
-  // of allocating fresh arrays every animation frame.
-  private seasonView: { tier: number; maxTier: number; have: number; need: number; label: string; tiers: ReturnType<SeasonPass["view"]> } = {
-    tier: 0,
-    maxTier: 0,
-    have: 0,
-    need: 0,
-    label: "",
-    tiers: [],
-  };
-  private trophyViews: AchievementView[] = [];
-  private trophyCounts = { unlocked: 0, total: 0 };
-  private cupViews: TournamentView[] = [];
-  private trailViews: { id: string; label: string; equipped: boolean }[] = [];
-  private todayBestCache = 0;
   private questViews: QuestView[] = [];
   private skinViews: SkinView[] = [];
   private boostViews: BoostView[] = [];
@@ -204,16 +190,19 @@ export class Game {
   private raceFinishTime = 0;
   private net: RealtimeClient | null = null;
   private roomCode = "";
+  private roomSize = 40;
+  private roomSkill: "chill" | "sharp" | "ace" = "sharp";
+  private roomMuted = false;
   private lastEmoteAt = 0;
   private draftBanner = 0;
-  // PvP fields reserved for rank screen integration
-  // private rankedRace = true;
-  // private _lastRatingDelta = 0;
-  // private _lastRatingBonus = 0;
   /** Rival tracking: who beat you last time, for the revenge prompt. */
   private nemesis = "";
   private photoFinish = "";
-  private prevBestDistance = 0;
+  private rankedRace = true;
+  private lastRatingDelta = 0;
+  private lastRatingBonus = 0;
+  private lastPlace = 0;
+  private overtakeAcc = 0;
   private readonly flow = new FlowTuner();
   private readonly goals: SessionGoals;
   private nearMiss: NearMiss = { kind: "none", gap: 0, text: "" };
@@ -321,6 +310,7 @@ export class Game {
     this.bird = new Bird();
     this.bird.addTo(this.scene);
     this.ghostPlayer.addTo(this.scene);
+    this.scene.add(this.livingBg);
 
     this.camera = new CameraRig(1);
     this.particles = new ParticleFX();
@@ -669,6 +659,25 @@ export class Game {
       } else {
         this.draftBanner = Math.max(0, this.draftBanner - dt);
       }
+      // Overtake / lead-change feedback, sampled at ~4 Hz so the 41-row
+      // sort never runs per physics tick.
+      this.overtakeAcc += dt;
+      if (this.overtakeAcc >= 0.25 && !this.bird.asleep) {
+        this.overtakeAcc = 0;
+        const place = this.massRace.standings(this.bird.x, this.startX, this.pilotName, 8).place;
+        if (this.lastPlace > 0 && place > 0 && place < this.lastPlace) {
+          const gain = this.lastPlace - place;
+          this.hud.toast(place === 1 ? "👑 LEAD! Hold it!" : `P${this.lastPlace} → P${place}!`, "gold");
+          if (place === 1) {
+            this.flash("perfect");
+            this.audio.purchase();
+          } else if (gain >= 3) {
+            this.audio.ding();
+          }
+          this.haptic(10);
+        }
+        this.lastPlace = place;
+      }
     }
 
     const biomeNow = this.terrain.biomeAt(this.bird.x);
@@ -689,7 +698,7 @@ export class Game {
       this.audio.shield();
       this.hud.toast("Shield bounce!", "power");
       this.shake(0.6);
-      this.haptic(20);
+      this.haptic([15, 10, 15, 10, 30]);
     }
 
     const slope = this.terrain.slopeAt(this.bird.x);
@@ -826,6 +835,19 @@ export class Game {
 
         this.hud.toast(`FINISH · P${s.place} of ${s.total}`, s.place <= 3 ? "gold" : "island");
         if (better) this.hud.toast("New best placing!", "gold");
+        if (this.rankedRace) {
+          const res = this.save.recordRivalResult(s.place, s.total, "massrace", this.today);
+          this.lastRatingDelta = res.delta;
+          this.lastRatingBonus = res.bonus;
+          this.hud.toast(
+            `Rival rating ${res.delta >= 0 ? "+" : ""}${res.delta} → ${this.save.state.rival.rating}${res.bonus > 0 ? ` · +${res.bonus}● streak` : ""}`,
+            res.delta >= 0 ? "gold" : "warn",
+          );
+          this.audio.purchase();
+        } else {
+          this.lastRatingDelta = 0;
+          this.lastRatingBonus = 0;
+        }
       } else {
         this.hud.toast("FINISH!", "gold");
       }
@@ -1134,6 +1156,7 @@ export class Game {
     this.finishRemaining = this.finishGate.update(visDt, this.bird.x);
     this.particles.update(visDt);
     this.camera.update(rawDt, this.bird, playing, this.terrain.heightAt(this.bird.x));
+    this.livingBg.update(rawDt, this.bird.x, this.bird.y);
 
     this.applyWorldLook(this.bird.x, this.bird.altitude);
     this.terrain.update(this.bird.x);
@@ -1225,11 +1248,16 @@ export class Game {
     // identical for anyone flying this race. Real players take over slots as
     // they join; unfilled slots keep flying as local squadron pilots.
     if (this.modeId === "massrace") {
-      this.massRace.spawn(MASS_RACE_FIELD, `${this.seed}:${this.modeId}`, this.terrain, this.startX);
-      this.raceField = MASS_RACE_FIELD + 1;
+      this.massRace.spawn(this.roomSize, `${this.seed}:${this.modeId}:${this.roomSize}`, this.terrain, this.startX);
+      this.massRace.setFieldSkill(this.roomSkill === "ace" ? 1.25 : this.roomSkill === "chill" ? 0.7 : 1);
+      this.raceField = this.roomSize + 1;
       this.racePlace = 0;
       this.raceFinishTime = 0;
       this.photoFinish = "";
+      this.lastRatingDelta = 0;
+      this.lastRatingBonus = 0;
+      this.lastPlace = 0;
+      this.overtakeAcc = 0;
       this.connectRace();
     } else {
       this.disconnectRace();
@@ -1371,9 +1399,6 @@ export class Game {
     this.newlyCompleted = this.missions.applyRun(stats);
     this.claimedQuests = this.missions.claimQuests(this.today, stats);
     const score = this.score();
-    // Captured before recording so the results screen can frame a new best
-    // honestly (previous record vs this flight).
-    this.prevBestDistance = this.save.state.bestDistance;
     this.save.recordRun(stats.distance, this.runCoins, score, this.today, this.island, this.terrain.biomeAt(this.bird.x).id);
     this.save.addLifetimeZeniths(stats.zenith);
     // distance XP is awarded at the end; everything else accrued live during the flight
@@ -1677,10 +1702,67 @@ export class Game {
         break;
       }
       case "quick-match":
+      case "pvp-ranked":
         this.roomCode = "";
         this.modeId = "massrace";
         this.mode = modeById("massrace");
+        this.rankedRace = true;
         this.startRun();
+        break;
+      case "room-size": {
+        const n = Math.max(5, Math.min(40, parseInt(id || "40", 10) || 40));
+        this.roomSize = n;
+        this.hud.toast(`Field size · ${n} rivals`, "info");
+        this.bump();
+        break;
+      }
+      case "room-skill":
+        this.roomSkill = (id as "chill" | "sharp" | "ace") || "sharp";
+        this.massRace.setFieldSkill(this.roomSkill === "ace" ? 1.25 : this.roomSkill === "chill" ? 0.7 : 1);
+        this.hud.toast(`Rival skill · ${this.roomSkill}`, "info");
+        this.bump();
+        break;
+      case "room-shuffle":
+        this.massRace.shuffle(`${this.seed}:${this.modeId}`);
+        this.hud.toast("Field shuffled", "info");
+        this.audio.ding();
+        this.bump();
+        break;
+      case "room-kick":
+        if (this.massRace.kick(id)) {
+          this.hud.toast("Pilot removed from room", "warn");
+          this.audio.butter();
+        } else {
+          this.hud.toast("Pilot already gone", "warn");
+        }
+        this.bump();
+        break;
+      case "room-mute":
+        this.roomMuted = !this.roomMuted;
+        this.hud.toast(this.roomMuted ? "Emotes muted" : "Emotes on", "info");
+        this.bump();
+        break;
+      case "room-close":
+        this.massRace.clear();
+        this.roomCode = "";
+        this.hud.toast("Room closed", "warn");
+        this.bump();
+        break;
+      case "pvp-casual":
+        this.roomCode = "";
+        this.modeId = "massrace";
+        this.mode = modeById("massrace");
+        this.rankedRace = false;
+        this.startRun();
+        break;
+      case "pvp-practice":
+        this.exitVersus();
+        this.modeId = "daytrip";
+        this.mode = modeById("daytrip");
+        this.startRun();
+        break;
+      case "open-rank":
+        this.setScreen("rank");
         break;
       case "open-live":
         this.setScreen("live");
@@ -2202,9 +2284,7 @@ export class Game {
   }
 
   private preferredDpr(): number {
-    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-    const maxDpr = isMobile ? 1.5 : 2;
-    const dev = Math.min(window.devicePixelRatio || 1, maxDpr);
+    const dev = Math.min(window.devicePixelRatio || 1, 2);
     return this.save.state.settings.quality === "low" ? 1 : dev;
   }
 
@@ -2301,6 +2381,10 @@ export class Game {
   }
 
   private sendEmote(text: string): void {
+    if (this.roomMuted) {
+      this.hud.toast("Emotes muted in this room", "info");
+      return;
+    }
     if (this.elapsed - this.lastEmoteAt < 1.2) return; // simple spam guard
     this.lastEmoteAt = this.elapsed;
     this.massRace.showEmote("you", text);
@@ -2451,6 +2535,37 @@ export class Game {
     return `Hills of ${formatDatePretty(this.seed)}`;
   }
 
+  private rivalCard(): RivalCard {
+    const r = this.save.state.rival;
+    const div = divisionFor(r.rating);
+    const next = nextDivision(r.rating);
+    const span = div.max - div.min;
+    return {
+      rating: Math.floor(r.rating),
+      division: div.name,
+      divisionIcon: div.icon,
+      wins: r.wins,
+      losses: r.losses,
+      streak: r.streak,
+      bestStreak: r.bestStreak,
+      nextName: next ? next.div.name : "",
+      nextNeeded: next ? next.needed : 0,
+      progress: span > 0 ? Math.max(0, Math.min(1, (r.rating - div.min) / span)) : 1,
+      matches: r.matches.map((m) => ({ place: m.place, field: m.field, mode: m.mode, date: m.date, won: m.won })),
+    };
+  }
+
+  private loadoutView(): LoadoutView {
+    const trail = this.save.state.activeTrail
+      ? (TRAILS[this.save.state.activeTrail]?.label ?? this.save.state.activeTrail)
+      : "Default trail";
+    return {
+      bird: this.skin.name,
+      trail,
+      boosts: this.save.state.armedBoosts.length,
+    };
+  }
+
   private ghostDelta(): number | null {
     if (!this.ghostPlayer.active) return null;
     const dist = Math.max(0, this.bird.x - this.startX);
@@ -2474,28 +2589,6 @@ export class Game {
       affordable: st.wallet >= def.price,
     }));
     this.boostViews = BOOSTS.map((def) => ({ def, armed: st.armedBoosts.includes(def.id), affordable: st.wallet >= def.price }));
-
-    const tiers = this.seasonPass.view();
-    const prog = this.seasonPass.progressInTier();
-    this.seasonView = {
-      tier: this.seasonPass.tier(),
-      maxTier: tiers.length,
-      have: prog.have,
-      need: prog.need,
-      label: seasonLabel(seasonId()),
-      tiers,
-    };
-    this.trophyViews = this.achievements.view();
-    this.trophyCounts = this.achievements.counts();
-    this.cupViews = this.cups.view();
-    this.trailViews = this.cups.ownedTrails().map((id) => ({
-      id,
-      label: TRAILS[id]?.label ?? id,
-      equipped: st.activeTrail === id,
-    }));
-    let todayBest = 0;
-    for (const h of st.highScores) if (h.date === this.today && h.distance > todayBest) todayBest = h.distance;
-    this.todayBestCache = todayBest;
     this.viewsVersion = this.uiVersion;
   }
 
@@ -2503,6 +2596,10 @@ export class Game {
     if (this.viewsVersion !== this.uiVersion) this.refreshViews();
     const st = this.save.state;
     const stats = this.runStats();
+    let todayBest = 0;
+    for (const h of st.highScores) if (h.date === this.today && h.distance > todayBest) todayBest = h.distance;
+    const sTier = this.seasonPass.tier();
+    const sProg = this.seasonPass.progressInTier();
     const snap: HudSnapshot = {
       state: this.state,
       screen: this.screen,
@@ -2517,8 +2614,6 @@ export class Game {
       feverOn: this.feverOn,
       multiplier: this.save.nestMultiplier() * (this.feverOn ? 2 : 1),
       bestDistance: st.bestDistance,
-      prevBestDistance: this.state === "menu" ? st.bestDistance : this.prevBestDistance,
-      firstRun: st.tutorialRuns < 2,
       score: this.score(),
       island: this.island,
       perfects: this.perfects,
@@ -2550,7 +2645,7 @@ export class Game {
       missions: this.missionViews,
       quests: this.questViews,
       highScores: st.highScores,
-      todayBest: this.todayBestCache,
+      todayBest,
       runsPlayed: st.runsPlayed,
       newlyCompleted: this.newlyCompleted,
       claimedQuests: this.claimedQuests,
@@ -2569,9 +2664,16 @@ export class Game {
       checkoutWaiting: this.checkoutWaiting,
       restoreMessage: this.restoreMessage,
       resetArmed: this.resetArmed,
-      season: this.seasonView,
-      trophies: this.trophyViews,
-      trophyCounts: this.trophyCounts,
+      season: {
+        tier: sTier,
+        maxTier: this.seasonPass.view().length,
+        have: sProg.have,
+        need: sProg.need,
+        label: seasonLabel(seasonId()),
+        tiers: this.seasonPass.view(),
+      },
+      trophies: this.achievements.view(),
+      trophyCounts: this.achievements.counts(),
       referralCode: st.referralCode,
       referralRedeemed: st.referralRedeemed,
       referralMessage: this.referralMessage,
@@ -2618,8 +2720,12 @@ export class Game {
       boardScope: this.boardScope,
       boardMetric: this.boardMetric,
       boardOnline: isLeaderboardOnline(),
-      cups: this.cupViews,
-      trails: this.trailViews,
+      cups: this.cups.view(),
+      trails: this.cups.ownedTrails().map((id) => ({
+        id,
+        label: TRAILS[id]?.label ?? id,
+        equipped: st.activeTrail === id,
+      })),
       lastPrize: this.lastPrize ? `${this.lastPrize.prize.icon} ${this.lastPrize.prize.label}` : "",
       standings:
         this.massRace.active && this.state === "playing"
@@ -2635,14 +2741,24 @@ export class Game {
           ? this.massRace.roster(this.bird.x, this.startX, this.mode.finish, this.pilotName)
           : [],
       roomCode: this.net?.info().code ?? this.roomCode,
-      roomCount: this.net?.info().count ?? 0,
+      roomCount: this.net?.info().count ?? this.massRace.fieldSize + 1,
       roomCapacity: this.net?.info().capacity ?? MASS_RACE_FIELD,
+      roomSize: this.roomSize,
+      roomSkill: this.roomSkill,
+      roomMuted: this.roomMuted,
+      roomRivals: this.massRace.rivals.slice(0, 12).map((r) => ({ id: r.id, name: r.name, skill: Math.round(r.skill * 100), hue: Math.round(r.hue * 360) })),
       netState: this.net?.info().state ?? "offline",
       netError: this.net?.info().error ?? "",
       draft: this.massRace.draft,
       finishRemaining: this.finishRemaining,
       nemesis: this.nemesis,
       photoFinish: this.photoFinish,
+      rival: this.rivalCard(),
+      loadout: this.loadoutView(),
+      lobbyRivals: featuredRivals(`${this.seed}:massrace`),
+      raceRated: this.rankedRace,
+      ratingDelta: this.lastRatingDelta,
+      ratingBonus: this.lastRatingBonus,
       showTutorialHand: this.state === "playing" && st.tutorialRuns < 2 && this.hintTimer < 2.6 && !this.input.diving,
     };
     this.hud.update(snap);

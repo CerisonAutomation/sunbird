@@ -9,6 +9,7 @@ import {
   VIP_DAYS,
 } from "./constants";
 import { dateSeed } from "./math";
+import { defaultRival, ratingDelta, streakBonus, type RivalMatch, type RivalState } from "./pvp";
 import { seasonId } from "./SeasonPass";
 import { emptyTournamentState, type TournamentState } from "./Tournaments";
 
@@ -90,6 +91,9 @@ export type SaveState = {
   pilotName: string;
   bestPlace: number;
   racesRun: number;
+  /** On-device Rival rating for the simulated 40-bird field. Local only —
+   *  never synced, never presented as a server rank. */
+  rival: RivalState;
 };
 
 const DEFAULT_SETTINGS: Settings = {
@@ -152,6 +156,7 @@ function defaults(): SaveState {
     pilotName: "",
     bestPlace: 0,
     racesRun: 0,
+    rival: defaultRival(),
   };
 }
 
@@ -166,6 +171,35 @@ function strArr(v: unknown): string[] {
 
 function numArr(v: unknown): number[] {
   return Array.isArray(v) ? v.map(Number).filter((n) => Number.isFinite(n)) : [];
+}
+
+function parseRival(v: unknown): RivalState {
+  const d = defaultRival();
+  if (!v || typeof v !== "object") return d;
+  const p = v as Partial<RivalState> & { matches?: unknown };
+  const matches: RivalMatch[] = Array.isArray(p.matches)
+    ? (p.matches as unknown[])
+        .filter((m): m is RivalMatch => !!m && typeof m === "object")
+        .map((m) => {
+          const r = m as Partial<RivalMatch>;
+          return {
+            place: num(r.place),
+            field: Math.max(2, num(r.field)),
+            mode: String(r.mode ?? "massrace"),
+            date: String(r.date ?? ""),
+            won: Boolean(r.won),
+          };
+        })
+        .slice(-8)
+    : [];
+  return {
+    rating: num(p.rating) || d.rating,
+    wins: num(p.wins),
+    losses: num(p.losses),
+    streak: num(p.streak),
+    bestStreak: num(p.bestStreak),
+    matches,
+  };
 }
 
 export class SaveData {
@@ -285,6 +319,7 @@ export class SaveData {
         pilotName: typeof p.pilotName === "string" ? p.pilotName : "",
         bestPlace: num(p.bestPlace),
         racesRun: num(p.racesRun),
+        rival: parseRival(p.rival),
       };
     } catch {
       return d;
@@ -349,6 +384,37 @@ export class SaveData {
     this.persist();
     void field;
     return better;
+  }
+
+  /**
+   * Records a ranked 40-bird result into the on-device Rival rating.
+   * Returns the rating delta and any streak bonus actually granted.
+   * Local only — never synced, never a server rank.
+   */
+  recordRivalResult(place: number, field: number, mode: string, date: string): { delta: number; bonus: number; streak: number } {
+    const r = this.state.rival;
+    const p = Math.max(1, Math.min(Math.max(2, field), Math.floor(place)));
+    const f = Math.max(2, Math.floor(field));
+    const delta = ratingDelta(p, f);
+    const won = p <= Math.max(1, Math.ceil(f * 0.25));
+    r.rating = Math.max(0, r.rating + delta);
+    if (won) {
+      r.wins += 1;
+      r.streak += 1;
+      r.bestStreak = Math.max(r.bestStreak, r.streak);
+    } else {
+      r.losses += 1;
+      r.streak = 0;
+    }
+    r.matches.push({ place: p, field: f, mode, date, won });
+    if (r.matches.length > 8) r.matches.splice(0, r.matches.length - 8);
+    const bonus = won ? streakBonus(r.streak) : 0;
+    if (bonus > 0) {
+      this.state.wallet += bonus;
+      this.state.totalCoins += bonus;
+    }
+    this.persist();
+    return { delta, bonus, streak: r.streak };
   }
 
   equipTrail(id: string): void {

@@ -206,24 +206,17 @@ export class GameAudio {
   }
 
   perfect(): void {
-    // Rising triumphant arpeggio — C5 → E5 → G5 → C6
-    this.tone(523.25, 0.12, "sine", 0.12, 523.25);
-    this.tone(659.25, 0.14, "sine", 0.11, 659.25);
-    this.tone(783.99, 0.16, "sine", 0.10, 783.99);
-    this.tone(1046.5, 0.22, "triangle", 0.09, 1046.5);
-    // Sparkle overtone
-    this.tone(1567.98, 0.18, "sine", 0.04);
+    this.tone(523.25, 0.18, "sine", 0.14, 523.25);
+    this.tone(659.25, 0.2, "sine", 0.12, 659.25);
+    this.tone(783.99, 0.24, "sine", 0.12, 783.99);
+    this.tone(1046.5, 0.28, "triangle", 0.08, 1046.5);
   }
 
   feverOn(): void {
-    // Power chord blast — G3 → C4 → E4 → G4 with rising intensity
-    this.tone(196, 0.08, "square", 0.06, 392);
-    this.tone(392, 0.1, "square", 0.06, 523.25);
-    this.tone(523.25, 0.12, "square", 0.07, 659.25);
-    this.tone(783.99, 0.18, "sawtooth", 0.05, 1046.5);
-    this.tone(1046.5, 0.3, "triangle", 0.09, 1318.5);
-    // Sub bass rumble
-    this.tone(65, 0.35, "sine", 0.08);
+    this.tone(392, 0.12, "square", 0.05, 523.25);
+    this.tone(523.25, 0.14, "square", 0.05, 659.25);
+    this.tone(783.99, 0.2, "square", 0.06, 1046.5);
+    this.tone(1046.5, 0.25, "triangle", 0.08, 1318.5);
   }
 
   splash(): void {
@@ -298,14 +291,24 @@ export class GameAudio {
   launchWhoosh(rating: string, speed: number): void {
     const speedRatio = Math.min(1.5, Math.max(0.4, speed / 55));
     const baseFreq = rating === "perfect" ? 784 : rating === "great" ? 587 : 440;
-    // Rising tone sweep for launch momentum
-    this.tone(baseFreq, 0.15, "sine", 0.12 * speedRatio, baseFreq * 1.8);
-    // Wind rush noise burst
-    this.noiseBurst(0.22, 600 + speed * 15, 0.08 * speedRatio);
-    // Harmonic sparkle on perfect
-    if (rating === "perfect") {
-      this.tone(baseFreq * 2, 0.12, "triangle", 0.05 * speedRatio);
+    this.tone(baseFreq, 0.18, "sine", 0.12 * speedRatio, baseFreq * 1.6);
+    this.noiseBurst(0.2, 800 + speed * 12, 0.07 * speedRatio);
+  }
+
+  countdownBeep(isGo = false): void {
+    if (isGo) {
+      this.tone(880, 0.24, "sine", 0.16, 1174.66);
+      this.tone(1320, 0.22, "triangle", 0.08);
+    } else {
+      this.tone(440, 0.12, "sine", 0.12);
     }
+  }
+
+  eggHatch(): void {
+    this.noiseBurst(0.06, 1400, 0.14);
+    this.tone(587.33, 0.12, "triangle", 0.08, 880);
+    this.tone(880, 0.16, "sine", 0.1, 1174.66);
+    this.tone(1174.66, 0.28, "sine", 0.12);
   }
 
   /* ---------- synth primitives ---------- */

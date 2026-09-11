@@ -9,6 +9,9 @@
   --sky: #5eb7ea;
   --paper: #fff4e4;
   --shadow: rgba(42, 28, 40, 0.18);
+  /* Display face for titles/numerals/buttons; Atkinson Hyperlegible for readable body text. */
+  --display: Fredoka, "Trebuchet MS", "Segoe UI", sans-serif;
+  --body: "Atkinson Hyperlegible", "Trebuchet MS", "Segoe UI", sans-serif;
 }
 
 * {
@@ -23,7 +26,7 @@ body,
   height: 100%;
   overflow: hidden;
   background: #1a1430;
-  font-family: Fredoka, "Trebuchet MS", "Segoe UI", sans-serif;
+  font-family: var(--body);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
   user-select: none;
@@ -91,7 +94,7 @@ textarea {
 .play-hud {
   position: absolute;
   inset: 0;
-  padding: calc(12px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
+  padding: calc(12px + env(safe-area-inset-top)) 16px 16px;
 }
 
 .top-bar {
@@ -284,11 +287,31 @@ textarea {
   inset: 0;
   display: flex;
   padding: 24px;
-  background: radial-gradient(ellipse at center, rgba(20, 16, 40, 0.15), rgba(20, 16, 40, 0.38));
+  background:
+    radial-gradient(ellipse at 50% 18%, rgba(255, 214, 140, 0.14), transparent 55%),
+    radial-gradient(ellipse at center, rgba(20, 16, 40, 0.18), rgba(20, 16, 40, 0.44));
   pointer-events: auto;
   overflow: auto;
   touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
+}
+
+/* Desktop hover feedback — subtle lift, no neon. */
+@media (hover: hover) {
+  .primary-btn:hover {
+    filter: brightness(1.06);
+    transform: translateY(-1px);
+  }
+  .soft-btn:hover,
+  .mini-btn:hover {
+    filter: brightness(1.05);
+    transform: translateY(-1px);
+  }
+  .soft-btn:hover,
+  .mini-btn:hover,
+  .primary-btn:hover {
+    transition: filter 0.14s ease, transform 0.14s ease;
+  }
 }
 
 .overlay > * {
@@ -315,28 +338,245 @@ textarea {
   padding: 32px 28px;
 }
 
+/* ---------- cinematic main-menu (title screen over the living world) ---------- */
+/* The main menu is a translucent stage laid over the 3D sky + flock, not a
+   solid form. Other screens (shop/pass/etc) keep the solid .paper-card. */
+.paper-card.menu-hero {
+  width: min(480px, 100%);
+  background:
+    linear-gradient(180deg, rgba(255, 244, 228, 0.94) 0%, rgba(255, 244, 228, 0.9) 34%, rgba(255, 244, 228, 0.96) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow:
+    0 22px 0 rgba(42, 28, 40, 0.1),
+    0 40px 80px rgba(20, 16, 40, 0.3);
+  padding: 26px 24px 20px;
+  text-align: center;
+}
+
+.hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+/* Layered sun: warm disc + soft corona + slow breathing halo. */
+.hero-sun {
+  position: relative;
+  width: 74px;
+  height: 74px;
+  margin-bottom: 4px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 34%, #fff3c4 0%, #ffd166 45%, #ff9a3a 78%, #ff7a30 100%);
+  box-shadow:
+    0 0 0 7px rgba(255, 200, 90, 0.28),
+    0 0 0 15px rgba(255, 170, 70, 0.14),
+    0 14px 34px rgba(255, 140, 50, 0.5);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero-sun {
+    animation: sun-breathe 4.2s ease-in-out infinite;
+  }
+}
+
+@keyframes sun-breathe {
+  50% {
+    box-shadow:
+      0 0 0 9px rgba(255, 200, 90, 0.34),
+      0 0 0 20px rgba(255, 170, 70, 0.18),
+      0 18px 40px rgba(255, 140, 50, 0.55);
+  }
+}
+
+.hero-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.hero-kicker {
+  font-family: var(--display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: #c86a3a;
+}
+
+.hero-sub {
+  margin: 2px 0 0;
+  font-size: 13.5px;
+  color: #7a5a52;
+  letter-spacing: 0.02em;
+}
+
+.hero-meta {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.seed-pill {
+  background: rgba(42, 28, 40, 0.07);
+  color: #6a4a42;
+  font-size: 12px;
+}
+
+/* Dominant FLY action — the single loudest thing on screen. */
+.fly-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 16px 20px 14px;
+  margin: 4px 0 8px;
+}
+
+.fly-label {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 1;
+}
+
+.fly-sub {
+  font-family: var(--body);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  opacity: 0.85;
+}
+
+/* Clean icon nav grid instead of a dense button stack. */
+.nav-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 6px 0 10px;
+}
+
+.nav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  border: none;
+  border-radius: 14px;
+  padding: 10px 4px 9px;
+  background: rgba(42, 28, 40, 0.07);
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: 0 3px 0 rgba(42, 28, 40, 0.08);
+  transition: transform 0.14s ease, filter 0.14s ease, box-shadow 0.14s ease;
+}
+
+.nav-btn i {
+  font-style: normal;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.nav-btn span {
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.nav-btn.gold {
+  background: linear-gradient(135deg, #ffd76a, #ffb020);
+  color: #5a3a00;
+  box-shadow: 0 3px 0 #c98a10;
+}
+
+@media (hover: hover) {
+  .nav-btn:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.05);
+    box-shadow: 0 5px 0 rgba(42, 28, 40, 0.12);
+  }
+}
+
+.nav-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 rgba(42, 28, 40, 0.08);
+}
+
+@media (max-width: 420px) {
+  .nav-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .hero-title h1,
+  .paper-card.menu-hero h1 {
+    font-size: 44px;
+  }
+}
+
 .logo-mark {
-  width: 54px;
-  height: 54px;
-  margin: 0 auto 8px;
-  border-radius: 18px;
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 10px;
+  border-radius: 19px;
   background: linear-gradient(145deg, #ffb24a, #ff6b4a);
   color: #fff;
   display: grid;
   place-items: center;
-  font-size: 28px;
-  box-shadow: 0 6px 0 #d45532;
+  font-size: 30px;
+  box-shadow:
+    0 6px 0 #d45532,
+    0 10px 26px rgba(255, 122, 69, 0.45);
 }
 
 h1 {
   margin: 0;
-  font-size: 48px;
-  letter-spacing: 0.04em;
+  font-family: var(--display);
+  font-size: 52px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   line-height: 1;
-  background: linear-gradient(180deg, #ff7a45, #e24a3a);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: #e8542f;
+  text-shadow: 0 3px 0 rgba(140, 40, 20, 0.25);
+}
+
+h2,
+.primary-btn,
+.ghost-btn,
+.soft-btn,
+.mini-btn,
+.back-btn,
+.nav-btn,
+.fly-label {
+  font-family: var(--display);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .paper-card {
+    animation: card-rise 0.45s cubic-bezier(0.18, 0.9, 0.24, 1.1);
+  }
+
+  .logo-mark {
+    animation: logo-bob 3.4s ease-in-out infinite;
+  }
+}
+
+@keyframes card-rise {
+  from {
+    opacity: 0;
+    transform: translateY(22px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes logo-bob {
+  50% {
+    transform: translateY(-5px) rotate(-2deg);
+  }
 }
 
 h2 {
@@ -658,29 +898,4 @@ h2 {
     bottom: calc(18px + env(safe-area-inset-bottom));
     right: 14px;
   }
-}
-
-/* ---------- reduced motion (WCAG 2.3.3) ---------- */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-  .game-root::after { display: none; }
-}
-
-/* ---------- forced-colors (Windows High Contrast) ---------- */
-@media (forced-colors: active) {
-  .primary-btn { border: 2px solid ButtonText; }
-  .soft-btn { border: 1px solid ButtonText; }
-  .toggle { border: 2px solid ButtonText; }
-}
-
-/* ---------- print (for sharing results) ---------- */
-@media print {
-  .hud-root { display: none; }
-  .game-root { position: static; }
 }

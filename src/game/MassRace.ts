@@ -148,8 +148,6 @@ export class MassRace {
     const n = clamp(Math.floor(count), 0, MAX_RIVALS);
     this.ensureCapacity(n);
     const rng = new SeededRandom(`${seed}:field`);
-    // Dispose old rivals before overwriting to prevent GPU memory leak.
-    for (const r of this.rivals) r.bird.dispose();
     this.rivals = [];
 
     for (let i = 0; i < n; i++) {
@@ -197,6 +195,43 @@ export class MassRace {
     this.group.visible = false;
     this.bodyMesh.count = 0;
     this.wingMesh.count = 0;
+  }
+
+  /** Room admin: remove one pilot by id. Returns true if removed. */
+  kick(id: string): boolean {
+    const i = this.rivals.findIndex((r) => r.id === id);
+    if (i < 0) return false;
+    const [r] = this.rivals.splice(i, 1)!;
+    r!.bird.dispose();
+    return true;
+  }
+
+  /** Room admin: re-roll names/skills for a fresh grid without leaving. */
+  shuffle(seed: string): void {
+    const n = this.rivals.length;
+    if (!n) return;
+    const rng = new SeededRandom(`${seed}:shuffle:${Date.now() % 100000}`);
+    const names = [...NAMES].sort(() => rng.next() - 0.5);
+    for (let i = 0; i < this.rivals.length; i++) {
+      const r = this.rivals[i]!;
+      r.name = names[i % names.length]!;
+      r.skill = Math.min(1, Math.max(0.12, rng.next() * 0.9 + 0.1));
+      r.hue = rng.next();
+      r.finished = false;
+      r.finishTime = 0;
+    }
+  }
+
+  /** Room admin: scale whole-field skill (0.5 chill … 1.4 ace). */
+  setFieldSkill(mult: number): void {
+    for (const r of this.rivals) {
+      r.skill = Math.min(1, Math.max(0.1, r.skill * mult));
+      r.lead = Math.min(132, Math.max(18, r.lead + (mult > 1 ? 6 : -6)));
+    }
+  }
+
+  get fieldSize(): number {
+    return this.rivals.length;
   }
 
   /** Fixed-step update. Rivals use the identical physics contract as the player. */
