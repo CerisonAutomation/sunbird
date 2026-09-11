@@ -3867,3 +3867,35 @@ button:focus-visible, .toggle:focus-visible {
   background: #fff;
   box-shadow: 0 2px 6px rgba(58, 34, 24, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
+
+/* ---------- omega round 3: lobby VS stage composition ---------- */
+.vs-you {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 2px solid #ffb020;
+  background:
+    radial-gradient(120% 70% at 50% -10%, rgba(255, 220, 130, 0.5), rgba(255, 220, 130, 0) 60%),
+    #fff6e0;
+  box-shadow: var(--elev-1), 0 0 16px -4px rgba(255, 176, 32, 0.45);
+}
+.vs-you .vs-swatch { transform: scale(1.5); margin: 10px 0 12px; }
+.vs-foe {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--hairline);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.6));
+  box-shadow: var(--elev-1);
+  border-radius: 12px;
+}
+.vs-mark {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 50%),
+    linear-gradient(180deg, #ff6b4a, #d44528);
+  box-shadow: 0 3px 0 #a03a20, 0 6px 14px -4px rgba(200, 70, 40, 0.5);
+  transform: rotate(-4deg);
+}
