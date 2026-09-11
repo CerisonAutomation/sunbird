@@ -52,5 +52,7 @@ until proven otherwise. This file exists so the commit log can't overclaim.
 
 ## External-only (needs accounts/keys, not code)
 - Cloudflare deploy of `backend/` + `VITE_MULTIPLAYER_URL` / `VITE_LEADERBOARD_URL`
-- Stripe live payment links + webhook entitlement route (design in DEPLOY.md)
+- Stripe live payment links + webhook secret (`wrangler secret put STRIPE_WEBHOOK_SECRET`)
+  — the webhook route itself is now CODE-COMPLETE (`backend/src/entitlements.ts`,
+  signature-verified, test-pinned; setup steps in DEPLOY.md §5)
 - Portal submissions (zips build ready: poki / crazy / generic)

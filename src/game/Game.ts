@@ -71,7 +71,7 @@ import { Input } from "./Input";
 import { clamp, dateSeed, formatDatePretty, lerp } from "./math";
 import { Missions, type MissionView, type QuestReward, type QuestView, type RunStats } from "./Missions";
 import { ParticleFX } from "./ParticleFX";
-import {
+import { fetchServerEntitlements,
   consumeStripeReturn,
   ensureStripeJs,
   MockAdProvider,
@@ -2896,6 +2896,24 @@ export class Game {
     this.checkoutOk = true;
     this.setScreen("checkout");
     this.setState("menu");
+    // Upgrade the receipt to server-verified once the webhook lands (webhooks
+    // typically beat the redirect, but poll once more after a short grace).
+    void this.syncServerEntitlements();
+    window.setTimeout(() => void this.syncServerEntitlements(), 5000);
+  }
+
+  /** Pull webhook-verified purchases from the backend and grant any missing.
+   * Silent no-op when no backend is configured — local flow is unchanged. */
+  private async syncServerEntitlements(): Promise<void> {
+    const skus = await fetchServerEntitlements(this.save.state.deviceId);
+    if (this.disposed || skus.length === 0) return;
+    for (const sku of skus) {
+      const owned =
+        sku === "sunbird_gold" ? this.save.state.gold
+        : sku === "sunbird_vip" ? this.save.isVipActive()
+        : this.save.state.starterPack;
+      if (!owned) this.grantSku(sku, "stripe_webhook");
+    }
   }
 
   private grantSku(sku: Sku, source: string): void {
@@ -2920,6 +2938,8 @@ export class Game {
   private restore(): void {
     this.restoreMessage = "Checking…";
     this.bump();
+    // Server-verified entitlements first (authoritative), local receipts second.
+    void this.syncServerEntitlements();
     void this.mockPayments.restore().then((skus) => {
       if (this.disposed) return;
       let found = false;

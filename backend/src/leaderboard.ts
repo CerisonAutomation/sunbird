@@ -69,6 +69,13 @@ export class LeaderboardDO implements DurableObject {
         date     TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_scores_date ON scores(date);
+      CREATE TABLE IF NOT EXISTS entitlements (
+        deviceId  TEXT NOT NULL,
+        sku       TEXT NOT NULL,
+        sessionId TEXT NOT NULL DEFAULT '',
+        grantedAt TEXT NOT NULL,
+        PRIMARY KEY (deviceId, sku)
+      );
       CREATE TABLE IF NOT EXISTS ghosts (
         seed     TEXT NOT NULL,
         deviceId TEXT NOT NULL,
@@ -91,6 +98,37 @@ export class LeaderboardDO implements DurableObject {
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
+
+    if (url.pathname === "/entitlements/grant" && request.method === "POST") {
+      // Internal route: only the worker's verified webhook handler calls this.
+      let body: { deviceId?: unknown; sku?: unknown; sessionId?: unknown };
+      try {
+        body = (await request.json()) as typeof body;
+      } catch {
+        return Response.json({ error: "invalid json" }, { status: 400 });
+      }
+      const deviceId = clean(typeof body.deviceId === "string" ? body.deviceId : "", 64);
+      const sku = clean(typeof body.sku === "string" ? body.sku : "", 32);
+      if (!deviceId || !sku) return Response.json({ error: "deviceId and sku required" }, { status: 400 });
+      this.sql.exec(
+        `INSERT INTO entitlements (deviceId, sku, sessionId, grantedAt) VALUES (?, ?, ?, ?)
+         ON CONFLICT(deviceId, sku) DO UPDATE SET sessionId = excluded.sessionId`,
+        deviceId,
+        sku,
+        clean(typeof body.sessionId === "string" ? body.sessionId : "", 128),
+        new Date().toISOString(),
+      );
+      return Response.json({ ok: true });
+    }
+
+    if (url.pathname === "/entitlements" && request.method === "GET") {
+      const device = clean(url.searchParams.get("device"), 64);
+      if (!device) return Response.json({ error: "device required" }, { status: 400 });
+      const rows = this.sql
+        .exec("SELECT sku, grantedAt FROM entitlements WHERE deviceId = ?", device)
+        .toArray() as { sku: string; grantedAt: string }[];
+      return Response.json({ entitlements: rows });
+    }
 
     if (url.pathname === "/ghost" && request.method === "POST") {
       // Async PvP: publish your best daily-seed flight as a replayable ghost.

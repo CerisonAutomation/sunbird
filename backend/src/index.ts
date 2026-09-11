@@ -23,10 +23,12 @@
 
 export { RoomDO } from "./room";
 export { LeaderboardDO } from "./leaderboard";
+import { entitlementFromEvent, verifyStripeSignature } from "./entitlements";
 
 export interface Env {
   ROOMS: DurableObjectNamespace;
   BOARD: DurableObjectNamespace;
+  STRIPE_WEBHOOK_SECRET?: string;
 }
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -106,6 +108,35 @@ export default {
 
     if (url.pathname === "/board" && request.method === "GET") {
       return board.fetch(`https://do/board${url.search}`).then(withCors);
+    }
+
+    if (url.pathname === "/stripe/webhook" && request.method === "POST") {
+      // Server-authoritative purchase fulfilment (REPO_TRUTH_AUDIT #12).
+      const secret = env.STRIPE_WEBHOOK_SECRET ?? "";
+      if (!secret) return json({ error: "webhook not configured" }, 503);
+      const raw = await request.text();
+      if (raw.length > 65_536) return json({ error: "payload too large" }, 413);
+      const ok = await verifyStripeSignature(secret, request.headers.get("stripe-signature"), raw);
+      if (!ok) return json({ error: "bad signature" }, 400);
+      let evt: unknown;
+      try {
+        evt = JSON.parse(raw);
+      } catch {
+        return json({ error: "invalid json" }, 400);
+      }
+      const grant = entitlementFromEvent(evt as Parameters<typeof entitlementFromEvent>[0]);
+      // Unhandled event types are acknowledged so Stripe stops retrying.
+      if (!grant) return json({ ok: true, handled: false });
+      await board.fetch("https://do/entitlements/grant", {
+        method: "POST",
+        body: JSON.stringify(grant),
+        headers: { "content-type": "application/json" },
+      });
+      return json({ ok: true, handled: true });
+    }
+
+    if (url.pathname === "/entitlements" && request.method === "GET") {
+      return board.fetch(`https://do/entitlements${url.search}`).then(withCors);
     }
 
     if (url.pathname === "/ghost") {

@@ -32,6 +32,31 @@ export function stripeConfigured(sku: Sku): boolean {
   return Boolean(LINKS[sku]);
 }
 
+/**
+ * Server-verified entitlements (Stripe webhook → backend → here). Returns the
+ * SKUs the backend has confirmed as PAID for this device, or [] when no
+ * backend is configured / reachable. This outranks every local receipt.
+ */
+export async function fetchServerEntitlements(deviceId: string): Promise<Sku[]> {
+  const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
+  const base = (env.VITE_LEADERBOARD_URL ?? (env.DEV ? "/mp" : "")).replace(/\/$/, "");
+  if (!base) return [];
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 4000);
+    const res = await fetch(`${base}/entitlements?device=${encodeURIComponent(deviceId)}`, { signal: ctrl.signal });
+    clearTimeout(timer);
+    if (!res.ok) return [];
+    const data = (await res.json()) as { entitlements?: { sku?: unknown }[] };
+    const valid: Sku[] = ["sunbird_gold", "sunbird_vip", "sunbird_starter"];
+    return (data.entitlements ?? [])
+      .map((e) => e.sku)
+      .filter((s): s is Sku => typeof s === "string" && (valid as string[]).includes(s));
+  } catch {
+    return [];
+  }
+}
+
 
 
 /** Builds a real, hosted Stripe Payment Link URL — no backend required. */

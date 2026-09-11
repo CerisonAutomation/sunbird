@@ -14,6 +14,9 @@
   "compatibility_date": "2026-09-01",
   // Shared salt for HMAC-signed leaderboard submissions (LEADERBOARD_API.md).
   // Empty = accept unsigned posts (dev). Match VITE_LEADERBOARD_SALT client-side.
+  // Stripe webhook signing secret (whsec_…) — set as a REAL secret in prod:
+  //   npx wrangler secret put STRIPE_WEBHOOK_SECRET
+  // Empty/unset = webhook endpoint answers 503 and payments stay client-manual.
   "vars": { "LEADERBOARD_SALT": "" },
   "observability": { "enabled": true },
   "durable_objects": {
