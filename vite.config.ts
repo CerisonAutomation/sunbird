@@ -10,6 +10,9 @@ const __dirname = path.dirname(__filename);
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Relative base: portals (Poki GDN, CrazyGames CDN) serve builds from deep
+  // subpaths — any absolute /asset URL 404s there. "./" works everywhere.
+  base: "./",
   plugins: [react(), tailwindcss(), viteSingleFile()],
   server: {
     host: true,

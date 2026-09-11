@@ -142,6 +142,9 @@ textarea {
 
 .stat-block.right {
   text-align: right;
+  /* Clear the absolutely-positioned pause button (42px + gap) — on wide
+     portal iframes the coin counter used to run underneath it. */
+  padding-right: 54px;
 }
 
 .sun-meter {
@@ -900,6 +903,9 @@ h2 {
   }
   .hint {
     font-size: 22px;
+  }
+  .stat-block.right {
+    padding-right: 0;
   }
   .pause-btn {
     top: auto;

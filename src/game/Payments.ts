@@ -1,4 +1,8 @@
-import { loadStripe } from "@stripe/stripe-js";
+// The "/pure" entrypoint is load-bearing: the default "@stripe/stripe-js"
+// module injects js.stripe.com AT IMPORT TIME as a side effect — which makes
+// every portal build phone an external payment provider on boot. Instant
+// portal rejection. /pure only loads when loadStripe() is actually called.
+import { loadStripe } from "@stripe/stripe-js/pure";
 import { AD_DURATION, STRIPE_GOLD_LINK, STRIPE_PUBLISHABLE_KEY, STRIPE_RETURN_KEY, STRIPE_VIP_LINK } from "./constants";
 
 export type Sku = "sunbird_gold" | "sunbird_vip";
@@ -15,6 +19,8 @@ let stripeReady: Promise<unknown> | null = null;
 /** Loads Stripe.js once (used for key validation / future Embedded Checkout upgrades). */
 export function ensureStripeJs(): Promise<unknown> | null {
   if (!STRIPE_PUBLISHABLE_KEY) return null;
+  // Never load a payment provider inside a portal iframe.
+  if ((import.meta.env.VITE_PORTAL_TARGET ?? "none") !== "none") return null;
   // Swallow network failures: portals/sandboxes block js.stripe.com and an
   // unhandled rejection here used to spray console errors at boot.
   if (!stripeReady) stripeReady = loadStripe(STRIPE_PUBLISHABLE_KEY).catch(() => null);

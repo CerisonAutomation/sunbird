@@ -406,10 +406,13 @@ export class Game {
       if (document.hidden) {
         this.hidden = true;
         if (this.state === "playing") this.setState("paused");
+        // Portal QA requirement (and basic courtesy): a hidden tab is silent.
+        this.audio.setHiddenMuted(true);
       } else {
         this.hidden = false;
         this.last = performance.now();
         this.acc = 0;
+        this.audio.setHiddenMuted(false);
       }
     };
     document.addEventListener("visibilitychange", this.onVis);
@@ -2604,6 +2607,7 @@ export class Game {
   /* ----------------------------------------------------------- checkout */
 
   private openCheckout(sku: Sku): void {
+    if (this.portalEnabled()) return;
     this.checkoutSku = sku;
     this.checkoutError = "";
     this.checkoutOk = false;
@@ -2637,6 +2641,9 @@ export class Game {
   }
 
   private openStripeTab(): void {
+    // Portals forbid external payment links, full stop. The entry actions are
+    // gated too, but this is the hard backstop for any future code path.
+    if (this.portalEnabled()) return;
     const link = stripeLinkFor(this.checkoutSku, this.save.state.deviceId);
     if (!link) return;
     window.open(link, "_blank", "noopener,noreferrer");
@@ -2753,7 +2760,7 @@ export class Game {
         referralCode: this.save.state.referralCode,
         seedLabel: this.seedLabel(),
       });
-      const result = await shareOrDownload(card);
+      const result = await shareOrDownload(card, undefined, !this.portalEnabled());
       this.telemetry.track("share_run", { result });
       this.hud.toast(result === "shared" ? "Shared!" : "Image saved", "info");
     } catch {
@@ -3470,7 +3477,7 @@ export class Game {
       referralMessage: this.referralMessage,
       cloudCode: this.screen === "account" ? this.save.exportCode() : "",
       cloudMessage: this.cloudMessage,
-      canInstall: Boolean(this.deferredInstall),
+      canInstall: Boolean(this.deferredInstall) && !this.portalEnabled(),
       shareBusy: this.shareBusy,
       combo: Math.max(this.perfectChain, this.versus && this.p1 ? this.p1.launch.combo : this.launch.combo),
       speedNorm: Math.min(1, this.bird.speed() / 100),

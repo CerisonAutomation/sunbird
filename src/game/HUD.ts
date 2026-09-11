@@ -69,7 +69,7 @@ export type AtlasEntry = {
 export type UiState = "menu" | "playing" | "paused" | "continue" | "ad" | "gameover";
 export type SeedMode = "today" | "yesterday" | "random";
 export type CheckoutMode = "stripe" | "demo";
-export type PortalName = "none" | "poki" | "crazy";
+export type PortalName = "none" | "poki" | "crazy" | "generic";
 
 export type HudSnapshot = {
   state: UiState;
@@ -1526,12 +1526,12 @@ function renderMain(s: HudSnapshot): string {
         .map((m) => `<button data-ui data-action="seed-${m.id}" class="${s.seedMode === m.id ? "on" : ""}">${m.label}</button>`)
         .join("")}</div>`
     : portal
-      ? `<p class="portal-note">${s.portalName === "poki" ? "Poki" : "CrazyGames"} edition · portal rewards enabled</p>`
+      ? `<p class="portal-note">${s.portalName === "poki" ? "Poki edition · portal rewards enabled" : s.portalName === "crazy" ? "CrazyGames edition · portal rewards enabled" : "Portal edition"}</p>`
       : `<button class="lock-chip" data-ui data-action="open-paywall">✦ Pick your hills with Gold</button>`;
   return `
     <header class="hero">
       <div class="hero-sun" aria-hidden="true"></div>
-      <img class="hero-bird" src="/icons/icon-192.png" alt="" aria-hidden="true" />
+      <img class="hero-bird" src="./icons/icon-192.png" alt="" aria-hidden="true" />
       <div class="hero-title">
         <span class="hero-kicker">chase the daylight</span>
         <h1>SUNBIRD</h1>
@@ -1792,7 +1792,7 @@ function renderPaywall(s: HudSnapshot): string {
       <div class="portal-card">
         <div class="logo-mark">✦</div>
         <h2>Play Fair. Fly Far.</h2>
-        <p class="tagline">This edition uses ${s.portalName === "poki" ? "Poki" : "CrazyGames"} portal rewards only. No direct checkout, no external ads, no paywall.</p>
+        <p class="tagline">This portal edition has no direct checkout, no external ads, no paywall.${s.portalName === "poki" || s.portalName === "crazy" ? " Rewards come from the portal." : ""}</p>
         <p class="fineprint">Keep your momentum, complete missions, and earn every cosmetic through play.</p>
       </div>
     `;
@@ -2092,7 +2092,7 @@ function renderContinue(s: HudSnapshot): string {
 function renderAd(s: HudSnapshot): string {
   if (s.portalName !== "none") {
     return `
-      <div class="ad-label">${s.portalName === "poki" ? "Poki" : "CrazyGames"} break</div>
+      <div class="ad-label">${s.portalName === "poki" ? "Poki" : s.portalName === "crazy" ? "CrazyGames" : "Portal"} break</div>
       <div class="portal-ad-wait"><div class="spinner"></div><h3>Preparing the next flight</h3><p>Your run is paused while the portal handles this break.</p></div>
     `;
   }

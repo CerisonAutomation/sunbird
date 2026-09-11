@@ -12,8 +12,8 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import path from "node:path";
 
 const portal = process.argv[2];
-if (!portal || !["poki", "crazy"].includes(portal)) {
-  console.error("usage: package-portal.mjs <poki|crazy>");
+if (!portal || !["poki", "crazy", "generic"].includes(portal)) {
+  console.error("usage: package-portal.mjs <poki|crazy|generic>");
   process.exit(1);
 }
 const src = `dist-${portal}`;
@@ -35,4 +35,10 @@ const zip = `sunbird-${portal}.zip`;
 rmSync(zip, { force: true });
 execSync(`cd ${stage} && zip -qr ../${zip} .`);
 rmSync(stage, { recursive: true, force: true });
-console.log(`✓ ${zip} ready for ${portal === "poki" ? "Poki Inspector upload" : "CrazyGames developer portal"}`);
+const dest =
+  portal === "poki"
+    ? "Poki Inspector upload"
+    : portal === "crazy"
+      ? "CrazyGames developer portal"
+      : "any HTML5 portal (GameDistribution, Yandex, itch.io, Newgrounds, GameMonetize, …)";
+console.log(`✓ ${zip} ready for ${dest}`);

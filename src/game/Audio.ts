@@ -21,6 +21,7 @@ export class GameAudio {
   private musicVol = 0.8;
   private sfxVol = 0.9;
   private adMuted = false;
+  private hiddenMuted = false;
   private started = false;
   private pendingMode: MusicMode = "off";
   private pendingBiome: BiomeMusicStyle = "bright";
@@ -132,8 +133,19 @@ export class GameAudio {
   /** Portal SDKs require that audio is silent while an ad has focus. */
   setAdMuted(muted: boolean): void {
     this.adMuted = muted;
+    this.applyMasterMute();
+  }
+
+  /** A hidden tab must be a silent tab — portal QA checks this explicitly. */
+  setHiddenMuted(muted: boolean): void {
+    this.hiddenMuted = muted;
+    this.applyMasterMute();
+  }
+
+  private applyMasterMute(): void {
     if (!this.master || !this.ctx) return;
-    this.master.gain.setTargetAtTime(muted ? 0 : 0.85, this.ctx.currentTime, muted ? 0.01 : 0.08);
+    const silent = this.adMuted || this.hiddenMuted;
+    this.master.gain.setTargetAtTime(silent ? 0 : 0.85, this.ctx.currentTime, silent ? 0.01 : 0.08);
   }
 
   setMusicMode(mode: MusicMode): void {

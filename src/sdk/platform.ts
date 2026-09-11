@@ -1,4 +1,4 @@
-export type PlatformName = "poki" | "crazy" | "none";
+export type PlatformName = "poki" | "crazy" | "generic" | "none";
 
 export type PlatformEvents = {
   onAdOpened?: () => void;
@@ -52,7 +52,13 @@ const CRAZY_SRC = "https://sdk.crazygames.com/crazygames-sdk-v3.js";
 const SDK_LOAD_TIMEOUT_MS = 6000;
 
 export function portalTarget(): PlatformName {
-  return TARGET === "poki" ? "poki" : TARGET === "crazy" || TARGET === "crazygames" ? "crazy" : "none";
+  if (TARGET === "poki") return "poki";
+  if (TARGET === "crazy" || TARGET === "crazygames") return "crazy";
+  // "generic": portal-safe build for GameDistribution / Yandex / itch.io /
+  // Newgrounds / GameMonetize etc. — no ads SDK, but ALL portal restrictions
+  // apply (no external payments, no install prompt, no file downloads).
+  if (TARGET === "generic") return "generic";
+  return "none";
 }
 
 export function isPortalBuild(): boolean {
@@ -216,11 +222,11 @@ let sdkBootPromise: Promise<PlatformName> | null = null;
 function scriptFor(target: PlatformName): string | null {
   if (target === "poki") return POKI_SRC;
   if (target === "crazy") return CRAZY_SRC;
-  return null;
+  return null; // "generic" and "none": no SDK script
 }
 
 function ensureSdk(target: PlatformName): Promise<PlatformName> {
-  if (target === "none") return Promise.resolve("none");
+  if (target === "none" || target === "generic") return Promise.resolve(target);
   if (loadPromise) return loadPromise;
   loadPromise = new Promise((resolve) => {
     const isReady = target === "poki" ? Boolean(window.PokiSDK) : Boolean(window.CrazyGames?.SDK);
