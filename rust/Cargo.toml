@@ -12,6 +12,7 @@ rust-version = "1.75"
 anyhow = { version = "1", features = ["backtrace"] }
 axum = { version = "0.7", features = ["json", "ws"] }
 base64 = "0.22"
+futures-util = { version = "0.3", default-features = false, features = ["sink"] }
 hex = "0.4"
 hmac = "0.12"
 http = "1"

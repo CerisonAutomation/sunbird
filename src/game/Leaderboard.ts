@@ -13,7 +13,19 @@ import { dateSeed } from "./math";
  *    as if they were worldwide results.
  */
 
-const API = (import.meta.env.VITE_LEADERBOARD_URL ?? "").replace(/\/$/, "");
+const API = (import.meta.env.VITE_LEADERBOARD_URL ?? (import.meta.env.DEV ? "/mp" : "")).replace(/\/$/, "");
+const SALT = import.meta.env.VITE_LEADERBOARD_SALT ?? "";
+
+async function signScore(deviceId: string, distance: number, score: number): Promise<string> {
+  if (!SALT || !crypto?.subtle) return "";
+  try {
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(SALT), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${deviceId}|${distance}|${score}`));
+    return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  } catch {
+    return "";
+  }
+}
 const KEY = "sunbird.board.v1";
 const NAME_KEY = "sunbird.pilotname";
 
@@ -214,12 +226,14 @@ export class Leaderboard {
     this.cache.clear();
 
     if (!API) return;
-    void fetch(`${API}/score`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(row),
-      keepalive: true,
-    }).catch(() => {
+    void signScore(row.deviceId, row.distance, row.score).then((sig) =>
+      fetch(`${API}/score`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(sig ? { ...row, sig } : row),
+        keepalive: true,
+      }),
+    ).catch(() => {
       // Submission is best-effort; the local row already persisted so the
       // player never loses credit for the run.
     });

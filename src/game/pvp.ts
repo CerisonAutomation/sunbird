@@ -34,7 +34,7 @@ export type Division = {
 
 export const DIVISIONS: Division[] = [
   { id: "fledgling", name: "Fledgling", icon: "🐣", min: 0, max: 1099 },
-  { id: "glider", name: "Glider", icon: "🪶", min: 1100, max: 1249 },
+  { id: "glider", name: "Glider", icon: "🐦", min: 1100, max: 1249 },
   { id: "racer", name: "Sky Racer", icon: "🌤️", min: 1250, max: 1399 },
   { id: "ace", name: "Sky Ace", icon: "⚡", min: 1400, max: 1549 },
   { id: "legend", name: "Sunbird Legend", icon: "👑", min: 1550, max: 1_000_000 },
@@ -73,53 +73,8 @@ export function streakBonus(streak: number): number {
   return Math.min(60, 10 * streak);
 }
 
-export type PvpMode = {
-  id: "ranked" | "casual" | "local" | "practice";
-  name: string;
-  icon: string;
-  blurb: string;
-  scope: string;
-  rated: boolean;
-};
 
-export const PVP_MODES: PvpMode[] = [
-  {
-    id: "ranked",
-    name: "Ranked 40",
-    icon: "🏆",
-    blurb: "Full field. Your on-device Rival rating moves with every finish.",
-    scope: "Solo · simulated field",
-    rated: true,
-  },
-  {
-    id: "casual",
-    name: "Casual 40",
-    icon: "🐦",
-    blurb: "Same pack, zero pressure. Rating frozen — fly loose.",
-    scope: "Solo · simulated field",
-    rated: false,
-  },
-  {
-    id: "local",
-    name: "Local Versus",
-    icon: "👥",
-    blurb: "Two pilots, one screen. Pass-and-play or split input.",
-    scope: "Local · 2 players",
-    rated: false,
-  },
-  {
-    id: "practice",
-    name: "Practice",
-    icon: "🌅",
-    blurb: "Empty skies. Learn the hills with no pack and no clock.",
-    scope: "Solo · no rivals",
-    rated: false,
-  },
-];
 
-export function pvpModeLabel(id: string): string {
-  return PVP_MODES.find((m) => m.id === id)?.name ?? "Ranked 40";
-}
 
 const RIVAL_NAMES = [
   "Aria", "Kestrel", "Nomi", "Tavi", "Wren", "Bex", "Juno", "Pike", "Sable", "Fen",
@@ -157,12 +112,52 @@ export function medalFor(place: number): string {
   return `#${place}`;
 }
 
-export function escapeHtml(v: string): string {
-  return v.replace(/[&<>"']/g, (c) =>
-    c === "&" ? "&amp;" : c === "<" ? "&lt;" : c === ">" ? "&gt;" : c === '"' ? "&quot;" : "&#39;",
-  );
-}
 
 export function defaultRival(): RivalState {
   return { rating: RIVAL_BASE_RATING, wins: 0, losses: 0, streak: 0, bestStreak: 0, matches: [] };
+}
+
+/* ------------------------------------------------------------- seasons */
+
+/** Ranked seasons roll monthly, matching the Nest Pass cadence. */
+export function rankSeasonId(d = new Date()): string {
+  return `R${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/**
+ * Soft reset applied at each season rollover: ratings drift halfway back to
+ * base so climbing stays meaningful without erasing a season of work.
+ */
+export function softResetRating(rating: number): number {
+  return Math.round((Math.max(0, rating) + RIVAL_BASE_RATING) / 2);
+}
+
+/** End-of-season coin reward for the peak division reached. */
+export function seasonReward(peakRating: number): { coins: number; division: Division } {
+  const div = divisionFor(peakRating);
+  const idx = DIVISIONS.findIndex((d) => d.id === div.id);
+  return { coins: 60 + idx * 70, division: div };
+}
+
+/* --------------------------------------------------------------- duels */
+
+/**
+ * Duel matchmaking (local): map the player's rating onto an opponent skill
+ * multiplier so a Legend faces a genuinely sharper pilot than a Fledgling.
+ */
+export function duelSkillFor(rating: number): number {
+  const r = Math.max(0, rating);
+  return Math.min(1.4, Math.max(0.55, 0.6 + (r - RIVAL_BASE_RATING) / 800));
+}
+
+/** Deterministic duel opponent for a given seed + rating band. */
+export function duelOpponent(seed: string, rating: number): { name: string; tag: string; rating: number } {
+  const picks = featuredRivals(`${seed}:duel`, 1);
+  const base = picks[0] ?? { name: "Kestrel", tag: "steady wings" };
+  // Opponent rating shown in the lobby: your band, ± a small seeded offset.
+  let h = 5381;
+  const s = `${seed}:duelr`;
+  for (let i = 0; i < s.length; i++) h = (h * 33) ^ s.charCodeAt(i);
+  const jitter = ((h >>> 0) % 121) - 60;
+  return { ...base, rating: Math.max(0, Math.round(rating + jitter)) };
 }

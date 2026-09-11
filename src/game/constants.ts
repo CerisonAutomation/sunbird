@@ -116,9 +116,13 @@ export const BOOST_EXTRA_SPEED = 42;
 export const HEADSTART_DISTANCE = 300;
 
 /* ---------- Stripe (see .env.example) ---------- */
-export const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? "";
-export const STRIPE_GOLD_LINK = import.meta.env.VITE_STRIPE_GOLD_LINK ?? "";
-export const STRIPE_VIP_LINK = import.meta.env.VITE_STRIPE_VIP_LINK ?? "";
+// import.meta.env only exists under Vite — plain Node runners (tsx harnesses
+// like scripts/physcheck.ts) import this module too, so read it defensively.
+const ENV: Record<string, string | undefined> = (import.meta as unknown as { env?: Record<string, string> }).env ?? {};
+export const STRIPE_PUBLISHABLE_KEY = ENV.VITE_STRIPE_PUBLISHABLE_KEY ?? "";
+export const STRIPE_GOLD_LINK = ENV.VITE_STRIPE_GOLD_LINK ?? "";
+export const STRIPE_VIP_LINK = ENV.VITE_STRIPE_VIP_LINK ?? "";
+export const STRIPE_STARTER_LINK = ENV.VITE_STRIPE_STARTER_LINK ?? "";
 export const STRIPE_RETURN_KEY = "sunbird_stripe";
 
 export const VIP_DAYS = 30;
@@ -126,9 +130,9 @@ export const ADS_PER_DAY = 4;
 export const AD_MIN_RUN_GAP = 2;
 
 /* ---------- Season pass ---------- */
-export const SEASON_TIERS = 30;
-export const SEASON_XP_PER_TIER = 220;
-export const VIP_DAILY_GIFT = 25;
+export const SEASON_TIERS = 50;
+export const SEASON_XP_PER_TIER = 260;
+export const VIP_DAILY_GIFT = 100;
 
 /* ---------- Ghost rival ---------- */
 export const GHOST_SAMPLE_DT = 0.1;

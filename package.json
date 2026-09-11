@@ -6,16 +6,21 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:itch": "VITE_SINGLEFILE=true vite build",
-    "build:vercel": "vite build",
-    "build:poki": "VITE_PORTAL_TARGET=poki vite build",
-    "build:crazy": "VITE_PORTAL_TARGET=crazy vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "verify": "npm run typecheck && npm run test && npm run build",
+    "test:mp": "node scripts/mp-smoke.mjs",
+    "build:web": "vite build",
+    "build:poki": "VITE_PORTAL_TARGET=poki VITE_MULTIPLAYER_URL= vite build --outDir dist-poki && node scripts/package-portal.mjs poki",
+    "build:crazy": "VITE_PORTAL_TARGET=crazy VITE_MULTIPLAYER_URL= vite build --outDir dist-crazy && node scripts/package-portal.mjs crazy",
+    "build:portals": "npm run build:poki && npm run build:crazy && npm run build:generic",
+    "build:generic": "VITE_PORTAL_TARGET= VITE_MULTIPLAYER_URL= vite build --outDir dist-generic && node scripts/package-portal.mjs generic",
+    "build:itch": "VITE_SINGLEFILE=true vite build --outDir dist-itch",
+    "build:vercel": "vite build",
+    "gen-icons": "node scripts/gen-icons.mjs",
     "physcheck": "npx tsx scripts/physcheck.ts",
-    "gen-icons": "node scripts/gen-icons.mjs"
+    "lint": "eslint src scripts backend/src --max-warnings 0"
   },
   "dependencies": {
     "@stripe/stripe-js": "^9.15.0",
@@ -31,14 +36,18 @@
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
     "@types/three": "^0.185.4",
-    "@types/ws": "^8.5.14",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "5.1.1",
+    "eslint": "^10.10.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "jsdom": "^30.0.1",
     "tailwindcss": "4.1.17",
-    "tsx": "4.19.3",
+    "tsx": "^4.23.13",
     "typescript": "5.9.3",
+    "typescript-eslint": "^8.70.0",
     "vite": "7.3.2",
     "vite-plugin-singlefile": "2.3.0",
     "vitest": "^4.1.11",
-    "ws": "^8.18.3"
+    "ws": "^8.18.0"
   }
 }

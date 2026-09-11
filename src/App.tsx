@@ -15,7 +15,12 @@ export default function App() {
     } catch (err) {
       console.error("Sunbird failed to boot:", err);
       if (!cancelled) {
-        setFailed(err instanceof Error ? err.message : String(err));
+        // Defer: setState synchronously inside an effect body forces a
+        // cascading re-render; a microtask keeps the boot-failure path clean.
+        const msg = err instanceof Error ? err.message : String(err);
+        queueMicrotask(() => {
+          if (!cancelled) setFailed(msg);
+        });
       }
     }
     return () => {

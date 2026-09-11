@@ -22,6 +22,16 @@ type Storm = { x: number; y: number; sprite: THREE.Sprite; active: boolean; cool
 export class Weather {
   readonly group = new THREE.Group();
   gust = 0; // 0..1 current headwind strength
+  /** Storm Ward boost / weatherproof skins: gusts and ash storms barely touch the bird. */
+  ward = false;
+  /** Stealth skins: storms detect at half range, gusts push half as hard. */
+  stealth = false;
+  /** Weekly-event wind multiplier (Storm Surge doubles gust push). */
+  windMult = 1;
+  /** Stormfront Royale: every biome behaves like a storm biome — gusts fire
+   *  everywhere and ash clouds spawn on every island. Same seed → identical
+   *  gauntlet for the whole field. */
+  stormfront = false;
   inThermal = false;
   private readonly thermals: Thermal[] = [];
   private readonly storms: Storm[] = [];
@@ -64,6 +74,8 @@ export class Weather {
   }
 
   reset(): void {
+    this.ward = false;
+    this.stealth = false;
     for (const t of this.thermals) {
       t.active = false;
       t.mesh.visible = false;
@@ -113,7 +125,7 @@ export class Weather {
     this.wasInThermal = this.inThermal;
 
     // gusts
-    if (biome.hazard === "gust") {
+    if (biome.hazard === "gust" || this.stormfront) {
       this.gustTimer -= dt;
       if (this.gustPhase === "calm" && this.gustTimer <= 0) {
         this.gustPhase = "blowing";
@@ -125,7 +137,7 @@ export class Weather {
       }
       const target = this.gustPhase === "blowing" ? 1 : 0;
       this.gust = lerp(this.gust, target, 1 - Math.pow(0.02, dt));
-      if (this.gust > 0.05 && airborne && !diving) bird.vx -= 7.5 * this.gust * dt;
+      if (this.gust > 0.05 && airborne && !diving) bird.vx -= (this.ward ? 1.8 : 7.5) * (this.stealth ? 0.5 : 1) * this.windMult * this.gust * dt;
     } else {
       this.gust = lerp(this.gust, 0, 1 - Math.pow(0.02, dt));
       this.gustPhase = "calm";
@@ -143,10 +155,11 @@ export class Weather {
       s.sprite.position.y = s.y + Math.sin(time * 0.8 + s.x) * 0.5;
       const dx = Math.abs(bird.x - s.x);
       const dy = Math.abs(bird.y - s.y);
-      if (dx < 5.2 && dy < 2.6 && this.stormCd <= 0) {
+      const reach = this.stealth ? 0.5 : 1; // stealth birds slip under the cloud's radar
+      if (dx < 5.2 * reach && dy < 2.6 * reach && this.stormCd <= 0) {
         this.stormCd = 1.2;
-        bird.vx *= 0.78;
-        bird.vy = Math.min(bird.vy, 2);
+        bird.vx *= this.ward ? 0.95 : 0.78;
+        if (!this.ward) bird.vy = Math.min(bird.vy, 2);
         ev.onStormHit(s.x, s.y);
       }
     }

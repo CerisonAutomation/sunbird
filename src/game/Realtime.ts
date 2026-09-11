@@ -17,7 +17,10 @@ import { PROTOCOL_VERSION } from "./protocol/v1";
  *    which one you are in.
  */
 
-const URL_BASE = (import.meta.env.VITE_MULTIPLAYER_URL ?? "").trim();
+// Dev default: the vite /mp proxy is always present (vite.config.ts), so
+// local multiplayer Just Works without an env file. Production must opt in
+// via VITE_MULTIPLAYER_URL (portals ship with it explicitly emptied).
+const URL_BASE = (import.meta.env.VITE_MULTIPLAYER_URL ?? (import.meta.env.DEV ? "/mp" : "")).trim();
 
 /** Outbound state rate. 15 Hz is plenty given client-side interpolation. */
 const SEND_HZ = 15;
@@ -89,6 +92,7 @@ export type ProtocolGatewayInfo = {
   reason: string;
 };
 
+// ts-prune-ignore-next -- phase-2 surface, mirrored by rust/crates/sunbird-protocol
 export function protocolGatewayInfo(): ProtocolGatewayInfo {
   return {
     supportedVersion: PROTOCOL_VERSION,
@@ -112,6 +116,8 @@ export function makeRoomCode(): string {
 export class RealtimeClient implements NetTransport {
   state: PresenceState = "offline";
   roomCode = "";
+  /** Our server-assigned finish place among live pilots (0 = none yet). */
+  myPlace = 0;
   seed = "";
   capacity = 40;
   errorText = "";
@@ -151,17 +157,29 @@ export class RealtimeClient implements NetTransport {
       this.errorText = "No multiplayer server configured";
       return;
     }
+    // Idempotent: opening the lobby pre-seats us in a room; starting the race
+    // must reuse that live socket, not tear it down and rejoin (which looked
+    // like "PvP never has anyone in it" — we kept leaving the room we'd
+    // just matched into).
+    const sameRoom = this.roomCode === code.toUpperCase() && this.seed === seed;
+    if (sameRoom && this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
     this.disconnect();
     this.closedByUs = false;
     this.roomCode = code.toUpperCase();
     this.seed = seed;
+    this.myPlace = 0;
     this.state = "connecting";
     this.errorText = "";
     this.open();
   }
 
   private open(): void {
-    const url = new URL(URL_BASE);
+    // URL_BASE may be absolute (wss://host) or relative (/mp behind the dev
+    // proxy / same-origin edge). Resolve against the page and force ws(s).
+    const url = new URL(URL_BASE, typeof location !== "undefined" ? location.href : "http://localhost/");
+    url.protocol = url.protocol === "https:" ? "wss:" : url.protocol === "http:" ? "ws:" : url.protocol;
     url.searchParams.set("device", this.deviceId);
     url.searchParams.set("name", this.name);
     url.searchParams.set("skin", this.skin);
@@ -291,12 +309,20 @@ export class RealtimeClient implements NetTransport {
         break;
       }
       case "finish": {
+        // The DO is the referee: it assigns places by arrival order of finish
+        // messages. When the echo for OUR finish lands, keep the official
+        // place so the result screen can correct the local estimate.
+        if (msg.id === this.selfId) {
+          this.myPlace = msg.place || 0;
+          break;
+        }
         const t = this.track(msg.id);
         t.finished = true;
         t.finishTime = msg.time;
         break;
       }
       case "start":
+        this.myPlace = 0;
         this.startsAt = msg.at;
         this.seed = msg.seed || this.seed;
         this.state = "racing";

@@ -11,6 +11,12 @@ runs in a clearly-labelled offline mode until you point it at a server.
 The UI never presents device-only data as if it were worldwide. That labelling
 is deliberate and should be kept.
 
+> **A production implementation of this entire contract ships in
+> [`backend/`](backend/README.md)** — Cloudflare Workers + Durable Objects,
+> running fully on the free plan (100k req/day, hibernating WebSocket rooms,
+> 5 GB SQLite leaderboard). Deploy with `cd backend && npx wrangler deploy`,
+> then set both env vars to the printed `workers.dev` URL.
+
 ---
 
 ## 1. Leaderboard HTTP contract
@@ -119,3 +125,25 @@ Tournaments are fully client-side and need no server:
 
 To make cups competitive rather than solo, submit cup scores to the same
 leaderboard backend and rank them server-side.
+
+## Submission signing (v1.1)
+
+When both sides configure a shared salt, `POST /score` requires a `sig` field:
+
+```
+sig = hex(HMAC-SHA256(salt, `${deviceId}|${distance}|${score}`))
+```
+
+- **Server:** set `LEADERBOARD_SALT` in `backend/wrangler.jsonc` `vars` (or a wrangler secret).
+- **Client:** set `VITE_LEADERBOARD_SALT` at build time.
+- Unsigned posts are rejected with `403` when the server salt is set; when unset, the endpoint stays open (dev mode).
+
+Honest scope: the salt ships inside the client bundle, so signing deters
+casual curl-spoofing, not determined reverse-engineering. The server also
+enforces plausibility gates regardless of signature:
+
+- `distance > 60,000 m` → `422 implausible distance`
+- `score > distance × 40 + 50,000` → `422 implausible score`
+
+True tamper-proofing requires replay validation (deterministic re-simulation
+of the run from its seed + input trace) — tracked in ROADMAP.md.

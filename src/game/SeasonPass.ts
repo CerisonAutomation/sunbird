@@ -1,7 +1,13 @@
 import { SEASON_TIERS, SEASON_XP_PER_TIER } from "./constants";
 import type { SaveData } from "./SaveData";
+import { seasonId } from "./season";
+export { seasonId, seasonLabel } from "./season";
 
-export type SeasonReward = { kind: "coins"; amount: number } | { kind: "skin"; id: string } | { kind: "boost"; id: string };
+export type SeasonReward =
+  | { kind: "coins"; amount: number }
+  | { kind: "skin"; id: string }
+  | { kind: "boost"; id: string }
+  | { kind: "trail"; id: string };
 
 export type TierDef = {
   tier: number;
@@ -13,14 +19,27 @@ export type TierDef = {
 function buildTiers(): TierDef[] {
   const tiers: TierDef[] = [];
   for (let i = 1; i <= SEASON_TIERS; i++) {
+    // Free track: coins every tier, a boost every 5th, the Starfall trail at 25,
+    // and the Bird of Paradise at 30 — free players earn a real exclusive.
     const free: SeasonReward =
-      i % 5 === 0 ? { kind: "boost", id: i % 10 === 0 ? "headstart" : "sunflask" } : { kind: "coins", amount: 30 + i * 4 };
+      i === 25
+        ? { kind: "trail", id: "trail_star" }
+        : i === 30
+          ? { kind: "skin", id: "paradise" }
+          : i % 5 === 0
+            ? { kind: "boost", id: i % 10 === 0 ? "headstart" : "sunflask" }
+            : { kind: "coins", amount: 30 + i * 4 };
+    // Premium track: earlier skins, the Prism trail, and a Raven capstone at 50.
     const premium: SeasonReward =
       i === 10
         ? { kind: "skin", id: "owl" }
         : i === 20
           ? { kind: "skin", id: "ember" }
-          : { kind: "coins", amount: 70 + i * 10 };
+          : i === 35
+            ? { kind: "trail", id: "trail_prism" }
+            : i === 50
+              ? { kind: "skin", id: "raven" }
+              : { kind: "coins", amount: 70 + i * 10 };
     tiers.push({ tier: i, xpNeeded: i * SEASON_XP_PER_TIER, free, premium });
   }
   return tiers;
@@ -28,15 +47,9 @@ function buildTiers(): TierDef[] {
 
 export const SEASON_TIER_DEFS = buildTiers();
 
-export function seasonId(date = new Date()): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-}
 
-export function seasonLabel(id: string): string {
-  const [y, m] = id.split("-").map(Number);
-  const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-  return `${months[(m ?? 1) - 1]} ${y}`;
-}
+
+
 
 /** XP is granted live from gameplay events (coins, clouds, perfects, islands, zeniths, distance). */
 export const XP_RULES = {
@@ -122,6 +135,7 @@ export class SeasonPass {
   private grant(reward: SeasonReward): void {
     if (reward.kind === "coins") this.save.addCoins(reward.amount);
     else if (reward.kind === "skin") this.save.ownSkin(reward.id);
+    else if (reward.kind === "trail") this.save.ownTrail(reward.id);
     else this.save.armBoost(reward.id);
   }
 }

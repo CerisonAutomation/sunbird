@@ -9,7 +9,7 @@
  *   fever → + clap, whistle lead, brighter, faster
  *   sleep → music-box lullaby
  */
-export type MusicMode = "off" | "menu" | "play" | "fever" | "sleep";
+export type MusicMode = "off" | "menu" | "play" | "fever" | "sleep" | "storm";
 export type BiomeMusicStyle = "bright" | "warm" | "airy" | "wide" | "night" | "crystal";
 
 type Voicing = number[];
@@ -142,6 +142,7 @@ export class Music {
   private readonly bassGain: GainNode;
   private readonly percGain: GainNode;
   private readonly whistleGain: GainNode;
+  private readonly padGain: GainNode;
   private readonly lullabyGain: GainNode;
   private readonly noise: AudioBuffer;
   private lullabyStep = 0;
@@ -175,6 +176,7 @@ export class Music {
     this.bassGain = mk(0.42);
     this.percGain = mk(0);
     this.whistleGain = mk(0);
+    this.padGain = mk(0);
     this.lullabyGain = mk(0);
 
     const len = ctx.sampleRate;
@@ -228,12 +230,15 @@ export class Music {
 
     const style = BIOME_MIX[this.biome];
     this.transpose = style.transpose;
-    const song = m === "menu" || m === "play" || m === "fever";
+    const song = m === "menu" || m === "play" || m === "fever" || m === "storm";
     this.ukeGain.gain.setTargetAtTime(song ? (m === "menu" ? 0.3 : 0.36) * style.uke : 0, t, 0.4);
     this.glockGain.gain.setTargetAtTime(song ? (m === "menu" ? 0.24 : 0.32) * style.glock : 0, t, 0.4);
     this.bassGain.gain.setTargetAtTime(song ? 0.42 * style.bass : 0, t, 0.4);
-    this.percGain.gain.setTargetAtTime((m === "play" ? 0.28 : m === "fever" ? 0.36 : 0) * style.perc, t, 0.3);
+    this.percGain.gain.setTargetAtTime((m === "play" ? 0.28 : m === "fever" ? 0.36 : m === "storm" ? 0.42 : 0) * style.perc, t, 0.3);
     this.whistleGain.gain.setTargetAtTime((m === "fever" ? 0.22 : 0) * style.whistle, t, 0.3);
+    // Warm pad bed: strongest on the menu (it carries the screen alone),
+    // subtle underneath play, gone in fever where percussion drives.
+    this.padGain.gain.setTargetAtTime(m === "menu" ? 0.16 : m === "play" ? 0.08 : 0, t, 0.8);
     this.lullabyGain.gain.setTargetAtTime(m === "sleep" ? 0.3 : 0, t, 0.6);
     this.filter.frequency.setTargetAtTime(style.cutoff - this.night * 4200, t, 0.55);
     this.lastCutoff = style.cutoff - this.night * 4200;
@@ -279,37 +284,52 @@ export class Music {
   }
 
   private scheduleStep(t: number): void {
+    // Storm mode pulls the whole song down a minor third — same melody,
+    // completely different weather.
+    const stormShift = this.mode === "storm" ? -3 : 0;
     const sec = SECTIONS[this.section]!;
     const chordName = sec.prog[this.bar]!;
     const chord = UKE[chordName]!;
     const idx = this.bar * 8 + this.step;
     const beat = 60 / this.bpm;
 
+    // Chord pad: one swell per bar — two detuned triangles on root+fifth an
+    // octave down. ~6 oscillators/bar; negligible cost, huge warmth.
+    if (this.step === 0) this.pad(t, chordName, beat * 8);
+
+    // Menu-only birdsong: an occasional far-away sparkle chirp, seeded by the
+    // bar so it stays sparse and never machine-guns.
+    if (this.mode === "menu" && this.step === 6 && Math.random() < 0.3) {
+      this.birdsong(t + Math.random() * beat * 0.5);
+    }
+
     // Ukulele strum
     const strum = STRUM[this.step]!;
     if (strum) {
       const accent = this.step === 0 ? 1 : this.step === 4 ? 0.85 : 0.65;
       const order = strum === 1 ? chord : [...chord].reverse();
-      order.forEach((m, i) => this.pluck(t + i * 0.011, mtof(m + this.transpose), accent * (0.7 + 0.3 * Math.random())));
+      order.forEach((m, i) => this.pluck(t + i * 0.011 + Math.random() * 0.004, mtof(m + this.transpose + stormShift), accent * (0.7 + 0.3 * Math.random())));
     }
 
     // Bass: root on 1, fifth or root on 3, occasional walk-up on 8
-    if (this.step === 0) this.bass(t, mtof(BASS_ROOT[chordName]! + this.transpose), beat * 0.9);
-    if (this.step === 4) this.bass(t, mtof(BASS_ROOT[chordName]! + (this.bar % 2 ? 7 : 0) + this.transpose), beat * 0.8);
-    if (this.step === 7 && this.bar % 4 === 3) this.bass(t, mtof(BASS_ROOT[chordName]! + 5 + this.transpose), beat * 0.4);
+    if (this.step === 0) this.bass(t, mtof(BASS_ROOT[chordName]! + this.transpose + stormShift), beat * 0.9);
+    if (this.step === 4) this.bass(t, mtof(BASS_ROOT[chordName]! + (this.bar % 2 ? 7 : 0) + this.transpose + stormShift), beat * 0.8);
+    if (this.step === 7 && this.bar % 4 === 3) this.bass(t, mtof(BASS_ROOT[chordName]! + 5 + this.transpose + stormShift), beat * 0.4);
 
     // Glockenspiel melody
     const note = sec.mel[idx] ?? 0;
     if (note > 0) {
       const sparse = this.mode === "menu" && this.step % 2 === 1 && Math.random() < 0.5;
-      if (!sparse) this.glock(t, mtof(note + this.transpose), this.step === 0 ? 1 : 0.8);
+      if (!sparse) this.glock(t, mtof(note + this.transpose + stormShift), this.step === 0 ? 1 : 0.8);
     }
 
     // Percussion
-    if (this.mode === "play" || this.mode === "fever") {
+    if (this.mode === "play" || this.mode === "fever" || this.mode === "storm") {
       this.shaker(t, this.step % 2 === 0 ? 0.55 : 0.32);
       if (this.step === 0 || this.step === 4) this.kick(t, this.step === 0 ? 1 : 0.8);
       if (this.mode === "fever" && (this.step === 2 || this.step === 6)) this.clap(t);
+      // Storm: relentless — kicks on every other eighth, like weather that won't quit.
+      if (this.mode === "storm" && (this.step === 2 || this.step === 6)) this.kick(t, 0.55);
       if (this.step === 7 && this.bar % 2 === 1) this.shaker(t + beat * 0.22, 0.4);
     }
 
@@ -343,6 +363,56 @@ export class Music {
   }
 
   /* ---------- instruments ---------- */
+
+  /** Bar-long chord swell: two detuned triangles + a fifth, lowpassed. */
+  private pad(t: number, chordName: string, dur: number): void {
+    const root = (BASS_ROOT[chordName] ?? 48) + 12 + this.transpose;
+    const notes = [root, root + 7];
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.5, t + dur * 0.3);
+    g.gain.setValueAtTime(0.5, t + dur * 0.7);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    const f = this.ctx.createBiquadFilter();
+    f.type = "lowpass";
+    f.frequency.value = 900;
+    g.connect(f);
+    f.connect(this.padGain);
+    const send = this.ctx.createGain();
+    send.gain.value = 0.35;
+    f.connect(send);
+    send.connect(this.reverbSend);
+    for (const m of notes) {
+      for (const det of [-4, 4]) {
+        const o = this.ctx.createOscillator();
+        o.type = "triangle";
+        o.frequency.value = mtof(m) * Math.pow(2, det / 1200);
+        o.connect(g);
+        o.start(t);
+        o.stop(t + dur + 0.05);
+      }
+    }
+  }
+
+  /** Distant two-note bird chirp for the menu — pure decoration. */
+  private birdsong(t: number): void {
+    const base = 2200 + Math.random() * 900;
+    const o = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    o.type = "sine";
+    o.frequency.setValueAtTime(base, t);
+    o.frequency.exponentialRampToValueAtTime(base * 1.25, t + 0.05);
+    o.frequency.exponentialRampToValueAtTime(base * 0.92, t + 0.11);
+    o.frequency.exponentialRampToValueAtTime(base * 1.18, t + 0.16);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.05, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+    o.connect(g);
+    g.connect(this.reverbSend);
+    o.start(t);
+    o.stop(t + 0.25);
+  }
+
 
   private pluck(t: number, freq: number, vel: number): void {
     const o = this.ctx.createOscillator();

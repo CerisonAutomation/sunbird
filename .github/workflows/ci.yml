@@ -8,7 +8,7 @@ on:
 
 jobs:
   verify:
-    name: Typecheck · Test · Build
+    name: Lint · Typecheck · Test · Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,6 +20,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Lint
+        run: npm run lint
 
       - name: Typecheck
         run: npm run typecheck
@@ -39,6 +42,20 @@ jobs:
           path: dist/
           retention-days: 14
 
+  backend:
+    name: Backend typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+        working-directory: backend
+      - run: npx tsc --noEmit
+        working-directory: backend
+
   build-itch:
     name: Build (itch.io single-file)
     runs-on: ubuntu-latest
@@ -57,11 +74,11 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: sunbird-dist-itch
-          path: dist/
+          path: dist-itch/
           retention-days: 14
 
-  portal-poki:
-    name: Build (Poki)
+  portals:
+    name: Build (Poki + CrazyGames + generic zips)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -70,32 +87,13 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Build (Poki portal)
-        env:
-          VITE_PORTAL_TARGET: poki
-        run: npm run build:poki
+      - name: Build all portal zips
+        run: npm run build:portals
       - uses: actions/upload-artifact@v4
         with:
-          name: sunbird-dist-poki
-          path: dist/
-          retention-days: 14
-
-  portal-crazy:
-    name: Build (CrazyGames)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - name: Build (CrazyGames portal)
-        env:
-          VITE_PORTAL_TARGET: crazy
-        run: npm run build:crazy
-      - uses: actions/upload-artifact@v4
-        with:
-          name: sunbird-dist-crazy
-          path: dist/
+          name: sunbird-portal-zips
+          path: |
+            sunbird-poki.zip
+            sunbird-crazy.zip
+            sunbird-generic.zip
           retention-days: 14

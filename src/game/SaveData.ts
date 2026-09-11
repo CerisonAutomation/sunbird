@@ -9,8 +9,8 @@ import {
   VIP_DAYS,
 } from "./constants";
 import { dateSeed } from "./math";
-import { defaultRival, ratingDelta, streakBonus, type RivalMatch, type RivalState } from "./pvp";
-import { seasonId } from "./SeasonPass";
+import { defaultRival, rankSeasonId, ratingDelta, RIVAL_BASE_RATING, seasonReward, softResetRating, streakBonus, type RivalMatch, type RivalState } from "./pvp";
+import { seasonId } from "./season";
 import { emptyTournamentState, type TournamentState } from "./Tournaments";
 
 export type HighScore = {
@@ -31,6 +31,10 @@ export type Settings = {
   sfxVolume: number;
   haptics: boolean;
   reduceMotion: boolean;
+  /** Colorblind assist: shifts warning reds/greens to blue/orange + adds glyphs. */
+  colorAssist: boolean;
+  /** Large-text mode: bumps every UI font a step for readability. */
+  bigText: boolean;
   quality: Quality;
 };
 
@@ -55,6 +59,10 @@ export type SaveState = {
   wallet: number;
   nestLevel: number;
   completedMissions: string[];
+  /** Nest levels bought with coins (stacks with mission levels). */
+  nestBought: number;
+  /** One-time starter pack purchased (never offered again). */
+  starterPack: boolean;
   highScores: HighScore[];
   gold: boolean;
   vip: boolean;
@@ -68,6 +76,8 @@ export type SaveState = {
   settings: Settings;
   quests: { date: string; claimed: string[] };
   streak: { last: string; days: number; claimedDate: string };
+  /** Collection ids whose completion bonus has been paid. */
+  claimedCollections: string[];
   redeemedCodes: string[];
   runsPlayed: number;
   lifetime: LifetimeStats;
@@ -79,6 +89,8 @@ export type SaveState = {
   farthestIsland: number;
   biomesSeen: string[];
   tutorialRuns: number;
+  /** One-time interactive first-flight coach completed (dive/launch/soar). */
+  firstFlightDone: boolean;
   /** rolling flow-calibration estimate */
   skill: number;
   skillSamples: number;
@@ -94,6 +106,36 @@ export type SaveState = {
   /** On-device Rival rating for the simulated 40-bird field. Local only —
    *  never synced, never presented as a server rank. */
   rival: RivalState;
+  /** Head-to-head duel record (local ranked 1v1). */
+  duel: DuelState;
+  /** Monthly ranked season bookkeeping: soft reset + peak-division reward. */
+  rankSeason: { id: string; peak: number };
+  /** Daily challenge / weekly gauntlet completion state. */
+  challenges: ChallengeState;
+  /** 28-day login calendar, separate from the streak. */
+  calendar: { cycleDay: number; lastClaim: string };
+  /** Runs flown per mode, feeding mode mastery levels. */
+  mastery: Record<string, number>;
+  /** Campaign chapters whose rewards were claimed. */
+  campaignClaimed: string[];
+  /** Weekly-event / monthly-theme progress windows. */
+  events: { week: string; clearsThisWeek: number; month: string; clearsThisMonth: number; claimedTrailMonth: string };
+};
+
+export type DuelState = {
+  wins: number;
+  losses: number;
+  streak: number;
+  bestStreak: number;
+};
+
+export type ChallengeState = {
+  dailyDate: string;
+  dailyDone: boolean;
+  dailiesDone: number;
+  gauntletWeek: string;
+  gauntletDone: number[];
+  gauntletsCleared: number;
 };
 
 const DEFAULT_SETTINGS: Settings = {
@@ -103,6 +145,8 @@ const DEFAULT_SETTINGS: Settings = {
   sfxVolume: 0.9,
   haptics: true,
   reduceMotion: false,
+  colorAssist: false,
+  bigText: false,
   quality: "auto",
 };
 
@@ -124,6 +168,8 @@ function defaults(): SaveState {
     wallet: 0,
     nestLevel: 0,
     completedMissions: [],
+    nestBought: 0,
+    starterPack: false,
     highScores: [],
     gold: false,
     vip: false,
@@ -136,6 +182,7 @@ function defaults(): SaveState {
     settings: { ...DEFAULT_SETTINGS },
     quests: { date: "", claimed: [] },
     streak: { last: "", days: 0, claimedDate: "" },
+    claimedCollections: [],
     redeemedCodes: [],
     runsPlayed: 0,
     lifetime: { distance: 0, coins: 0, zeniths: 0, ghostBeats: 0 },
@@ -147,6 +194,7 @@ function defaults(): SaveState {
     farthestIsland: 0,
     biomesSeen: [],
     tutorialRuns: 0,
+    firstFlightDone: false,
     skill: 0.25,
     skillSamples: 0,
     bestAltitude: 0,
@@ -157,6 +205,13 @@ function defaults(): SaveState {
     bestPlace: 0,
     racesRun: 0,
     rival: defaultRival(),
+    duel: { wins: 0, losses: 0, streak: 0, bestStreak: 0 },
+    rankSeason: { id: rankSeasonId(), peak: RIVAL_BASE_RATING },
+    challenges: { dailyDate: "", dailyDone: false, dailiesDone: 0, gauntletWeek: "", gauntletDone: [], gauntletsCleared: 0 },
+    calendar: { cycleDay: 0, lastClaim: "" },
+    mastery: {},
+    campaignClaimed: [],
+    events: { week: "", clearsThisWeek: 0, month: "", clearsThisMonth: 0, claimedTrailMonth: "" },
   };
 }
 
@@ -229,6 +284,8 @@ export class SaveData {
         wallet: p.wallet === undefined ? num(p.totalCoins) : num(p.wallet),
         nestLevel: num(p.nestLevel),
         completedMissions: strArr(p.completedMissions),
+        nestBought: num(p.nestBought),
+        starterPack: Boolean(p.starterPack),
         highScores: Array.isArray(p.highScores)
           ? p.highScores
               .map((h) => ({
@@ -265,6 +322,8 @@ export class SaveData {
               : 0.9,
           haptics: p.settings?.haptics === undefined ? true : Boolean(p.settings.haptics),
           reduceMotion: Boolean(p.settings?.reduceMotion),
+          colorAssist: Boolean(p.settings?.colorAssist),
+          bigText: Boolean(p.settings?.bigText),
           quality: quality === "high" || quality === "low" ? quality : "auto",
         },
         quests:
@@ -298,7 +357,9 @@ export class SaveData {
         referralRedeemed: Boolean(p.referralRedeemed),
         farthestIsland: num(p.farthestIsland),
         biomesSeen: strArr(p.biomesSeen),
+        claimedCollections: strArr(p.claimedCollections),
         tutorialRuns: num(p.tutorialRuns),
+        firstFlightDone: Boolean(p.firstFlightDone),
         skill: p.skill === undefined ? 0.25 : num(p.skill),
         skillSamples: num(p.skillSamples),
         bestAltitude: num(p.bestAltitude),
@@ -320,6 +381,44 @@ export class SaveData {
         bestPlace: num(p.bestPlace),
         racesRun: num(p.racesRun),
         rival: parseRival(p.rival),
+        duel:
+          p.duel && typeof p.duel === "object"
+            ? { wins: num(p.duel.wins), losses: num(p.duel.losses), streak: num(p.duel.streak), bestStreak: num(p.duel.bestStreak) }
+            : { wins: 0, losses: 0, streak: 0, bestStreak: 0 },
+        rankSeason:
+          p.rankSeason && typeof p.rankSeason.id === "string"
+            ? { id: p.rankSeason.id, peak: num(p.rankSeason.peak) || RIVAL_BASE_RATING }
+            : { id: rankSeasonId(), peak: RIVAL_BASE_RATING },
+        challenges:
+          p.challenges && typeof p.challenges === "object"
+            ? {
+                dailyDate: String(p.challenges.dailyDate ?? ""),
+                dailyDone: Boolean(p.challenges.dailyDone),
+                dailiesDone: num(p.challenges.dailiesDone),
+                gauntletWeek: String(p.challenges.gauntletWeek ?? ""),
+                gauntletDone: numArr(p.challenges.gauntletDone),
+                gauntletsCleared: num(p.challenges.gauntletsCleared),
+              }
+            : d.challenges,
+        calendar:
+          p.calendar && typeof p.calendar === "object"
+            ? { cycleDay: num(p.calendar.cycleDay), lastClaim: String(p.calendar.lastClaim ?? "") }
+            : d.calendar,
+        mastery:
+          p.mastery && typeof p.mastery === "object" && !Array.isArray(p.mastery)
+            ? Object.fromEntries(Object.entries(p.mastery as Record<string, unknown>).map(([k, v]) => [k, num(v)]))
+            : {},
+        campaignClaimed: strArr(p.campaignClaimed),
+        events:
+          p.events && typeof p.events === "object"
+            ? {
+                week: String((p.events as Record<string, unknown>).week ?? ""),
+                clearsThisWeek: num((p.events as Record<string, unknown>).clearsThisWeek),
+                month: String((p.events as Record<string, unknown>).month ?? ""),
+                clearsThisMonth: num((p.events as Record<string, unknown>).clearsThisMonth),
+                claimedTrailMonth: String((p.events as Record<string, unknown>).claimedTrailMonth ?? ""),
+              }
+            : d.events,
       };
     } catch {
       return d;
@@ -398,6 +497,7 @@ export class SaveData {
     const delta = ratingDelta(p, f);
     const won = p <= Math.max(1, Math.ceil(f * 0.25));
     r.rating = Math.max(0, r.rating + delta);
+    this.state.rankSeason.peak = Math.max(this.state.rankSeason.peak, r.rating);
     if (won) {
       r.wins += 1;
       r.streak += 1;
@@ -415,6 +515,138 @@ export class SaveData {
     }
     this.persist();
     return { delta, bonus, streak: r.streak };
+  }
+
+  /**
+   * Monthly ranked season rollover: soft-reset the rating toward base and pay
+   * a coin reward for the peak division reached last season.
+   * @returns the reward paid, or null when no rollover happened.
+   */
+  ensureRankSeason(): { coins: number; division: string } | null {
+    const id = rankSeasonId();
+    if (this.state.rankSeason.id === id) return null;
+    const reward = seasonReward(this.state.rankSeason.peak);
+    this.state.rival.rating = softResetRating(this.state.rival.rating);
+    this.state.rival.streak = 0;
+    this.state.rankSeason = { id, peak: this.state.rival.rating };
+    this.state.wallet += reward.coins;
+    this.state.totalCoins += reward.coins;
+    this.persist();
+    return { coins: reward.coins, division: reward.division.name };
+  }
+
+  /** Head-to-head duel result. Rating swing is a flat ±16 vs the duelist. */
+  recordDuelResult(won: boolean, date: string): { delta: number; streak: number } {
+    const d = this.state.duel;
+    const delta = won ? 16 : -16;
+    this.state.rival.rating = Math.max(0, this.state.rival.rating + delta);
+    this.state.rankSeason.peak = Math.max(this.state.rankSeason.peak, this.state.rival.rating);
+    if (won) {
+      d.wins += 1;
+      d.streak += 1;
+      d.bestStreak = Math.max(d.bestStreak, d.streak);
+    } else {
+      d.losses += 1;
+      d.streak = 0;
+    }
+    this.state.rival.matches.push({ place: won ? 1 : 2, field: 2, mode: "duel", date, won });
+    if (this.state.rival.matches.length > 8) this.state.rival.matches.splice(0, this.state.rival.matches.length - 8);
+    this.persist();
+    return { delta, streak: d.streak };
+  }
+
+  /** Marks today's daily challenge complete. @returns false if already done. */
+  completeDaily(date: string): boolean {
+    const c = this.state.challenges;
+    if (c.dailyDate === date && c.dailyDone) return false;
+    c.dailyDate = date;
+    c.dailyDone = true;
+    c.dailiesDone += 1;
+    this.persist();
+    return true;
+  }
+
+  isDailyDone(date: string): boolean {
+    const c = this.state.challenges;
+    return c.dailyDate === date && c.dailyDone;
+  }
+
+  /** Marks a gauntlet stage done. @returns "stage" | "clear" | null. */
+  completeGauntletStage(week: string, index: number): "stage" | "clear" | null {
+    const c = this.state.challenges;
+    if (c.gauntletWeek !== week) {
+      c.gauntletWeek = week;
+      c.gauntletDone = [];
+    }
+    if (c.gauntletDone.includes(index)) return null;
+    c.gauntletDone.push(index);
+    const cleared = c.gauntletDone.length >= 3;
+    if (cleared) c.gauntletsCleared += 1;
+    this.persist();
+    return cleared ? "clear" : "stage";
+  }
+
+  gauntletDone(week: string): number[] {
+    const c = this.state.challenges;
+    return c.gauntletWeek === week ? [...c.gauntletDone] : [];
+  }
+
+  /** Claims today's login-calendar day. @returns the new cycle day, or 0. */
+  claimCalendar(today: string): number {
+    const c = this.state.calendar;
+    if (c.lastClaim === today) return 0;
+    c.lastClaim = today;
+    c.cycleDay = (c.cycleDay % 28) + 1;
+    this.persist();
+    return c.cycleDay;
+  }
+
+  /** Records a weekly-event clear. @returns clears this week / this month. */
+  recordEventClear(week: string, month: string): { week: number; month: number } {
+    const e = this.state.events;
+    if (e.week !== week) {
+      e.week = week;
+      e.clearsThisWeek = 0;
+    }
+    if (e.month !== month) {
+      e.month = month;
+      e.clearsThisMonth = 0;
+    }
+    e.clearsThisWeek += 1;
+    e.clearsThisMonth += 1;
+    this.persist();
+    return { week: e.clearsThisWeek, month: e.clearsThisMonth };
+  }
+
+  /** Marks the monthly theme trail as claimed for `month`. @returns false if already claimed. */
+  claimThemeTrail(month: string): boolean {
+    if (this.state.events.claimedTrailMonth === month) return false;
+    this.state.events.claimedTrailMonth = month;
+    this.persist();
+    return true;
+  }
+
+  /** Claims a campaign chapter reward. @returns false if already claimed. */
+  claimCampaign(chapterId: string): boolean {
+    if (this.state.campaignClaimed.includes(chapterId)) return false;
+    this.state.campaignClaimed.push(chapterId);
+    this.persist();
+    return true;
+  }
+
+  /** Counts a run toward per-mode mastery. @returns the new run count. */
+  addMasteryRun(modeId: string): number {
+    const n = (this.state.mastery[modeId] ?? 0) + 1;
+    this.state.mastery[modeId] = n;
+    this.persist();
+    return n;
+  }
+
+  ownTrail(id: string): boolean {
+    if (this.state.tournaments.trails.includes(id)) return false;
+    this.state.tournaments.trails.push(id);
+    this.persist();
+    return true;
   }
 
   equipTrail(id: string): void {
@@ -437,7 +669,23 @@ export class SaveData {
   completeMission(id: string): boolean {
     if (this.state.completedMissions.includes(id)) return false;
     this.state.completedMissions.push(id);
-    this.state.nestLevel = this.state.completedMissions.length;
+    this.state.nestLevel = this.state.completedMissions.length + this.state.nestBought;
+    this.persist();
+    return true;
+  }
+
+  /** Price of the next bought nest level: 300, 450, 675… (×1.5 per level). */
+  nestUpgradePrice(): number {
+    return Math.round(300 * Math.pow(1.5, this.state.nestBought));
+  }
+
+  /** The coin sink: convert coins into a permanent score multiplier level. */
+  buyNestUpgrade(): boolean {
+    const price = this.nestUpgradePrice();
+    if (this.state.nestBought >= 10) return false; // cap: +1.2x from purchases
+    if (!this.spend(price)) return false;
+    this.state.nestBought += 1;
+    this.state.nestLevel = this.state.completedMissions.length + this.state.nestBought;
     this.persist();
     return true;
   }
@@ -450,7 +698,9 @@ export class SaveData {
   }
 
   nestMultiplier(): number {
-    return 1 + this.state.nestLevel * NEST_MULT_PER_LEVEL;
+    const base = 1 + this.state.nestLevel * NEST_MULT_PER_LEVEL;
+    // VIP: the nest works 25% harder while the subscription is active.
+    return this.isVipActive() ? 1 + (base - 1) * 1.25 : base;
   }
 
   spend(amount: number): boolean {

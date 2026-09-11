@@ -35,4 +35,21 @@ rust/target/
 # Graph-it
 .graph-it/
 .vercel
+
+# Cloudflare Workers backend
+backend/node_modules
+backend/.wrangler
+.wrangler/
+
+# Playwright MCP debug snapshots
 .playwright-mcp/
+server/social/sunbird-social-data/
+
+# portal build artifacts
+dist-poki/
+dist-crazy/
+sunbird-poki.zip
+sunbird-crazy.zip
+dist-generic/
+sunbird-generic.zip
+dist-itch/

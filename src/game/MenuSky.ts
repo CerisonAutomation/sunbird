@@ -6,9 +6,17 @@
  * when the menu is not visible and renders a single static frame under
  * `prefers-reduced-motion`. This is decorative-only and never touches the
  * 3D scene or gameplay.
+ *
+ * Performance notes (why it stays cheap even with the hero bird):
+ *  • All gradients + the two hill silhouettes are built ONCE per resize and
+ *    reused every frame (gradient objects + Path2D), so the per-frame cost is
+ *    fills and ~20 tiny strokes — zero allocation, zero GC churn.
+ *  • resize() is a no-op unless the size/DPR actually changed. Setting
+ *    canvas.width clears the canvas, and the old unconditional resize was the
+ *    source of visible flashing (blank canvas until the next 30 Hz tick).
  */
 
-type Bird = {
+type Flocker = {
   x: number;
   y: number;
   scale: number;
@@ -17,15 +25,36 @@ type Bird = {
   flapRate: number;
   drift: number;
   depth: number;
+  /** Body plumage — distant birds are tinted silhouettes, near ones show color. */
+  color: string;
+  belly: string;
 };
 
-const FLOCK_SIZE = 14;
+const FLOCK_SIZE = 18;
+
+/** Plumages drawn from the shop's actual skin palette — the flock reads as
+ *  other players' birds crossing the valley, not abstract chevrons. */
+const PLUMAGES: [string, string][] = [
+  ["#ff7a45", "#ffe6c4"], // sunbird
+  ["#4a90d8", "#d8ecff"], // kingfisher
+  ["#d84a5a", "#ffd8dc"], // cardinal
+  ["#3a3f4a", "#e8eef4"], // storm swift
+  ["#2fae6a", "#d8ffe8"], // lorikeet
+  ["#8a5ad8", "#e8d8ff"], // magpie violet
+  ["#e8a020", "#fff2d0"], // goldfinch
+  ["#e86aa8", "#ffe0ee"], // rose finch
+];
+const TRAIL_LEN = 16;
 
 export class MenuSky {
   readonly host: HTMLDivElement;
+  /** Transparent overlay canvas that draws the hero bird ABOVE the UI card. */
+  readonly heroHost: HTMLDivElement;
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
-  private readonly birds: Bird[] = [];
+  private readonly heroCanvas: HTMLCanvasElement;
+  private readonly hctx: CanvasRenderingContext2D;
+  private readonly birds: Flocker[] = [];
   private readonly reduceMotion: boolean;
   private raf = 0;
   private last = 0;
@@ -35,6 +64,17 @@ export class MenuSky {
   private width = 1;
   private height = 1;
   private dpr = 1;
+
+  // Cached per-resize scenery (rebuilt only when the canvas really changes).
+  private skyGrad: CanvasGradient | null = null;
+  private bloomGrad: CanvasGradient | null = null;
+  private hazeGrad: CanvasGradient | null = null;
+  private hillFar: Path2D | null = null;
+  private hillNear: Path2D | null = null;
+
+  // Hero sunbird — the player's bird swooping through its own menu sky.
+  private readonly trail: { x: number; y: number }[] = [];
+  private heroFlap = 0;
 
   constructor() {
     this.reduceMotion =
@@ -51,8 +91,17 @@ export class MenuSky {
     this.host.appendChild(this.canvas);
     this.ctx = this.canvas.getContext("2d")!;
 
+    this.heroHost = document.createElement("div");
+    this.heroHost.className = "menu-hero-layer";
+    this.heroHost.setAttribute("aria-hidden", "true");
+    this.heroCanvas = document.createElement("canvas");
+    this.heroCanvas.className = "menu-sky-canvas";
+    this.heroHost.appendChild(this.heroCanvas);
+    this.hctx = this.heroCanvas.getContext("2d")!;
+
     for (let i = 0; i < FLOCK_SIZE; i++) {
       const depth = i / (FLOCK_SIZE - 1);
+      const plumage = PLUMAGES[i % PLUMAGES.length]!;
       this.birds.push({
         x: Math.random(),
         y: 0.06 + depth * 0.34 + Math.random() * 0.16,
@@ -62,27 +111,41 @@ export class MenuSky {
         flapRate: 7 + Math.random() * 3.5,
         drift: 0.012 + Math.random() * 0.02,
         depth,
+        color: plumage[0],
+        belly: plumage[1],
       });
     }
   }
 
   resize(width: number, height: number): void {
     if (width < 2 || height < 2) return;
-    this.dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    // No-op when nothing changed — the old unconditional path cleared the
+    // canvas every HUD update and caused visible flashing.
+    if (width === this.width && height === this.height && dpr === this.dpr) return;
+    this.dpr = dpr;
     this.width = width;
     this.height = height;
-    this.canvas.width = Math.floor(width * this.dpr);
-    this.canvas.height = Math.floor(height * this.dpr);
+    this.canvas.width = Math.floor(width * dpr);
+    this.canvas.height = Math.floor(height * dpr);
     this.canvas.style.width = `${width}px`;
     this.canvas.style.height = `${height}px`;
-    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    if (!this.active || this.reduceMotion) this.draw(0);
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.heroCanvas.width = Math.floor(width * dpr);
+    this.heroCanvas.height = Math.floor(height * dpr);
+    this.heroCanvas.style.width = `${width}px`;
+    this.heroCanvas.style.height = `${height}px`;
+    this.hctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.buildScenery();
+    // Paint immediately so a resize never leaves a blank frame behind.
+    this.draw(0);
   }
 
   setActive(active: boolean): void {
     if (active === this.active) return;
     this.active = active;
     this.host.classList.toggle("on", active);
+    this.heroHost.classList.toggle("on", active);
     if (active && !this.reduceMotion) this.start();
     else this.stop();
     if (active) this.draw(0);
@@ -91,6 +154,7 @@ export class MenuSky {
   dispose(): void {
     this.stop();
     this.host.remove();
+    this.heroHost.remove();
   }
 
   private start(): void {
@@ -118,10 +182,9 @@ export class MenuSky {
     this.acc = 0;
   }
 
-  private draw(dt: number): void {
-    const w = this.width;
-    const h = this.height;
-    const ctx = this.ctx;
+  /** Gradients + hill silhouettes are rebuilt only on a real resize. */
+  private buildScenery(): void {
+    const { ctx, width: w, height: h } = this;
 
     const sky = ctx.createLinearGradient(0, 0, 0, h);
     sky.addColorStop(0, "#1d3f6b");
@@ -129,40 +192,183 @@ export class MenuSky {
     sky.addColorStop(0.62, "#9cc9e6");
     sky.addColorStop(0.82, "#f0c9a0");
     sky.addColorStop(1, "#f6b96f");
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, w, h);
+    this.skyGrad = sky;
 
-    // Low sun with a soft bloom — the game's daylight fantasy.
     const sunX = w * 0.76;
     const sunY = h * 0.34;
     const bloom = ctx.createRadialGradient(sunX, sunY, 4, sunX, sunY, h * 0.5);
     bloom.addColorStop(0, "rgba(255, 244, 205, 0.95)");
     bloom.addColorStop(0.16, "rgba(255, 226, 150, 0.5)");
     bloom.addColorStop(1, "rgba(255, 200, 120, 0)");
-    ctx.fillStyle = bloom;
-    ctx.fillRect(0, 0, w, h);
+    this.bloomGrad = bloom;
 
-    this.band(ctx, w, h, 0.4, 0.16, 0.34, "rgba(255,255,255,0.30)", 0.16);
-    this.band(ctx, w, h, 0.3, 0.2, 0.22, "rgba(255,255,255,0.22)", 0.3);
-    this.band(ctx, w, h, 0.2, 0.24, 0.14, "rgba(255,255,255,0.16)", 0.5);
-
-    this.hills(ctx, w, h, 0.66, "rgba(40,74,92,0.55)", 1.1, 2.1);
-    this.hills(ctx, w, h, 0.76, "rgba(24,48,64,0.78)", 0.8, 4.3);
-
-    // Foreground haze to seat the flock in the sky.
     const haze = ctx.createLinearGradient(0, h * 0.55, 0, h);
     haze.addColorStop(0, "rgba(255, 214, 160, 0)");
     haze.addColorStop(1, "rgba(255, 198, 138, 0.22)");
-    ctx.fillStyle = haze;
+    this.hazeGrad = haze;
+
+    this.hillFar = this.buildHill(0.66, 1.1, 2.1);
+    this.hillNear = this.buildHill(0.76, 0.8, 4.3);
+  }
+
+  private buildHill(baseY: number, amp: number, freq: number): Path2D {
+    const { width: w, height: h } = this;
+    const p = new Path2D();
+    const y0 = h * baseY;
+    p.moveTo(0, h);
+    for (let x = 0; x <= w; x += 14) {
+      const t = x / w;
+      const y = y0 - Math.sin(t * Math.PI * freq + freq) * (h * 0.03 * amp) - Math.sin(t * 9.1) * (h * 0.012 * amp);
+      p.lineTo(x, y);
+    }
+    p.lineTo(w, h);
+    p.closePath();
+    return p;
+  }
+
+  private draw(dt: number): void {
+    const w = this.width;
+    const h = this.height;
+    const ctx = this.ctx;
+    if (!this.skyGrad) this.buildScenery();
+
+    ctx.fillStyle = this.skyGrad!;
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = this.bloomGrad!;
+    ctx.fillRect(0, 0, w, h);
+
+    this.band(ctx, w, h, 0.4, 0.16, "rgba(255,255,255,0.30)", 0.16);
+    this.band(ctx, w, h, 0.3, 0.2, "rgba(255,255,255,0.22)", 0.3);
+    this.band(ctx, w, h, 0.2, 0.24, "rgba(255,255,255,0.16)", 0.5);
+
+    ctx.fillStyle = "rgba(40,74,92,0.55)";
+    ctx.fill(this.hillFar!);
+    ctx.fillStyle = "rgba(24,48,64,0.78)";
+    ctx.fill(this.hillNear!);
+
+    ctx.fillStyle = this.hazeGrad!;
     ctx.fillRect(0, h * 0.55, w, h * 0.45);
 
     for (const bird of this.birds) {
       if (dt > 0) this.step(bird, dt);
-      this.drawBird(ctx, bird, w, h);
+      this.drawFlocker(ctx, bird, w, h);
     }
+
+    // Hero flies on its own transparent overlay so it soars OVER the UI card.
+    this.hctx.clearRect(0, 0, w, h);
+    this.drawHero(this.hctx, w, h, dt);
   }
 
-  private step(bird: Bird, dt: number): void {
+  /* ------------------------------------------------------------- hero bird */
+
+  /**
+   * The hero sunbird swoops along a slow figure-of-eight (two incommensurate
+   * sines, so the path never visibly repeats), banking into turns and leaving
+   * a short ember trail — the menu shows the bird you actually fly.
+   */
+  private heroPos(t: number): { x: number; y: number } {
+    // Stay in the top band of the screen: full-width sweeps, but never lower
+    // than ~32% down so the bird plays around the logo, not over body copy.
+    return {
+      x: 0.5 + 0.4 * Math.sin(t * 0.21) + 0.07 * Math.sin(t * 0.53 + 1.2),
+      y: 0.16 + 0.1 * Math.sin(t * 0.42 + 0.8) + 0.05 * Math.sin(t * 0.17),
+    };
+  }
+
+  private drawHero(ctx: CanvasRenderingContext2D, w: number, h: number, dt: number): void {
+    const t = this.reduceMotion ? 4.2 : this.time;
+    const p = this.heroPos(t);
+    const ahead = this.heroPos(t + 0.12);
+    const vx = ahead.x - p.x;
+    const vy = ahead.y - p.y;
+    const heading = Math.atan2(vy * h, vx * w);
+    const dirRight = Math.cos(heading) >= 0;
+
+    const x = p.x * w;
+    const y = p.y * h;
+    const size = Math.max(18, Math.min(w, h) * 0.055);
+
+    if (dt > 0) {
+      this.heroFlap += dt * (7 + Math.abs(Math.sin(t * 0.42)) * 4);
+      this.trail.push({ x, y });
+      if (this.trail.length > TRAIL_LEN) this.trail.shift();
+    }
+
+    // Ember trail — fading, shrinking dots along the recent path.
+    for (let i = 0; i < this.trail.length; i++) {
+      const k = i / TRAIL_LEN;
+      const tp = this.trail[i]!;
+      ctx.fillStyle = `rgba(255, 190, 110, ${0.05 + k * 0.2})`;
+      ctx.beginPath();
+      ctx.arc(tp.x, tp.y, size * 0.1 + k * size * 0.16, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(heading * 0.5); // soften banking so it never looks acrobatic
+    if (!dirRight) ctx.scale(-1, 1);
+
+    const flap = Math.sin(this.heroFlap) * 0.85;
+
+    // Far wing (behind the body, slightly darker).
+    ctx.fillStyle = "#e06a35";
+    ctx.beginPath();
+    ctx.ellipse(-size * 0.05, -size * 0.16 - flap * size * 0.34, size * 0.5, size * 0.2, -0.5 - flap * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Body.
+    ctx.fillStyle = "#ff7a45";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, size * 0.62, size * 0.4, 0.06, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Belly.
+    ctx.fillStyle = "#ffe6c4";
+    ctx.beginPath();
+    ctx.ellipse(size * 0.1, size * 0.14, size * 0.36, size * 0.2, 0.1, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Tail feathers.
+    ctx.fillStyle = "#e06a35";
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.5, 0);
+    ctx.lineTo(-size * 0.95, -size * 0.18);
+    ctx.lineTo(-size * 0.85, size * 0.12);
+    ctx.closePath();
+    ctx.fill();
+
+    // Near wing (banks with the flap).
+    ctx.fillStyle = "#ff9a62";
+    ctx.beginPath();
+    ctx.ellipse(size * 0.02, -size * 0.05 - flap * size * 0.42, size * 0.56, size * 0.24, -0.35 - flap * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Beak.
+    ctx.fillStyle = "#ffb020";
+    ctx.beginPath();
+    ctx.moveTo(size * 0.58, -size * 0.06);
+    ctx.lineTo(size * 0.86, size * 0.02);
+    ctx.lineTo(size * 0.56, size * 0.12);
+    ctx.closePath();
+    ctx.fill();
+
+    // Eye.
+    ctx.fillStyle = "#2a1c28";
+    ctx.beginPath();
+    ctx.arc(size * 0.36, -size * 0.1, size * 0.07, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.beginPath();
+    ctx.arc(size * 0.385, -size * 0.125, size * 0.025, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  /* ---------------------------------------------------------- distant flock */
+
+  private step(bird: Flocker, dt: number): void {
     bird.x += bird.speed * dt;
     if (bird.x > 1.12) {
       bird.x = -0.12;
@@ -177,7 +383,6 @@ export class MenuSky {
     h: number,
     baseY: number,
     height: number,
-    alpha: number,
     color: string,
     drift: number,
   ): void {
@@ -192,45 +397,43 @@ export class MenuSky {
       ctx.ellipse(cx, y, cw, ch, 0, 0, Math.PI * 2);
       ctx.fill();
     }
-    void alpha;
   }
 
-  private hills(
-    ctx: CanvasRenderingContext2D,
-    w: number,
-    h: number,
-    baseY: number,
-    color: string,
-    amp: number,
-    freq: number,
-  ): void {
-    const y0 = h * baseY;
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(0, h);
-    for (let x = 0; x <= w; x += 14) {
-      const t = x / w;
-      const y = y0 - Math.sin(t * Math.PI * freq + freq) * (h * 0.03 * amp) - Math.sin(t * 9.1) * (h * 0.012 * amp);
-      ctx.lineTo(x, y);
-    }
-    ctx.lineTo(w, h);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  private drawBird(ctx: CanvasRenderingContext2D, bird: Bird, w: number, h: number): void {
+  private drawFlocker(ctx: CanvasRenderingContext2D, bird: Flocker, w: number, h: number): void {
     const x = bird.x * w;
     const y = bird.y * h + Math.sin(this.time * 0.9 + bird.flap * 0.15) * (h * 0.004);
     const size = 8 * bird.scale;
     const flap = Math.sin(bird.flap) * 0.7;
-    const shade = 0.42 + bird.depth * 0.3;
-    ctx.strokeStyle = `rgba(28, 42, 62, ${shade})`;
-    ctx.lineWidth = Math.max(1.2, size * 0.16);
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(x - size, y + flap * size * 0.42);
-    ctx.quadraticCurveTo(x - size * 0.4, y - size * 0.3, x, y);
-    ctx.quadraticCurveTo(x + size * 0.4, y - size * 0.3, x + size, y + flap * size * 0.42);
-    ctx.stroke();
+
+    // Near half of the flock: small colored bodies (other pilots' plumage).
+    // Far half: classic dark chevron silhouettes for depth.
+    if (bird.depth > 0.45) {
+      ctx.fillStyle = bird.color;
+      ctx.beginPath();
+      ctx.ellipse(x, y, size * 0.5, size * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = bird.belly;
+      ctx.beginPath();
+      ctx.ellipse(x + size * 0.1, y + size * 0.1, size * 0.26, size * 0.14, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = bird.color;
+      ctx.lineWidth = Math.max(1.4, size * 0.18);
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(x - size, y + flap * size * 0.42);
+      ctx.quadraticCurveTo(x - size * 0.4, y - size * 0.34, x, y - size * 0.08);
+      ctx.quadraticCurveTo(x + size * 0.4, y - size * 0.34, x + size, y + flap * size * 0.42);
+      ctx.stroke();
+    } else {
+      const shade = 0.42 + bird.depth * 0.3;
+      ctx.strokeStyle = `rgba(28, 42, 62, ${shade})`;
+      ctx.lineWidth = Math.max(1.2, size * 0.16);
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(x - size, y + flap * size * 0.42);
+      ctx.quadraticCurveTo(x - size * 0.4, y - size * 0.3, x, y);
+      ctx.quadraticCurveTo(x + size * 0.4, y - size * 0.3, x + size, y + flap * size * 0.42);
+      ctx.stroke();
+    }
   }
 }

@@ -1,4 +1,4 @@
-export type PlatformName = "poki" | "crazy" | "none";
+export type PlatformName = "poki" | "crazy" | "generic" | "none";
 
 export type PlatformEvents = {
   onAdOpened?: () => void;
@@ -48,9 +48,17 @@ const TARGET = (import.meta.env.VITE_PORTAL_TARGET ?? "none").toLowerCase();
 const CRAZY_BANNER_ID = import.meta.env.VITE_CRAZY_BANNER_ID ?? "";
 const POKI_SRC = "https://game-cdn.poki.com/scripts/v2/poki-sdk.js";
 const CRAZY_SRC = "https://sdk.crazygames.com/crazygames-sdk-v3.js";
+/** If the portal SDK can't load in this long, boot the game without it. */
+const SDK_LOAD_TIMEOUT_MS = 6000;
 
 export function portalTarget(): PlatformName {
-  return TARGET === "poki" ? "poki" : TARGET === "crazy" || TARGET === "crazygames" ? "crazy" : "none";
+  if (TARGET === "poki") return "poki";
+  if (TARGET === "crazy" || TARGET === "crazygames") return "crazy";
+  // "generic": portal-safe build for GameDistribution / Yandex / itch.io /
+  // Newgrounds / GameMonetize etc. — no ads SDK, but ALL portal restrictions
+  // apply (no external payments, no install prompt, no file downloads).
+  if (TARGET === "generic") return "generic";
+  return "none";
 }
 
 export function isPortalBuild(): boolean {
@@ -214,11 +222,11 @@ let sdkBootPromise: Promise<PlatformName> | null = null;
 function scriptFor(target: PlatformName): string | null {
   if (target === "poki") return POKI_SRC;
   if (target === "crazy") return CRAZY_SRC;
-  return null;
+  return null; // "generic" and "none": no SDK script
 }
 
 function ensureSdk(target: PlatformName): Promise<PlatformName> {
-  if (target === "none") return Promise.resolve("none");
+  if (target === "none" || target === "generic") return Promise.resolve(target);
   if (loadPromise) return loadPromise;
   loadPromise = new Promise((resolve) => {
     const isReady = target === "poki" ? Boolean(window.PokiSDK) : Boolean(window.CrazyGames?.SDK);
@@ -259,7 +267,11 @@ function ensureSdk(target: PlatformName): Promise<PlatformName> {
  * are fresh after React StrictMode's development remount. */
 function bootstrapSdk(target: PlatformName): Promise<PlatformName> {
   if (sdkBootPromise) return sdkBootPromise;
-  sdkBootPromise = ensureSdk(target).then(async (loaded) => {
+  // Hard cap: a hanging/blocked SDK script must never hold the game hostage.
+  const timeout = new Promise<PlatformName>((resolve) => {
+    window.setTimeout(() => resolve("none"), SDK_LOAD_TIMEOUT_MS);
+  });
+  const boot = ensureSdk(target).then(async (loaded) => {
     if (loaded === "poki") {
       try {
         await window.PokiSDK?.init?.();
@@ -276,6 +288,7 @@ function bootstrapSdk(target: PlatformName): Promise<PlatformName> {
     }
     return loaded;
   });
+  sdkBootPromise = Promise.race([boot, timeout]);
   return sdkBootPromise;
 }
 

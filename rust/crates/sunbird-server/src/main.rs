@@ -1,9 +1,12 @@
 mod auth;
 mod config;
 mod metrics;
+mod rooms;
+mod ws;
 
+use anyhow::Context;
 use axum::{
-    extract::{OriginalUri, State},
+    extract::State,
     http::{header, HeaderValue, Method, StatusCode},
     response::{IntoResponse, Json, Response},
     routing::{get, post},
@@ -12,11 +15,8 @@ use axum::{
 use config::{Config, Environment};
 use parking_lot::RwLock;
 use serde::Serialize;
-use std::{net::SocketAddr, sync::Arc, time::Duration};
-use sunbird_protocol::{
-    parse_client_message, ClientMessage, Limits, ProtocolError, SeatGrant, ServerMessage, MAX_JSON_PAYLOAD_BYTES,
-    PROTOCOL_VERSION,
-};
+use std::{sync::Arc, time::Duration};
+use sunbird_protocol::{Limits, ProtocolError, SeatGrant, ServerMessage, MAX_JSON_PAYLOAD_BYTES, PROTOCOL_VERSION};
 use tokio::{net::TcpListener, signal, sync::watch};
 use tower_http::{
     cors::{Any, CorsLayer},
@@ -37,6 +37,7 @@ struct Shared {
     issuer: auth::SeatTokenIssuer,
     protocol_limits: Limits,
     state: Arc<RuntimeState>,
+    rooms: Arc<rooms::RoomManager>,
 }
 
 struct RuntimeState {
@@ -67,13 +68,16 @@ async fn main() -> anyhow::Result<()> {
         "sunbird service configuration validated"
     );
 
+    let room_manager = Arc::new(rooms::RoomManager::new());
+    ws::spawn_sweeper(room_manager.clone());
     let shared = Arc::new(Shared {
         issuer: auth::SeatTokenIssuer::new(&config.reconnect_secret, config.reconnect_grace),
         protocol_limits: Limits::current(),
         config,
         state: Arc::new(RuntimeState::new()),
+        rooms: room_manager,
     });
-    let listener = TcpListener::bind(bind_addr).await.with_context(|err| format!("cannot bind {bind_addr}: {err}"))?;
+    let listener = TcpListener::bind(bind_addr).await.with_context(|| format!("cannot bind {bind_addr}"))?;
     let bound = listener.local_addr().context("failed to resolve listener address")?;
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
     let app = build_app(shared.clone(), shutdown_rx.clone());
@@ -83,7 +87,7 @@ async fn main() -> anyhow::Result<()> {
 
     if let Some(metrics_bind) = shared.config.metrics_bind {
         let metrics_app = metrics_endpoint_app();
-        let metrics_listener = TcpListener::bind(metrics_bind).await.with_context(|err| format!("cannot bind metrics address {metrics_bind}: {err}"))?;
+        let metrics_listener = TcpListener::bind(metrics_bind).await.with_context(|| format!("cannot bind metrics address {metrics_bind}"))?;
         let metrics_addr = metrics_listener.local_addr().context("failed to resolve metrics address")?;
         metrics::install();
         tokio::spawn(async move {
@@ -114,7 +118,11 @@ fn init_tracing() {
 
 fn build_app(shared: SharedState, shutdown_rx: watch::Receiver<bool>) -> Router {
     let cors = cors_layer(&shared.config);
+    // The WebSocket route carries its own state (the room registry) so the
+    // socket task never needs the whole Shared config.
+    let ws_router = Router::new().route("/v1/ws", get(ws::ws_handler)).with_state(shared.rooms.clone());
     Router::new()
+        .merge(ws_router)
         .route("/health", get(health))
         .route("/healthz", get(health))
         .route("/ready", get(ready))
@@ -123,6 +131,7 @@ fn build_app(shared: SharedState, shutdown_rx: watch::Receiver<bool>) -> Router 
         .route("/v1/hello", get(protocol_hello))
         .route("/v1/reconnect-token", post(issue_reconnect_token))
         .route("/v1/degrade", get(degrade_status))
+        .route("/v1/rooms", get(room_stats))
         .layer(TraceLayer::new_for_http())
         .layer(TimeoutLayer::new(Duration::from_secs(3)))
         .layer(RequestBodyLimitLayer::new(MAX_JSON_PAYLOAD_BYTES))
@@ -223,16 +232,23 @@ struct DegradeResponse {
     fallback: &'static str,
 }
 
-/// Explicit capability gate for the browser while authoritative rooms do not
-/// exist. This deliberately prevents the UI from reaching an online claim.
+/// Capability gate for the browser. Phase 3: authoritative rooms are live on
+/// `/v1/ws`, so multiplayer is claimable; the fallback string still tells
+/// clients what to do if the socket cannot be established.
 async fn degrade_status(State(shared): State<SharedState>) -> Json<DegradeResponse> {
     metrics::note_health();
     let external_ready = shared.config.environment != Environment::Development;
     Json(DegradeResponse {
-        multiplayer_ready: false,
-        reason: "authoritative-room-pending-phase-3",
+        multiplayer_ready: true,
+        reason: "authoritative-rooms-live",
         fallback: if external_ready { "local-practice-only" } else { "local-practice-mode" },
     })
+}
+
+/// Ops snapshot of the room registry: room/seat/started counts.
+async fn room_stats(State(shared): State<SharedState>) -> Json<rooms::RoomStats> {
+    metrics::note_health();
+    Json(shared.rooms.stats())
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -277,6 +293,7 @@ impl ApiError {
         }
     }
 
+    #[allow(dead_code)]
     fn invalid(message: String) -> Self {
         Self {
             status: StatusCode::UNPROCESSABLE_ENTITY,
@@ -327,6 +344,7 @@ async fn shutdown_signal(tx: ShutdownTx) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sunbird_protocol::{parse_client_message, ClientMessage};
 
     fn test_shared() -> SharedState {
         Arc::new(Shared {
@@ -334,6 +352,7 @@ mod tests {
             issuer: auth::SeatTokenIssuer::new(b"01234567890123456789012345678901", Duration::from_secs(30)),
             protocol_limits: Limits::current(),
             state: Arc::new(RuntimeState::new()),
+            rooms: Arc::new(rooms::RoomManager::new()),
         })
     }
 

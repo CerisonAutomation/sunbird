@@ -103,7 +103,11 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.closePath();
 }
 
-export async function shareOrDownload(card: ShareCard, filename = "sunbird-flight.png"): Promise<"shared" | "downloaded" | "copied"> {
+export async function shareOrDownload(
+  card: ShareCard,
+  filename = "sunbird-flight.png",
+  allowDownload = true,
+): Promise<"shared" | "downloaded" | "copied"> {
   const nav = navigator as Navigator & {
     share?: (data: ShareData) => Promise<void>;
     canShare?: (data: ShareData) => boolean;
@@ -125,6 +129,9 @@ export async function shareOrDownload(card: ShareCard, filename = "sunbird-fligh
   } catch {
     /* ignore */
   }
+  // Portal iframes: triggering file downloads is flagged by QA — the copied
+  // text is the share. Web builds still save the image card.
+  if (!allowDownload) return "copied";
   const a = document.createElement("a");
   a.href = card.dataUrl;
   a.download = filename;

@@ -40,6 +40,8 @@ export type BirdStepOpts = {
   dragMult?: number;
   /** feather — raises the floor on sloppy landings */
   feather?: boolean;
+  /** weekly-event gravity multiplier (Feather Week / Heavy Metal) */
+  gravityMult?: number;
 };
 
 export type BirdSkinColors = {
@@ -141,10 +143,26 @@ export class Bird {
     this.buildWing(this.wingR, -1);
     this.squash.add(this.wingL, this.wingR);
 
-    this.tail = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.55, 5), this.wingMat);
+    // Crest: three little head feathers give the silhouette real character.
+    for (let i = 0; i < 3; i++) {
+      const crest = new THREE.Mesh(new THREE.ConeGeometry(0.09 - i * 0.015, 0.42 - i * 0.06, 5), this.wingMat);
+      crest.position.set(0.18 - i * 0.17, 0.62 + i * 0.03, 0);
+      crest.rotation.z = 0.55 + i * 0.35;
+      this.squash.add(crest);
+    }
+
+    // Fanned three-feather tail reads far better in 3/4 view than one cone.
+    this.tail = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.62, 5), this.wingMat);
     this.tail.rotation.z = Math.PI / 2.4;
     this.tail.position.set(-0.7, 0.05, 0);
     this.squash.add(this.tail);
+    for (const side of [-1, 1]) {
+      const f = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.5, 5), this.wingMat);
+      f.rotation.z = Math.PI / 2.55;
+      f.rotation.y = 0.35 * side;
+      f.position.set(-0.64, 0.02, 0.16 * side);
+      this.squash.add(f);
+    }
 
     this.glow = new THREE.PointLight(0xffe08a, 0, 18, 2);
     this.glow.position.set(0, 0.4, 1);
@@ -230,6 +248,7 @@ export class Bird {
     this.wasGrounded = was;
 
     const diving = opts.diving && !this.asleep;
+    const gMult = opts.gravityMult ?? 1;
     const cap =
       (opts.fever ? MAX_SPEED_FEVER : MAX_SPEED) * opts.speedMult + (opts.boost ? BOOST_EXTRA_SPEED : 0);
 
@@ -261,7 +280,7 @@ export class Bird {
       let launched = false;
       if (curv > 0) {
         const needed = vt * vt * curv; // centripetal pull required to stay glued
-        const available = (diving ? GRAVITY_DIVE : GRAVITY_GLIDE) * n2.ny + (diving ? STICK_ACCEL_DIVE : STICK_ACCEL_GLIDE);
+        const available = (diving ? GRAVITY_DIVE : GRAVITY_GLIDE) * gMult * n2.ny + (diving ? STICK_ACCEL_DIVE : STICK_ACCEL_GLIDE);
         if (needed > available) launched = true;
       }
       if (launched) {
@@ -284,7 +303,7 @@ export class Bird {
       const lift = diving
         ? 0
         : Math.min(0.85, GLIDE_LIFT_MAX * clamp(sp / GLIDE_LIFT_SPEED, 0, 1) * (opts.liftMult ?? 1));
-      this.vy -= (diving ? GRAVITY_DIVE : GRAVITY_GLIDE) * (1 - lift) * dt;
+      this.vy -= (diving ? GRAVITY_DIVE : GRAVITY_GLIDE) * gMult * (1 - lift) * dt;
 
       const k = (diving ? AIR_DRAG_DIVE : AIR_DRAG_GLIDE) * (opts.dragMult ?? 1);
       const decay = Math.max(0, 1 - k * sp * dt);
@@ -459,9 +478,22 @@ export class Bird {
   }
 
   private buildWing(group: THREE.Group, side: number): void {
+    // Two-layer wing: broad primary + darker secondary layer underneath,
+    // plus three feather tips so the flap reads with depth from any angle.
     const wing = new THREE.Mesh(new THREE.SphereGeometry(0.48, 10, 8), this.wingMat);
     wing.scale.set(0.95, 0.18, 0.55);
     group.add(wing);
+    const under = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 6), this.bodyMat);
+    under.scale.set(0.85, 0.14, 0.48);
+    under.position.set(-0.08, -0.05, 0.05 * side);
+    group.add(under);
+    for (let i = 0; i < 3; i++) {
+      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.38, 4), this.wingMat);
+      tip.rotation.x = (Math.PI / 2) * side;
+      tip.rotation.z = -0.25 - i * 0.18;
+      tip.position.set(-0.28 - i * 0.14, -0.02, (0.34 + i * 0.05) * side);
+      group.add(tip);
+    }
     group.position.set(-0.05, 0.12, 0.45 * side);
     group.rotation.y = 0.35 * side;
   }

@@ -21,6 +21,7 @@ export class GameAudio {
   private musicVol = 0.8;
   private sfxVol = 0.9;
   private adMuted = false;
+  private hiddenMuted = false;
   private started = false;
   private pendingMode: MusicMode = "off";
   private pendingBiome: BiomeMusicStyle = "bright";
@@ -132,8 +133,19 @@ export class GameAudio {
   /** Portal SDKs require that audio is silent while an ad has focus. */
   setAdMuted(muted: boolean): void {
     this.adMuted = muted;
+    this.applyMasterMute();
+  }
+
+  /** A hidden tab must be a silent tab — portal QA checks this explicitly. */
+  setHiddenMuted(muted: boolean): void {
+    this.hiddenMuted = muted;
+    this.applyMasterMute();
+  }
+
+  private applyMasterMute(): void {
     if (!this.master || !this.ctx) return;
-    this.master.gain.setTargetAtTime(muted ? 0 : 0.85, this.ctx.currentTime, muted ? 0.01 : 0.08);
+    const silent = this.adMuted || this.hiddenMuted;
+    this.master.gain.setTargetAtTime(silent ? 0 : 0.85, this.ctx.currentTime, silent ? 0.01 : 0.08);
   }
 
   setMusicMode(mode: MusicMode): void {
@@ -232,8 +244,11 @@ export class GameAudio {
   }
 
   sleep(): void {
-    this.tone(392, 0.35, "sine", 0.09, 196);
-    this.tone(329.63, 0.5, "triangle", 0.06, 164.81);
+    // A real sting, not a shrug: falling minor line over a low drone.
+    this.tone(392, 0.4, "sine", 0.1, 196);
+    this.tone(329.63, 0.55, "triangle", 0.07, 164.81);
+    this.tone(98, 1.4, "sine", 0.07, 92);
+    this.tone(311.13, 0.8, "sine", 0.05, 155.56);
   }
 
   island(): void {
@@ -290,9 +305,63 @@ export class GameAudio {
     this.tone(90, 0.3, "sine", 0.09, 50);
   }
 
+  /** Distance milestone: rising fourth — "you're getting somewhere". */
+  milestone(): void {
+    this.tone(783.99, 0.14, "sine", 0.1, 830);
+    this.tone(1046.5, 0.3, "triangle", 0.09, 1108);
+  }
+
+  /** Golden Hour begins: warm brass-ish swell, the day's last light. */
+  goldenHour(): void {
+    this.tone(392, 0.7, "sawtooth", 0.035, 396);
+    this.tone(493.88, 0.7, "sawtooth", 0.03, 498);
+    this.tone(587.33, 0.9, "triangle", 0.06, 592);
+    this.tone(783.99, 1.1, "sine", 0.07, 790);
+  }
+
+  /** Rival mark beaten mid-run: two-note gloat. */
+  rivalDown(): void {
+    this.tone(659.25, 0.12, "square", 0.05, 690);
+    this.tone(987.77, 0.35, "triangle", 0.09, 1046);
+  }
+
   butter(): void {
     this.tone(1046.5, 0.08, "sine", 0.07, 1318.5);
     this.tone(1318.5, 0.12, "sine", 0.06, 1567.98);
+  }
+
+  /** Comedy honk — a squeezed rubber-duck blast for silly moments. */
+  honk(): void {
+    this.tone(196, 0.16, "square", 0.1, 175);
+    this.tone(392, 0.12, "sawtooth", 0.05, 330);
+    this.noiseBurst(0.05, 1800, 0.03);
+  }
+
+  /** Tiny sneeze: inhale chirp then a fast descending "choo". */
+  sneeze(): void {
+    this.tone(880, 0.09, "sine", 0.06, 1320);
+    this.tone(660, 0.16, "triangle", 0.09, 220);
+    this.noiseBurst(0.12, 2400, 0.06);
+  }
+
+  /** Cartoon boing for springy surprises. */
+  boing(): void {
+    this.tone(220, 0.28, "sine", 0.12, 660);
+    this.tone(330, 0.22, "triangle", 0.06, 880);
+  }
+
+  /** Short triumphant fanfare for surprise windfalls. */
+  fanfare(): void {
+    this.tone(523.25, 0.12, "square", 0.06, 523.25);
+    this.tone(659.25, 0.12, "square", 0.06, 659.25);
+    this.tone(783.99, 0.16, "square", 0.07, 783.99);
+    this.tone(1046.5, 0.4, "triangle", 0.1, 1046.5);
+    this.tone(1318.5, 0.3, "sine", 0.05, 1318.5);
+  }
+
+  /** Woozy slide-whistle drop — plays when something absurd happens. */
+  slideWhistle(): void {
+    this.tone(1400, 0.45, "sine", 0.08, 300);
   }
 
   launchWhoosh(rating: string, speed: number): void {
@@ -309,6 +378,29 @@ export class GameAudio {
     } else {
       this.tone(440, 0.12, "sine", 0.12);
     }
+  }
+
+  /** Feather-soft UI tick for screen navigation — barely there, very tactile. */
+  uiTick(): void {
+    this.tone(2093, 0.035, "sine", 0.028, 1567.98);
+  }
+
+  /** Weekly-event stinger: a rising two-note "something special" cue. */
+  eventStinger(): void {
+    this.tone(392, 0.14, "triangle", 0.08, 523.25);
+    this.tone(587.33, 0.2, "sine", 0.09, 783.99);
+    this.tone(1174.66, 0.26, "sine", 0.05);
+  }
+
+  /** Campaign chapter-complete fanfare — bigger than the windfall fanfare. */
+  chapterFanfare(): void {
+    this.tone(392, 0.14, "square", 0.06);
+    this.tone(523.25, 0.14, "square", 0.06, 523.25);
+    this.tone(659.25, 0.18, "square", 0.07);
+    this.tone(783.99, 0.3, "triangle", 0.1, 830);
+    this.tone(1046.5, 0.5, "sine", 0.09, 1046.5);
+    this.tone(1568, 0.35, "sine", 0.04);
+    this.noiseBurst(0.08, 3200, 0.03);
   }
 
   eggHatch(): void {

@@ -7,9 +7,13 @@ import type { BoardMetric, BoardPage, BoardScope } from "./Leaderboard";
 import type { TournamentView } from "./Tournaments";
 import type { RosterBird, Standing } from "./MassRace";
 import { VIP_DAILY_GIFT } from "./constants";
-import type { BoostView, SkinView } from "./Economy";
+import { COLLECTIONS, type BoostView, type ShopTrailView, type SkinView } from "./Economy";
+import { MenuSky } from "./MenuSky";
 import { formatDistance } from "./math";
 import type { MissionView, QuestReward, QuestView } from "./Missions";
+import type { CampaignChapterView } from "./Campaign";
+import type { MonthlyTheme, WeeklyEvent } from "./Events";
+import type { SquadState } from "./Squad";
 import type { HighScore, Settings } from "./SaveData";
 import type { TierView } from "./SeasonPass";
 
@@ -28,7 +32,10 @@ export type UiScreen =
   | "board"
   | "cups"
   | "live"
-  | "rank";
+  | "rank"
+  | "challenges"
+  | "campaign"
+  | "squad";
 
 export type RivalCard = {
   rating: number;
@@ -42,6 +49,7 @@ export type RivalCard = {
   nextNeeded: number;
   progress: number;
   matches: { place: number; field: number; mode: string; date: string; won: boolean }[];
+  season: { daysLeft: number; peak: number; peakDivision: string; peakIcon: string; rewardCoins: number };
 };
 
 export type LoadoutView = {
@@ -62,12 +70,12 @@ export type AtlasEntry = {
 export type UiState = "menu" | "playing" | "paused" | "continue" | "ad" | "gameover";
 export type SeedMode = "today" | "yesterday" | "random";
 export type CheckoutMode = "stripe" | "demo";
-export type PortalName = "none" | "poki" | "crazy";
+export type PortalName = "none" | "poki" | "crazy" | "generic";
 
 export type HudSnapshot = {
   state: UiState;
   screen: UiScreen;
-  checkoutSku: "sunbird_gold" | "sunbird_vip";
+  checkoutSku: "sunbird_gold" | "sunbird_vip" | "sunbird_starter";
   portalName: PortalName;
   version: number;
   distance: number;
@@ -101,10 +109,14 @@ export type HudSnapshot = {
   adTotal: number;
   adReason: "continue" | "interstitial";
   seedLabel: string;
+  /** Active incoming rival challenge: "name|distance", or "" when none. */
+  rivalBanner: string;
   seedMode: SeedMode;
   wallet: number;
   streakDays: number;
   nestLevel: number;
+  nestPrice: number;
+  nestMaxed: boolean;
   nestMult: number;
   missions: MissionView[];
   quests: QuestView[];
@@ -115,8 +127,12 @@ export type HudSnapshot = {
   claimedQuests: QuestReward[];
   skins: SkinView[];
   boosts: BoostView[];
+  shopTrails: ShopTrailView[];
   settings: Settings;
   goldPrice: string;
+  starterPrice: string;
+  starterFeatures: string[];
+  starterOwned: boolean;
   goldFeatures: string[];
   vipPrice: string;
   vipFeatures: string[];
@@ -186,6 +202,8 @@ export type HudSnapshot = {
   lastPrize: string;
   standings: Standing[];
   racePlace: number;
+  /** Finish line in metres for the live race progress strip (0 = endless). */
+  raceFinishM: number;
   raceField: number;
   raceFinishTime: number;
   massRace: boolean;
@@ -209,8 +227,77 @@ export type HudSnapshot = {
   loadout: LoadoutView;
   lobbyRivals: { name: string; tag: string }[];
   raceRated: boolean;
+  /** True when the room server (single-threaded referee) confirmed the place. */
+  raceVerified: boolean;
   ratingDelta: number;
   ratingBonus: number;
+  /* --- duels --- */
+  duel: { wins: number; losses: number; streak: number; bestStreak: number };
+  duelWas: "" | "won" | "lost";
+  duelDelta: number;
+  duelFoe: { name: string; tag: string; rating: number };
+  /* --- daily challenge / weekly gauntlet / calendar / mastery --- */
+  daily: DailyCard;
+  gauntlet: GauntletCard;
+  calendar: CalendarCard;
+  mastery: MasteryRow[];
+  challengeOutcome: string;
+  /* --- live-ops events + campaign + squad --- */
+  weeklyEvent: WeeklyEvent;
+  monthlyTheme: MonthlyTheme;
+  eventClearsWeek: number;
+  eventClearsMonth: number;
+  themeTrailClaimed: boolean;
+  themeTrailNeed: number;
+  campaign: CampaignChapterView[];
+  campaignDone: number;
+  campaignTotal: number;
+  squad: SquadState;
+  squadNotice: string;
+};
+
+export type DailyCard = {
+  title: string;
+  modeName: string;
+  modeIcon: string;
+  modifierIcon: string;
+  modifierLabel: string;
+  modifierDesc: string;
+  metric: string;
+  target: number;
+  reward: number;
+  done: boolean;
+  dailiesDone: number;
+};
+
+export type GauntletCard = {
+  week: string;
+  stages: { index: number; label: string; modeName: string; modeIcon: string; metric: string; target: number; reward: number; done: boolean }[];
+  clearBonus: number;
+  cleared: boolean;
+  lifetimeClears: number;
+};
+
+export type CalendarCard = {
+  cycleDay: number;
+  claimedToday: boolean;
+  days: { day: number; label: string; claimed: boolean; today: boolean; milestone: boolean }[];
+};
+
+export type MasteryRow = {
+  modeId: string;
+  name: string;
+  icon: string;
+  runs: number;
+  level: number;
+  nextAt: number | null;
+  progress: number;
+  /** Active perk line ("+4% coins" or the signature skill when maxed). */
+  perk: string;
+  /** Signature level-5 skill this mode builds toward. */
+  skillName: string;
+  skillDesc: string;
+  maxed: boolean;
 };
 
 type ActionHandler = (action: string, id: string) => void;
@@ -233,6 +320,7 @@ export class HUD {
   private feverFill!: HTMLElement;
   private hintEl!: HTMLElement;
   private menuEl!: HTMLElement;
+  private readonly menuSky = new MenuSky();
   private menuCard!: HTMLElement;
   private pauseEl!: HTMLElement;
   private contEl!: HTMLElement;
@@ -258,7 +346,16 @@ export class HUD {
   private goalStrip!: HTMLElement;
   private goalPop!: HTMLElement;
   private standingsEl!: HTMLElement;
+  private posBadgeEl!: HTMLElement;
+  private raceProgEl!: HTMLElement;
+  private raceProgFill!: HTMLElement;
+  private raceDotYou!: HTMLElement;
+  private raceDotLeader!: HTMLElement;
+  private lastPlace = 0;
   private rosterBar!: HTMLElement;
+  private matchmakingEl!: HTMLElement;
+  private matchmakingCount!: HTMLElement;
+  private matchmakingLabel!: HTMLElement;
   private draftMeter!: HTMLElement;
   private finishCd!: HTMLElement;
   private lastFinishCd = "";
@@ -313,6 +410,7 @@ export class HUD {
           <div class="stat-block">
             <div class="stat-label">Distance</div>
             <div class="stat-value" data-ref="distance">0 m</div>
+            <div class="stat-sub">best <span data-ref="best">0</span></div>
           </div>
           <div class="sun-meter" title="Daylight">
             <div class="sun-track">
@@ -324,11 +422,10 @@ export class HUD {
           <div class="stat-block right">
             <div class="stat-label">Coins</div>
             <div class="stat-value coin" data-ref="coins">0</div>
-            <div class="stat-sub">best <span data-ref="best">0</span></div>
           </div>
         </div>
-        <div class="position-badge" data-ref="positionBadge">1<span class="pos-suffix">st</span></div>
-        <div class="race-progress" data-ref="raceProgress"><div class="race-progress-fill" data-ref="raceProgressFill" style="width:10%"></div><div class="race-progress-dot you" style="left:10%"></div><div class="race-progress-dot leader" style="left:85%"></div><span class="race-progress-finish">🏁</span></div>
+        <div class="position-badge hidden" data-ref="positionBadge">1<span class="pos-suffix">st</span></div>
+        <div class="race-progress hidden" data-ref="raceProgress"><div class="race-progress-fill" data-ref="raceProgressFill" style="width:0%"></div><div class="race-progress-dot you" data-ref="raceDotYou" style="left:0%"></div><div class="race-progress-dot leader" data-ref="raceDotLeader" style="left:0%"></div><span class="race-progress-finish">🏁</span></div>
         <div class="speedlines" data-ref="speedlines"></div>
         <div class="alt-gauge" data-ref="altGauge">
           <div class="alt-track">
@@ -353,7 +450,11 @@ export class HUD {
           <button data-ui data-action="emote" data-id="👋">👋</button>
           <button data-ui data-action="emote" data-id="🔥">🔥</button>
           <button data-ui data-action="emote" data-id="😂">😂</button>
-          <button data-ui data-action="emote" data-id="🫡">🫡</button>
+          <button data-ui data-action="emote" data-id="👋">👋</button>
+          <button data-ui data-action="emote" data-id="😱">😱</button>
+          <button data-ui data-action="emote" data-id="👑">👑</button>
+          <button data-ui data-action="emote" data-id="💨">💨</button>
+          <button data-ui data-action="emote" data-id="🤝">🤝</button>
         </div>
         <div class="mid-meta">
           <div class="island-chip" data-ref="island">Island 1</div>
@@ -392,11 +493,22 @@ export class HUD {
       <div class="toasts" data-ref="toasts"></div>
       <div class="flash" data-ref="flash"></div>
       <div class="victory-banner hidden" data-ref="victoryBanner"><div class="victory-text" data-ref="victoryText"></div></div>
-      <div class="matchmaking hidden" data-ref="matchmaking"><div class="matchmaking-spinner"></div><div class="matchmaking-count" data-ref="matchmakingCount">0/40</div><div class="matchmaking-label">Finding rivals...</div></div>
+      <div class="matchmaking hidden" data-ref="matchmaking"><div class="matchmaking-spinner"></div><div class="matchmaking-count" data-ref="matchmakingCount">0 pilots</div><div class="matchmaking-label" data-ref="matchmakingLabel">Searching for live pilots…</div><button class="soft-btn mm-cancel" data-ui data-action="mm-cancel">Cancel</button></div>
       <div class="vs-screen hidden" data-ref="vsScreen"><div class="vs-title">VS</div><div class="vs-players"><div class="vs-player"><div class="vs-player-name" data-ref="vsP1">You</div></div><div class="vs-player"><div class="vs-player-name" data-ref="vsP2">Rival</div></div></div></div>
     `;
     parent.appendChild(this.root);
     this.bind();
+  }
+
+  /** Matchmaking overlay: live pilot count + honest countdown to backfill. */
+  setMatchmaking(on: boolean, live: number, _field: number, secsLeft: number): void {
+    this.matchmakingEl.classList.toggle("hidden", !on);
+    if (!on) return;
+    this.matchmakingCount.textContent = `${live} live pilot${live === 1 ? "" : "s"}`;
+    this.matchmakingLabel.textContent =
+      secsLeft > 0.5
+        ? `Searching… player ghosts fill the field in ${Math.ceil(secsLeft)}s`
+        : "Launching…";
   }
 
   onAction(handler: ActionHandler): void {
@@ -427,6 +539,11 @@ export class HUD {
     this.playHud.classList.toggle("versus", s.versus);
     const menuVisible = s.state === "menu" || (s.state === "gameover" && s.screen !== "main");
     this.menuEl.classList.toggle("hidden", !menuVisible);
+    if (menuVisible) this.menuSky.resize(this.menuEl.clientWidth, this.menuEl.clientHeight);
+    this.menuSky.setActive(menuVisible);
+    // The hero bird only plays on the title screen — flying over the shop or
+    // pass card reads as a glitch, not charm.
+    this.menuSky.heroHost.classList.toggle("hidden", !(menuVisible && s.screen === "main"));
     this.pauseEl.classList.toggle("hidden", s.state !== "paused");
     this.contEl.classList.toggle("hidden", s.state !== "continue");
     this.adEl.classList.toggle("hidden", s.state !== "ad");
@@ -571,9 +688,9 @@ export class HUD {
             `<div class="roster-track" role="img" aria-label="Live race positions">${s.roster
               .map(
                 (r) =>
-                  `<span class="rb ${r.you ? "you" : ""} ${r.remote ? "remote" : ""} ${r.finished ? "done" : ""}" ` +
+                  `<span class="rb ${r.you ? "you" : ""} ${r.remote ? "remote" : ""} ${r.ghost ? "ghost" : ""} ${r.finished ? "done" : ""}" ` +
                   `style="left:${(r.progress * 100).toFixed(1)}%;--h:${Math.round(r.hue * 360)}" ` +
-                  `title="#${r.place} ${escapeHtml(r.name)}${r.remote ? " · live" : ""}">${r.emote ? `<b class="rb-emote">${escapeHtml(r.emote)}</b>` : ""}</span>`,
+                  `title="#${r.place} ${escapeHtml(r.name)}${r.remote ? " · live player" : r.ghost ? " · player ghost" : ""}">${r.emote ? `<b class="rb-emote">${escapeHtml(r.emote)}</b>` : ""}</span>`,
               )
               .join("")}</div>`;
         }
@@ -605,6 +722,31 @@ export class HUD {
       // ahead so every position fight reads at a glance. Throttled like the
       // roster so it never rebuilds mid-frame more than ~5×/s.
       this.standingsEl.classList.toggle("hidden", s.standings.length === 0);
+
+      // Live position badge + race progress strip — mass race only. These were
+      // static markup once; now they follow the standings every frame.
+      const you = s.standings.find((r) => r.you);
+      const leader = s.standings[0];
+      const showRace = s.massRace && s.raceFinishM > 0 && Boolean(you) && s.standings.length > 0;
+      this.posBadgeEl.classList.toggle("hidden", !showRace);
+      this.raceProgEl.classList.toggle("hidden", !showRace);
+      if (showRace && you && leader) {
+        if (you.place !== this.lastPlace) {
+          this.lastPlace = you.place;
+          const suffix = you.place % 10 === 1 && you.place !== 11 ? "st" : you.place % 10 === 2 && you.place !== 12 ? "nd" : you.place % 10 === 3 && you.place !== 13 ? "rd" : "th";
+          this.posBadgeEl.innerHTML = `${you.place}<span class="pos-suffix">${suffix}</span>`;
+          this.posBadgeEl.classList.toggle("first", you.place === 1);
+          this.posBadgeEl.classList.toggle("top3", you.place > 1 && you.place <= 3);
+          this.posBadgeEl.classList.remove("pop");
+          void this.posBadgeEl.offsetWidth;
+          this.posBadgeEl.classList.add("pop");
+        }
+        const youF = Math.max(0, Math.min(1, you.distance / s.raceFinishM));
+        const leadF = Math.max(0, Math.min(1, leader.distance / s.raceFinishM));
+        this.setStyle(this.raceProgFill, "raceFill", "width", `${(youF * 100).toFixed(1)}%`);
+        this.setStyle(this.raceDotYou, "raceYou", "left", `${(youF * 100).toFixed(1)}%`);
+        this.setStyle(this.raceDotLeader, "raceLead", "left", `${(leadF * 100).toFixed(1)}%`);
+      }
       if (s.standings.length) {
         const nowS = performance.now();
         const key = s.standings.map((r) => `${r.id}${r.place}${Math.round(r.distance / 12)}${r.finished ? "F" : ""}`).join("|");
@@ -739,6 +881,12 @@ export class HUD {
         return renderLive(s);
       case "rank":
         return renderRank(s);
+      case "challenges":
+        return renderChallenges(s);
+      case "campaign":
+        return renderCampaign(s);
+      case "squad":
+        return renderSquad(s);
       default:
         return renderMain(s);
     }
@@ -762,6 +910,13 @@ export class HUD {
     this.feverFill = grab("feverFill");
     this.hintEl = grab("hint");
     this.menuEl = grab("menu");
+    // Living painted sky with the depth flock — sits behind the paper card.
+    this.menuEl.insertBefore(this.menuSky.host, this.menuEl.firstChild);
+    // Hero-bird overlay: appended last so the sunbird swoops over the card.
+    this.menuEl.appendChild(this.menuSky.heroHost);
+    if (typeof ResizeObserver !== "undefined") {
+      new ResizeObserver(() => this.menuSky.resize(this.menuEl.clientWidth, this.menuEl.clientHeight)).observe(this.menuEl);
+    }
     this.menuCard = grab("menuCard");
     this.pauseEl = grab("pause");
     this.contEl = grab("continue");
@@ -784,9 +939,17 @@ export class HUD {
     this.powerStrip = grab("powerStrip");
     this.countdownEl = grab("countdown");
     this.versusBar = grab("versusBar");
+    this.matchmakingEl = grab("matchmaking");
+    this.matchmakingCount = grab("matchmakingCount");
+    this.matchmakingLabel = grab("matchmakingLabel");
     this.goalStrip = grab("goalStrip");
     this.goalPop = grab("goalPop");
     this.standingsEl = grab("standings");
+    this.posBadgeEl = grab("positionBadge");
+    this.raceProgEl = grab("raceProgress");
+    this.raceProgFill = grab("raceProgressFill");
+    this.raceDotYou = grab("raceDotYou");
+    this.raceDotLeader = grab("raceDotLeader");
     this.rosterBar = grab("rosterBar");
     this.draftMeter = grab("draftMeter");
     this.finishCd = grab("finishCd");
@@ -934,24 +1097,40 @@ function renderLive(s: HudSnapshot): string {
   return `
     ${head("Race Lobby", "back", status)}
     <div class="vs-stage" aria-label="You versus the featured rivals">
-      <div class="vs-you"><span class="vs-bird">🐦</span><b>YOU</b><span class="vs-sub">${s.rival.divisionIcon} ${s.rival.division} · ${s.rival.rating}</span></div>
+      <div class="vs-you"><span class="vs-swatch" style="--body:#ff7a45;--wing:#ff9a62;--belly:#ffe6c4"><i class="w"></i><i class="b"></i><i class="e"></i></span><b>YOU</b><span class="vs-sub">${s.rival.divisionIcon} ${s.rival.division} · ${s.rival.rating}</span></div>
       <div class="vs-mark">VS</div>
-      <div class="vs-foes">${featured.map((r) => `<div class="vs-foe"><span class="vs-bird">🐤</span><b>${escapeHtml(r.name)}</b><span class="vs-sub">${escapeHtml(r.tag)}</span></div>`).join("")}</div>
+      <div class="vs-foes">${featured.map((r) => `<div class="vs-foe ${r.tag.includes("live") ? "live" : ""}"><span class="vs-swatch" style="${r.tag.includes("live") ? "--body:#5eb7ea;--wing:#83cbf2;--belly:#eaf6ff" : "--body:#8a9bb0;--wing:#a8b8c8;--belly:#e8eef4"}"><i class="w"></i><i class="b"></i><i class="e"></i></span><b>${escapeHtml(r.name)}</b><span class="vs-sub">${escapeHtml(r.tag)}</span></div>`).join("")}</div>
     </div>
 
     <div class="lobby-rules">
       <span><b>3,000 m</b> gate</span><span class="dot"></span>
-      <span><b>41</b> birds</span><span class="dot"></span>
+      <span><b>${s.roomSize + 1}</b> birds</span><span class="dot"></span>
       <span>Same hills · same wind</span>
     </div>
 
+    <div class="room-controls">
+      <div class="room-ctl">
+        <span class="room-ctl-label">Field size</span>
+        <div class="seg">${[5, 10, 20, 40]
+          .map((n) => `<button data-ui data-action="room-size" data-id="${n}" class="${s.roomSize === n ? "on" : ""}">${n}</button>`)
+          .join("")}</div>
+      </div>
+      <div class="room-ctl">
+        <span class="room-ctl-label">Rival skill</span>
+        <div class="seg">${(["chill", "sharp", "ace"] as const)
+          .map((k) => `<button data-ui data-action="room-skill" data-id="${k}" class="${s.roomSkill === k ? "on" : ""}">${k === "chill" ? "😌 Chill" : k === "sharp" ? "🎯 Sharp" : "🔥 Ace"}</button>`)
+          .join("")}</div>
+      </div>
+    </div>
+
     <div class="loadout-card">
-      <div class="loadout-row"><span>🪶 ${s.loadout.bird}</span><span>${s.loadout.trail}</span><span>🎒 ${s.loadout.boosts} armed</span></div>
+      <div class="loadout-row"><span>🐦 ${s.loadout.bird}</span><span>${s.loadout.trail}</span><span>🎒 ${s.loadout.boosts} armed</span></div>
       <button class="mini-btn" data-ui data-action="open-shop">Change loadout</button>
     </div>
 
     <button class="primary-btn race40 hero" data-ui data-action="quick-match"><span class="hero-label">⚡ START RACE</span><span class="hero-hint">ranked · rating on the line</span></button>
     <button class="soft-btn wide" data-ui data-action="pvp-casual">Casual start · no rating change</button>
+    <button class="soft-btn wide storm-cta" data-ui data-action="pvp-storm">⛈ Stormfront Royale · PvE storm × PvP race</button>
 
     <div class="race-grid">
       <div class="race-card">
@@ -965,7 +1144,7 @@ function renderLive(s: HudSnapshot): string {
           <button class="mini-btn" data-ui data-action="join-room">Join</button>
         </div>
       </div>
-      <div class="race-card how">
+      <div class="race-card craft">
         <div class="race-card-h"><b>Race craft</b><span>win the pack</span></div>
         <div class="race-tip"><b>🌀 Draft</b><span>Tuck behind a rival to cut drag, then slingshot past.</span></div>
         <div class="race-tip"><b>👑 Roster</b><span>Every bird rides the top rail — you are gold.</span></div>
@@ -980,6 +1159,192 @@ function renderLive(s: HudSnapshot): string {
         ? "Connected to the configured race server. Finish order is decided server-side."
         : "Race against AI pilots on today's hills. Each pilot flies the same terrain with unique skill levels."
     }</p>
+  `;
+}
+
+function renderChallenges(s: HudSnapshot): string {
+  const d = s.daily;
+  const g = s.gauntlet;
+  const c = s.calendar;
+  const daily = `
+    <div class="section-title">Daily challenge <small>resets at midnight</small></div>
+    <div class="daily-card ${d.done ? "done" : ""}">
+      <div class="daily-head"><span class="daily-icon">${d.modeIcon}</span><div><b>${d.title}</b><em>${d.modeName} · ${escapeHtml(d.metric)} ≥ ${d.target}</em></div><span class="pill coin">● ${d.reward}</span></div>
+      <div class="daily-mod"><b>${d.modifierIcon} ${d.modifierLabel}</b><span>${escapeHtml(d.modifierDesc)}</span></div>
+      ${
+        d.done
+          ? `<div class="reward-strip">✓ Complete · come back tomorrow (${d.dailiesDone} lifetime)</div>`
+          : `<button class="primary-btn" data-ui data-action="play-daily">☀ FLY THE CHALLENGE</button>`
+      }
+    </div>`;
+
+  const gauntlet = `
+    <div class="section-title">Weekly gauntlet <small>3 stages · resets Monday</small></div>
+    <div class="gauntlet">
+      ${g.stages
+        .map(
+          (st) => `<div class="g-stage ${st.done ? "done" : ""}">
+            <span class="g-num">${st.done ? "✓" : st.index + 1}</span>
+            <div class="g-body"><b>${st.modeIcon} ${escapeHtml(st.label)}</b><em>${st.modeName} · ${escapeHtml(st.metric)} ≥ ${st.target}</em></div>
+            ${st.done ? `<span class="tag on">Clear</span>` : `<button class="mini-btn" data-ui data-action="play-gauntlet" data-id="${st.index}">● ${st.reward}</button>`}
+          </div>`,
+        )
+        .join("")}
+      <div class="g-bonus ${g.cleared ? "done" : ""}">${g.cleared ? `🏆 Gauntlet cleared this week · +${g.clearBonus} paid` : `Clear all 3 → +${g.clearBonus} coins`}${g.lifetimeClears > 0 ? ` · ${g.lifetimeClears} lifetime clears` : ""}</div>
+    </div>`;
+
+  const calendar = `
+    <div class="section-title">Login calendar <small>day ${c.cycleDay || "—"} of 28</small></div>
+    <div class="cal-grid">
+      ${c.days
+        .map(
+          (day) =>
+            `<div class="cal-day ${day.claimed ? "claimed" : ""} ${day.today ? "today" : ""} ${day.milestone ? "milestone" : ""}"><span class="cal-num">${day.day}</span><span class="cal-r">${day.label}</span></div>`,
+        )
+        .join("")}
+    </div>
+    ${
+      c.claimedToday
+        ? `<div class="reward-strip">📅 Today's gift claimed — see you tomorrow</div>`
+        : `<button class="primary-btn" data-ui data-action="claim-calendar">📅 CLAIM TODAY'S GIFT</button>`
+    }`;
+
+  const mastery = `
+    <div class="section-title">Mode mastery <small>fly every mode</small></div>
+    <div class="mastery-list">
+      ${s.mastery
+        .map(
+          (m) => `<div class="mastery-row ${m.maxed ? "maxed" : ""}">
+            <span class="m-icon">${m.icon}</span>
+            <div class="m-body"><b>${m.name}${m.maxed ? ` <span class="m-skill">★ ${m.skillName}</span>` : ""}</b>
+            <em>${
+              m.maxed
+                ? `Mastered · ${m.skillDesc} — always on in this mode`
+                : `${m.runs} runs · next level at ${m.nextAt}${m.perk ? ` · ${m.perk}` : ` · Lv.5 skill: ${m.skillName} (${m.skillDesc})`}`
+            }</em>
+            ${m.maxed ? "" : `<div class="qb"><i style="width:${Math.round(m.progress * 100)}%"></i></div>`}</div>
+            <span class="m-stars">${"★".repeat(m.level)}${"☆".repeat(Math.max(0, 5 - m.level))}</span>
+          </div>`,
+        )
+        .join("")}
+    </div>`;
+
+  const ev = s.weeklyEvent;
+  const th = s.monthlyTheme;
+  const trailDone = s.themeTrailClaimed;
+  const event = `
+    <div class="section-title">Live event <small>new twist every week</small></div>
+    <div class="event-card">
+      <div class="daily-head"><span class="daily-icon">${ev.icon}</span><div><b>${ev.name}</b><em>${escapeHtml(ev.desc)}</em></div><span class="pill coin">● ${ev.reward}</span></div>
+      <div class="event-meta"><span>Fly ${ev.target.toLocaleString()} m in one event run</span><span>${s.eventClearsWeek > 0 ? `✓ ${s.eventClearsWeek} clear${s.eventClearsWeek > 1 ? "s" : ""} this week` : "No clears yet this week"}</span></div>
+      <button class="primary-btn" data-ui data-action="play-event">${ev.icon} FLY THE EVENT</button>
+      <div class="theme-strip ${trailDone ? "done" : ""}">
+        <span class="theme-icon">${th.icon}</span>
+        <div class="theme-body"><b>${th.name}</b><em>${escapeHtml(th.tagline)}</em></div>
+        <span class="theme-prog">${trailDone ? "✨ trail claimed" : `${Math.min(s.eventClearsMonth, s.themeTrailNeed)}/${s.themeTrailNeed} clears → trail`}</span>
+      </div>
+    </div>`;
+
+  return `
+    ${head("Challenges", "back", `<span class="pill">☀ Daily · 🌩 Weekly</span>`)}
+    <p class="tagline">Same hills as everyone else today. Modifiers change how you fly them.</p>
+    ${event}
+    ${daily}
+    ${gauntlet}
+    ${calendar}
+    ${mastery}
+  `;
+}
+
+function renderCampaign(s: HudSnapshot): string {
+  const rows = s.campaign
+    .map((ch) => {
+      const goals = ch.goals
+        .map(
+          (g) => `<div class="camp-goal ${g.done ? "done" : ""}">
+            <span class="check">${g.done ? "✓" : ""}</span>
+            <span class="cg-label">${escapeHtml(g.def.label)}</span>
+            <span class="cg-prog">${Math.floor(g.progress).toLocaleString()}/${g.def.target.toLocaleString()}</span>
+          </div>`,
+        )
+        .join("");
+      const cta = !ch.unlocked
+        ? `<span class="tag">🔒 Finish chapter ${ch.index} first</span>`
+        : ch.claimed
+          ? `<span class="tag on">✓ ${escapeHtml(ch.def.rewardLabel)}</span>`
+          : ch.complete
+            ? `<button class="mini-btn gold" data-ui data-action="claim-campaign" data-id="${ch.def.id}">CLAIM ● ${ch.def.rewardCoins}</button>`
+            : `<span class="tag">● ${ch.def.rewardCoins} on completion</span>`;
+      return `<div class="camp-chapter ${!ch.unlocked ? "locked" : ""} ${ch.claimed ? "claimed" : ""}">
+        <div class="camp-head"><span class="camp-icon">${ch.def.icon}</span><div><b>Chapter ${ch.index + 1} · ${escapeHtml(ch.def.title)}</b><em>${escapeHtml(ch.def.story)}</em></div></div>
+        ${ch.unlocked ? goals : ""}
+        <div class="camp-foot">${cta}</div>
+      </div>`;
+    })
+    .join("");
+  return `
+    ${head("The Long Migration", "back", `<span class="pill">${s.campaignDone}/${s.campaignTotal}</span>`)}
+    <p class="tagline">A journey in eight chapters. Progress accrues from every flight — no separate grind.</p>
+    <div class="camp-list">${rows}</div>
+  `;
+}
+
+function renderSquad(s: HudSnapshot): string {
+  const sq = s.squad;
+  if (!sq.live) {
+    return `
+      ${head("Squad", "back")}
+      <p class="tagline">Friends, clubs and club chat live on the social server.</p>
+      <div class="empty-note">🔌 Social server not configured.<br/><small>Set <b>VITE_SOCIAL_URL</b> and restart — see SOCIAL_API.md. No fake friends here, ever.</small></div>
+    `;
+  }
+  const notice = s.squadNotice ? `<div class="reward-strip">${escapeHtml(s.squadNotice)}</div>` : "";
+  const friends = `
+    <div class="section-title">Friends <small>${sq.friends.length} winged</small></div>
+    <div class="redeem"><input data-ui data-ref="squadCode" placeholder="Friend's code (SUN-XXXXXX)" maxlength="10" autocomplete="off" /><button class="mini-btn" data-ui data-action="squad-add">Add</button></div>
+    ${
+      sq.friends.length
+        ? `<div class="friend-list">${sq.friends
+            .map(
+              (f) => `<div class="friend-row"><span class="fr-name">🐦 ${escapeHtml(f.name)}</span><span class="fr-code">${escapeHtml(f.code)}</span><button class="mini-btn ghost" data-ui data-action="squad-remove" data-id="${escapeHtml(f.code)}">✕</button></div>`,
+            )
+            .join("")}</div>`
+        : `<div class="empty-note">No friends yet — swap codes! Yours is <b>${escapeHtml(sq.myCode || "…")}</b></div>`
+    }`;
+  const myClub = sq.clubs.find((c) => c.id === sq.myClubId);
+  const clubs = myClub
+    ? `
+    <div class="section-title">Your club <small>${myClub.members}/30 members</small></div>
+    <div class="club-card mine">
+      <div class="daily-head"><span class="daily-icon">🏰</span><div><b>${escapeHtml(myClub.name)}</b><em>${escapeHtml(myClub.motto)}</em></div><button class="mini-btn ghost" data-ui data-action="squad-leave-club">Leave</button></div>
+      <div class="chat-box" data-ref="chatBox">${
+        sq.chat.length
+          ? sq.chat.map((m) => `<div class="chat-msg"><b>${escapeHtml(m.name)}</b><span>${escapeHtml(m.text)}</span></div>`).join("")
+          : `<div class="chat-msg dim"><span>Quiet in here. Say hi 👋</span></div>`
+      }</div>
+      <div class="redeem"><input data-ui data-ref="chatText" placeholder="Message your club…" maxlength="200" autocomplete="off" /><button class="mini-btn" data-ui data-action="squad-chat">Send</button></div>
+    </div>`
+    : `
+    <div class="section-title">Clubs <small>join or found one</small></div>
+    ${
+      sq.clubs.length
+        ? `<div class="club-list">${sq.clubs
+            .map(
+              (c) => `<div class="club-row"><div><b>🏰 ${escapeHtml(c.name)}</b><em>${escapeHtml(c.motto)} · ${c.members}/30</em></div><button class="mini-btn" data-ui data-action="squad-join-club" data-id="${c.id}" ${c.members >= 30 ? "disabled" : ""}>Join</button></div>`,
+            )
+            .join("")}</div>`
+        : `<div class="empty-note">No clubs yet — found the first one.</div>`
+    }
+    <div class="redeem"><input data-ui data-ref="clubName" placeholder="Club name" maxlength="24" autocomplete="off" /><button class="mini-btn gold" data-ui data-action="squad-create-club">Found club</button></div>`;
+  return `
+    ${head("Squad", "back", sq.myCode ? `<span class="pill">${escapeHtml(sq.myCode)}</span>` : "")}
+    <p class="tagline">Real pilots only — friends, clubs and club chat.</p>
+    ${sq.loading ? `<div class="reward-strip">↻ Syncing with the roost…</div>` : ""}
+    ${sq.error ? `<div class="empty-note">⚠ ${escapeHtml(sq.error)}</div>` : ""}
+    ${notice}
+    ${friends}
+    ${clubs}
+    <button class="soft-btn wide" data-ui data-action="squad-refresh">↻ Refresh</button>
   `;
 }
 
@@ -998,8 +1363,12 @@ function renderRank(s: HudSnapshot): string {
     <div class="rank-stats">
       <div><span>W–L</span><b>${r.wins}–${r.losses}</b></div>
       <div><span>Win rate</span><b>${wl}%</b></div>
-      <div><span>Streak</span><b>🔥${r.streak}</b></div>
+      <div><span>Streak</span><b class="streak-b ${r.streak > 0 ? "lit" : ""}"><svg viewBox="0 0 24 24" class="fl"><path d="M12 2C13 6 17 8 17 13a5 5 0 0 1-10 0c0-2 1-3.4 2-4.6 0 1.6.6 2.6 1.8 3 -.4-3.4 1.4-6.6 1.2-9.4z" fill="currentColor"/></svg>${r.streak}</b></div>
       <div><span>Best</span><b>×${r.bestStreak}</b></div>
+    </div>
+    <div class="season-card">
+      <div class="season-head"><b>Season</b><span class="pill">${r.season.daysLeft}d left</span></div>
+      <div class="season-body">Peak ${r.season.peakIcon} ${r.season.peak} · pays <b>● ${r.season.rewardCoins}</b> at reset, then ratings drift halfway back to 1000.</div>
     </div>
     <div class="section-title">Recent races <small>this device only</small></div>
     ${
@@ -1013,8 +1382,23 @@ function renderRank(s: HudSnapshot): string {
             .join("")}</div>`
         : `<p class="fineprint">No ranked races yet. Your first 40-bird finish sets the tone.</p>`
     }
+    <div class="section-title">Duels <small>ranked 1v1 · ±16 rating</small></div>
+    <div class="duel-card">
+      <div class="vs-stage slim">
+        <div class="vs-you"><span class="vs-swatch" style="--body:#ff7a45;--wing:#ff9a62;--belly:#ffe6c4"><i class="w"></i><i class="b"></i><i class="e"></i></span><b>YOU</b><span class="vs-sub">${r.rating}</span></div>
+        <div class="vs-mark">VS</div>
+        <div class="vs-foes"><div class="vs-foe"><span class="vs-swatch" style="--body:#8a9bb0;--wing:#a8b8c8;--belly:#e8eef4"><i class="w"></i><i class="b"></i><i class="e"></i></span><b>${escapeHtml(s.duelFoe.name)}</b><span class="vs-sub">${escapeHtml(s.duelFoe.tag)} · ~${s.duelFoe.rating}</span></div></div>
+      </div>
+      <div class="rank-stats">
+        <div><span>Duel W–L</span><b>${s.duel.wins}–${s.duel.losses}</b></div>
+        <div><span>Streak</span><b class="streak-b ${s.duel.streak > 0 ? "lit" : ""}"><svg viewBox="0 0 24 24" class="fl"><path d="M12 2C13 6 17 8 17 13a5 5 0 0 1-10 0c0-2 1-3.4 2-4.6 0 1.6.6 2.6 1.8 3 -.4-3.4 1.4-6.6 1.2-9.4z" fill="currentColor"/></svg>${s.duel.streak}</b></div>
+        <div><span>Best</span><b>×${s.duel.bestStreak}</b></div>
+        <div><span>Prize</span><b>${s.duel.wins >= 10 ? "🐦 won" : `${s.duel.wins}/10`}</b></div>
+      </div>
+      <button class="primary-btn hero" data-ui data-action="pvp-duel"><span class="hero-label">⚔ DUEL</span><span class="hero-hint">1v1 · first to 3,000 m · win 10 for the Hummingbird</span></button>
+    </div>
     <button class="primary-btn race40 hero" data-ui data-action="pvp-ranked"><span class="hero-label">⚔ RACE RANKED</span><span class="hero-hint">climb or defend ${r.division}</span></button>
-    <p class="fineprint">Your rating changes based on how you finish in ranked 40-bird races. Climb divisions to prove your skill!</p>
+    <p class="fineprint">Your rating changes based on how you finish in ranked 40-bird races and duels. Reaching Sunbird Legend unlocks the Solstice bird. Seasons soft-reset monthly with a division reward.</p>
   `;
 }
 
@@ -1154,11 +1538,12 @@ function renderMain(s: HudSnapshot): string {
         .map((m) => `<button data-ui data-action="seed-${m.id}" class="${s.seedMode === m.id ? "on" : ""}">${m.label}</button>`)
         .join("")}</div>`
     : portal
-      ? `<p class="portal-note">${s.portalName === "poki" ? "Poki" : "CrazyGames"} edition · portal rewards enabled</p>`
-      : `<button class="lock-chip" data-ui data-action="open-paywall">🔒 Pick your hills with Gold</button>`;
+      ? `<p class="portal-note">${s.portalName === "poki" ? "Poki edition · portal rewards enabled" : s.portalName === "crazy" ? "CrazyGames edition · portal rewards enabled" : "Portal edition"}</p>`
+      : `<button class="lock-chip" data-ui data-action="open-paywall">✦ Pick your hills with Gold</button>`;
   return `
     <header class="hero">
       <div class="hero-sun" aria-hidden="true"></div>
+      <img class="hero-bird" src="./icons/icon-192.png" alt="" aria-hidden="true" />
       <div class="hero-title">
         <span class="hero-kicker">chase the daylight</span>
         <h1>SUNBIRD</h1>
@@ -1169,24 +1554,30 @@ function renderMain(s: HudSnapshot): string {
     <div class="hero-meta">
       <span class="pill seed-pill">${s.seedLabel}</span>
     </div>
+    ${s.rivalBanner ? renderRivalBanner(s.rivalBanner) : ""}
     ${seedPicker}
 
-    <!-- 3 MAIN PLAY MODES -->
+    <!-- MAIN PLAY MODES: 1P · PVP · PVE · TOURNAMENT -->
     <div class="mode-cards" role="group" aria-label="Play modes">
       <button class="mode-card-main" data-ui data-action="pvp-practice">
-        <span class="mode-icon-lg">☀</span>
-        <span class="mode-name">SOLO</span>
-        <span class="mode-desc">Free flight across the islands</span>
+        <span class="mode-icon-lg"><svg class="mi" viewBox="0 0 48 48"><defs><linearGradient id="gSun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd76a"/><stop offset="1" stop-color="#ff9a3a"/></linearGradient></defs><circle cx="24" cy="22" r="9" fill="url(#gSun)"/><g stroke="url(#gSun)" stroke-width="3" stroke-linecap="round"><line x1="24" y1="5" x2="24" y2="10"/><line x1="24" y1="34" x2="24" y2="39"/><line x1="7" y1="22" x2="12" y2="22"/><line x1="36" y1="22" x2="41" y2="22"/><line x1="11.5" y1="9.5" x2="15" y2="13"/><line x1="33" y1="31" x2="36.5" y2="34.5"/><line x1="36.5" y1="9.5" x2="33" y2="13"/><line x1="15" y1="31" x2="11.5" y2="34.5"/></g><path d="M14 42 Q20 36 24 40 Q28 36 34 42" fill="none" stroke="#e8862a" stroke-width="2.6" stroke-linecap="round"/></svg></span>
+        <span class="mode-name">1 PLAYER</span>
+        <span class="mode-desc">Free flight — chase the daylight</span>
       </button>
-      <button class="mode-card-main" data-ui data-action="pvp-ranked">
-        <span class="mode-icon-lg">⚔</span>
+      <button class="mode-card-main pvp" data-ui data-action="open-live">
+        <span class="mode-icon-lg"><svg class="mi" viewBox="0 0 48 48"><defs><linearGradient id="gPvp" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7a6a"/><stop offset="1" stop-color="#d84a5a"/></linearGradient></defs><g stroke="url(#gPvp)" stroke-width="3.4" stroke-linecap="round"><line x1="10" y1="10" x2="34" y2="34"/><line x1="38" y1="10" x2="14" y2="34"/></g><g stroke="#a83a4a" stroke-width="3.4" stroke-linecap="round"><line x1="31" y1="37" x2="37" y2="31"/><line x1="11" y1="31" x2="17" y2="37"/></g><circle cx="24" cy="22" r="4.5" fill="#fff" opacity="0.9"/></svg></span>
         <span class="mode-name">PVP</span>
-        <span class="mode-desc">Race 40 rivals to the gate</span>
+        <span class="mode-desc">Race 40 pilots · duels · rooms</span>
       </button>
-      <button class="mode-card-main" data-ui data-action="open-live">
-        <span class="mode-icon-lg">🎯</span>
+      <button class="mode-card-main pve" data-ui data-action="open-challenges">
+        <span class="mode-icon-lg"><svg class="mi" viewBox="0 0 48 48"><defs><linearGradient id="gPve" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6ab8ff"/><stop offset="1" stop-color="#3a7ad8"/></linearGradient></defs><circle cx="24" cy="24" r="16" fill="none" stroke="url(#gPve)" stroke-width="3.4"/><circle cx="24" cy="24" r="9" fill="none" stroke="url(#gPve)" stroke-width="3"/><circle cx="24" cy="24" r="3.2" fill="url(#gPve)"/></svg></span>
         <span class="mode-name">PVE</span>
-        <span class="mode-desc">Complete missions and cups</span>
+        <span class="mode-desc">Daily challenge & storm gauntlet</span>
+      </button>
+      <button class="mode-card-main cup" data-ui data-action="open-cups">
+        <span class="mode-icon-lg"><svg class="mi" viewBox="0 0 48 48"><defs><linearGradient id="gCup" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe08a"/><stop offset="1" stop-color="#e8a020"/></linearGradient></defs><path d="M15 8h18v10a9 9 0 0 1-18 0z" fill="url(#gCup)"/><path d="M15 10H8a7 7 0 0 0 7 9M33 10h7a7 7 0 0 1-7 9" fill="none" stroke="url(#gCup)" stroke-width="3"/><rect x="21" y="26" width="6" height="7" fill="url(#gCup)"/><path d="M16 36h16v4H16z" fill="#c8871a"/></svg></span>
+        <span class="mode-name">TOURNAMENT</span>
+        <span class="mode-desc">Weekly cups — win exclusive gear</span>
       </button>
     </div>
 
@@ -1201,15 +1592,28 @@ function renderMain(s: HudSnapshot): string {
       } · 🔥${s.rival.streak} streak</span>
     </button>
 
-    <div class="pvp-modes" role="group" aria-label="PvP options">
-      <button class="pvp-mode rated" data-ui data-action="pvp-ranked"><i>🏆</i><b>Ranked</b><span>Rating on the line</span></button>
-      <button class="pvp-mode" data-ui data-action="pvp-casual"><i>🐦</i><b>Casual</b><span>No pressure</span></button>
+    <div class="pvp-modes" role="group" aria-label="Play modes">
+      <button class="pvp-mode rated" data-ui data-action="pvp-ranked"><i>🏆</i><b>Ranked 40</b><span>Rating moves</span></button>
+      <button class="pvp-mode rated" data-ui data-action="pvp-duel"><i>⚔</i><b>Duel 1v1</b><span>±16 rating</span></button>
+      <button class="pvp-mode" data-ui data-action="pvp-casual"><i>🐦</i><b>Casual 40</b><span>No rating</span></button>
+      <button class="pvp-mode storm" data-ui data-action="pvp-storm"><i>⛈</i><b>Stormfront</b><span>PvE × PvP</span></button>
       <button class="pvp-mode" data-ui data-action="versus"><i>👥</i><b>Local 2P</b><span>Same screen</span></button>
-      <button class="pvp-mode" data-ui data-action="pvp-practice"><i>🌅</i><b>Practice</b><span>Learn the hills</span></button>
     </div>
 
+    <button class="daily-strip ${s.daily.done ? "done" : ""}" data-ui data-action="${s.daily.done ? "open-challenges" : "play-daily"}">
+      <span class="ds-icon">${s.daily.done ? "✓" : s.daily.modifierIcon}</span>
+      <span class="ds-body"><b>Daily · ${s.daily.title}</b><em>${s.daily.done ? "Complete — gauntlet & calendar inside" : `${s.daily.modifierLabel} · ${escapeHtml(s.daily.metric)} ≥ ${s.daily.target} · ● ${s.daily.reward}`}</em></span>
+      <span class="ds-go">${s.daily.done ? "›" : "FLY"}</span>
+    </button>
+    <button class="event-strip" data-ui data-action="play-event">
+      <span class="ds-icon">${s.weeklyEvent.icon}</span>
+      <span class="ds-body"><b>Event · ${s.weeklyEvent.name}</b><em>${s.monthlyTheme.icon} ${s.monthlyTheme.name} · fly ${s.weeklyEvent.target.toLocaleString()} m · ● ${s.weeklyEvent.reward}</em></span>
+      <span class="ds-go">${s.eventClearsWeek > 0 ? `✓${s.eventClearsWeek}` : "FLY"}</span>
+    </button>
+    ${!s.calendar.claimedToday ? `<button class="cal-strip" data-ui data-action="claim-calendar">📅 Daily gift ready — day ${(s.calendar.cycleDay % 28) + 1} of 28 <b>CLAIM</b></button>` : ""}
+
     <div class="loadout-strip">
-      <span class="loadout-bird">🪶 ${s.loadout.bird}</span>
+      <span class="loadout-bird">🐦 ${s.loadout.bird}</span>
       <span class="loadout-trail">${s.loadout.trail}</span>
       <span class="loadout-boost">🎒 ${s.loadout.boosts} armed</span>
       <button class="mini-btn" data-ui data-action="open-shop">Loadout</button>
@@ -1219,13 +1623,16 @@ function renderMain(s: HudSnapshot): string {
 
     <nav class="nav-grid compact">
       <button class="nav-btn" data-ui data-action="mode-select"><i>🎯</i><span>Modes</span></button>
+      <button class="nav-btn" data-ui data-action="open-challenges"><i>☀</i><span>Daily</span></button>
       <button class="nav-btn" data-ui data-action="open-live"><i>🐦</i><span>Race</span></button>
       <button class="nav-btn" data-ui data-action="open-board"><i>🌍</i><span>Board</span></button>
       <button class="nav-btn" data-ui data-action="open-cups"><i>🏆</i><span>Cups</span></button>
-      <button class="nav-btn" data-ui data-action="open-shop"><i>🛍</i><span>Shop</span></button>
-      <button class="nav-btn" data-ui data-action="open-pass"><i>🎟</i><span>Pass ${s.season.tier}</span></button>
+      <button class="nav-btn" data-ui data-action="open-shop"><i><svg viewBox="0 0 24 24" class="ti"><path d="M6 8h12l-1.2 12H7.2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 8V6a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="2"/></svg></i><span>Shop</span></button>
+      <button class="nav-btn" data-ui data-action="open-pass"><i><svg viewBox="0 0 24 24" class="ti"><path d="M4 9a2 2 0 0 0 0 6v3h16v-3a2 2 0 0 1 0-6V6H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><line x1="14" y1="6" x2="14" y2="18" stroke="currentColor" stroke-width="2" stroke-dasharray="2 2.4"/></svg></i><span>Pass ${s.season.tier}</span></button>
       <button class="nav-btn" data-ui data-action="open-trophies"><i>🏅</i><span>${s.trophyCounts.unlocked}/${s.trophyCounts.total}</span></button>
       <button class="nav-btn" data-ui data-action="open-rank"><i>⚔</i><span>Rank</span></button>
+      <button class="nav-btn" data-ui data-action="open-campaign"><i>🧭</i><span>Story ${s.campaignDone}/${s.campaignTotal}</span></button>
+      <button class="nav-btn" data-ui data-action="open-squad"><i>🤝</i><span>Squad</span></button>
       <button class="nav-btn" data-ui data-action="open-atlas"><i>🗺</i><span>Atlas</span></button>
       <button class="nav-btn" data-ui data-action="open-scores"><i>📈</i><span>Scores</span></button>
       <button class="nav-btn" data-ui data-action="open-account"><i>👤</i><span>Account</span></button>
@@ -1234,11 +1641,11 @@ function renderMain(s: HudSnapshot): string {
 
     <!-- Bottom Tab Navigation (Popular Game Pattern) -->
     <nav class="bottom-tabs" data-ref="bottomTabs">
-      <button class="tab-item active" data-ui data-action="pvp-practice"><span class="tab-icon">☀</span><span class="tab-label">Fly</span></button>
-      <button class="tab-item" data-ui data-action="open-rank"><span class="tab-icon">⚔</span><span class="tab-label">Rank</span></button>
-      <button class="tab-item" data-ui data-action="open-shop"><span class="tab-icon">🛍</span><span class="tab-label">Shop</span></button>
-      <button class="tab-item" data-ui data-action="open-pass"><span class="tab-icon">🎟</span><span class="tab-label">Pass</span></button>
-      <button class="tab-item" data-ui data-action="open-settings"><span class="tab-icon">⚙</span><span class="tab-label">More</span></button>
+      <button class="tab-item" data-ui data-action="open-rank"><span class="tab-icon"><svg viewBox="0 0 24 24" class="ti"><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="5" x2="17" y2="17"/><line x1="19" y1="5" x2="7" y2="17"/><line x1="15.5" y1="18.5" x2="18.5" y2="15.5"/><line x1="5.5" y1="15.5" x2="8.5" y2="18.5"/></g></svg></span><span class="tab-label">Rank</span></button>
+      <button class="tab-item" data-ui data-action="open-shop"><span class="tab-icon"><svg viewBox="0 0 24 24" class="ti"><path d="M6 8h12l-1.2 12H7.2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 8V6a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="2"/></svg></span><span class="tab-label">Shop</span></button>
+      <button class="tab-fly" data-ui data-action="pvp-practice" aria-label="Fly now"><span class="fly-disc"><svg viewBox="0 0 24 24" class="fi"><circle cx="12" cy="11" r="4.2" fill="currentColor"/><g stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="12" y1="2.5" x2="12" y2="5"/><line x1="12" y1="17" x2="12" y2="19.5"/><line x1="3.5" y1="11" x2="6" y2="11"/><line x1="18" y1="11" x2="20.5" y2="11"/><line x1="5.9" y1="4.9" x2="7.7" y2="6.7"/><line x1="16.3" y1="15.3" x2="18.1" y2="17.1"/><line x1="18.1" y1="4.9" x2="16.3" y2="6.7"/><line x1="7.7" y1="15.3" x2="5.9" y2="17.1"/></g></svg></span><span class="tab-label fly-label">Fly</span></button>
+      <button class="tab-item" data-ui data-action="open-pass"><span class="tab-icon"><svg viewBox="0 0 24 24" class="ti"><path d="M4 9a2 2 0 0 0 0 6v3h16v-3a2 2 0 0 1 0-6V6H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><line x1="14" y1="6" x2="14" y2="18" stroke="currentColor" stroke-width="2" stroke-dasharray="2 2.4"/></svg></span><span class="tab-label">Pass</span></button>
+      <button class="tab-item" data-ui data-action="open-settings"><span class="tab-icon"><svg viewBox="0 0 24 24" class="ti"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span><span class="tab-label">More</span></button>
     </nav>
 
     ${
@@ -1265,7 +1672,10 @@ function renderMain(s: HudSnapshot): string {
   `;
 }
 
-function skinRarity(d: { goldOnly?: boolean; vipOnly?: boolean; price: number }): { key: string; label: string } {
+function skinRarity(d: { goldOnly?: boolean; vipOnly?: boolean; prizeOnly?: string; price: number; rarity?: string }): { key: string; label: string } {
+  if (d.prizeOnly) return { key: "prize", label: "PRIZE" };
+  // Explicit rarity from the catalogue wins over inferred price bands.
+  if (d.rarity && d.rarity !== "starter") return { key: d.rarity, label: d.rarity.toUpperCase() };
   if (d.vipOnly) return { key: "mythic", label: "MYTHIC" };
   if (d.goldOnly) return { key: "legendary", label: "LEGENDARY" };
   if (d.price >= 700) return { key: "epic", label: "EPIC" };
@@ -1285,6 +1695,30 @@ function skinStatBars(d: { speedMult: number; feverBonus: number; daylightBonus:
     .join("")}${d.magnetAlways ? `<span class="sk-stat mag">🧲 always-on</span>` : ""}</div>`;
 }
 
+/** Group the 60+ bird wall into browsable collections with owned counters. */
+function renderSkinCollections(s: HudSnapshot): string {
+  const portal = s.portalName !== "none";
+  const byId = new Map<string, SkinView[]>();
+  for (const v of s.skins) {
+    const cid = v.def.collection ?? "starter";
+    if (!byId.has(cid)) byId.set(cid, []);
+    byId.get(cid)!.push(v);
+  }
+  return COLLECTIONS.filter((c) => byId.has(c.id))
+    .map((c) => {
+      const skins = byId.get(c.id)!;
+      const got = skins.filter((v) => v.owned).length;
+      const complete = got === skins.length;
+      const bonus = 100 + skins.length * 25;
+      return `<div class="collection ${complete ? "complete" : ""}">
+        <div class="coll-head"><span class="coll-icon">${c.icon}</span><b>${c.name}</b>
+        <span class="coll-count">${complete ? "✓ complete" : `${got}/${skins.length} · set bonus ● ${bonus}`}</span></div>
+        <div class="skin-grid">${skins.map((v) => renderSkinCard(v, portal)).join("")}</div>
+      </div>`;
+    })
+    .join("");
+}
+
 function renderSkinCard(v: SkinView, portal = false): string {
   const d = v.def;
   const rarity = skinRarity(d);
@@ -1292,6 +1726,7 @@ function renderSkinCard(v: SkinView, portal = false): string {
   let action: string;
   if (v.equipped) action = `<span class="tag on">✓ In use</span>`;
   else if (v.owned) action = `<button class="mini-btn" data-ui data-action="equip-skin" data-id="${d.id}">Equip</button>`;
+  else if (d.prizeOnly) action = `<span class="tag prize" title="${d.prizeOnly}">🏆 ${d.prizeOnly}</span>`;
   else if (v.locked && portal)
     action = `<span class="tag portal-lock">Portal event</span>`;
   else if (v.locked)
@@ -1303,15 +1738,39 @@ function renderSkinCard(v: SkinView, portal = false): string {
     <div class="sk-name">${d.name}</div><div class="sk-perk">${d.perk}</div>${skinStatBars(d)}${action}</div>`;
 }
 
+function renderRivalBanner(banner: string): string {
+  const [name, dist] = banner.split("|");
+  return `<div class="rival-banner">🥊 <b>${escapeHtml(name)}</b> challenged you — beat <b>${escapeHtml(dist)} m</b> on their hills. Hold to fly.</div>`;
+}
+
 function renderBoostRow(v: BoostView, wallet: number): string {
   const d = v.def;
-  const missing = Math.max(0, d.price - wallet);
+  const price = v.dealPrice ?? d.price;
+  const missing = Math.max(0, price - wallet);
+  const priceLabel = v.dealPrice !== undefined ? `<s>● ${d.price}</s> ● ${price}` : `● ${price}`;
   const action = v.armed
     ? `<span class="tag on">Armed ✓</span>`
     : v.affordable
-      ? `<button class="mini-btn" data-ui data-action="buy-boost" data-id="${d.id}">● ${d.price}</button>`
+      ? `<button class="mini-btn ${v.dealPrice !== undefined ? "gold" : ""}" data-ui data-action="buy-boost" data-id="${d.id}">${priceLabel}</button>`
       : `<span class="tag need">Need ${missing}●</span>`;
-  return `<div class="boost-row ${v.armed ? "armed" : ""}"><span class="bi">${d.icon}</span><div><div class="mt">${d.name}<span class="boost-once">one flight</span></div><div class="md">${d.desc}</div></div>${action}</div>`;
+  const dealTag = v.dealPrice !== undefined && !v.armed ? `<span class="deal-tag">TODAY −50%</span>` : "";
+  return `<div class="boost-row ${v.armed ? "armed" : ""} ${v.dealPrice !== undefined ? "deal" : ""}"><span class="bi">${d.icon}</span><div><div class="mt">${d.name}<span class="boost-once">one flight</span>${dealTag}</div><div class="md">${d.desc}</div></div>${action}</div>`;
+}
+
+function renderTrailCard(v: ShopTrailView, wallet: number): string {
+  const d = v.def;
+  const stops = d.css.join(", ");
+  const missing = Math.max(0, d.price - wallet);
+  const action = v.equipped
+    ? `<span class="tag on">✓ In use</span>`
+    : v.owned
+      ? `<button class="mini-btn" data-ui data-action="buy-trail" data-id="${d.id}">Equip</button>`
+      : v.affordable
+        ? `<button class="mini-btn" data-ui data-action="buy-trail" data-id="${d.id}">● ${d.price}</button>`
+        : `<span class="tag need">Need ${missing}●</span>`;
+  return `<div class="trail-card ${v.equipped ? "equipped" : ""}">
+    <span class="trail-swatch" style="background:linear-gradient(90deg, ${stops})"></span>
+    <div class="trail-body"><b>${d.label}</b><em>${d.desc}</em></div>${action}</div>`;
 }
 
 function renderShop(s: HudSnapshot): string {
@@ -1321,9 +1780,24 @@ function renderShop(s: HudSnapshot): string {
     ${head("Shop", "back", `<span class="pill coin">● ${s.wallet}</span>`)}
     <p class="tagline">Birds change how you fly. Boosts arm for exactly one flight — spend them where they count.</p>
     <div class="section-title">Birds <small>${owned}/${s.skins.length} owned</small></div>
-    <div class="skin-grid">${s.skins.map((skin) => renderSkinCard(skin, s.portalName !== "none")).join("")}</div>
+    ${renderSkinCollections(s)}
     <div class="section-title">Boosts <small>${armed} armed for your next flight</small></div>
     <div class="boost-list">${s.boosts.map((b) => renderBoostRow(b, s.wallet)).join("")}</div>
+    <div class="section-title">Nest <small>permanent score multiplier</small></div>
+    <div class="boost-list"><div class="boost-row nest-row">
+      <span class="bi">☀️</span>
+      <div><div class="mt">Nest upgrade <span class="boost-once">forever</span></div>
+      <div class="md">Lv.${s.nestLevel} · ×${s.nestMult.toFixed(2)} score${s.nestMaxed ? " · fully upgraded" : ` · next ×${(s.nestMult + 0.12).toFixed(2)}`}</div></div>
+      ${
+        s.nestMaxed
+          ? `<span class="tag on">MAX ✓</span>`
+          : s.wallet >= s.nestPrice
+            ? `<button class="mini-btn gold" data-ui data-action="buy-nest">● ${s.nestPrice}</button>`
+            : `<span class="tag need">Need ${s.nestPrice - s.wallet}●</span>`
+      }
+    </div></div>
+    <div class="section-title">Trails <small>cosmetic — yours forever</small></div>
+    <div class="trail-list">${s.shopTrails.map((t) => renderTrailCard(t, s.wallet)).join("")}</div>
     ${s.portalName === "none" && !(s.gold && s.vip) ? upsellStrip() : ""}
     <p class="fineprint">Earn coins by flying, daily quests, streaks and the Nest Pass.</p>
   `;
@@ -1336,14 +1810,24 @@ function renderPaywall(s: HudSnapshot): string {
       <div class="portal-card">
         <div class="logo-mark">✦</div>
         <h2>Play Fair. Fly Far.</h2>
-        <p class="tagline">This edition uses ${s.portalName === "poki" ? "Poki" : "CrazyGames"} portal rewards only. No direct checkout, no external ads, no paywall.</p>
+        <p class="tagline">This portal edition has no direct checkout, no external ads, no paywall.${s.portalName === "poki" || s.portalName === "crazy" ? " Rewards come from the portal." : ""}</p>
         <p class="fineprint">Keep your momentum, complete missions, and earn every cosmetic through play.</p>
       </div>
     `;
   }
   const stripeGold = s.checkoutMode === "stripe";
+  const starter = !s.starterOwned
+    ? `
+    <div class="starter-card">
+      <div class="starter-flag">ONE-TIME OFFER</div>
+      <h3>🎁 First Flight Pack · ${s.starterPrice}</h3>
+      <ul class="feature-list tight">${s.starterFeatures.map((f) => `<li>${f}</li>`).join("")}</ul>
+      <button class="primary-btn starter" data-ui data-action="starter-buy">Claim the pack · ${s.starterPrice}</button>
+    </div>`
+    : "";
   return `
     ${head("Gold &amp; VIP")}
+    ${starter}
     <div class="gold-hero"><div class="gold-badge">✦</div><div class="gold-price">${s.goldPrice}<small> one-time</small></div></div>
     <ul class="feature-list">${s.goldFeatures.map((f) => `<li>${f}</li>`).join("")}</ul>
     ${
@@ -1369,9 +1853,15 @@ function renderPaywall(s: HudSnapshot): string {
 
 function renderCheckout(s: HudSnapshot): string {
   if (s.checkoutOk) {
-    return `<div class="check-ok"><div class="gold-badge big">${s.checkoutSku === "sunbird_vip" ? "♛" : "✦"}</div><h2>You're ${s.checkoutSku === "sunbird_vip" ? "VIP" : "Gold"}!</h2><p class="tagline">Your perks are active immediately</p><button class="primary-btn gold" data-ui data-action="back">Fly on</button></div>`;
+    const okLabel = s.checkoutSku === "sunbird_vip" ? "VIP" : s.checkoutSku === "sunbird_starter" ? "ready for takeoff" : "Gold";
+    return `<div class="check-ok"><div class="gold-badge big">${s.checkoutSku === "sunbird_vip" ? "♛" : s.checkoutSku === "sunbird_starter" ? "🎁" : "✦"}</div><h2>You're ${okLabel}!</h2><p class="tagline">Your perks are active immediately</p><button class="primary-btn gold" data-ui data-action="back">Fly on</button></div>`;
   }
-  const item = s.checkoutSku === "sunbird_vip" ? { name: "Sunbird VIP · monthly", price: s.vipPrice } : { name: "Sunbird Gold · lifetime", price: s.goldPrice };
+  const item =
+    s.checkoutSku === "sunbird_vip"
+      ? { name: "Sunbird VIP · monthly", price: s.vipPrice }
+      : s.checkoutSku === "sunbird_starter"
+        ? { name: "First Flight Pack · one-time", price: s.starterPrice }
+        : { name: "Sunbird Gold · lifetime", price: s.goldPrice };
   if (s.checkoutMode === "stripe") {
     return `
       ${head("Stripe Checkout", "checkout-cancel")}
@@ -1415,6 +1905,8 @@ function renderSettings(s: HudSnapshot): string {
     <div class="setting-row"><span>Music Volume</span><button class="mini-btn" data-ui data-action="set-music-vol">${!s.settings.music ? "Off" : `${mPct}%`}</button></div>
     ${toggle("Haptics", "haptics", s.settings.haptics)}
     ${toggle("Reduce motion", "motion", s.settings.reduceMotion)}
+    ${toggle("Colorblind assist", "colorassist", s.settings.colorAssist)}
+    ${toggle("Large text", "bigtext", s.settings.bigText)}
     <div class="setting-row"><span>Render quality</span><button class="mini-btn" data-ui data-action="set-quality">${s.settings.quality.toUpperCase()}</button></div>
     <div class="setting-row"><span>Flights flown</span><b>${s.runsPlayed}</b></div>
     ${s.canInstall ? `<button class="soft-btn wide" data-ui data-action="install-app">⬇ Install Sunbird</button>` : ""}
@@ -1433,16 +1925,17 @@ function renderScores(s: HudSnapshot): string {
 
 function rewardLabel(r: { kind: string; amount?: number; id?: string }): string {
   if (r.kind === "coins") return `● ${r.amount}`;
-  if (r.kind === "skin") return `🪶 ${r.id}`;
+  if (r.kind === "skin") return `🐦 ${r.id}`;
+  if (r.kind === "trail") return `✨ ${r.id?.replace("trail_", "") ?? "trail"}`;
   return `🎁 ${r.id}`;
 }
 
 function renderPass(s: HudSnapshot): string {
   const pct = Math.min(100, (s.season.have / s.season.need) * 100);
   return `
-    ${head(`Nest Pass · ${s.season.label}`, "back", `<span class="pill">Lv.${s.season.tier}/${s.season.maxTier}</span>`)}
+    ${head("Nest Pass", "back", `<span class="pill">Lv.${s.season.tier}/${s.season.maxTier}</span>`)}
     <div class="pass-progress"><i style="width:${pct}%"></i></div>
-    <p class="tagline">Fly to earn XP. Gold unlocks the premium track.</p>
+    <p class="tagline">${s.season.label} — fly to earn XP. Gold unlocks the premium track.</p>
     ${!s.gold ? `<button class="upsell" data-ui data-action="open-paywall"><div><b>✦ Unlock premium rewards</b><span>Double the tier rewards with Gold</span></div><span class="mini-btn gold">Unlock</span></button>` : ""}
     <div class="tier-track">
       ${s.season.tiers
@@ -1452,7 +1945,7 @@ function renderPass(s: HudSnapshot): string {
           return `<div class="tier-card ${t.unlocked ? "unlocked" : ""}">
             <div class="tier-num">Lv.${t.tier}</div>
             <button class="tier-reward free ${t.freeClaimed ? "claimed" : ""}" data-ui data-action="${canFree ? "claim-pass-free" : ""}" data-id="${t.tier}" ${canFree ? "" : "disabled"}>${rewardLabel(t.free)}</button>
-            <button class="tier-reward premium ${t.premiumClaimed ? "claimed" : ""} ${t.premiumLocked ? "locked" : ""}" data-ui data-action="${canPremium ? "claim-pass-premium" : ""}" data-id="${t.tier}" ${canPremium ? "" : "disabled"}>${t.premiumLocked ? "✦" : rewardLabel(t.premium)}</button>
+            <button class="tier-reward premium ${t.premiumClaimed ? "claimed" : ""} ${t.premiumLocked ? "locked" : ""}" data-ui data-action="${canPremium ? "claim-pass-premium" : ""}" data-id="${t.tier}" ${canPremium ? "" : "disabled"}>${rewardLabel(t.premium)}${t.premiumLocked ? `<i class="lock-badge">✦</i>` : ""}</button>
           </div>`;
         })
         .join("")}
@@ -1551,11 +2044,21 @@ function renderGameOver(s: HudSnapshot): string {
     s.raceRated && s.ratingDelta !== 0
       ? `<span class="rate-delta ${s.ratingDelta > 0 ? "up" : "down"}">${s.ratingDelta > 0 ? "+" : ""}${s.ratingDelta}</span>`
       : "";
+  const duelStrip =
+    s.duelWas !== ""
+      ? `<div class="race-hero ${s.duelWas === "won" ? "win" : ""}">
+           <div class="race-medal">${s.duelWas === "won" ? "⚔🥇" : "⚔"}</div>
+           <div class="race-place"><b>DUEL ${s.duelWas === "won" ? "WON" : "LOST"}</b><span>${s.duelWas === "won" ? "+" : ""}${s.duelDelta} rating → ${s.rival.rating}</span></div>
+           <div class="race-rating">Duel record ${s.duel.wins}–${s.duel.losses} · 🔥${s.duel.streak} streak<span class="race-rated-tag">ranked · local</span></div>
+         </div>
+         <button class="primary-btn race40 hero" data-ui data-action="pvp-duel"><span class="hero-label">⚔ REMATCH</span><span class="hero-hint">same rating band, fresh wings</span></button>`
+      : "";
   const raceStrip =
-    s.massRace && s.racePlace > 0
+    s.duelWas === "" && s.massRace && s.racePlace > 0
       ? `<div class="race-hero ${s.racePlace === 1 ? "win" : s.racePlace <= 3 ? "podium" : ""}">
            <div class="race-medal">${s.racePlace === 1 ? "🥇" : s.racePlace === 2 ? "🥈" : s.racePlace === 3 ? "🥉" : "🏁"}</div>
            <div class="race-place"><b>P${s.racePlace}</b><span>of ${s.raceField} pilots · ${s.raceFinishTime.toFixed(1)}s</span></div>
+           ${s.raceVerified ? `<div class="verified-tag">✓ placement refereed by the room server</div>` : ""}
            <div class="race-bar"><i style="width:${Math.round((1 - (s.racePlace - 1) / Math.max(1, s.raceField)) * 100)}%"></i></div>
            ${
              s.raceRated
@@ -1588,9 +2091,13 @@ function renderGameOver(s: HudSnapshot): string {
     ${questTotal ? `<div class="reward-strip">Daily quest${s.claimedQuests.length > 1 ? "s" : ""} complete · +${questTotal} coins</div>` : ""}
     ${s.newlyCompleted.length ? `<div class="reward-strip nest">Nest upgraded → Lv.${s.nestLevel} · ×${s.nestMult.toFixed(2)} score</div>` : ""}
     ${s.nearMiss ? `<div class="nearmiss">${s.nearMiss}</div>` : ""}
+    ${s.challengeOutcome ? `<div class="reward-strip ${s.challengeOutcome.includes("missed") ? "nest" : ""}">${escapeHtml(s.challengeOutcome)}</div>` : ""}
+    ${duelStrip}
     ${raceStrip}
     <div class="reached-strip">Reached <b>${s.biomeEmoji} ${s.biomeName}</b> · Island ${s.island + 1}</div>
     <button class="play-again-btn" data-ui data-action="retry">✈ FLY AGAIN</button>
+    ${s.massRace && s.racePlace > 0 ? `<button class="soft-btn wide rematch" data-ui data-action="rematch">🔁 Rematch — same stakes</button>` : ""}
+    <button class="soft-btn wide" data-ui data-action="throw-challenge">🥊 Challenge a rival on these hills</button>
     <button class="soft-btn wide" data-ui data-action="share" ${s.shareBusy ? "disabled" : ""}>${s.shareBusy ? "Preparing…" : "📤 Share this flight"}</button>
     <div class="btn-row">
       <button class="soft-btn" data-ui data-action="open-shop">🛍 Shop</button>
@@ -1624,14 +2131,14 @@ function renderContinue(s: HudSnapshot): string {
 function renderAd(s: HudSnapshot): string {
   if (s.portalName !== "none") {
     return `
-      <div class="ad-label">${s.portalName === "poki" ? "Poki" : "CrazyGames"} break</div>
+      <div class="ad-label">${s.portalName === "poki" ? "Poki" : s.portalName === "crazy" ? "CrazyGames" : "Portal"} break</div>
       <div class="portal-ad-wait"><div class="spinner"></div><h3>Preparing the next flight</h3><p>Your run is paused while the portal handles this break.</p></div>
     `;
   }
   return `
     <div class="ad-label">Sponsored break · ${s.adReason === "continue" ? "earning your second wind" : "between flights"}</div>
     <div class="ad-creative">
-      <div class="ad-logo">🪺</div>
+      <div class="ad-logo">☀️</div>
       <h3>Nest Deluxe</h3>
       <p>Sleep deeper. Fly farther. The premium nest for discerning sunbirds.</p>
       <span class="ad-cta">Learn more</span>

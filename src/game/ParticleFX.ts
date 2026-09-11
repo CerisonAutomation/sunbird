@@ -282,6 +282,24 @@ export class ParticleFX {
       g = cy ? 0.95 : 0.35;
       b = 0.85;
       sz = 0.5;
+    } else if (biomeId === "reef") {
+      const pink = Math.random() < 0.5;
+      r = pink ? 1.0 : 0.45;
+      g = pink ? 0.75 : 0.95;
+      b = pink ? 0.85 : 0.9;
+      vy = (Math.random() - 0.5) * 2 + 1.2; // bubbles drift upward
+      sz = 0.42;
+    } else if (biomeId === "volcano") {
+      const ember = Math.random() < 0.6;
+      r = 1.0;
+      g = ember ? 0.45 : 0.25;
+      b = ember ? 0.15 : 0.2;
+      vy = 1.5 + Math.random() * 2.5; // embers rise
+      sz = ember ? 0.34 : 0.5;
+    } else if (biomeId === "canyon") {
+      r = 0.95; g = 0.62; b = 0.4;
+      vx = -9 - Math.random() * 6; // red dust on the wind
+      sz = 0.38;
     }
 
     this.spawn({
