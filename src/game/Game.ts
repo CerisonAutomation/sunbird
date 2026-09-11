@@ -62,7 +62,7 @@ import {
   ZENITH_DURATION,
   ZENITH_SLOWMO,
 } from "./constants";
-import { BOOSTS, COLLECTIONS, GOLD, PROMO_CODES, SHOP_TRAILS, SKINS, VIP, dailyDealBoost, skinById, type BoostView, type ShopTrailView, type SkinDef, type SkinView } from "./Economy";
+import { BOOSTS, COLLECTIONS, GOLD, PROMO_CODES, SHOP_TRAILS, SKINS, STARTER_PACK, VIP, dailyDealBoost, skinById, type BoostView, type ShopTrailView, type SkinDef, type SkinView } from "./Economy";
 import { GhostPlayer, GhostRecorder } from "./Ghost";
 import { HUD, type CalendarCard, type CheckoutMode, type DailyCard, type GauntletCard, type HudSnapshot, type LoadoutView, type RivalCard, type SeedMode, type UiScreen, type UiState } from "./HUD";
 import { divisionFor, duelOpponent, duelSkillFor, featuredRivals, nextDivision } from "./pvp";
@@ -187,7 +187,7 @@ export class Game {
   private splashQuipN = 0;
   private shield = 0;
   private boostTimer = 0;
-  private continueUsed = false;
+  private continuesUsed = 0;
   private continueTimer = 0;
   private adTimer = 0;
   private adReason: AdReason = "interstitial";
@@ -241,6 +241,10 @@ export class Game {
   private lastMatchOpts: { ranked: boolean; storm: boolean } | null = null;
   /** Stormfront mode: PvE hazards×PvP race hybrid — everyone flies the gauntlet. */
   private stormfront = false;
+  /** Golden Hour: the last stretch of daylight — 2× coins, amber world. */
+  private goldenHour = false;
+  private nextMilestone = 500;
+  private rivalBeatenToast = false;
   /** True once the DO's official finish place has been folded in this race. */
   private serverPlaceApplied = false;
   private duelResult: "" | "won" | "lost" = "";
@@ -944,7 +948,8 @@ export class Game {
             (this.mode.id === "coinrush" ? 2 : 1) *
             this.challengeMods.coinMult *
             this.masteryPerk.coinMult *
-            (this.eventRun ? weeklyEvent().mods.coinMult : 1),
+            (this.eventRun ? weeklyEvent().mods.coinMult : 1) *
+            (this.goldenHour ? 2 : 1),
         );
         this.runCoins += value;
         this.bonus += 4 * COIN_VALUE * value;
@@ -984,6 +989,22 @@ export class Game {
       }
     }
     if (this.bird.speed() > this.maxSpeed) this.maxSpeed = this.bird.speed();
+
+    // Distance milestones: a small rising chime every 500 m keeps long runs
+    // punctuated even when nothing else is happening.
+    const runDist = this.bird.x - this.startX;
+    if (runDist >= this.nextMilestone) {
+      this.nextMilestone += 500;
+      this.audio.milestone();
+      this.particles.emitSparkle(this.bird.x, this.bird.y);
+    }
+    // The moment you pass a rival's posted mark, gloat immediately — don't
+    // make the player wait for the results screen to feel it.
+    if (this.rival && !this.rivalBeatenToast && this.seed === this.rival.seed && runDist >= this.rival.distance) {
+      this.rivalBeatenToast = true;
+      this.audio.rivalDown();
+      this.hud.toast(`🥊 Passed ${this.rival.name}'s mark — keep flying!`, "gold");
+    }
 
     // Finish line (Race / Mass Race) — reached by distance, not by clock.
     if (this.mode.finish > 0 && !this.runRecorded && this.bird.x - this.startX >= this.mode.finish) {
@@ -1058,6 +1079,21 @@ export class Game {
 
     if (this.mode.clock > 0) {
       this.daylight -= dt;
+      // GOLDEN HOUR — the last 22% of the day. The world turns amber, the
+      // music opens, and every coin is worth double. Deep runs get a reason.
+      const goldenNow = this.daylight > 0 && this.daylight < this.daylightMax() * 0.22;
+      if (goldenNow && !this.goldenHour) {
+        this.goldenHour = true;
+        this.audio.goldenHour();
+        this.hud.toast("🌇 GOLDEN HOUR — coins are worth double", "gold");
+        this.flash("fever");
+      } else if (!goldenNow && this.goldenHour) {
+        this.goldenHour = false; // sun flask refilled the day
+      }
+      // Golden Hour magic: the air itself glitters — drifting amber motes.
+      if (this.goldenHour && Math.random() < dt * 6) {
+        this.particles.emitSparkle(this.bird.x + 6 + Math.random() * 18, this.bird.y + (Math.random() - 0.5) * 10, 1, 0.72, 0.25);
+      }
       if (this.daylight <= 0 && !this.bird.asleep) {
         this.onDaylightOut();
         return;
@@ -1476,6 +1512,9 @@ export class Game {
     this.challengeMods = this.challengeRun === "daily" ? modsFor(dailyChallenge(this.today).modifier.id) : NO_MODS;
     this.eventRun = Boolean(opts?.event);
     this.serverPlaceApplied = false;
+    this.goldenHour = false;
+    this.nextMilestone = 500;
+    this.rivalBeatenToast = false;
     // Stormfront survives only through launchMatch(); any other entry resets.
     if (!opts?.storm) this.stormfront = false;
     this.challengeOutcome = "";
@@ -1624,7 +1663,10 @@ export class Game {
     const canAd = this.portalEnabled()
       ? Boolean(this.platform && this.platform.name !== "none")
       : !gold && this.ads.isAvailable() && this.save.adsLeftToday() > 0;
-    if (!this.continueUsed && (gold || canCoins || canAd)) {
+    // Honest tiering: free players get 1 second wind, VIP gets 2, and Gold
+    // gets what its feature list promises — the sun never wins on a technicality.
+    const maxContinues = gold ? 99 : this.save.isVipActive() ? 2 : 1;
+    if (this.continuesUsed < maxContinues && (gold || canCoins || canAd)) {
       this.continueTimer = CONTINUE_TIMEOUT;
       this.setState("continue");
     } else {
@@ -1633,7 +1675,7 @@ export class Game {
   }
 
   private doContinue(source: string): void {
-    this.continueUsed = true;
+    this.continuesUsed += 1;
     this.bird.asleep = false;
     this.daylight = CONTINUE_DAYLIGHT;
     this.bird.y = Math.max(this.bird.y, this.terrain.heightAt(this.bird.x) + BIRD_RADIUS + 0.5);
@@ -1685,7 +1727,7 @@ export class Game {
     // Global board + weekly cups both score off the same verified run stats.
     this.board.submit({
       deviceId: this.save.state.deviceId,
-      name: this.pilotName,
+      name: this.racedName(),
       skin: this.skin.id,
       distance: Math.round(stats.distance),
       altitude: Math.round(this.maxAltitude),
@@ -1717,7 +1759,7 @@ export class Game {
       const won = stats.distance >= this.rival.distance;
       this.rivalResult = won ? "won" : "lost";
       if (won) {
-        const bounty = 150;
+        const bounty = this.save.isVipActive() ? 300 : 150;
         this.save.addCoins(bounty);
         this.challengeOutcome = `🥊 Challenge won! Out-flew ${this.rival.name} (${this.rival.distance} m) · +${bounty} coins`;
         this.hud.toast(this.challengeOutcome, "gold");
@@ -1839,6 +1881,7 @@ export class Game {
       this.setState("ad");
     } else {
       this.setState("gameover");
+      this.maybeNudgeStarter();
     }
     this.skipInterstitialOnce = false;
   }
@@ -1938,7 +1981,7 @@ export class Game {
     this.magnetTimer = 0;
     this.shield = 0;
     this.boostTimer = 0;
-    this.continueUsed = false;
+    this.continuesUsed = 0;
     this.continueTimer = 0;
     this.timeScale = 1;
     this.zenithTimer = 0;
@@ -2361,6 +2404,10 @@ export class Game {
       case "buy-trail":
         this.buyTrail(id);
         break;
+      case "starter-buy":
+        if (this.portalEnabled() || this.save.state.starterPack) break;
+        this.openCheckout("sunbird_starter");
+        break;
       case "gold-buy":
         if (this.portalEnabled()) break;
         this.openCheckout("sunbird_gold");
@@ -2717,6 +2764,20 @@ export class Game {
     this.bump();
   }
 
+  /** The one honest upsell moment: after the player proves they like the
+   * game (run 3+), surface the starter pack ONCE per session at the results
+   * screen — never mid-run, never modal, never repeated. */
+  private starterNudged = false;
+  private maybeNudgeStarter(): void {
+    if (this.starterNudged || this.portalEnabled()) return;
+    if (this.save.state.starterPack || this.save.state.gold) return;
+    const runs = this.save.state.runsPlayed;
+    if (runs < 3 || runs > 12) return;
+    this.starterNudged = true;
+    this.hud.toast(`🎁 First Flight Pack · ${STARTER_PACK.price} — 1,200 coins + Goldleaf trail`, "gold");
+    this.telemetry.track("starter_nudge", { runs });
+  }
+
   private handleStripeReturn(): void {
     const sku = consumeStripeReturn();
     if (!sku) return;
@@ -2729,7 +2790,21 @@ export class Game {
 
   private grantSku(sku: Sku, source: string): void {
     if (sku === "sunbird_vip") this.grantVip(source);
+    else if (sku === "sunbird_starter") this.grantStarter(source);
     else this.grantGold(source);
+  }
+
+  private grantStarter(source: string): void {
+    if (this.save.state.starterPack) return;
+    this.save.state.starterPack = true;
+    this.save.addCoins(STARTER_PACK.coins);
+    this.save.ownTrail(STARTER_PACK.trailId);
+    this.save.equipTrail(STARTER_PACK.trailId);
+    this.save.armBoost("sunflask");
+    this.audio.fanfare();
+    this.hud.toast(`🎁 First Flight Pack — +${STARTER_PACK.coins} coins, Goldleaf trail, Sun Flask armed`, "gold");
+    this.telemetry.track("purchase_ok", { sku: "sunbird_starter", source });
+    this.bump();
   }
 
   private restore(): void {
@@ -3066,7 +3141,7 @@ export class Game {
       this.net = new RealtimeClient(this.save.state.deviceId, this.pilotName, this.skin.id, 0.06);
       this.massRace.attachTransport(this.net);
     }
-    this.net.setIdentity(this.pilotName, this.skin.id, 0.06);
+    this.net.setIdentity(this.racedName(), this.skin.id, 0.06);
     this.net.connect(this.roomCode, `${this.seed}:massrace`);
   }
 
@@ -3077,7 +3152,7 @@ export class Game {
       this.net = new RealtimeClient(this.save.state.deviceId, this.pilotName, this.skin.id, 0.06);
       this.massRace.attachTransport(this.net);
     }
-    this.net.setIdentity(this.pilotName, this.skin.id, 0.06);
+    this.net.setIdentity(this.racedName(), this.skin.id, 0.06);
     this.net.connect(this.roomCode, `${this.seed}:${this.modeId}`);
   }
 
@@ -3244,7 +3319,7 @@ export class Game {
     if (s === "menu" || s === "ad") this.audio.setMusicMode("menu");
     else if (s === "gameover" || s === "continue") this.audio.setMusicMode("sleep");
     else if (s === "paused") this.audio.duckMusic(0.55, 3);
-    else if (s === "playing") this.audio.setMusicMode(this.feverOn ? "fever" : "play");
+    else if (s === "playing") this.audio.setMusicMode(this.feverOn ? "fever" : this.stormfront ? "storm" : "play");
     if (previous === "playing" && s !== "playing") this.platform?.gameplayStop();
     if (previous !== "playing" && s === "playing") this.platform?.gameplayStart();
     this.bump();
@@ -3280,6 +3355,11 @@ export class Game {
 
   private bump(): void {
     this.uiVersion += 1;
+  }
+
+  /** Public-facing pilot identity: VIPs wear the crown in every roster. */
+  private racedName(): string {
+    return this.save.isVipActive() ? `♛ ${this.pilotName}`.slice(0, 16) : this.pilotName;
   }
 
   private lastRunDistance(): number {
@@ -3513,6 +3593,9 @@ export class Game {
       shopTrails: this.shopTrailViews,
       settings: st.settings,
       goldPrice: GOLD.price,
+      starterPrice: STARTER_PACK.price,
+      starterFeatures: STARTER_PACK.features,
+      starterOwned: this.save.state.starterPack,
       goldFeatures: GOLD.features,
       vipPrice: VIP.price,
       vipFeatures: VIP.features,

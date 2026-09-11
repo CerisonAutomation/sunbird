@@ -3,14 +3,15 @@
 // every portal build phone an external payment provider on boot. Instant
 // portal rejection. /pure only loads when loadStripe() is actually called.
 import { loadStripe } from "@stripe/stripe-js/pure";
-import { AD_DURATION, STRIPE_GOLD_LINK, STRIPE_PUBLISHABLE_KEY, STRIPE_RETURN_KEY, STRIPE_VIP_LINK } from "./constants";
+import { AD_DURATION, STRIPE_GOLD_LINK, STRIPE_PUBLISHABLE_KEY, STRIPE_RETURN_KEY, STRIPE_STARTER_LINK, STRIPE_VIP_LINK } from "./constants";
 
-export type Sku = "sunbird_gold" | "sunbird_vip";
+export type Sku = "sunbird_gold" | "sunbird_vip" | "sunbird_starter";
 export type PurchaseResult = { ok: true; receipt: string } | { ok: false; error: string };
 
 const LINKS: Record<Sku, string> = {
   sunbird_gold: STRIPE_GOLD_LINK,
   sunbird_vip: STRIPE_VIP_LINK,
+  sunbird_starter: STRIPE_STARTER_LINK,
 };
 
 const RECEIPT_KEY = "sunbird.receipts";
@@ -47,11 +48,11 @@ export function consumeStripeReturn(): Sku | null {
   try {
     const params = new URLSearchParams(window.location.search);
     const v = params.get(STRIPE_RETURN_KEY);
-    if (v !== "gold" && v !== "vip") return null;
+    if (v !== "gold" && v !== "vip" && v !== "starter") return null;
     params.delete(STRIPE_RETURN_KEY);
     const clean = `${window.location.pathname}${params.toString() ? `?${params}` : ""}${window.location.hash}`;
     window.history.replaceState({}, "", clean);
-    return v === "gold" ? "sunbird_gold" : "sunbird_vip";
+    return v === "gold" ? "sunbird_gold" : v === "starter" ? "sunbird_starter" : "sunbird_vip";
   } catch {
     return null;
   }

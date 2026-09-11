@@ -74,7 +74,7 @@ export type PortalName = "none" | "poki" | "crazy" | "generic";
 export type HudSnapshot = {
   state: UiState;
   screen: UiScreen;
-  checkoutSku: "sunbird_gold" | "sunbird_vip";
+  checkoutSku: "sunbird_gold" | "sunbird_vip" | "sunbird_starter";
   portalName: PortalName;
   version: number;
   distance: number;
@@ -129,6 +129,9 @@ export type HudSnapshot = {
   shopTrails: ShopTrailView[];
   settings: Settings;
   goldPrice: string;
+  starterPrice: string;
+  starterFeatures: string[];
+  starterOwned: boolean;
   goldFeatures: string[];
   vipPrice: string;
   vipFeatures: string[];
@@ -1806,8 +1809,18 @@ function renderPaywall(s: HudSnapshot): string {
     `;
   }
   const stripeGold = s.checkoutMode === "stripe";
+  const starter = !s.starterOwned
+    ? `
+    <div class="starter-card">
+      <div class="starter-flag">ONE-TIME OFFER</div>
+      <h3>🎁 First Flight Pack · ${s.starterPrice}</h3>
+      <ul class="feature-list tight">${s.starterFeatures.map((f) => `<li>${f}</li>`).join("")}</ul>
+      <button class="primary-btn starter" data-ui data-action="starter-buy">Claim the pack · ${s.starterPrice}</button>
+    </div>`
+    : "";
   return `
     ${head("Gold &amp; VIP")}
+    ${starter}
     <div class="gold-hero"><div class="gold-badge">✦</div><div class="gold-price">${s.goldPrice}<small> one-time</small></div></div>
     <ul class="feature-list">${s.goldFeatures.map((f) => `<li>${f}</li>`).join("")}</ul>
     ${
@@ -1833,9 +1846,15 @@ function renderPaywall(s: HudSnapshot): string {
 
 function renderCheckout(s: HudSnapshot): string {
   if (s.checkoutOk) {
-    return `<div class="check-ok"><div class="gold-badge big">${s.checkoutSku === "sunbird_vip" ? "♛" : "✦"}</div><h2>You're ${s.checkoutSku === "sunbird_vip" ? "VIP" : "Gold"}!</h2><p class="tagline">Your perks are active immediately</p><button class="primary-btn gold" data-ui data-action="back">Fly on</button></div>`;
+    const okLabel = s.checkoutSku === "sunbird_vip" ? "VIP" : s.checkoutSku === "sunbird_starter" ? "ready for takeoff" : "Gold";
+    return `<div class="check-ok"><div class="gold-badge big">${s.checkoutSku === "sunbird_vip" ? "♛" : s.checkoutSku === "sunbird_starter" ? "🎁" : "✦"}</div><h2>You're ${okLabel}!</h2><p class="tagline">Your perks are active immediately</p><button class="primary-btn gold" data-ui data-action="back">Fly on</button></div>`;
   }
-  const item = s.checkoutSku === "sunbird_vip" ? { name: "Sunbird VIP · monthly", price: s.vipPrice } : { name: "Sunbird Gold · lifetime", price: s.goldPrice };
+  const item =
+    s.checkoutSku === "sunbird_vip"
+      ? { name: "Sunbird VIP · monthly", price: s.vipPrice }
+      : s.checkoutSku === "sunbird_starter"
+        ? { name: "First Flight Pack · one-time", price: s.starterPrice }
+        : { name: "Sunbird Gold · lifetime", price: s.goldPrice };
   if (s.checkoutMode === "stripe") {
     return `
       ${head("Stripe Checkout", "checkout-cancel")}

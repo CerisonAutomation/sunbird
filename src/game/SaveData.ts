@@ -57,6 +57,8 @@ export type SaveState = {
   completedMissions: string[];
   /** Nest levels bought with coins (stacks with mission levels). */
   nestBought: number;
+  /** One-time starter pack purchased (never offered again). */
+  starterPack: boolean;
   highScores: HighScore[];
   gold: boolean;
   vip: boolean;
@@ -161,6 +163,7 @@ function defaults(): SaveState {
     nestLevel: 0,
     completedMissions: [],
     nestBought: 0,
+    starterPack: false,
     highScores: [],
     gold: false,
     vip: false,
@@ -276,6 +279,7 @@ export class SaveData {
         nestLevel: num(p.nestLevel),
         completedMissions: strArr(p.completedMissions),
         nestBought: num(p.nestBought),
+        starterPack: Boolean(p.starterPack),
         highScores: Array.isArray(p.highScores)
           ? p.highScores
               .map((h) => ({
@@ -686,7 +690,9 @@ export class SaveData {
   }
 
   nestMultiplier(): number {
-    return 1 + this.state.nestLevel * NEST_MULT_PER_LEVEL;
+    const base = 1 + this.state.nestLevel * NEST_MULT_PER_LEVEL;
+    // VIP: the nest works 25% harder while the subscription is active.
+    return this.isVipActive() ? 1 + (base - 1) * 1.25 : base;
   }
 
   spend(amount: number): boolean {

@@ -9,7 +9,7 @@
  *   fever → + clap, whistle lead, brighter, faster
  *   sleep → music-box lullaby
  */
-export type MusicMode = "off" | "menu" | "play" | "fever" | "sleep";
+export type MusicMode = "off" | "menu" | "play" | "fever" | "sleep" | "storm";
 export type BiomeMusicStyle = "bright" | "warm" | "airy" | "wide" | "night" | "crystal";
 
 type Voicing = number[];
@@ -230,11 +230,11 @@ export class Music {
 
     const style = BIOME_MIX[this.biome];
     this.transpose = style.transpose;
-    const song = m === "menu" || m === "play" || m === "fever";
+    const song = m === "menu" || m === "play" || m === "fever" || m === "storm";
     this.ukeGain.gain.setTargetAtTime(song ? (m === "menu" ? 0.3 : 0.36) * style.uke : 0, t, 0.4);
     this.glockGain.gain.setTargetAtTime(song ? (m === "menu" ? 0.24 : 0.32) * style.glock : 0, t, 0.4);
     this.bassGain.gain.setTargetAtTime(song ? 0.42 * style.bass : 0, t, 0.4);
-    this.percGain.gain.setTargetAtTime((m === "play" ? 0.28 : m === "fever" ? 0.36 : 0) * style.perc, t, 0.3);
+    this.percGain.gain.setTargetAtTime((m === "play" ? 0.28 : m === "fever" ? 0.36 : m === "storm" ? 0.42 : 0) * style.perc, t, 0.3);
     this.whistleGain.gain.setTargetAtTime((m === "fever" ? 0.22 : 0) * style.whistle, t, 0.3);
     // Warm pad bed: strongest on the menu (it carries the screen alone),
     // subtle underneath play, gone in fever where percussion drives.
@@ -284,6 +284,9 @@ export class Music {
   }
 
   private scheduleStep(t: number): void {
+    // Storm mode pulls the whole song down a minor third — same melody,
+    // completely different weather.
+    const stormShift = this.mode === "storm" ? -3 : 0;
     const sec = SECTIONS[this.section]!;
     const chordName = sec.prog[this.bar]!;
     const chord = UKE[chordName]!;
@@ -305,26 +308,28 @@ export class Music {
     if (strum) {
       const accent = this.step === 0 ? 1 : this.step === 4 ? 0.85 : 0.65;
       const order = strum === 1 ? chord : [...chord].reverse();
-      order.forEach((m, i) => this.pluck(t + i * 0.011 + Math.random() * 0.004, mtof(m + this.transpose), accent * (0.7 + 0.3 * Math.random())));
+      order.forEach((m, i) => this.pluck(t + i * 0.011 + Math.random() * 0.004, mtof(m + this.transpose + stormShift), accent * (0.7 + 0.3 * Math.random())));
     }
 
     // Bass: root on 1, fifth or root on 3, occasional walk-up on 8
-    if (this.step === 0) this.bass(t, mtof(BASS_ROOT[chordName]! + this.transpose), beat * 0.9);
-    if (this.step === 4) this.bass(t, mtof(BASS_ROOT[chordName]! + (this.bar % 2 ? 7 : 0) + this.transpose), beat * 0.8);
-    if (this.step === 7 && this.bar % 4 === 3) this.bass(t, mtof(BASS_ROOT[chordName]! + 5 + this.transpose), beat * 0.4);
+    if (this.step === 0) this.bass(t, mtof(BASS_ROOT[chordName]! + this.transpose + stormShift), beat * 0.9);
+    if (this.step === 4) this.bass(t, mtof(BASS_ROOT[chordName]! + (this.bar % 2 ? 7 : 0) + this.transpose + stormShift), beat * 0.8);
+    if (this.step === 7 && this.bar % 4 === 3) this.bass(t, mtof(BASS_ROOT[chordName]! + 5 + this.transpose + stormShift), beat * 0.4);
 
     // Glockenspiel melody
     const note = sec.mel[idx] ?? 0;
     if (note > 0) {
       const sparse = this.mode === "menu" && this.step % 2 === 1 && Math.random() < 0.5;
-      if (!sparse) this.glock(t, mtof(note + this.transpose), this.step === 0 ? 1 : 0.8);
+      if (!sparse) this.glock(t, mtof(note + this.transpose + stormShift), this.step === 0 ? 1 : 0.8);
     }
 
     // Percussion
-    if (this.mode === "play" || this.mode === "fever") {
+    if (this.mode === "play" || this.mode === "fever" || this.mode === "storm") {
       this.shaker(t, this.step % 2 === 0 ? 0.55 : 0.32);
       if (this.step === 0 || this.step === 4) this.kick(t, this.step === 0 ? 1 : 0.8);
       if (this.mode === "fever" && (this.step === 2 || this.step === 6)) this.clap(t);
+      // Storm: relentless — kicks on every other eighth, like weather that won't quit.
+      if (this.mode === "storm" && (this.step === 2 || this.step === 6)) this.kick(t, 0.55);
       if (this.step === 7 && this.bar % 2 === 1) this.shaker(t + beat * 0.22, 0.4);
     }
 

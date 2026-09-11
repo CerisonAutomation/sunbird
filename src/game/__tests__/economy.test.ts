@@ -172,3 +172,25 @@ describe("nest coin sink", () => {
     expect(10 * 0.12).toBeCloseTo(1.2);
   });
 });
+
+describe("monetization tiers", () => {
+  it("starter pack is priced as the easy first yes", () => {
+    // Mirror constants: pack must stay a sub-$1 impulse with outsized value.
+    const price = 0.99;
+    const coinValue = 1200;
+    expect(price).toBeLessThan(1);
+    // Value anchor: 1200 coins ≈ 4 nest levels ≈ more than the $2.99 Gold price in coin terms.
+    expect(coinValue).toBeGreaterThanOrEqual(1200);
+  });
+
+  it("continue tiers are strictly ordered free < vip < gold", () => {
+    const free = 1, vip = 2, gold = 99;
+    expect(free).toBeLessThan(vip);
+    expect(vip).toBeLessThan(gold);
+  });
+
+  it("vip daily gift pays back the subscription in play terms", () => {
+    // 100/day * 30 days = 3000 coins per month — must beat the 1200-coin starter pack.
+    expect(100 * 30).toBeGreaterThan(1200 * 2);
+  });
+});

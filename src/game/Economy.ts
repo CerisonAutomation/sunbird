@@ -595,10 +595,23 @@ export const GOLD = {
     "2× coins on every flight",
     "+10 s longer days",
     "No sponsored breaks, ever",
-    "Free second wind on every run",
+    "Unlimited free second winds — the sun never wins",
     "Fly yesterday's hills or wild random seeds",
     "Unlocks the Nest Pass premium reward track",
   ],
+};
+
+/** One-time starter pack: the classic >90%-of-first-purchases offer. Shown
+ * after the player has proven engagement (3+ runs) and priced as an easy
+ * yes. Contents are deliberately generous — the first purchase is the hard
+ * one; its job is to convert, not to profit. */
+export const STARTER_PACK = {
+  sku: "sunbird_starter" as const,
+  price: "$0.99",
+  name: "First Flight Pack",
+  coins: 1200,
+  trailId: "trail_gold",
+  features: ["1,200 coins — four nest levels on day one", "Goldleaf trail — pure molten gold, equipped instantly", "Sun Flask armed for your next flight"],
 };
 
 export const VIP = {
@@ -607,9 +620,11 @@ export const VIP = {
   name: "Sunbird VIP",
   features: [
     "Exclusive Aurora bird skin with a rainbow trail",
-    "Daily login gift of 25 coins",
-    "Priority queue on the daily quest refresh",
-    "A little sparkle on your name in high-score tables",
+    "Daily login gift of 100 coins — 3,000+ a month",
+    "Two second winds per flight instead of one",
+    "Nest multiplier boosted +25% while active",
+    "Double bounty on won rival challenges",
+    "♛ crown on your name in every leaderboard & race",
   ],
 };
 

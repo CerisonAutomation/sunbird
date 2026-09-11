@@ -305,6 +305,26 @@ export class GameAudio {
     this.tone(90, 0.3, "sine", 0.09, 50);
   }
 
+  /** Distance milestone: rising fourth — "you're getting somewhere". */
+  milestone(): void {
+    this.tone(783.99, 0.14, "sine", 0.1, 830);
+    this.tone(1046.5, 0.3, "triangle", 0.09, 1108);
+  }
+
+  /** Golden Hour begins: warm brass-ish swell, the day's last light. */
+  goldenHour(): void {
+    this.tone(392, 0.7, "sawtooth", 0.035, 396);
+    this.tone(493.88, 0.7, "sawtooth", 0.03, 498);
+    this.tone(587.33, 0.9, "triangle", 0.06, 592);
+    this.tone(783.99, 1.1, "sine", 0.07, 790);
+  }
+
+  /** Rival mark beaten mid-run: two-note gloat. */
+  rivalDown(): void {
+    this.tone(659.25, 0.12, "square", 0.05, 690);
+    this.tone(987.77, 0.35, "triangle", 0.09, 1046);
+  }
+
   butter(): void {
     this.tone(1046.5, 0.08, "sine", 0.07, 1318.5);
     this.tone(1318.5, 0.12, "sine", 0.06, 1567.98);
