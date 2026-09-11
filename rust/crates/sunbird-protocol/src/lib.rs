@@ -126,9 +126,18 @@ pub enum ClientMessage {
         reconnect_token: Option<String>,
     },
     #[serde(rename_all = "camelCase")]
-    Leave { version: u32, room_id: Uuid, seat_id: Uuid },
+    Leave {
+        version: u32,
+        room_id: Uuid,
+        seat_id: Uuid,
+    },
     #[serde(rename_all = "camelCase")]
-    Ready { version: u32, room_id: Uuid, seat_id: Uuid, ready: bool },
+    Ready {
+        version: u32,
+        room_id: Uuid,
+        seat_id: Uuid,
+        ready: bool,
+    },
     #[serde(rename_all = "camelCase")]
     Heartbeat {
         version: u32,
@@ -173,7 +182,10 @@ pub enum ServerMessage {
         seed: String,
     },
     #[serde(rename_all = "camelCase")]
-    Snapshot { version: u32, snapshot: ServerSnapshot },
+    Snapshot {
+        version: u32,
+        snapshot: ServerSnapshot,
+    },
     #[serde(rename_all = "camelCase")]
     Error { version: u32, error: ProtocolError },
 }
@@ -220,20 +232,28 @@ pub enum ValidationError {
     PayloadTooLarge,
 }
 
-pub fn parse_client_message(payload: &[u8], max_bytes: usize) -> Result<ClientMessage, ValidationError> {
+pub fn parse_client_message(
+    payload: &[u8],
+    max_bytes: usize,
+) -> Result<ClientMessage, ValidationError> {
     if payload.len() > max_bytes {
         return Err(ValidationError::PayloadTooLarge);
     }
-    let value: serde_json::Value = serde_json::from_slice(payload).map_err(|_| ValidationError::InvalidJson)?;
+    let value: serde_json::Value =
+        serde_json::from_slice(payload).map_err(|_| ValidationError::InvalidJson)?;
     validate_message_value(&value)?;
     Ok(serde_json::from_value(value)?)
 }
 
-pub fn parse_server_message(payload: &[u8], max_bytes: usize) -> Result<ServerMessage, ValidationError> {
+pub fn parse_server_message(
+    payload: &[u8],
+    max_bytes: usize,
+) -> Result<ServerMessage, ValidationError> {
     if payload.len() > max_bytes {
         return Err(ValidationError::PayloadTooLarge);
     }
-    let value: serde_json::Value = serde_json::from_slice(payload).map_err(|_| ValidationError::InvalidJson)?;
+    let value: serde_json::Value =
+        serde_json::from_slice(payload).map_err(|_| ValidationError::InvalidJson)?;
     validate_message_value(&value)?;
     Ok(serde_json::from_value(value)?)
 }
@@ -256,7 +276,11 @@ fn validate_message_value(value: &serde_json::Value) -> Result<(), ValidationErr
     Ok(())
 }
 
-fn check_len(obj: &serde_json::Map<String, serde_json::Value>, key: &'static str, max: usize) -> Result<(), ValidationError> {
+fn check_len(
+    obj: &serde_json::Map<String, serde_json::Value>,
+    key: &'static str,
+    max: usize,
+) -> Result<(), ValidationError> {
     if let Some(serde_json::Value::String(text)) = obj.get(key) {
         if text.chars().count() > max {
             return Err(ValidationError::TextLimit(key));
@@ -276,7 +300,9 @@ pub fn sanitize_text(input: &str, max_chars: usize) -> String {
 }
 
 pub fn rfc3339_now() -> String {
-    OffsetDateTime::now_utc().format(&Rfc3339).unwrap_or_default()
+    OffsetDateTime::now_utc()
+        .format(&Rfc3339)
+        .unwrap_or_default()
 }
 
 pub fn new_uuid() -> Uuid {

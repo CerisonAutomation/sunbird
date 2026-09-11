@@ -17,7 +17,9 @@ use config::{Config, Environment};
 use parking_lot::RwLock;
 use serde::Serialize;
 use std::{sync::Arc, time::Duration};
-use sunbird_protocol::{Limits, ProtocolError, SeatGrant, ServerMessage, MAX_JSON_PAYLOAD_BYTES, PROTOCOL_VERSION};
+use sunbird_protocol::{
+    Limits, ProtocolError, SeatGrant, ServerMessage, MAX_JSON_PAYLOAD_BYTES, PROTOCOL_VERSION,
+};
 use tokio::{net::TcpListener, signal, sync::watch};
 use tower_http::{
     cors::{Any, CorsLayer},
@@ -82,8 +84,12 @@ async fn main() -> anyhow::Result<()> {
         rooms: room_manager,
         legacy_rooms,
     });
-    let listener = TcpListener::bind(bind_addr).await.with_context(|| format!("cannot bind {bind_addr}"))?;
-    let bound = listener.local_addr().context("failed to resolve listener address")?;
+    let listener = TcpListener::bind(bind_addr)
+        .await
+        .with_context(|| format!("cannot bind {bind_addr}"))?;
+    let bound = listener
+        .local_addr()
+        .context("failed to resolve listener address")?;
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
     let app = build_app(shared.clone(), shutdown_rx.clone());
 
@@ -92,8 +98,12 @@ async fn main() -> anyhow::Result<()> {
 
     if let Some(metrics_bind) = shared.config.metrics_bind {
         let metrics_app = metrics_endpoint_app();
-        let metrics_listener = TcpListener::bind(metrics_bind).await.with_context(|| format!("cannot bind metrics address {metrics_bind}"))?;
-        let metrics_addr = metrics_listener.local_addr().context("failed to resolve metrics address")?;
+        let metrics_listener = TcpListener::bind(metrics_bind)
+            .await
+            .with_context(|| format!("cannot bind metrics address {metrics_bind}"))?;
+        let metrics_addr = metrics_listener
+            .local_addr()
+            .context("failed to resolve metrics address")?;
         metrics::install();
         tokio::spawn(async move {
             info!(%metrics_addr, "metrics listener started");
@@ -110,14 +120,26 @@ async fn main() -> anyhow::Result<()> {
         .context("service terminated with an error")?;
 
     *shared.state.ready.write() = false;
-    info!(grace_seconds = shutdown_grace.as_secs(), "shutdown complete");
+    info!(
+        grace_seconds = shutdown_grace.as_secs(),
+        "shutdown complete"
+    );
     Ok(())
 }
 
 fn init_tracing() {
     tracing_subscriber::registry()
-        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "sunbird_server=info,tower_http=info".into()))
-        .with(tracing_subscriber::fmt::layer().json().with_target(false).with_current_span(false).with_span_list(false))
+        .with(
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "sunbird_server=info,tower_http=info".into()),
+        )
+        .with(
+            tracing_subscriber::fmt::layer()
+                .json()
+                .with_target(false)
+                .with_current_span(false)
+                .with_span_list(false),
+        )
         .init();
 }
 
@@ -125,7 +147,9 @@ fn build_app(shared: SharedState, shutdown_rx: watch::Receiver<bool>) -> Router 
     let cors = cors_layer(&shared.config);
     // The WebSocket route carries its own state (the room registry) so the
     // socket task never needs the whole Shared config.
-    let ws_router = Router::new().route("/v1/ws", get(ws::ws_handler)).with_state(shared.rooms.clone());
+    let ws_router = Router::new()
+        .route("/v1/ws", get(ws::ws_handler))
+        .with_state(shared.rooms.clone());
     // The legacy simple-protocol socket the browser ships with today.
     let legacy_router = Router::new()
         .route("/ws", get(legacy::legacy_ws_handler))
@@ -160,7 +184,9 @@ fn build_app(shared: SharedState, shutdown_rx: watch::Receiver<bool>) -> Router 
 }
 
 fn cors_layer(config: &Config) -> CorsLayer {
-    let layer = CorsLayer::new().allow_methods([Method::GET, Method::POST, Method::OPTIONS]).allow_headers([header::CONTENT_TYPE]);
+    let layer = CorsLayer::new()
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_headers([header::CONTENT_TYPE]);
     if config.public_origins.iter().any(|origin| origin == "*") {
         layer.allow_origin(Any)
     } else {
@@ -188,7 +214,8 @@ async fn health(State(shared): State<SharedState>) -> Json<HealthResponse> {
         status: "ok",
         service: shared.config.app_identity(),
         protocol_version: PROTOCOL_VERSION,
-        uptime_seconds: time::OffsetDateTime::now_utc().unix_timestamp() - *shared.state.started_at_unix.read(),
+        uptime_seconds: time::OffsetDateTime::now_utc().unix_timestamp()
+            - *shared.state.started_at_unix.read(),
     })
 }
 
@@ -199,17 +226,22 @@ async fn ready(State(shared): State<SharedState>) -> Response {
             status: "ready",
             service: shared.config.app_identity(),
             protocol_version: PROTOCOL_VERSION,
-            uptime_seconds: time::OffsetDateTime::now_utc().unix_timestamp() - *shared.state.started_at_unix.read(),
+            uptime_seconds: time::OffsetDateTime::now_utc().unix_timestamp()
+                - *shared.state.started_at_unix.read(),
         })
         .into_response()
     } else {
-        (StatusCode::SERVICE_UNAVAILABLE, Json(HealthResponse {
-            status: "not_ready",
-            service: shared.config.app_identity(),
-            protocol_version: PROTOCOL_VERSION,
-            uptime_seconds: time::OffsetDateTime::now_utc().unix_timestamp() - *shared.state.started_at_unix.read(),
-        }))
-        .into_response()
+        (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(HealthResponse {
+                status: "not_ready",
+                service: shared.config.app_identity(),
+                protocol_version: PROTOCOL_VERSION,
+                uptime_seconds: time::OffsetDateTime::now_utc().unix_timestamp()
+                    - *shared.state.started_at_unix.read(),
+            }),
+        )
+            .into_response()
     }
 }
 
@@ -251,7 +283,11 @@ async fn degrade_status(State(shared): State<SharedState>) -> Json<DegradeRespon
     Json(DegradeResponse {
         multiplayer_ready: true,
         reason: "authoritative-rooms-live",
-        fallback: if external_ready { "local-practice-only" } else { "local-practice-mode" },
+        fallback: if external_ready {
+            "local-practice-only"
+        } else {
+            "local-practice-mode"
+        },
     })
 }
 
@@ -277,7 +313,12 @@ async fn issue_reconnect_token(
     metrics::note_join_intent();
     let token = shared
         .issuer
-        .issue(request.player_id, request.room_id, request.seat_id, request.generation)
+        .issue(
+            request.player_id,
+            request.room_id,
+            request.seat_id,
+            request.generation,
+        )
         .map_err(|err| ApiError::internal(err.to_string()))?;
     metrics::note_reconnect_token_issued();
     Ok(Json(SeatGrant {
@@ -359,7 +400,10 @@ mod tests {
     fn test_shared() -> SharedState {
         Arc::new(Shared {
             config: Config::development_default(),
-            issuer: auth::SeatTokenIssuer::new(b"01234567890123456789012345678901", Duration::from_secs(30)),
+            issuer: auth::SeatTokenIssuer::new(
+                b"01234567890123456789012345678901",
+                Duration::from_secs(30),
+            ),
             protocol_limits: Limits::current(),
             state: Arc::new(RuntimeState::new()),
             rooms: Arc::new(rooms::RoomManager::new()),
@@ -419,7 +463,8 @@ mod tests {
             client_time: time::OffsetDateTime::now_utc(),
         })
         .expect("encode");
-        let parsed = parse_client_message(&encoded, MAX_JSON_PAYLOAD_BYTES).expect("parse heartbeat");
+        let parsed =
+            parse_client_message(&encoded, MAX_JSON_PAYLOAD_BYTES).expect("parse heartbeat");
         assert!(matches!(parsed, ClientMessage::Heartbeat { .. }));
     }
 }

@@ -32,12 +32,25 @@ impl SeatTokenIssuer {
         }
     }
 
-    pub fn issue(&self, player_id: Uuid, room_id: Uuid, seat_id: Uuid, generation: u64) -> Result<String> {
+    pub fn issue(
+        &self,
+        player_id: Uuid,
+        room_id: Uuid,
+        seat_id: Uuid,
+        generation: u64,
+    ) -> Result<String> {
         let now = OffsetDateTime::now_utc();
         self.issue_at(player_id, room_id, seat_id, generation, now)
     }
 
-    fn issue_at(&self, player_id: Uuid, room_id: Uuid, seat_id: Uuid, generation: u64, issued: OffsetDateTime) -> Result<String> {
+    fn issue_at(
+        &self,
+        player_id: Uuid,
+        room_id: Uuid,
+        seat_id: Uuid,
+        generation: u64,
+        issued: OffsetDateTime,
+    ) -> Result<String> {
         let claims = SeatClaims {
             v: sunbird_protocol::PROTOCOL_VERSION,
             player_id,
@@ -48,16 +61,23 @@ impl SeatTokenIssuer {
             expires_at_unix: (issued + self.ttl).unix_timestamp(),
         };
         let payload = serde_json::to_vec(&claims).context("failed to encode seat claims")?;
-        let payload64 = base64::Engine::encode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, payload);
+        let payload64 =
+            base64::Engine::encode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, payload);
         let signature = self.sign(payload64.as_bytes())?;
         Ok(format!("{TOKEN_PREFIX_V1}.{payload64}.{signature}"))
     }
 
     pub fn verify(&self, token: &str) -> Result<SeatClaims> {
         let mut parts = token.splitn(3, '.');
-        let prefix = parts.next().ok_or_else(|| anyhow!("token format is invalid"))?;
-        let payload64 = parts.next().ok_or_else(|| anyhow!("token format is invalid"))?;
-        let signature = parts.next().ok_or_else(|| anyhow!("token format is invalid"))?;
+        let prefix = parts
+            .next()
+            .ok_or_else(|| anyhow!("token format is invalid"))?;
+        let payload64 = parts
+            .next()
+            .ok_or_else(|| anyhow!("token format is invalid"))?;
+        let signature = parts
+            .next()
+            .ok_or_else(|| anyhow!("token format is invalid"))?;
         if prefix != TOKEN_PREFIX_V1 {
             return Err(anyhow!("unsupported token prefix"));
         }
@@ -65,8 +85,11 @@ impl SeatTokenIssuer {
         if !constant_time_eq(expected.as_bytes(), signature.as_bytes()) {
             return Err(anyhow!("token signature mismatch"));
         }
-        let payload = base64::Engine::decode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, payload64).context("invalid token payload")?;
-        let claims: SeatClaims = serde_json::from_slice(&payload).context("invalid token claims")?;
+        let payload =
+            base64::Engine::decode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, payload64)
+                .context("invalid token payload")?;
+        let claims: SeatClaims =
+            serde_json::from_slice(&payload).context("invalid token claims")?;
         if claims.v != sunbird_protocol::PROTOCOL_VERSION {
             return Err(anyhow!("unsupported claim version"));
         }
@@ -77,7 +100,8 @@ impl SeatTokenIssuer {
     }
 
     fn sign(&self, payload: &[u8]) -> Result<String> {
-        let mut mac = HmacSha256::new_from_slice(&self.key).map_err(|_| anyhow!("invalid signing key"))?;
+        let mut mac =
+            HmacSha256::new_from_slice(&self.key).map_err(|_| anyhow!("invalid signing key"))?;
         mac.update(payload);
         Ok(hex::encode(mac.finalize().into_bytes()))
     }
@@ -102,7 +126,8 @@ mod tests {
 
     #[test]
     fn issue_and_verify() {
-        let issuer = SeatTokenIssuer::new(b"01234567890123456789012345678901", Duration::minutes(5));
+        let issuer =
+            SeatTokenIssuer::new(b"01234567890123456789012345678901", Duration::minutes(5));
         let player = Uuid::new_v4();
         let room = Uuid::new_v4();
         let seat = Uuid::new_v4();
@@ -116,8 +141,11 @@ mod tests {
 
     #[test]
     fn tampered_token_rejected() {
-        let issuer = SeatTokenIssuer::new(b"01234567890123456789012345678901", Duration::minutes(5));
-        let token = issuer.issue(Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4(), 1).expect("issue");
+        let issuer =
+            SeatTokenIssuer::new(b"01234567890123456789012345678901", Duration::minutes(5));
+        let token = issuer
+            .issue(Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4(), 1)
+            .expect("issue");
         let mut bad = token.clone();
         bad.replace_range(token.len() - 1.., "0");
         assert!(issuer.verify(&bad).is_err());
@@ -125,7 +153,8 @@ mod tests {
 
     #[test]
     fn wrong_prefix_rejected() {
-        let issuer = SeatTokenIssuer::new(b"01234567890123456789012345678901", Duration::minutes(5));
+        let issuer =
+            SeatTokenIssuer::new(b"01234567890123456789012345678901", Duration::minutes(5));
         assert!(issuer.verify("sb0.x.y").is_err());
     }
 }

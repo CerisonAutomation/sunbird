@@ -28,7 +28,7 @@ use axum::{
     },
     response::Response,
 };
-use futures_util::{sink::SinkExt, stream::StreamExt, stream::SplitSink};
+use futures_util::{sink::SinkExt, stream::SplitSink, stream::StreamExt};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -172,7 +172,9 @@ pub struct LegacyRooms {
 impl LegacyRooms {
     pub fn new() -> Self {
         Self {
-            inner: RwLock::new(Registry { rooms: HashMap::new() }),
+            inner: RwLock::new(Registry {
+                rooms: HashMap::new(),
+            }),
         }
     }
 
@@ -208,20 +210,27 @@ impl LegacyRooms {
         room.pilots.insert(identity.id.clone(), pilot);
         room.empty_since = Instant::now();
 
-        send_to(room, &identity.id, &Out::Welcome {
-            id: identity.id.clone(),
-            room: room.code.clone(),
-            seed: room.seed.clone(),
-            capacity: CAPACITY,
-        });
+        send_to(
+            room,
+            &identity.id,
+            &Out::Welcome {
+                id: identity.id.clone(),
+                room: room.code.clone(),
+                seed: room.seed.clone(),
+                capacity: CAPACITY,
+            },
+        );
         broadcast_peers(room);
 
         if room.pilots.len() >= 2 && room.started_at == 0 {
             room.started_at = epoch_ms() + 3000;
-            broadcast(room, &Out::Start {
-                at: room.started_at,
-                seed: room.seed.clone(),
-            });
+            broadcast(
+                room,
+                &Out::Start {
+                    at: room.started_at,
+                    seed: room.seed.clone(),
+                },
+            );
         }
 
         Ok(room.code.clone())
@@ -231,7 +240,9 @@ impl LegacyRooms {
     /// find them, then torn down by [`tick`](Self::tick).
     fn leave(&self, code: &str, id: &str) {
         let mut reg = self.inner.write();
-        let Some(room) = reg.rooms.get_mut(code) else { return };
+        let Some(room) = reg.rooms.get_mut(code) else {
+            return;
+        };
         if room.pilots.remove(id).is_none() {
             return;
         }
@@ -248,7 +259,9 @@ impl LegacyRooms {
     /// Dispatch an inbound legacy frame against a seated pilot.
     fn on_message(&self, code: &str, id: &str, msg: In) {
         let mut reg = self.inner.write();
-        let Some(room) = reg.rooms.get_mut(code) else { return };
+        let Some(room) = reg.rooms.get_mut(code) else {
+            return;
+        };
         match msg {
             In::State { x, y, r, d } => {
                 if let Some(p) = room.pilots.get_mut(id) {
@@ -263,7 +276,14 @@ impl LegacyRooms {
             In::Emote { emote } => {
                 if room.pilots.contains_key(id) {
                     let clean = sanitize(&emote, 12);
-                    broadcast_except(room, &Out::Emote { id: id.to_string(), emote: clean }, id);
+                    broadcast_except(
+                        room,
+                        &Out::Emote {
+                            id: id.to_string(),
+                            emote: clean,
+                        },
+                        id,
+                    );
                 }
             }
             In::Ready { ready } => {
@@ -317,7 +337,13 @@ impl LegacyRooms {
                 .map(|p| (p.id.clone(), p.x, p.y, p.rot, p.distance))
                 .collect();
             if !pilots.is_empty() {
-                broadcast(room, &Out::State { t: now_secs, pilots });
+                broadcast(
+                    room,
+                    &Out::State {
+                        t: now_secs,
+                        pilots,
+                    },
+                );
             }
         }
 
@@ -376,7 +402,9 @@ fn fresh_code(reg: &Registry) -> String {
 
 /// Authoritative finish: the server assigns places by arrival order.
 fn finish(room: &mut Room, id: &str, time: f64, distance: f64) {
-    let Some(pilot) = room.pilots.get_mut(id) else { return };
+    let Some(pilot) = room.pilots.get_mut(id) else {
+        return;
+    };
     if pilot.finished {
         return;
     }
@@ -385,11 +413,14 @@ fn finish(room: &mut Room, id: &str, time: f64, distance: f64) {
     pilot.last_seen = Instant::now();
     room.finish_order.push(id.to_string());
     let place = room.finish_order.len();
-    broadcast(room, &Out::Finish {
-        id: id.to_string(),
-        time,
-        place,
-    });
+    broadcast(
+        room,
+        &Out::Finish {
+            id: id.to_string(),
+            time,
+            place,
+        },
+    );
 }
 
 fn broadcast_peers(room: &Room) {

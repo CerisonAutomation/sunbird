@@ -19,8 +19,8 @@ use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use sunbird_protocol::{
-    sanitize_text, PilotPublic, ProtocolError, RoomPublic, SeatGrant, MAX_NAME_CHARS, MAX_SEED_CHARS,
-    MAX_SKIN_CHARS,
+    sanitize_text, PilotPublic, ProtocolError, RoomPublic, SeatGrant, MAX_NAME_CHARS,
+    MAX_SEED_CHARS, MAX_SKIN_CHARS,
 };
 use tokio::sync::broadcast;
 use uuid::Uuid;
@@ -40,7 +40,11 @@ pub enum RoomEvent {
     /// Roster changed (join/leave/ready/reconnect) — carries fresh public state.
     Roster(RoomPublic),
     /// The race started; clients switch to the countdown.
-    Started { room_id: Uuid, seed: String, start_unix_ms: i64 },
+    Started {
+        room_id: Uuid,
+        seed: String,
+        start_unix_ms: i64,
+    },
 }
 
 struct Seat {
@@ -128,7 +132,9 @@ impl RoomManager {
         let name = safe_name(name);
         let skin = sanitize_text(skin, MAX_SKIN_CHARS);
         if seed.is_empty() {
-            return Err(ProtocolError::InvalidMessage { reason: "seed is required".into() });
+            return Err(ProtocolError::InvalidMessage {
+                reason: "seed is required".into(),
+            });
         }
 
         let mut reg = self.inner.write();
@@ -150,9 +156,14 @@ impl RoomManager {
             }
         };
 
-        let room = reg.rooms.get_mut(&room_id).ok_or(ProtocolError::RoomNotFound)?;
+        let room = reg
+            .rooms
+            .get_mut(&room_id)
+            .ok_or(ProtocolError::RoomNotFound)?;
         if room.started {
-            return Err(ProtocolError::Rejected { message: "race already started".into() });
+            return Err(ProtocolError::Rejected {
+                message: "race already started".into(),
+            });
         }
         if room.seats.len() >= room.capacity {
             return Err(ProtocolError::RoomFull);
@@ -183,14 +194,21 @@ impl RoomManager {
         let public = room.to_public();
         let events = room.events.subscribe();
         let _ = room.events.send(RoomEvent::Roster(public.clone()));
-        Ok(JoinOutcome { grant, room: public, events })
+        Ok(JoinOutcome {
+            grant,
+            room: public,
+            events,
+        })
     }
 
     /// Remove a seat. Empty rooms are torn down; a departing host hands the
     /// room to the longest-seated pilot.
     pub fn leave(&self, room_id: Uuid, seat_id: Uuid) -> Result<(), ProtocolError> {
         let mut reg = self.inner.write();
-        let room = reg.rooms.get_mut(&room_id).ok_or(ProtocolError::RoomNotFound)?;
+        let room = reg
+            .rooms
+            .get_mut(&room_id)
+            .ok_or(ProtocolError::RoomNotFound)?;
         let before = room.seats.len();
         room.seats.retain(|s| s.seat_id != seat_id);
         if room.seats.len() == before {
@@ -214,9 +232,17 @@ impl RoomManager {
 
     /// Flip a seat's ready flag. When every seat is ready (and at least two
     /// are present) the race starts and a `Started` event is broadcast.
-    pub fn set_ready(&self, room_id: Uuid, seat_id: Uuid, ready: bool) -> Result<bool, ProtocolError> {
+    pub fn set_ready(
+        &self,
+        room_id: Uuid,
+        seat_id: Uuid,
+        ready: bool,
+    ) -> Result<bool, ProtocolError> {
         let mut reg = self.inner.write();
-        let room = reg.rooms.get_mut(&room_id).ok_or(ProtocolError::RoomNotFound)?;
+        let room = reg
+            .rooms
+            .get_mut(&room_id)
+            .ok_or(ProtocolError::RoomNotFound)?;
         let seat = room
             .seats
             .iter_mut()
@@ -242,7 +268,10 @@ impl RoomManager {
     /// Record a heartbeat; unknown seats error so zombie sockets get closed.
     pub fn heartbeat(&self, room_id: Uuid, seat_id: Uuid) -> Result<(), ProtocolError> {
         let mut reg = self.inner.write();
-        let room = reg.rooms.get_mut(&room_id).ok_or(ProtocolError::RoomNotFound)?;
+        let room = reg
+            .rooms
+            .get_mut(&room_id)
+            .ok_or(ProtocolError::RoomNotFound)?;
         let seat = room
             .seats
             .iter_mut()
@@ -256,7 +285,10 @@ impl RoomManager {
     /// generation (invalidating older tokens) and returns a fresh grant.
     pub fn reconnect(&self, room_id: Uuid, seat_id: Uuid) -> Result<JoinOutcome, ProtocolError> {
         let mut reg = self.inner.write();
-        let room = reg.rooms.get_mut(&room_id).ok_or(ProtocolError::RoomNotFound)?;
+        let room = reg
+            .rooms
+            .get_mut(&room_id)
+            .ok_or(ProtocolError::RoomNotFound)?;
         let seat = room
             .seats
             .iter_mut()
@@ -274,7 +306,11 @@ impl RoomManager {
         let room_public = room.to_public();
         let events = room.events.subscribe();
         let _ = room.events.send(RoomEvent::Roster(room_public.clone()));
-        Ok(JoinOutcome { grant, room: room_public, events })
+        Ok(JoinOutcome {
+            grant,
+            room: room_public,
+            events,
+        })
     }
 
     /// Sweep seats whose heartbeats went silent, then drop empty rooms.
@@ -286,7 +322,8 @@ impl RoomManager {
         let mut dead_rooms: Vec<(Uuid, String)> = Vec::new();
         for room in reg.rooms.values_mut() {
             let before = room.seats.len();
-            room.seats.retain(|s| now.duration_since(s.last_heartbeat) < timeout);
+            room.seats
+                .retain(|s| now.duration_since(s.last_heartbeat) < timeout);
             let lost = before - room.seats.len();
             reaped += lost;
             if room.seats.is_empty() {
@@ -332,9 +369,16 @@ fn create_room(reg: &mut Registry, seed: &str, capacity_hint: Option<usize>) -> 
     create_room_with_code(reg, seed, &code, capacity_hint)
 }
 
-fn create_room_with_code(reg: &mut Registry, seed: &str, code: &str, capacity_hint: Option<usize>) -> Uuid {
+fn create_room_with_code(
+    reg: &mut Registry,
+    seed: &str,
+    code: &str,
+    capacity_hint: Option<usize>,
+) -> Uuid {
     let id = Uuid::new_v4();
-    let capacity = capacity_hint.unwrap_or(DEFAULT_CAPACITY).clamp(MIN_CAPACITY, MAX_CAPACITY);
+    let capacity = capacity_hint
+        .unwrap_or(DEFAULT_CAPACITY)
+        .clamp(MIN_CAPACITY, MAX_CAPACITY);
     let (events, _keepalive) = broadcast::channel(ROOM_CHANNEL_CAPACITY);
     reg.rooms.insert(
         id,
@@ -359,7 +403,9 @@ fn fresh_code(reg: &Registry) -> String {
     loop {
         let id = Uuid::new_v4();
         let bytes = id.as_bytes();
-        let code: String = (0..5).map(|i| ALPHABET[bytes[i] as usize % ALPHABET.len()] as char).collect();
+        let code: String = (0..5)
+            .map(|i| ALPHABET[bytes[i] as usize % ALPHABET.len()] as char)
+            .collect();
         if !reg.by_code.contains_key(&code) {
             return code;
         }
@@ -367,7 +413,12 @@ fn fresh_code(reg: &Registry) -> String {
 }
 
 fn normalize_code(raw: &str) -> String {
-    raw.trim().to_ascii_uppercase().chars().filter(|c| c.is_ascii_alphanumeric()).take(5).collect()
+    raw.trim()
+        .to_ascii_uppercase()
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .take(5)
+        .collect()
 }
 
 fn safe_name(raw: &str) -> String {
@@ -389,7 +440,8 @@ mod tests {
     use super::*;
 
     fn join(mgr: &RoomManager, code: &str, name: &str) -> JoinOutcome {
-        mgr.join(code, "2026-09-11", name, "sunbird", None).expect("join")
+        mgr.join(code, "2026-09-11", name, "sunbird", None)
+            .expect("join")
     }
 
     #[test]
@@ -402,16 +454,28 @@ mod tests {
         let b = join(&mgr, "ABCDE", "Swift");
         assert_eq!(b.room.id, a.room.id);
         assert_eq!(b.room.pilots.len(), 2);
-        assert_eq!(b.room.host_seat_id, a.grant.seat_id, "host stays with the first pilot");
+        assert_eq!(
+            b.room.host_seat_id, a.grant.seat_id,
+            "host stays with the first pilot"
+        );
     }
 
     #[test]
     fn capacity_is_enforced() {
         let mgr = RoomManager::new();
         for i in 0..MIN_CAPACITY {
-            mgr.join("FULLR", "s", &format!("p{i}"), "sunbird", Some(MIN_CAPACITY)).expect("join within capacity");
+            mgr.join(
+                "FULLR",
+                "s",
+                &format!("p{i}"),
+                "sunbird",
+                Some(MIN_CAPACITY),
+            )
+            .expect("join within capacity");
         }
-        let err = mgr.join("FULLR", "s", "late", "sunbird", Some(MIN_CAPACITY)).unwrap_err();
+        let err = mgr
+            .join("FULLR", "s", "late", "sunbird", Some(MIN_CAPACITY))
+            .unwrap_err();
         assert!(matches!(err, ProtocolError::RoomFull));
     }
 
@@ -430,8 +494,14 @@ mod tests {
         let mgr = RoomManager::new();
         let a = join(&mgr, "READY", "a");
         let b = join(&mgr, "READY", "b");
-        assert!(!mgr.set_ready(a.room.id, a.grant.seat_id, true).expect("ready a"));
-        assert!(mgr.set_ready(b.room.id, b.grant.seat_id, true).expect("ready b"), "last ready starts the race");
+        assert!(!mgr
+            .set_ready(a.room.id, a.grant.seat_id, true)
+            .expect("ready a"));
+        assert!(
+            mgr.set_ready(b.room.id, b.grant.seat_id, true)
+                .expect("ready b"),
+            "last ready starts the race"
+        );
         // A started room refuses new joins.
         let err = mgr.join("READY", "s", "late", "sunbird", None).unwrap_err();
         assert!(matches!(err, ProtocolError::Rejected { .. }));
@@ -456,7 +526,9 @@ mod tests {
     fn reconnect_bumps_generation() {
         let mgr = RoomManager::new();
         let a = join(&mgr, "RECON", "flaky");
-        let again = mgr.reconnect(a.room.id, a.grant.seat_id).expect("reconnect");
+        let again = mgr
+            .reconnect(a.room.id, a.grant.seat_id)
+            .expect("reconnect");
         assert_eq!(again.grant.generation, a.grant.generation + 1);
         assert_eq!(again.grant.player_id, a.grant.player_id);
     }
@@ -466,16 +538,24 @@ mod tests {
         let mgr = RoomManager::new();
         join(&mgr, "SWEEP", "ghost");
         assert_eq!(mgr.sweep(Duration::from_secs(60)), 0, "fresh seats survive");
-        assert_eq!(mgr.sweep(Duration::from_nanos(0)), 1, "silent seats are reaped");
+        assert_eq!(
+            mgr.sweep(Duration::from_nanos(0)),
+            1,
+            "silent seats are reaped"
+        );
         assert_eq!(mgr.stats().rooms, 0);
     }
 
     #[test]
     fn names_are_sanitized_and_defaulted() {
         let mgr = RoomManager::new();
-        let out = mgr.join("NAMES", "s", "  \u{0007}  ", "sunbird", None).expect("join");
+        let out = mgr
+            .join("NAMES", "s", "  \u{0007}  ", "sunbird", None)
+            .expect("join");
         assert_eq!(out.room.pilots[0].name, "Pilot");
-        let long = mgr.join("NAMES", "s", "ABCDEFGHIJKLMNOPQR", "sunbird", None).expect("join");
+        let long = mgr
+            .join("NAMES", "s", "ABCDEFGHIJKLMNOPQR", "sunbird", None)
+            .expect("join");
         assert!(long.room.pilots[1].name.chars().count() <= MAX_NAME_CHARS);
     }
 }

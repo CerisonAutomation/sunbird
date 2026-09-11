@@ -30,7 +30,8 @@ use axum::{
 use futures_util::{sink::SinkExt, stream::StreamExt};
 use std::{sync::Arc, time::Duration};
 use sunbird_protocol::{
-    ClientMessage, ProtocolError, ServerMessage, ValidationError, MAX_JSON_PAYLOAD_BYTES, PROTOCOL_VERSION,
+    ClientMessage, ProtocolError, ServerMessage, ValidationError, MAX_JSON_PAYLOAD_BYTES,
+    PROTOCOL_VERSION,
 };
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
@@ -110,8 +111,16 @@ async fn serve_socket(socket: WebSocket, rooms: Arc<RoomManager>) {
                     }
                 }
                 Err(err) => {
-                    let fatal = matches!(err, ProtocolError::RoomNotFound | ProtocolError::SeatNotFound);
-                    let _ = out_tx.send(ServerMessage::Error { version: PROTOCOL_VERSION, error: err }).await;
+                    let fatal = matches!(
+                        err,
+                        ProtocolError::RoomNotFound | ProtocolError::SeatNotFound
+                    );
+                    let _ = out_tx
+                        .send(ServerMessage::Error {
+                            version: PROTOCOL_VERSION,
+                            error: err,
+                        })
+                        .await;
                     if fatal {
                         break;
                     }
@@ -142,7 +151,10 @@ async fn serve_socket(socket: WebSocket, rooms: Arc<RoomManager>) {
 }
 
 /// Pipes room broadcast events into this socket's outbound queue.
-fn spawn_forwarder(mut events: broadcast::Receiver<RoomEvent>, out: mpsc::Sender<ServerMessage>) -> JoinHandle<()> {
+fn spawn_forwarder(
+    mut events: broadcast::Receiver<RoomEvent>,
+    out: mpsc::Sender<ServerMessage>,
+) -> JoinHandle<()> {
     tokio::spawn(async move {
         loop {
             match events.recv().await {
@@ -161,12 +173,21 @@ fn spawn_forwarder(mut events: broadcast::Receiver<RoomEvent>, out: mpsc::Sender
 
 fn to_server_message(event: RoomEvent) -> ServerMessage {
     match event {
-        RoomEvent::Roster(room) => ServerMessage::RosterUpdate { version: PROTOCOL_VERSION, room },
-        RoomEvent::Started { room_id, seed, start_unix_ms } => ServerMessage::Started {
+        RoomEvent::Roster(room) => ServerMessage::RosterUpdate {
+            version: PROTOCOL_VERSION,
+            room,
+        },
+        RoomEvent::Started {
+            room_id,
+            seed,
+            start_unix_ms,
+        } => ServerMessage::Started {
             version: PROTOCOL_VERSION,
             room_id,
-            start_at: time::OffsetDateTime::from_unix_timestamp_nanos((start_unix_ms as i128) * 1_000_000)
-                .unwrap_or_else(|_| time::OffsetDateTime::now_utc()),
+            start_at: time::OffsetDateTime::from_unix_timestamp_nanos(
+                (start_unix_ms as i128) * 1_000_000,
+            )
+            .unwrap_or_else(|_| time::OffsetDateTime::now_utc()),
             seed,
         },
     }
@@ -177,49 +198,101 @@ struct Handled {
     events: Option<broadcast::Receiver<RoomEvent>>,
 }
 
-fn handle(rooms: &RoomManager, seat: &mut Option<(Uuid, Uuid)>, msg: ClientMessage) -> Result<Handled, ProtocolError> {
+fn handle(
+    rooms: &RoomManager,
+    seat: &mut Option<(Uuid, Uuid)>,
+    msg: ClientMessage,
+) -> Result<Handled, ProtocolError> {
     match msg {
-        ClientMessage::Join { room_code, seed, name, skin, .. } => {
+        ClientMessage::Join {
+            room_code,
+            seed,
+            name,
+            skin,
+            ..
+        } => {
             if seat.is_some() {
-                return Err(ProtocolError::Rejected { message: "already seated".into() });
+                return Err(ProtocolError::Rejected {
+                    message: "already seated".into(),
+                });
             }
-            let JoinOutcome { grant, room, events } = rooms.join(&room_code, &seed, &name, &skin, None)?;
+            let JoinOutcome {
+                grant,
+                room,
+                events,
+            } = rooms.join(&room_code, &seed, &name, &skin, None)?;
             *seat = Some((grant.room_id, grant.seat_id));
             Ok(Handled {
-                replies: vec![ServerMessage::Welcome { version: PROTOCOL_VERSION, grant, room }],
+                replies: vec![ServerMessage::Welcome {
+                    version: PROTOCOL_VERSION,
+                    grant,
+                    room,
+                }],
                 events: Some(events),
             })
         }
-        ClientMessage::Leave { room_id, seat_id, .. } => {
+        ClientMessage::Leave {
+            room_id, seat_id, ..
+        } => {
             require_seat(seat, room_id, seat_id)?;
             rooms.leave(room_id, seat_id)?;
             *seat = None;
-            Ok(Handled { replies: vec![], events: None })
+            Ok(Handled {
+                replies: vec![],
+                events: None,
+            })
         }
-        ClientMessage::Ready { room_id, seat_id, ready, .. } => {
+        ClientMessage::Ready {
+            room_id,
+            seat_id,
+            ready,
+            ..
+        } => {
             require_seat(seat, room_id, seat_id)?;
             rooms.set_ready(room_id, seat_id, ready)?;
-            Ok(Handled { replies: vec![], events: None })
+            Ok(Handled {
+                replies: vec![],
+                events: None,
+            })
         }
-        ClientMessage::Heartbeat { room_id, seat_id, .. } => {
+        ClientMessage::Heartbeat {
+            room_id, seat_id, ..
+        } => {
             require_seat(seat, room_id, seat_id)?;
             rooms.heartbeat(room_id, seat_id)?;
-            Ok(Handled { replies: vec![], events: None })
+            Ok(Handled {
+                replies: vec![],
+                events: None,
+            })
         }
-        ClientMessage::Reconnect { room_id, seat_id, .. } => {
+        ClientMessage::Reconnect {
+            room_id, seat_id, ..
+        } => {
             // Token verification happens at the HTTP issuer; here we only
             // reattach a live seat that this process still tracks.
-            let JoinOutcome { grant, room, events } = rooms.reconnect(room_id, seat_id)?;
+            let JoinOutcome {
+                grant,
+                room,
+                events,
+            } = rooms.reconnect(room_id, seat_id)?;
             *seat = Some((grant.room_id, grant.seat_id));
             Ok(Handled {
-                replies: vec![ServerMessage::Welcome { version: PROTOCOL_VERSION, grant, room }],
+                replies: vec![ServerMessage::Welcome {
+                    version: PROTOCOL_VERSION,
+                    grant,
+                    room,
+                }],
                 events: Some(events),
             })
         }
     }
 }
 
-fn require_seat(seat: &Option<(Uuid, Uuid)>, room_id: Uuid, seat_id: Uuid) -> Result<(), ProtocolError> {
+fn require_seat(
+    seat: &Option<(Uuid, Uuid)>,
+    room_id: Uuid,
+    seat_id: Uuid,
+) -> Result<(), ProtocolError> {
     match seat {
         Some((r, s)) if *r == room_id && *s == seat_id => Ok(()),
         _ => Err(ProtocolError::SeatNotFound),
@@ -228,11 +301,15 @@ fn require_seat(seat: &Option<(Uuid, Uuid)>, room_id: Uuid, seat_id: Uuid) -> Re
 
 fn to_protocol_error(err: ValidationError) -> ProtocolError {
     match err {
-        ValidationError::PayloadTooLarge => ProtocolError::PayloadTooLarge { max_bytes: MAX_JSON_PAYLOAD_BYTES },
+        ValidationError::PayloadTooLarge => ProtocolError::PayloadTooLarge {
+            max_bytes: MAX_JSON_PAYLOAD_BYTES,
+        },
         ValidationError::UnsupportedVersion(v) => ProtocolError::UnsupportedVersion {
             version: v,
             min_supported: sunbird_protocol::PROTOCOL_MIN_VERSION,
         },
-        other => ProtocolError::InvalidMessage { reason: other.to_string() },
+        other => ProtocolError::InvalidMessage {
+            reason: other.to_string(),
+        },
     }
 }
