@@ -13,11 +13,15 @@ until proven otherwise. This file exists so the commit log can't overclaim.
   challenges; weekly events with physics modifiers
 - Local squads/duels/leaderboards (see next section for the caveat)
 
-## 🟡 Written, tested, NOT deployed (single `wrangler deploy` away)
-- `backend/` — Cloudflare Workers + Durable Objects rooms, leaderboards, WS
+## 🟡 Written, tested, NOT deployed to production (single `wrangler deploy` away)
+- `backend/` — Cloudflare Workers + Durable Objects rooms, leaderboards, WS.
+  **WIRED END-TO-END in dev**: `.env.example` + the vite `/mp` proxy connect
+  the client to `wrangler dev` rooms; two real sockets joining the same DO
+  room and exchanging 15 Hz state is verified by test (`npm run test:mp`).
+  Production needs only the deploy + `VITE_MULTIPLAYER_URL=wss://…`.
 - `server/social/` — PGlite social layer (friends, squads, feed)
-- Until one of these is deployed, all "multiplayer" is client-side simulation
-  with human-sounding bot names. We say so here so nobody else has to.
+- Without a configured URL the game still falls back to local squadron
+  pilots with human-sounding names — the lobby badge says which one you got.
 
 ## 🔴 Aspirational (do not claim in commit messages)
 - `rust/` — protocol crate + server skeleton. Compiles in CI only. There is no

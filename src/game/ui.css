@@ -3353,3 +3353,26 @@ button {
 
 /* The menu paints its own sky — drop the generic overlay wash so it reads. */
 .overlay.menu { background: none; }
+
+/* crafted SVG mode icons + hero bird */
+.mode-icon-lg .mi { width: 40px; height: 40px; display: block; margin: 0 auto; filter: drop-shadow(0 2px 3px rgba(60, 30, 20, 0.18)); }
+.mode-card-main:active .mi { transform: scale(0.92); }
+.hero-bird {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 84px;
+  height: 84px;
+  margin-left: -42px;
+  border-radius: 22px;
+  box-shadow: 0 6px 18px rgba(120, 60, 20, 0.35), 0 0 0 3px rgba(255, 255, 255, 0.55);
+  animation: heroBob 3.4s ease-in-out infinite;
+  z-index: 2;
+}
+@keyframes heroBob {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-7px) rotate(2deg); }
+}
+.hero { padding-top: 64px; }
+.hero-sun { opacity: 0.55; }
+@media (prefers-reduced-motion: reduce) { .hero-bird { animation: none; } }

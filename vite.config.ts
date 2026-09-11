@@ -14,6 +14,16 @@ export default defineConfig({
   server: {
     host: true,
     allowedHosts: true,
+    // Real multiplayer: the browser talks to the SAME origin (/mp) and vite
+    // tunnels it to the Workers room server. No hardcoded hosts anywhere.
+    proxy: {
+      "/mp": {
+        target: "http://localhost:8787",
+        ws: true,
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/mp/, ""),
+      },
+    },
   },
   resolve: {
     alias: {

@@ -162,7 +162,10 @@ export class RealtimeClient implements NetTransport {
   }
 
   private open(): void {
-    const url = new URL(URL_BASE);
+    // URL_BASE may be absolute (wss://host) or relative (/mp behind the dev
+    // proxy / same-origin edge). Resolve against the page and force ws(s).
+    const url = new URL(URL_BASE, typeof location !== "undefined" ? location.href : "http://localhost/");
+    url.protocol = url.protocol === "https:" ? "wss:" : url.protocol === "http:" ? "ws:" : url.protocol;
     url.searchParams.set("device", this.deviceId);
     url.searchParams.set("name", this.name);
     url.searchParams.set("skin", this.skin);
