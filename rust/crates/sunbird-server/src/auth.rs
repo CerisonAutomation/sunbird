@@ -127,8 +127,10 @@ mod tests {
 
     #[test]
     fn issue_and_verify() {
-        let issuer =
-            SeatTokenIssuer::new(b"01234567890123456789012345678901", Duration::from_secs(300));
+        let issuer = SeatTokenIssuer::new(
+            b"01234567890123456789012345678901",
+            Duration::from_secs(300),
+        );
         let player = Uuid::new_v4();
         let room = Uuid::new_v4();
         let seat = Uuid::new_v4();
@@ -142,8 +144,10 @@ mod tests {
 
     #[test]
     fn tampered_token_rejected() {
-        let issuer =
-            SeatTokenIssuer::new(b"01234567890123456789012345678901", Duration::from_secs(300));
+        let issuer = SeatTokenIssuer::new(
+            b"01234567890123456789012345678901",
+            Duration::from_secs(300),
+        );
         let token = issuer
             .issue(Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4(), 1)
             .expect("issue");
@@ -154,8 +158,10 @@ mod tests {
 
     #[test]
     fn wrong_prefix_rejected() {
-        let issuer =
-            SeatTokenIssuer::new(b"01234567890123456789012345678901", Duration::from_secs(300));
+        let issuer = SeatTokenIssuer::new(
+            b"01234567890123456789012345678901",
+            Duration::from_secs(300),
+        );
         assert!(issuer.verify("sb0.x.y").is_err());
     }
 }
