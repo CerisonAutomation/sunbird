@@ -3899,3 +3899,12 @@ button:focus-visible, .toggle:focus-visible {
   box-shadow: 0 3px 0 #a03a20, 0 6px 14px -4px rgba(200, 70, 40, 0.5);
   transform: rotate(-4deg);
 }
+
+/* ---------- pvp truthfulness: live vs ghost vs practice ---------- */
+.vs-foe.live {
+  border-color: rgba(94, 183, 234, 0.65);
+  box-shadow: var(--elev-1), 0 0 12px -3px rgba(94, 183, 234, 0.55);
+}
+.vs-foe.live .vs-sub { color: #2d7aa8; font-weight: 700; }
+.rb.ghost { outline: 1.5px dashed rgba(255, 255, 255, 0.75); outline-offset: 1px; }
+.rb.remote { box-shadow: 0 0 8px 2px rgba(94, 183, 234, 0.8); }

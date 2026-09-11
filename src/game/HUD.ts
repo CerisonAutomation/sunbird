@@ -661,9 +661,9 @@ export class HUD {
             `<div class="roster-track" role="img" aria-label="Live race positions">${s.roster
               .map(
                 (r) =>
-                  `<span class="rb ${r.you ? "you" : ""} ${r.remote ? "remote" : ""} ${r.finished ? "done" : ""}" ` +
+                  `<span class="rb ${r.you ? "you" : ""} ${r.remote ? "remote" : ""} ${r.ghost ? "ghost" : ""} ${r.finished ? "done" : ""}" ` +
                   `style="left:${(r.progress * 100).toFixed(1)}%;--h:${Math.round(r.hue * 360)}" ` +
-                  `title="#${r.place} ${escapeHtml(r.name)}${r.remote ? " · live" : ""}">${r.emote ? `<b class="rb-emote">${escapeHtml(r.emote)}</b>` : ""}</span>`,
+                  `title="#${r.place} ${escapeHtml(r.name)}${r.remote ? " · live player" : r.ghost ? " · player ghost" : ""}">${r.emote ? `<b class="rb-emote">${escapeHtml(r.emote)}</b>` : ""}</span>`,
               )
               .join("")}</div>`;
         }
@@ -1067,7 +1067,7 @@ function renderLive(s: HudSnapshot): string {
     <div class="vs-stage" aria-label="You versus the featured rivals">
       <div class="vs-you"><span class="vs-swatch" style="--body:#ff7a45;--wing:#ff9a62;--belly:#ffe6c4"><i class="w"></i><i class="b"></i><i class="e"></i></span><b>YOU</b><span class="vs-sub">${s.rival.divisionIcon} ${s.rival.division} · ${s.rival.rating}</span></div>
       <div class="vs-mark">VS</div>
-      <div class="vs-foes">${featured.map((r) => `<div class="vs-foe"><span class="vs-swatch" style="--body:#8a9bb0;--wing:#a8b8c8;--belly:#e8eef4"><i class="w"></i><i class="b"></i><i class="e"></i></span><b>${escapeHtml(r.name)}</b><span class="vs-sub">${escapeHtml(r.tag)}</span></div>`).join("")}</div>
+      <div class="vs-foes">${featured.map((r) => `<div class="vs-foe ${r.tag.includes("live") ? "live" : ""}"><span class="vs-swatch" style="${r.tag.includes("live") ? "--body:#5eb7ea;--wing:#83cbf2;--belly:#eaf6ff" : "--body:#8a9bb0;--wing:#a8b8c8;--belly:#e8eef4"}"><i class="w"></i><i class="b"></i><i class="e"></i></span><b>${escapeHtml(r.name)}</b><span class="vs-sub">${escapeHtml(r.tag)}</span></div>`).join("")}</div>
     </div>
 
     <div class="lobby-rules">

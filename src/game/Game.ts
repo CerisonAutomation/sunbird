@@ -422,7 +422,8 @@ export class Game {
 
     this.goals.reset(this.today);
     this.terrain.setDifficulty(this.flow.difficulty());
-    ensureStripeJs();
+    // Stripe.js is only fetched when the paywall actually opens — no third-
+    // party network chatter (or console noise) during normal play.
     this.handleStripeReturn();
     // monthly VIP really lapses — surface it once per session
     this.vipActive = this.save.isVipActive();
@@ -1476,6 +1477,16 @@ export class Game {
       } else {
         this.massRace.setFieldSkill(this.roomSkill === "ace" ? 1.25 : this.roomSkill === "chill" ? 0.7 : 1);
       }
+      // Time-shifted multiplayer: seat doppelgängers of real players from the
+      // global board over local slots (name + skill from their best run).
+      if (!this.duelActive) {
+        const page = this.board.peek("global", "distance");
+        const rows = (page?.entries ?? [])
+          .filter((en) => !en.you && en.name)
+          .slice(0, 8)
+          .map((en) => ({ name: en.name, distance: en.distance }));
+        if (rows.length) this.massRace.applyGhosts(rows, this.mode.finish);
+      }
       this.raceField = fieldSize + 1;
       this.racePlace = 0;
       this.raceFinishTime = 0;
@@ -1961,6 +1972,7 @@ export class Game {
         this.setScreen("shop");
         break;
       case "open-paywall":
+        ensureStripeJs();
         if (this.portalEnabled()) {
           this.hud.toast("This portal edition uses only portal rewards", "info");
           break;
@@ -2258,6 +2270,9 @@ export class Game {
         break;
       case "open-live":
         this.setScreen("live");
+        // Seat into the public room immediately so the lobby shows real
+        // pilots before you commit — PvP should feel alive from the lobby.
+        this.preseatLobby();
         break;
       case "back":
         this.checkoutOk = false;
@@ -2886,6 +2901,21 @@ export class Game {
 
   /* ------------------------------------------------------- live multiplayer */
 
+  /** Pre-seats the lobby so the Race screen shows live pilots immediately. */
+  private preseatLobby(): void {
+    if (!isMultiplayerConfigured()) return;
+    // Warm the ghost source too so the next grid can seat real names.
+    void this.refreshBoard();
+    // Join with the massrace seed WITHOUT mutating the current mode — the
+    // player may still back out and start a plain 1P flight.
+    if (!this.net) {
+      this.net = new RealtimeClient(this.save.state.deviceId, this.pilotName, this.skin.id, 0.06);
+      this.massRace.attachTransport(this.net);
+    }
+    this.net.setIdentity(this.pilotName, this.skin.id, 0.06);
+    this.net.connect(this.roomCode, `${this.seed}:massrace`);
+  }
+
   /** Opens (or reuses) a realtime seat for the current race seed. */
   private connectRace(): void {
     if (!isMultiplayerConfigured()) return;
@@ -3410,7 +3440,21 @@ export class Game {
       photoFinish: this.photoFinish,
       rival: this.rivalCard(),
       loadout: this.loadoutView(),
-      lobbyRivals: featuredRivals(`${this.seed}:massrace`),
+      lobbyRivals: (() => {
+        // Real pilots seated in the room always outrank seeded flavor text.
+        const live = (this.net?.roster() ?? [])
+          .slice(0, 3)
+          .map((p) => ({ name: p.name, tag: "in room · live" }));
+        if (live.length) return live;
+        // Next best: time-shifted doubles of real leaderboard players.
+        const page = this.board.peek("global", "distance");
+        const ghosts = (page?.entries ?? [])
+          .filter((en) => !en.you && en.name)
+          .slice(0, 3)
+          .map((en) => ({ name: en.name, tag: `best ${Math.round(en.distance).toLocaleString()} m` }));
+        if (ghosts.length) return ghosts;
+        return featuredRivals(`${this.seed}:massrace`);
+      })(),
       raceRated: this.rankedRace,
       ratingDelta: this.lastRatingDelta,
       ratingBonus: this.lastRatingBonus,

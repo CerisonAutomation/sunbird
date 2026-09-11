@@ -51,6 +51,9 @@ export type Rival = {
   finished: boolean;
   finishTime: number;
   alive: boolean;
+  /** True when this pilot is a time-shifted double of a real player (name +
+   *  skill taken from a live leaderboard row — the Real Racing 3 pattern). */
+  ghost: boolean;
 };
 
 export type Standing = {
@@ -73,6 +76,8 @@ export type RosterBird = {
   place: number;
   you: boolean;
   remote: boolean;
+  /** Time-shifted double of a real player (leaderboard ghost). */
+  ghost: boolean;
   finished: boolean;
   emote: string;
 };
@@ -183,6 +188,7 @@ export class MassRace {
         finished: false,
         finishTime: 0,
         alive: true,
+        ghost: false,
       });
     }
     this.group.visible = n > 0;
@@ -220,6 +226,35 @@ export class MassRace {
       r.finished = false;
       r.finishTime = 0;
     }
+  }
+
+  /**
+   * Time-shifted multiplayer (the Real Racing 3 pattern): overlay real players
+   * from the leaderboard onto local slots. Each ghost keeps the real pilot's
+   * name and gets a skill derived from their submitted best distance, so a
+   * player who flew 3,000 m produces a genuinely hard double while a 600 m
+   * newbie sits at the back. Returns how many ghosts were seated.
+   */
+  applyGhosts(rows: { name: string; distance: number }[], gate: number): number {
+    const span = gate > 0 ? gate : 3000;
+    const locals = this.rivals.filter((r) => r.kind === "local");
+    let seated = 0;
+    for (const row of rows) {
+      const slot = locals[seated];
+      if (!slot) break;
+      const name = row.name.trim().slice(0, 14);
+      if (!name) continue;
+      const skill = clamp(0.3 + 0.6 * (row.distance / span), 0.3, 1);
+      slot.name = name;
+      slot.ghost = true;
+      slot.skill = skill;
+      // Better pilots read the crest closer to the optimum; alternate the
+      // error sign so ghosts spread instead of stacking on one line.
+      slot.lead = clamp(OPTIMAL_LEAD + (1 - skill) * 40 * (seated % 2 === 0 ? 1 : -1), 18, 132);
+      slot.wobbleAmp = (1 - skill) * 16 + 3;
+      seated++;
+    }
+    return seated;
   }
 
   /** Room admin: scale whole-field skill (0.5 chill … 1.4 ace). */
@@ -273,10 +308,13 @@ export class MassRace {
       if (!rival) {
         // Promote a local slot so the field size stays constant when a real
         // player joins mid-race.
-        rival = this.rivals.find((r) => r.kind === "local");
+        rival =
+          this.rivals.find((r) => r.kind === "local" && !r.ghost) ??
+          this.rivals.find((r) => r.kind === "local");
         if (!rival) continue;
         rival.id = snap.id;
         rival.kind = "remote";
+        rival.ghost = false;
       }
       rival.name = snap.name.slice(0, 14);
       rival.bird.x = snap.x;
@@ -326,6 +364,7 @@ export class MassRace {
       place: 0,
       you: false,
       remote: r.kind === "remote",
+      ghost: r.ghost && r.kind !== "remote",
       finished: r.finished,
       emote: this.emoteFor(r.id),
     }));
@@ -337,6 +376,7 @@ export class MassRace {
       place: 0,
       you: true,
       remote: false,
+      ghost: false,
       finished: false,
       emote: this.emoteFor("you"),
     });

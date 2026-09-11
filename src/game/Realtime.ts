@@ -155,6 +155,14 @@ export class RealtimeClient implements NetTransport {
       this.errorText = "No multiplayer server configured";
       return;
     }
+    // Idempotent: opening the lobby pre-seats us in a room; starting the race
+    // must reuse that live socket, not tear it down and rejoin (which looked
+    // like "PvP never has anyone in it" — we kept leaving the room we'd
+    // just matched into).
+    const sameRoom = this.roomCode === code.toUpperCase() && this.seed === seed;
+    if (sameRoom && this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
     this.disconnect();
     this.closedByUs = false;
     this.roomCode = code.toUpperCase();

@@ -15,7 +15,9 @@ let stripeReady: Promise<unknown> | null = null;
 /** Loads Stripe.js once (used for key validation / future Embedded Checkout upgrades). */
 export function ensureStripeJs(): Promise<unknown> | null {
   if (!STRIPE_PUBLISHABLE_KEY) return null;
-  if (!stripeReady) stripeReady = loadStripe(STRIPE_PUBLISHABLE_KEY);
+  // Swallow network failures: portals/sandboxes block js.stripe.com and an
+  // unhandled rejection here used to spray console errors at boot.
+  if (!stripeReady) stripeReady = loadStripe(STRIPE_PUBLISHABLE_KEY).catch(() => null);
   return stripeReady;
 }
 
