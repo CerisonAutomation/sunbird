@@ -4,7 +4,7 @@ import { GameAudio } from "./Audio";
 import { BIOMES, biomeForIsland } from "./Biomes";
 import { Bird, type BirdStepOpts } from "./Bird";
 import { CameraRig } from "./CameraRig";
-import { Collectibles, type CloudKind, type PickupKind } from "./Collectibles";
+import { PICKUP_STYLE, Collectibles, type CloudKind, type PickupKind } from "./Collectibles";
 import { evaluateNearMiss, FlowTuner, SessionGoals, type NearMiss } from "./Engagement";
 import { BIG_LAUNCH_QUIPS, SLEEP_QUIPS, SPLASH_QUIPS, SurpriseEngine, quip } from "./Surprises";
 import { LaunchSystem, ratingLabel, type LaunchResult } from "./LaunchSystem";
@@ -64,6 +64,7 @@ import {
 } from "./constants";
 import { BOOSTS, COLLECTIONS, GOLD, PROMO_CODES, SHOP_TRAILS, SKINS, STARTER_PACK, VIP, dailyDealBoost, skinById, type BoostView, type ShopTrailView, type SkinDef, type SkinView } from "./Economy";
 import { GhostPlayer, GhostRecorder } from "./Ghost";
+import { fetchRivalGhost, publishGhost } from "./GhostNet";
 import { HUD, type CalendarCard, type CheckoutMode, type DailyCard, type GauntletCard, type HudSnapshot, type LoadoutView, type RivalCard, type SeedMode, type UiScreen, type UiState } from "./HUD";
 import { divisionFor, duelOpponent, duelSkillFor, featuredRivals, nextDivision, seasonReward } from "./pvp";
 import { Input } from "./Input";
@@ -123,6 +124,12 @@ export class Game {
   private readonly telemetry = new Telemetry();
   private readonly ghostRecorder = new GhostRecorder();
   private readonly ghostPlayer = new GhostPlayer();
+  /** Network rival ghost (async PvP on the daily seed) — amber silhouette. */
+  private readonly rivalGhostPlayer = new GhostPlayer();
+  private rivalGhostName = "";
+  private rivalGhostPassed = false;
+  /** Run counter — guards async ghost loads against arriving mid-next-run. */
+  private runEpoch = 0;
   private readonly livingBg = new LivingBackground();
   private terrain: TerrainSystem;
   private collect: Collectibles;
@@ -243,6 +250,10 @@ export class Game {
   private stormfront = false;
   /** Stormfront phase (1-3): the storm escalates as the field advances. */
   private stormPhase = 1;
+  /** First thermal of the run gets a toast; the HUD chip covers the rest. */
+  private thermalToasted = false;
+  /** Weekly-event physics mods, cached at run start (hot path: every frame + every coin). */
+  private weeklyMods = { coinMult: 1, gravityMult: 1, windMult: 1, daylightMult: 1 };
   /** Golden Hour: the last stretch of daylight — 2× coins, amber world. */
   private goldenHour = false;
   private nextMilestone = 500;
@@ -380,6 +391,8 @@ export class Game {
     this.bird = new Bird();
     this.bird.addTo(this.scene);
     this.ghostPlayer.addTo(this.scene);
+    this.rivalGhostPlayer.addTo(this.scene);
+    this.rivalGhostPlayer.setTint(0xffc86a, 0xffe8b0);
     this.scene.add(this.livingBg);
 
     this.camera = new CameraRig(1);
@@ -507,6 +520,8 @@ export class Game {
     window.removeEventListener("beforeinstallprompt", this.onBeforeInstall);
     window.removeEventListener("appinstalled", this.onInstalled);
     window.removeEventListener("focus", this.onFocus);
+    this.telemetry.flush();
+    this.telemetry.dispose();
     this.weather.dispose();
     this.net?.disconnect();
     this.massRace.dispose();
@@ -679,7 +694,7 @@ export class Game {
         // Slipstream: tucking behind a rival genuinely reduces your drag.
         dragMult: this.powers.dragMult() * this.massRace.draftFor(this.bird.x, this.bird.y),
         feather: this.powers.featherOn(),
-        gravityMult: this.eventRun ? weeklyEvent().mods.gravityMult : 1,
+        gravityMult: this.eventRun ? this.weeklyMods.gravityMult : 1,
       },
       this.terrain,
     );
@@ -706,6 +721,15 @@ export class Game {
     if (this.bird.justLanded) this.onLanding();
 
     this.ghostRecorder.sample(dt, this.runTime, this.bird.x, this.bird.y, this.bird.rotation);
+    if (this.rivalGhostPlayer.active) {
+      const rx = this.rivalGhostPlayer.update(this.runTime, dt);
+      if (rx !== null && !this.rivalGhostPassed && this.bird.x > rx + 0.5 && this.runTime > 4) {
+        this.rivalGhostPassed = true;
+        this.hud.toast(`👻 Passed ${this.rivalGhostName}'s flight!`, "gold");
+        this.audio.ding();
+        this.bonus += 60;
+      }
+    }
     if (this.ghostPlayer.active) {
       const gx = this.ghostPlayer.update(this.runTime, dt);
       if (gx !== null) {
@@ -728,7 +752,12 @@ export class Game {
     this.weather.update(dt, this.elapsed, this.bird, this.terrain, diving, {
       onThermalEnter: () => {
         this.audio.thermal();
-        if (this.hintTimer < 40) this.hud.toast("Thermal — release to ride it", "power");
+        // Once per run: after the first call-out the ♨ HUD chip carries the
+        // message — toasting every thermal doubled the same text on screen.
+        if (!this.thermalToasted && this.hintTimer < 40) {
+          this.thermalToasted = true;
+          this.hud.toast("Thermal — release to ride it", "power");
+        }
       },
       onGustStart: () => {
         this.audio.gust();
@@ -941,7 +970,7 @@ export class Game {
     }
 
     const magnetOn = this.feverOn || this.magnetTimer > 0 || skin.magnetAlways || this.powers.magnetOn();
-    this.collect.update(dt, this.bird, this.terrain, magnetOn, this.elapsed, {
+    this.collect.update(dt, this.bird, this.terrain, magnetOn, this.elapsed, this.powers.magnetScale(), {
       onCoin: (x, y, gem) => {
         const base = gem ? 5 : 1;
         const value = Math.round(
@@ -951,7 +980,7 @@ export class Game {
             (this.mode.id === "coinrush" ? 2 : 1) *
             this.challengeMods.coinMult *
             this.masteryPerk.coinMult *
-            (this.eventRun ? weeklyEvent().mods.coinMult : 1) *
+            (this.eventRun ? this.weeklyMods.coinMult : 1) *
             (this.goldenHour ? 2 : 1) *
             (this.stormfront && this.stormPhase >= 3 ? 2 : 1),
         );
@@ -1316,7 +1345,22 @@ export class Game {
     this.audio.powerup();
     this.particles.emitCollect(x, y);
     this.haptic([40, 30, 40, 30, 100]);
+    const wasLive = this.powers.has(kind);
     this.powers.add(kind);
+    // OVERCHARGE: doubling up while live promotes the power-up to tier II.
+    if (wasLive && this.powers.level(kind) === 2) {
+      // Impulse-style effects still fire — the promotion adds, never removes.
+      if (kind === "rocket") {
+        this.boostTimer = BOOST_TIME;
+        this.bird.vx += 42;
+        this.bird.vy += 8;
+        this.shake(0.55);
+      }
+      this.particles.burstRing(x, y, 0xffffff);
+      this.hud.toast(`⚡ OVERCHARGE II — ${PICKUP_STYLE[kind].label}`, "zenith");
+      this.shake(0.3);
+      return;
+    }
     switch (kind) {
       case "sun":
         this.daylight = Math.min(this.daylightMax(), this.daylight + PICKUP_SUN_TIME);
@@ -1387,7 +1431,9 @@ export class Game {
     const slope = this.terrain.slopeAt(this.bird.x);
     if (this.hintTimer < 2.6 && slope < -0.08) return "HOLD to dive";
     if (slope > 0.16 && this.bird.grounded && this.bird.speed() > 18) return "RELEASE to launch";
-    if (this.weather.inThermal && !this.input.diving) return "Riding the thermal!";
+    // No thermal line here: the ♨ HUD chip already says "release!" — three
+    // simultaneous thermal texts (toast + chip + hint) was the worst offender
+    // of the multiple-text bug.
     if (this.terrain.isOcean(this.bird.x + 40) && !this.terrain.isOcean(this.bird.x)) return "Build speed — then RELEASE";
     return "";
   }
@@ -1533,11 +1579,13 @@ export class Game {
     this.challengeRun = opts?.challenge ?? "";
     this.challengeMods = this.challengeRun === "daily" ? modsFor(dailyChallenge(this.today).modifier.id) : NO_MODS;
     this.eventRun = Boolean(opts?.event);
+    if (this.eventRun) this.weeklyMods = weeklyEvent().mods;
     this.serverPlaceApplied = false;
     this.goldenHour = false;
     this.nextMilestone = 500;
     this.rivalBeatenToast = false;
     this.stormPhase = 1;
+    this.thermalToasted = false;
     // Stormfront survives only through launchMatch(); any other entry resets.
     if (!opts?.storm) this.stormfront = false;
     this.challengeOutcome = "";
@@ -1554,8 +1602,8 @@ export class Game {
     this.daylight =
       (this.mode.clock > 0 ? this.mode.clock : this.daylightMax()) *
       this.challengeMods.daylightMult *
-      (this.eventRun ? weeklyEvent().mods.daylightMult : 1);
-    this.weather.windMult = (this.eventRun ? weeklyEvent().mods.windMult : 1) * (this.stormfront ? 1.7 : 1);
+      (this.eventRun ? this.weeklyMods.daylightMult : 1);
+    this.weather.windMult = (this.eventRun ? this.weeklyMods.windMult : 1) * (this.stormfront ? 1.7 : 1);
     this.weather.stormfront = this.stormfront;
     if (this.stormfront) this.hud.toast("⛈ STORMFRONT — same storm for every pilot. Survive and outfly.", "warn");
     // Mass Race: build the 40-bird grid on the *same* seed so the field is
@@ -1742,6 +1790,17 @@ export class Game {
     this.flow.noteRun(stats.distance, this.perfects, this.launch.goods + this.launch.greats + this.launch.perfects, this.save);
     this.terrain.setDifficulty(this.flow.difficulty());
 
+    // Publish this flight to the ghost network (daily seed only, best-per-
+    // pilot kept server-side; silent no-op without a backend).
+    if (this.seedMode === "today" && !this.versus && stats.distance > 100) {
+      void publishGhost({
+        seed: this.seed,
+        deviceId: this.save.state.deviceId,
+        name: this.racedName(),
+        distance: stats.distance,
+        samples: this.ghostRecorder.snapshot(),
+      });
+    }
     const beatGhost = this.ghostRecorder.commit(this.seed, stats.distance);
     if (beatGhost) {
       this.hud.toast("New personal ghost recorded", "gold");
@@ -2021,7 +2080,24 @@ export class Game {
     this.lastBiomeId = idle ? "" : this.terrain.biomeAt(this.startX).id;
     this.ghostRecorder.reset();
     this.ghostPlayer.reset();
-    if (!idle) this.ghostPlayer.load(this.seed);
+    this.rivalGhostPlayer.reset();
+    this.rivalGhostPlayer.loadRecord(null);
+    this.rivalGhostPassed = false;
+    this.runEpoch += 1;
+    if (!idle) {
+      this.ghostPlayer.load(this.seed);
+      // Async PvP: chase a REAL player's flight on today's hills. Arrives
+      // quietly a moment into the run; a dead backend costs nothing.
+      if (this.seedMode === "today" && !this.versus && !this.massRace.active) {
+        const epoch = this.runEpoch;
+        void fetchRivalGhost(this.seed, this.save.state.deviceId, this.save.state.bestDistance).then((rg) => {
+          if (!rg || this.disposed || epoch !== this.runEpoch || this.state !== "playing") return;
+          this.rivalGhostName = rg.name;
+          this.rivalGhostPlayer.loadRecord({ seed: this.seed, distance: rg.distance, samples: rg.samples });
+          this.hud.toast(`👻 ${rg.name} flew ${Math.round(rg.distance)} m here — chase them`, "quest");
+        });
+      }
+    }
     this.launch.reset();
     this.powers.reset();
     this.runGems = 0;

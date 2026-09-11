@@ -37,9 +37,20 @@ until proven otherwise. This file exists so the commit log can't overclaim.
 - `rust/` — protocol crate + server skeleton. Compiles in CI only. There is no
   running Rust backend, no anti-cheat, no matchmaking. Phase 2 at best.
 
-## Next (in order)
-1. Deploy `backend/` to Cloudflare free tier; swap daily leaderboard to it
-2. Real-player ghost replays on the daily seed (async PvP)
-3. First-run dive tutorial (30 s, once)
-4. Coin sinks: consumable modifiers, skin upcycling
-5. Port `main`'s 25-trail catalogue behind the trail palette test
+## ✅ Formerly "Next" — all shipped in-repo
+1. ~~Deploy `backend/`~~ — code + wiring complete and smoke-tested against
+   `wrangler dev`; the deploy itself needs a Cloudflare account (external).
+2. ~~Real-player ghost replays on the daily seed (async PvP)~~ — SHIPPED:
+   `GhostNet.ts` publishes your best daily flight (`POST /ghost`, thinned to
+   ≤1500 samples, best-per-pilot-per-seed) and fetches a chaseable rival
+   ghost near your PB (`GET /ghost`, never your own). Amber silhouette,
+   pass-them bonus, silent no-op without a backend.
+3. ~~First-run dive tutorial~~ — shipped earlier as FirstFlight coach.
+4. ~~Coin sinks~~ — shipped: armed boosts, Nest upgrades (×10 tiers),
+   trail shop, skin catalogue, gauntlet retries.
+5. ~~Trail catalogue~~ — 18 trails live in TRAILS with palette-parity test.
+
+## External-only (needs accounts/keys, not code)
+- Cloudflare deploy of `backend/` + `VITE_MULTIPLAYER_URL` / `VITE_LEADERBOARD_URL`
+- Stripe live payment links + webhook entitlement route (design in DEPLOY.md)
+- Portal submissions (zips build ready: poki / crazy / generic)

@@ -147,7 +147,7 @@ export class Racer {
       ev.onSplash(this);
     }
 
-    this.collect.update(dt, this.bird, terrain, this.powers.magnetOn(), this.runTime, {
+    this.collect.update(dt, this.bird, terrain, this.powers.magnetOn(), this.runTime, this.powers.magnetScale(), {
       onCoin: (x, y, gem) => {
         this.stats.coins += (gem ? 5 : 1) * this.powers.coinMult();
         ev.onCoin(gem, x, y, this);

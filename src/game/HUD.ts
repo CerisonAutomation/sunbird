@@ -330,6 +330,7 @@ export class HUD {
   private overEl!: HTMLElement;
   private overCard!: HTMLElement;
   private toastLayer!: HTMLElement;
+  private readonly liveToasts = new Map<string, { el: HTMLElement; count: number; timer: number }>();
   private flashEl!: HTMLElement;
   private comboEl!: HTMLElement;
   private biomeChip!: HTMLElement;
@@ -576,9 +577,16 @@ export class HUD {
       this.feverWrap.classList.toggle("on", s.feverOn);
       this.setStyle(this.feverFill, "feverFill", "width", `${Math.max(0, Math.min(1, s.fever)) * 100}%`);
 
+      // Timed power-ups live ONLY in the power strip (countdown bars) — chips
+      // here double-printed the same power-up (the old bug: pickup magnet fed
+      // both magnetTimer AND PowerUps, so "🧲" showed twice). Chips remain as
+      // a fallback for armed-boost timers the strip doesn't know about, plus
+      // shield stock and weather calls to action.
       const chips: string[] = [];
-      if (s.boostTimer > 0) chips.push(`<span class="pchip boost">🚀 boost</span>`);
-      if (s.magnetTimer > 0) chips.push(`<span class="pchip magnet">🧲 ${Math.ceil(s.magnetTimer)}s</span>`);
+      if (s.boostTimer > 0 && !s.powers.some((p) => p.kind === "rocket"))
+        chips.push(`<span class="pchip boost">🚀 boost</span>`);
+      if (s.magnetTimer > 0 && !s.powers.some((p) => p.kind === "magnet"))
+        chips.push(`<span class="pchip magnet">🧲 ${Math.ceil(s.magnetTimer)}s</span>`);
       if (s.shield > 0) chips.push(`<span class="pchip shield">🛡 ×${s.shield}</span>`);
       if (s.gust > 0.3) chips.push(`<span class="pchip gust">🌬 headwind — dive!</span>`);
       if (s.inThermal) chips.push(`<span class="pchip thermal">♨ thermal — release!</span>`);
@@ -615,13 +623,13 @@ export class HUD {
         this.launchBanner.className = `launch-banner ${s.launchRating} ${s.launchBannerT > 0 ? "show" : ""}`;
       }
 
-      const pkey = s.powers.map((p) => `${p.kind}${Math.ceil(p.time)}`).join(",");
+      const pkey = s.powers.map((p) => `${p.kind}${p.level}${Math.ceil(p.time)}`).join(",");
       if (pkey !== this.lastPowers) {
         this.lastPowers = pkey;
         this.powerStrip.innerHTML = s.powers
           .map(
             (p) =>
-              `<span class="pu" title="${p.label}"><i>${p.icon}</i><b style="width:${Math.max(0, Math.min(1, p.time / p.total)) * 100}%"></b><u>${Math.ceil(p.time)}</u></span>`,
+              `<span class="pu${p.time < 1.8 ? " expiring" : ""}${p.level === 2 ? " lv2" : ""}" title="${p.label}${p.level === 2 ? " II (overcharged)" : ""}"><i>${p.icon}</i>${p.level === 2 ? `<em class="pu-lv">II</em>` : ""}<b style="width:${Math.max(0, Math.min(1, p.time / p.total)) * 100}%"></b><u>${Math.ceil(p.time)}</u></span>`,
           )
           .join("");
       }
@@ -812,16 +820,48 @@ export class HUD {
   }
 
   toast(text: string, kind = "info"): void {
+    // Dedup: firing the same line while it is still on screen bumps a ×n
+    // counter instead of stacking identical pills (ash storms, repeat
+    // pickups). Never show the same words twice at once.
+    const live = this.liveToasts.get(text);
+    if (live && live.el.isConnected) {
+      live.count += 1;
+      live.el.textContent = `${text} ×${live.count}`;
+      live.el.classList.remove("bump");
+      void live.el.offsetWidth;
+      live.el.classList.add("bump");
+      window.clearTimeout(live.timer);
+      live.timer = this.scheduleToastOut(live.el, text);
+      return;
+    }
+    // Cap the stack — beyond 4 pills the oldest leaves immediately.
+    while (this.toastLayer.children.length >= 4) {
+      const oldest = this.toastLayer.firstElementChild;
+      if (!oldest) break;
+      for (const [k, v] of this.liveToasts) if (v.el === oldest) this.liveToasts.delete(k);
+      oldest.remove();
+    }
     const el = document.createElement("div");
     el.className = `toast ${kind}`;
     el.textContent = text;
     this.toastLayer.appendChild(el);
     requestAnimationFrame(() => el.classList.add("in"));
-    window.setTimeout(() => {
+    const timer = this.scheduleToastOut(el, text);
+    this.liveToasts.set(text, { el, count: 1, timer });
+  }
+
+  /** Long lines earn longer reads: 1.2 s base + 28 ms/char, capped at 4 s. */
+  private scheduleToastOut(el: HTMLElement, key: string): number {
+    const hold = Math.min(4000, 1200 + Math.max(0, el.textContent!.length - 16) * 28);
+    return window.setTimeout(() => {
       el.classList.remove("in");
       el.classList.add("out");
-      window.setTimeout(() => el.remove(), 420);
-    }, 1200);
+      window.setTimeout(() => {
+        el.remove();
+        const live = this.liveToasts.get(key);
+        if (live && live.el === el) this.liveToasts.delete(key);
+      }, 420);
+    }, hold);
   }
 
   flash(kind: "perfect" | "fever" | "island" | "sleep"): void {
@@ -1911,7 +1951,7 @@ function renderSettings(s: HudSnapshot): string {
     <div class="setting-row"><span>Flights flown</span><b>${s.runsPlayed}</b></div>
     ${s.canInstall ? `<button class="soft-btn wide" data-ui data-action="install-app">⬇ Install Sunbird</button>` : ""}
     <button class="ghost-btn danger" data-ui data-action="reset-progress">${s.resetArmed ? "Tap again to erase everything" : "Reset progress"}</button>
-    <p class="fineprint">Sunbird 2.5 Pro · ${s.seedLabel}</p>
+    <p class="fineprint">Sunbird 1.0 · ${s.seedLabel}</p>
   `;
 }
 
