@@ -1,10 +1,10 @@
 /**
  * @deprecated EXPERIMENTAL NODE PROTOTYPE — NOT FOR PRODUCTION.
  *
- * Await the Rust `sunbird-server` workspace for the only supported backend.
- * This file remains only as a local protocol reference until Rust reaches
- * protocol parity; it is not part of the production deployment artifact.
- */
+ * The supported production backend now lives in `backend/` (Cloudflare
+ * Workers + Durable Objects, free plan) — see backend/README.md. This file
+ * remains only as a plain-Node protocol reference; it is not part of the
+ * production deployment artifact.
  *
  *   npm i ws
  *   node server/sunbird-server.mjs

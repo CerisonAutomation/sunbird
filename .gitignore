@@ -35,3 +35,8 @@ rust/target/
 # Graph-it
 .graph-it/
 .vercel
+
+# Cloudflare Workers backend
+backend/node_modules
+backend/.wrangler
+.wrangler/

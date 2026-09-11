@@ -11,6 +11,12 @@ runs in a clearly-labelled offline mode until you point it at a server.
 The UI never presents device-only data as if it were worldwide. That labelling
 is deliberate and should be kept.
 
+> **A production implementation of this entire contract ships in
+> [`backend/`](backend/README.md)** — Cloudflare Workers + Durable Objects,
+> running fully on the free plan (100k req/day, hibernating WebSocket rooms,
+> 5 GB SQLite leaderboard). Deploy with `cd backend && npx wrangler deploy`,
+> then set both env vars to the printed `workers.dev` URL.
+
 ---
 
 ## 1. Leaderboard HTTP contract

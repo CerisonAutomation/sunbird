@@ -1,0 +1,28 @@
+{
+  // Sunbird backend — deploys to the Cloudflare Workers FREE plan.
+  //
+  //   cd backend && npm install && npx wrangler deploy
+  //
+  // Free-plan budget this design respects:
+  //   • 100,000 requests/day (Worker + DO requests + WS messages at 20:1)
+  //   • ~13,000 GB-s/day Durable Object duration (WebSocket Hibernation keeps
+  //     idle rooms unbilled; the broadcast alarm only runs during live races)
+  //   • 5 GB SQLite-in-DO storage for the leaderboard
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sunbird-backend",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "observability": { "enabled": true },
+  "durable_objects": {
+    "bindings": [
+      { "name": "ROOMS", "class_name": "RoomDO" },
+      { "name": "BOARD", "class_name": "LeaderboardDO" }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["RoomDO", "LeaderboardDO"]
+    }
+  ]
+}
