@@ -252,7 +252,6 @@ export class Game {
   private runGems = 0;
   private readonly powers = new PowerUps();
   private coach: FirstFlight | null = null;
-  private coachDoneT = 0;
   private mode: ModeDef = modeById("daytrip");
   private modeId: ModeId = "daytrip";
   /** Permanent per-mode mastery perks (coin/daylight/fever/lift), refreshed each run. */
@@ -664,10 +663,7 @@ export class Game {
         this.save.persist();
         this.hud.toast("🕊 First flight complete · +50 coins — the sky is yours", "gold");
         this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
-        this.coachDoneT = 3;
       }
-    } else if (this.coachDoneT > 0) {
-      this.coachDoneT -= dt;
     }
     if (this.bird.justLanded) this.onLanding();
 
@@ -1451,8 +1447,12 @@ export class Game {
     this.challengeOutcome = "";
     this.resetRun(false);
     // First ever flight: spin up the interactive dive/launch/soar coach.
+    // Non-qualifying launches (duels, events, other modes) clear any live
+    // coach so tutorial text can never bleed into them.
     if (!this.save.state.firstFlightDone && this.modeId === "daytrip" && !this.duelActive && !this.challengeRun && !this.eventRun) {
       this.coach = new FirstFlight(false);
+    } else {
+      this.coach = null;
     }
     // Modes reshape the clock; Race has no sunset at all.
     this.daylight =
