@@ -65,7 +65,7 @@ import {
 import { BOOSTS, COLLECTIONS, GOLD, PROMO_CODES, SHOP_TRAILS, SKINS, STARTER_PACK, VIP, dailyDealBoost, skinById, type BoostView, type ShopTrailView, type SkinDef, type SkinView } from "./Economy";
 import { GhostPlayer, GhostRecorder } from "./Ghost";
 import { HUD, type CalendarCard, type CheckoutMode, type DailyCard, type GauntletCard, type HudSnapshot, type LoadoutView, type RivalCard, type SeedMode, type UiScreen, type UiState } from "./HUD";
-import { divisionFor, duelOpponent, duelSkillFor, featuredRivals, nextDivision } from "./pvp";
+import { divisionFor, duelOpponent, duelSkillFor, featuredRivals, nextDivision, seasonReward } from "./pvp";
 import { Input } from "./Input";
 import { clamp, dateSeed, formatDatePretty, lerp } from "./math";
 import { Missions, type MissionView, type QuestReward, type QuestView, type RunStats } from "./Missions";
@@ -241,6 +241,8 @@ export class Game {
   private lastMatchOpts: { ranked: boolean; storm: boolean } | null = null;
   /** Stormfront mode: PvE hazards×PvP race hybrid — everyone flies the gauntlet. */
   private stormfront = false;
+  /** Stormfront phase (1-3): the storm escalates as the field advances. */
+  private stormPhase = 1;
   /** Golden Hour: the last stretch of daylight — 2× coins, amber world. */
   private goldenHour = false;
   private nextMilestone = 500;
@@ -328,6 +330,7 @@ export class Game {
     this.achievements = new Achievements(this.save);
     this.seasonPass = new SeasonPass(this.save);
     this.board = new Leaderboard(this.save.state.deviceId);
+    this.telemetry.bindDevice(this.save.state.deviceId);
     this.cups = new Tournaments(this.save.state.tournaments);
     this.pilotName = this.save.state.pilotName || loadPilotName(this.save.state.deviceId);
     this.save.state.pilotName = this.pilotName;
@@ -949,7 +952,8 @@ export class Game {
             this.challengeMods.coinMult *
             this.masteryPerk.coinMult *
             (this.eventRun ? weeklyEvent().mods.coinMult : 1) *
-            (this.goldenHour ? 2 : 1),
+            (this.goldenHour ? 2 : 1) *
+            (this.stormfront && this.stormPhase >= 3 ? 2 : 1),
         );
         this.runCoins += value;
         this.bonus += 4 * COIN_VALUE * value;
@@ -997,6 +1001,24 @@ export class Game {
       this.nextMilestone += 500;
       this.audio.milestone();
       this.particles.emitSparkle(this.bird.x, this.bird.y);
+    }
+    // STORMFRONT ESCALATION — the flagship hook: the storm is a character
+    // with three acts. Same seed, same acts, for every pilot in the field.
+    if (this.stormfront) {
+      if (this.stormPhase === 1 && runDist >= 1000) {
+        this.stormPhase = 2;
+        this.weather.windMult *= 1.25;
+        this.audio.storm();
+        this.shake(0.5);
+        this.hud.toast("⛈ PHASE II — the storm tightens. Wind +25%", "warn");
+      } else if (this.stormPhase === 2 && runDist >= 2200) {
+        this.stormPhase = 3;
+        this.weather.windMult *= 1.25;
+        this.audio.storm();
+        this.shake(0.8);
+        this.camera.punch(2);
+        this.hud.toast("🌀 EYE WALL — survive to the line. Coins ×2 from here", "warn");
+      }
     }
     // The moment you pass a rival's posted mark, gloat immediately — don't
     // make the player wait for the results screen to feel it.
@@ -1515,6 +1537,7 @@ export class Game {
     this.goldenHour = false;
     this.nextMilestone = 500;
     this.rivalBeatenToast = false;
+    this.stormPhase = 1;
     // Stormfront survives only through launchMatch(); any other entry resets.
     if (!opts?.storm) this.stormfront = false;
     this.challengeOutcome = "";
@@ -1696,6 +1719,7 @@ export class Game {
     this.runRecorded = true;
     this.bird.asleep = true;
     const stats = this.runStats();
+    this.telemetry.track("run_end", { mode: this.modeId, distance: Math.round(stats.distance) });
 
     // A duel abandoned short of the line is a loss — no free retries on rating.
     if (this.duelActive && this.duelResult === "") {
@@ -2551,6 +2575,16 @@ export class Game {
         this.save.persist();
         this.applySettings();
         break;
+      case "set-colorassist":
+        this.save.state.settings.colorAssist = !this.save.state.settings.colorAssist;
+        this.save.persist();
+        this.applySettings();
+        break;
+      case "set-bigtext":
+        this.save.state.settings.bigText = !this.save.state.settings.bigText;
+        this.save.persist();
+        this.applySettings();
+        break;
       case "set-quality": {
         const order = ["auto", "high", "low"] as const;
         const cur = this.save.state.settings.quality;
@@ -2983,6 +3017,9 @@ export class Game {
     this.audio.setMusicEnabled(s.music);
     this.audio.setVolumes(s.musicVolume, s.sfxVolume);
     this.camera.setReduceMotion(s.reduceMotion);
+    // Accessibility classes live on <html> so every overlay inherits them.
+    document.documentElement.classList.toggle("a11y-color", s.colorAssist);
+    document.documentElement.classList.toggle("a11y-bigtext", s.bigText);
     this.dpr = this.preferredDpr();
     this.particleBudget = s.quality === "low" ? 0.4 : 1;
     this.particles.setBudget(this.particleBudget);
@@ -3464,6 +3501,23 @@ export class Game {
       nextNeeded: next ? next.needed : 0,
       progress: span > 0 ? Math.max(0, Math.min(1, (r.rating - div.min) / span)) : 1,
       matches: r.matches.map((m) => ({ place: m.place, field: m.field, mode: m.mode, date: m.date, won: m.won })),
+      season: this.seasonCard(),
+    };
+  }
+
+  /** Ranked-season summary: countdown, peak, and the payout it locks in. */
+  private seasonCard(): RivalCard["season"] {
+    const now = new Date();
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const daysLeft = Math.max(1, Math.ceil((end.getTime() - now.getTime()) / 86_400_000));
+    const peak = this.save.state.rankSeason.peak;
+    const reward = seasonReward(peak);
+    return {
+      daysLeft,
+      peak: Math.floor(peak),
+      peakDivision: reward.division.name,
+      peakIcon: reward.division.icon,
+      rewardCoins: reward.coins,
     };
   }
 
@@ -3715,6 +3769,7 @@ export class Game {
         return featuredRivals(`${this.seed}:massrace`);
       })(),
       raceRated: this.rankedRace,
+      raceVerified: this.serverPlaceApplied,
       ratingDelta: this.lastRatingDelta,
       ratingBonus: this.lastRatingBonus,
       duel: { ...st.duel },

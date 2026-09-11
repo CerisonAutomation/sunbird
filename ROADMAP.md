@@ -12,6 +12,16 @@ until proven otherwise. This file exists so the commit log can't overclaim.
 - Prize skins gated on real achievements; season pass; campaign; daily/weekly
   challenges; weekly events with physics modifiers
 - Local squads/duels/leaderboards (see next section for the caveat)
+- Ranked seasons (monthly): peak tracking, coin payout, halfway soft-reset —
+  now surfaced on the Rank screen with countdown + projected reward
+- Stormfront Royale escalation: three storm phases at 1 km / 2.2 km (wind
+  +25% each act, eye-wall pays coins ×2)
+- Accessibility: reduce-motion, colorblind-assist, and large-text toggles in
+  Settings, persisted and applied via `<html>` classes
+- Telemetry: local `dataLayer` bus + anonymous aggregate counters beaconed to
+  `/telemetry` on tab-hide (no PII, no retries, no-op without a backend)
+- Server-refereed race placements carry a visible "✓ refereed" stamp on the
+  results card — honesty is the trust brand
 
 ## 🟡 Written, tested, NOT deployed to production (single `wrangler deploy` away)
 - `backend/` — Cloudflare Workers + Durable Objects rooms, leaderboards, WS.

@@ -31,6 +31,10 @@ export type Settings = {
   sfxVolume: number;
   haptics: boolean;
   reduceMotion: boolean;
+  /** Colorblind assist: shifts warning reds/greens to blue/orange + adds glyphs. */
+  colorAssist: boolean;
+  /** Large-text mode: bumps every UI font a step for readability. */
+  bigText: boolean;
   quality: Quality;
 };
 
@@ -141,6 +145,8 @@ const DEFAULT_SETTINGS: Settings = {
   sfxVolume: 0.9,
   haptics: true,
   reduceMotion: false,
+  colorAssist: false,
+  bigText: false,
   quality: "auto",
 };
 
@@ -316,6 +322,8 @@ export class SaveData {
               : 0.9,
           haptics: p.settings?.haptics === undefined ? true : Boolean(p.settings.haptics),
           reduceMotion: Boolean(p.settings?.reduceMotion),
+          colorAssist: Boolean(p.settings?.colorAssist),
+          bigText: Boolean(p.settings?.bigText),
           quality: quality === "high" || quality === "low" ? quality : "auto",
         },
         quests:

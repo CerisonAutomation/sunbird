@@ -69,11 +69,51 @@ export class LeaderboardDO implements DurableObject {
         date     TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_scores_date ON scores(date);
+      CREATE TABLE IF NOT EXISTS telemetry (
+        day  TEXT NOT NULL,
+        k    TEXT NOT NULL,
+        mode TEXT NOT NULL DEFAULT '',
+        n    INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (day, k, mode)
+      );
     `);
   }
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
+
+    if (url.pathname === "/telemetry" && request.method === "POST") {
+      // Aggregate-only product counters. No per-device rows are stored; the
+      // deviceId in the payload is discarded after basic shape validation.
+      let body: { events?: { k?: unknown; mode?: unknown }[] };
+      try {
+        body = (await request.json()) as typeof body;
+      } catch {
+        return Response.json({ error: "invalid json" }, { status: 400 });
+      }
+      const events = Array.isArray(body.events) ? body.events.slice(0, 64) : [];
+      const day = todayStr();
+      for (const ev of events) {
+        const k = clean(typeof ev.k === "string" ? ev.k : "", 32);
+        if (!k) continue;
+        const mode = clean(typeof ev.mode === "string" ? ev.mode : "", 16);
+        this.sql.exec(
+          `INSERT INTO telemetry (day, k, mode, n) VALUES (?, ?, ?, 1)
+           ON CONFLICT(day, k, mode) DO UPDATE SET n = n + 1`,
+          day,
+          k,
+          mode,
+        );
+      }
+      return Response.json({ ok: true });
+    }
+
+    if (url.pathname === "/telemetry" && request.method === "GET") {
+      const rows = this.sql
+        .exec("SELECT day, k, mode, n FROM telemetry ORDER BY day DESC, n DESC LIMIT 200")
+        .toArray();
+      return Response.json({ rows });
+    }
 
     if (url.pathname === "/stats") {
       const row = this.sql.exec("SELECT COUNT(*) AS n FROM scores").one() as { n: number };

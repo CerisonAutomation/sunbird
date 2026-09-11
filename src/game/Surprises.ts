@@ -133,12 +133,22 @@ export const SLEEP_QUIPS = [
   "The sun clocked out. So did the bird",
   "Nap time is undefeated",
   "Zzz… dreaming of thermals",
+  "Filed under: birds who almost made it",
+  "The horizon won this round",
+  "Somewhere, a worm sighs in relief",
+  "Sleep now. Revenge at sunrise",
+  "The bird has left the flight simulator",
 ];
 
 export const BIG_LAUNCH_QUIPS = [
   "The hill said YEET",
   "FAA would like a word",
   "Gravity has filed a complaint",
+  "That wasn't flying. That was leaving",
+  "NASA called. They want notes",
+  "The clouds are pressing charges",
+  "Physics rage-quit",
+  "Air traffic control has questions",
 ];
 
 /** Deterministic quip pick so tests can pin behaviour. */

@@ -49,6 +49,7 @@ export type RivalCard = {
   nextNeeded: number;
   progress: number;
   matches: { place: number; field: number; mode: string; date: string; won: boolean }[];
+  season: { daysLeft: number; peak: number; peakDivision: string; peakIcon: string; rewardCoins: number };
 };
 
 export type LoadoutView = {
@@ -226,6 +227,8 @@ export type HudSnapshot = {
   loadout: LoadoutView;
   lobbyRivals: { name: string; tag: string }[];
   raceRated: boolean;
+  /** True when the room server (single-threaded referee) confirmed the place. */
+  raceVerified: boolean;
   ratingDelta: number;
   ratingBonus: number;
   /* --- duels --- */
@@ -1363,6 +1366,10 @@ function renderRank(s: HudSnapshot): string {
       <div><span>Streak</span><b class="streak-b ${r.streak > 0 ? "lit" : ""}"><svg viewBox="0 0 24 24" class="fl"><path d="M12 2C13 6 17 8 17 13a5 5 0 0 1-10 0c0-2 1-3.4 2-4.6 0 1.6.6 2.6 1.8 3 -.4-3.4 1.4-6.6 1.2-9.4z" fill="currentColor"/></svg>${r.streak}</b></div>
       <div><span>Best</span><b>×${r.bestStreak}</b></div>
     </div>
+    <div class="season-card">
+      <div class="season-head"><b>Season</b><span class="pill">${r.season.daysLeft}d left</span></div>
+      <div class="season-body">Peak ${r.season.peakIcon} ${r.season.peak} · pays <b>● ${r.season.rewardCoins}</b> at reset, then ratings drift halfway back to 1000.</div>
+    </div>
     <div class="section-title">Recent races <small>this device only</small></div>
     ${
       r.matches.length
@@ -1898,6 +1905,8 @@ function renderSettings(s: HudSnapshot): string {
     <div class="setting-row"><span>Music Volume</span><button class="mini-btn" data-ui data-action="set-music-vol">${!s.settings.music ? "Off" : `${mPct}%`}</button></div>
     ${toggle("Haptics", "haptics", s.settings.haptics)}
     ${toggle("Reduce motion", "motion", s.settings.reduceMotion)}
+    ${toggle("Colorblind assist", "colorassist", s.settings.colorAssist)}
+    ${toggle("Large text", "bigtext", s.settings.bigText)}
     <div class="setting-row"><span>Render quality</span><button class="mini-btn" data-ui data-action="set-quality">${s.settings.quality.toUpperCase()}</button></div>
     <div class="setting-row"><span>Flights flown</span><b>${s.runsPlayed}</b></div>
     ${s.canInstall ? `<button class="soft-btn wide" data-ui data-action="install-app">⬇ Install Sunbird</button>` : ""}
@@ -2049,6 +2058,7 @@ function renderGameOver(s: HudSnapshot): string {
       ? `<div class="race-hero ${s.racePlace === 1 ? "win" : s.racePlace <= 3 ? "podium" : ""}">
            <div class="race-medal">${s.racePlace === 1 ? "🥇" : s.racePlace === 2 ? "🥈" : s.racePlace === 3 ? "🥉" : "🏁"}</div>
            <div class="race-place"><b>P${s.racePlace}</b><span>of ${s.raceField} pilots · ${s.raceFinishTime.toFixed(1)}s</span></div>
+           ${s.raceVerified ? `<div class="verified-tag">✓ placement refereed by the room server</div>` : ""}
            <div class="race-bar"><i style="width:${Math.round((1 - (s.racePlace - 1) / Math.max(1, s.raceField)) * 100)}%"></i></div>
            ${
              s.raceRated

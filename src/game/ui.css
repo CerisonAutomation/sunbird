@@ -4001,3 +4001,37 @@ button:focus-visible, .toggle:focus-visible {
   width: 100%;
 }
 .vip-crown { color: #b06ae8; margin-right: 2px; }
+
+/* Honesty is the brand: the referee's stamp on verified race results. */
+.verified-tag {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #2a8a5a;
+  letter-spacing: 0.04em;
+}
+
+
+/* ===== Accessibility modes (toggled as classes on <html>) ===== */
+/* Colorblind assist: shift danger/success hues to a blue-orange axis that
+   survives deuteranopia + protanopia, and add shape cues where color was
+   load-bearing. */
+.a11y-color .toggle.on { background: #1668d8; }
+.a11y-color .verified-tag { color: #1668d8; }
+.a11y-color .ghost-btn.danger { color: #d87f16; border-color: #d87f16; }
+.a11y-color .toast.warn { border-left: 4px solid #d87f16; }
+
+/* Large text: one comfortable step up across the whole UI. */
+.a11y-bigtext #ui { font-size: 112%; }
+.a11y-bigtext .fineprint { font-size: 12px; }
+.a11y-bigtext .toast { font-size: 16px; }
+
+/* Ranked season summary card on the Rank screen. */
+.season-card {
+  margin: 10px 0 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(30, 60, 90, 0.12);
+}
+.season-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+.season-body { margin-top: 4px; font-size: 12px; opacity: 0.85; line-height: 1.45; }
