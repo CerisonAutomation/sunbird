@@ -10,7 +10,11 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "verify": "npm run typecheck && npm run test && npm run build",
-    "test:mp": "node scripts/mp-smoke.mjs"
+    "test:mp": "node scripts/mp-smoke.mjs",
+    "build:web": "vite build",
+    "build:poki": "VITE_PORTAL_TARGET=poki VITE_MULTIPLAYER_URL= vite build --outDir dist-poki && node scripts/package-portal.mjs poki",
+    "build:crazy": "VITE_PORTAL_TARGET=crazy VITE_MULTIPLAYER_URL= vite build --outDir dist-crazy && node scripts/package-portal.mjs crazy",
+    "build:portals": "npm run build:poki && npm run build:crazy"
   },
   "dependencies": {
     "@stripe/stripe-js": "^9.15.0",

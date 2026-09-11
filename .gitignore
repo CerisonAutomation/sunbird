@@ -44,3 +44,9 @@ backend/.wrangler
 # Playwright MCP debug snapshots
 .playwright-mcp/
 server/social/sunbird-social-data/
+
+# portal build artifacts
+dist-poki/
+dist-crazy/
+sunbird-poki.zip
+sunbird-crazy.zip
