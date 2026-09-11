@@ -109,6 +109,10 @@ export type HudSnapshot = {
   adTotal: number;
   adReason: "continue" | "interstitial";
   seedLabel: string;
+  /** Career wings: lifetime-distance rank shown on the title screen. */
+  wings: { icon: string; name: string; progress: number; nextName: string; nextNeeded: number; lifetime: number };
+  /** Flight recap: downsampled [metresFromStart, altitude] profile. */
+  flightPath: [number, number][];
   /** Active incoming rival challenge: "name|distance", or "" when none. */
   rivalBanner: string;
   seedMode: SeedMode;
@@ -1593,7 +1597,13 @@ function renderMain(s: HudSnapshot): string {
 
     <div class="hero-meta">
       <span class="pill seed-pill">${s.seedLabel}</span>
+      <span class="pill wings-pill" title="${formatDistance(s.wings.lifetime)} lifetime">${s.wings.icon} ${s.wings.name}</span>
     </div>
+    ${
+      s.wings.nextNeeded > 0
+        ? `<div class="wings-track" aria-label="Career progress"><i style="width:${Math.round(s.wings.progress * 100)}%"></i><span>${formatDistance(s.wings.nextNeeded)} to ${s.wings.nextName}</span></div>`
+        : ""
+    }
     ${s.rivalBanner ? renderRivalBanner(s.rivalBanner) : ""}
     ${seedPicker}
 
@@ -2077,6 +2087,39 @@ function renderGoalList(goals: SessionGoal[]): string {
     .join("")}</div>`;
 }
 
+/** The run's silhouette: an SVG sparkline of the altitude profile. */
+export function renderFlightRecap(path: [number, number][]): string {
+  if (path.length < 3) return "";
+  const w = 320;
+  const hgt = 64;
+  let maxX = 1;
+  let maxY = 12;
+  for (const [x, y] of path) {
+    if (x > maxX) maxX = x;
+    if (y > maxY) maxY = y;
+  }
+  const px = (x: number): number => (x / maxX) * (w - 4) + 2;
+  const py = (y: number): number => hgt - 4 - (Math.max(0, y) / maxY) * (hgt - 10);
+  const line = path.map(([x, y], i) => `${i === 0 ? "M" : "L"}${px(x).toFixed(1)} ${py(y).toFixed(1)}`).join(" ");
+  const area = `${line} L${px(path[path.length - 1]![0]).toFixed(1)} ${hgt - 2} L${px(path[0]![0]).toFixed(1)} ${hgt - 2} Z`;
+  // Peak marker — the flight's zenith deserves a dot.
+  let peak = path[0]!;
+  for (const p of path) if (p[1] > peak[1]) peak = p;
+  return `
+    <div class="flight-recap" aria-label="Flight altitude profile">
+      <svg viewBox="0 0 ${w} ${hgt}" preserveAspectRatio="none">
+        <defs><linearGradient id="fr-g" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#ffb020" stop-opacity="0.55"/>
+          <stop offset="1" stop-color="#ffb020" stop-opacity="0.05"/>
+        </linearGradient></defs>
+        <path d="${area}" fill="url(#fr-g)"/>
+        <path d="${line}" fill="none" stroke="#e08a10" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="${px(peak[0]).toFixed(1)}" cy="${py(peak[1]).toFixed(1)}" r="3" fill="#ff6b4a"/>
+      </svg>
+      <span class="fr-peak">▲ ${Math.round(peak[1])} m peak</span>
+    </div>`;
+}
+
 function renderGameOver(s: HudSnapshot): string {
   if (s.versus && s.p1Stats && s.p2Stats) return renderVersusResult(s);
   const questTotal = s.claimedQuests.reduce((a, q) => a + q.reward, 0);
@@ -2119,6 +2162,7 @@ function renderGameOver(s: HudSnapshot): string {
     <div class="zzz">z z z</div>
     <h2>Sunbird sleeps</h2>
     <p class="tagline">The daylight ran out.</p>
+    ${renderFlightRecap(s.flightPath)}
     <div class="over-stats">
       <div><span>Distance</span><b>${formatDistance(s.distance)}</b></div>
       <div><span>Score</span><b>${Math.floor(s.score).toLocaleString()}</b></div>

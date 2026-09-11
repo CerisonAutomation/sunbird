@@ -63,6 +63,7 @@ import {
   ZENITH_SLOWMO,
 } from "./constants";
 import { BOOSTS, COLLECTIONS, GOLD, PROMO_CODES, SHOP_TRAILS, SKINS, STARTER_PACK, VIP, dailyDealBoost, skinById, type BoostView, type ShopTrailView, type SkinDef, type SkinView } from "./Economy";
+import { nextWings, wingsFor, wingsProgress, wingsPromotion } from "./Career";
 import { GhostPlayer, GhostRecorder } from "./Ghost";
 import { fetchRivalGhost, publishGhost } from "./GhostNet";
 import { HUD, type CalendarCard, type CheckoutMode, type DailyCard, type GauntletCard, type HudSnapshot, type LoadoutView, type RivalCard, type SeedMode, type UiScreen, type UiState } from "./HUD";
@@ -252,6 +253,8 @@ export class Game {
   private stormPhase = 1;
   /** First thermal of the run gets a toast; the HUD chip covers the rest. */
   private thermalToasted = false;
+  /** Flight recap: downsampled [x, y] profile of the finished run. */
+  private flightPath: [number, number][] = [];
   /** Weekly-event physics mods, cached at run start (hot path: every frame + every coin). */
   private weeklyMods = { coinMult: 1, gravityMult: 1, windMult: 1, daylightMult: 1 };
   /** Golden Hour: the last stretch of daylight — 2× coins, amber world. */
@@ -1924,7 +1927,27 @@ export class Game {
       }
     }
     const score = this.score();
+    // FLIGHT RECAP — the run's altitude profile, drawn on the results card.
+    // The ghost recorder already sampled the whole flight; thin it to ~72
+    // points and normalize x to metres-from-start.
+    {
+      const s = this.ghostRecorder.snapshot();
+      const pts: [number, number][] = [];
+      const step = Math.max(1, Math.floor(s.length / 72));
+      for (let i = 0; i < s.length; i += step) pts.push([s[i]![1] - this.startX, s[i]![2]]);
+      if (s.length > 0) pts.push([s[s.length - 1]![1] - this.startX, s[s.length - 1]![2]]);
+      this.flightPath = pts.length >= 3 ? pts : [];
+    }
+    const lifetimeBefore = this.save.state.lifetime.distance;
     this.save.recordRun(stats.distance, this.runCoins, score, this.today, this.island, this.terrain.biomeAt(this.bird.x).id);
+    // CAREER WINGS promotion — a lifetime rank-up is rare; make it land.
+    const promo = wingsPromotion(lifetimeBefore, this.save.state.lifetime.distance);
+    if (promo) {
+      this.audio.fanfare();
+      this.particles.emitConfetti(this.bird.x, this.bird.y + 4);
+      this.hud.toast(`${promo.icon} ${promo.name.toUpperCase()} — lifetime rank earned`, "gold");
+      this.telemetry.track("wings_promo", { tier: promo.id });
+    }
     this.save.addLifetimeZeniths(stats.zenith);
     // distance XP is awarded at the end; everything else accrued live during the flight
     this.awardXp(Math.round(stats.distance * XP_RULES.perMetre));
@@ -3580,6 +3603,20 @@ export class Game {
     return { cycleDay: cal.cycleDay, claimedToday, days };
   }
 
+  private wingsCard(): HudSnapshot["wings"] {
+    const life = this.save.state.lifetime.distance;
+    const cur = wingsFor(life);
+    const next = nextWings(life);
+    return {
+      icon: cur.icon,
+      name: cur.name,
+      progress: wingsProgress(life),
+      nextName: next ? next.tier.name : "",
+      nextNeeded: next ? next.needed : 0,
+      lifetime: life,
+    };
+  }
+
   private rivalCard(): RivalCard {
     const r = this.save.state.rival;
     const div = divisionFor(r.rating);
@@ -3723,6 +3760,8 @@ export class Game {
       adTotal: this.ads.duration,
       adReason: this.adReason,
       seedLabel: this.seedLabel(),
+      wings: this.wingsCard(),
+      flightPath: this.state === "gameover" ? this.flightPath : [],
       rivalBanner: this.rival && this.rivalResult === "" ? `${this.rival.name}|${this.rival.distance}` : "",
       seedMode: this.seedMode,
       wallet: st.wallet,
