@@ -218,7 +218,7 @@ pub enum ProtocolError {
     Rejected { message: String },
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Error)]
+#[derive(Debug, Error)]
 pub enum ValidationError {
     #[error("unsupported protocol version {0}")]
     UnsupportedVersion(u32),
