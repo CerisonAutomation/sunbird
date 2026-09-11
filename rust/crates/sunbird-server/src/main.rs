@@ -173,16 +173,18 @@ fn build_app(shared: SharedState, shutdown_rx: watch::Receiver<bool>) -> Router 
         ))
         .layer(RequestBodyLimitLayer::new(MAX_JSON_PAYLOAD_BYTES))
         .layer(cors)
-        .layer(axum::middleware::from_fn(move |request, next: axum::middleware::Next| {
-            let mut rx = shutdown_rx.clone();
-            async move {
-                if *rx.borrow() {
-                    return StatusCode::SERVICE_UNAVAILABLE.into_response();
+        .layer(axum::middleware::from_fn(
+            move |request, next: axum::middleware::Next| {
+                let mut rx = shutdown_rx.clone();
+                async move {
+                    if *rx.borrow() {
+                        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+                    }
+                    metrics::note_http_request();
+                    next.run(request).await
                 }
-                metrics::note_http_request();
-                next.run(request).await
-            }
-        }))
+            },
+        ))
         .with_state(shared)
 }
 
