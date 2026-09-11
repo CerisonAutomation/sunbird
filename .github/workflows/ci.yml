@@ -27,17 +27,38 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Build (direct/PWA)
+      - name: Build (Vercel / direct / PWA)
         env:
           VITE_PORTAL_TARGET: none
-        run: npm run build
+        run: npm run build:vercel
 
-      - name: Upload dist artifact
+      - name: Upload dist artifact (Vercel)
         uses: actions/upload-artifact@v4
         with:
-          name: sunbird-dist
+          name: sunbird-dist-vercel
           path: dist/
-          retention-days: 7
+          retention-days: 14
+
+  build-itch:
+    name: Build (itch.io single-file)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Build (itch.io singlefile)
+        env:
+          VITE_PORTAL_TARGET: none
+          VITE_SINGLEFILE: "true"
+        run: npm run build:itch
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sunbird-dist-itch
+          path: dist/
+          retention-days: 14
 
   portal-poki:
     name: Build (Poki)
@@ -52,9 +73,29 @@ jobs:
       - name: Build (Poki portal)
         env:
           VITE_PORTAL_TARGET: poki
-        run: npm run build
+        run: npm run build:poki
       - uses: actions/upload-artifact@v4
         with:
           name: sunbird-dist-poki
           path: dist/
-          retention-days: 7
+          retention-days: 14
+
+  portal-crazy:
+    name: Build (CrazyGames)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Build (CrazyGames portal)
+        env:
+          VITE_PORTAL_TARGET: crazy
+        run: npm run build:crazy
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sunbird-dist-crazy
+          path: dist/
+          retention-days: 14
