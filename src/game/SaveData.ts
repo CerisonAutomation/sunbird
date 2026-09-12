@@ -287,6 +287,10 @@ export class SaveData {
   /** True when the on-disk save was unreadable this session and we booted
    *  clean. The corrupt payload is parked under SAVE_KEY_CORRUPT, not lost. */
   recoveredFromCorruption = false;
+  /** Invoked (throttled) when a persist fails — lets the game observe data-
+   *  loss risk instead of swallowing it silently. */
+  onPersistError: (() => void) | null = null;
+  private lastPersistErrorAt = 0;
 
   constructor() {
     this.state = this.load();
@@ -472,7 +476,14 @@ export class SaveData {
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify(state));
     } catch {
-      /* ignore */
+      // A write that silently no-ops loses player progress with no signal. Call
+      // the observer (if any) — throttled here so a full/blocked store can't
+      // flood it — and otherwise keep playing rather than crashing the game.
+      const now = Date.now();
+      if (now - this.lastPersistErrorAt > 10_000) {
+        this.lastPersistErrorAt = now;
+        this.onPersistError?.();
+      }
     }
   }
 

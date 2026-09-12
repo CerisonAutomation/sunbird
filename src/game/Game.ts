@@ -68,7 +68,7 @@ import { GhostPlayer, GhostRecorder } from "./Ghost";
 import { HUD, type CalendarCard, type CheckoutMode, type DailyCard, type GauntletCard, type HudSnapshot, type LoadoutView, type RivalCard, type SeedMode, type UiScreen, type UiState } from "./HUD";
 import { divisionFor, duelOpponent, duelSkillFor, featuredRivals, nextDivision, seasonReward } from "./pvp";
 import { Input } from "./Input";
-import { clamp, dateSeed, formatDatePretty, lerp } from "./math";
+import { clamp, dateSeed, formatDatePretty, lerp, SeededRandom } from "./math";
 import { Missions, type MissionView, type QuestReward, type QuestView, type RunStats } from "./Missions";
 import { ParticleFX } from "./ParticleFX";
 import { TrailRibbon } from "./Trail";
@@ -193,6 +193,8 @@ export class Game {
   private skimCd = 0;
   /** Rare delightful mid-run events (comedy + windfalls). */
   private readonly surprises = new SurpriseEngine();
+  /** Seeded RNG for surprises, so the same run seed yields the same events. */
+  private surpriseRng = new SeededRandom("surprises");
   private splashQuipN = 0;
   private shield = 0;
   private boostTimer = 0;
@@ -356,6 +358,9 @@ export class Game {
     this.seasonPass = new SeasonPass(this.save);
     this.board = new Leaderboard(this.save.state.deviceId);
     this.telemetry.bindDevice(this.save.state.deviceId);
+    // Persistence failures (quota / blocked storage) lose progress silently
+    // unless we say so — route them through the same observability bus.
+    this.save.onPersistError = () => this.telemetry.track("save_persist_failed", {});
     this.cups = new Tournaments(this.save.state.tournaments);
     this.pilotName = this.save.state.pilotName || loadPilotName(this.save.state.deviceId);
     this.save.state.pilotName = this.pilotName;
@@ -956,8 +961,15 @@ export class Game {
       if (this.splashQuipN % 3 === 1) this.hud.toast(quip(SPLASH_QUIPS, this.splashQuipN), "cloud");
     }
 
-    // Rare delight: golden geese, sneezes, encores. Never punishing.
-    const surprise = this.surprises.tick(dt, this.bird.x - this.startX, !this.bird.grounded && !this.bird.inWater && !this.bird.asleep);
+    // Rare delight: golden geese, sneezes, encores. Never punishing. Rolled on
+    // the run seed so the same hills yield the same surprises (and a race or
+    // daily challenge is never decided by cosmic RNG the field can't share).
+    const surprise = this.surprises.tick(
+      dt,
+      this.bird.x - this.startX,
+      !this.bird.grounded && !this.bird.inWater && !this.bird.asleep,
+      () => this.surpriseRng.next(),
+    );
     if (surprise) {
       this.hud.toast(surprise.toast, "gold");
       switch (surprise.kind) {
@@ -2237,6 +2249,7 @@ export class Game {
     this.skimTime = 0;
     this.skimCd = 0;
     this.surprises.reset();
+    this.surpriseRng = new SeededRandom(`${this.seed}:surprises`);
     this.feverTimer = 0;
     this.feverOn = false;
     this.feverReached = false;
