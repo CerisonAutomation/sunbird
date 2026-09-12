@@ -71,6 +71,7 @@ import { Input } from "./Input";
 import { clamp, dateSeed, formatDatePretty, lerp } from "./math";
 import { Missions, type MissionView, type QuestReward, type QuestView, type RunStats } from "./Missions";
 import { ParticleFX } from "./ParticleFX";
+import { TrailRibbon } from "./Trail";
 import {
   consumeStripeReturn,
   ensureStripeJs,
@@ -118,6 +119,7 @@ export class Game {
   private readonly bird: Bird;
   private readonly camera: CameraRig;
   private readonly particles: ParticleFX;
+  private readonly trail: TrailRibbon;
   private readonly fx: Fx;
   private readonly isMobile: boolean;
   private useBloom = false;
@@ -311,6 +313,7 @@ export class Game {
   private thermalEmitAcc = 0;
   private windEmitAcc = 0;
   private trailFxAcc = 0;
+  private powerFxAcc = 0;
   private atmosphereFxAcc = 0;
   private hueT = 0;
   private lastBiomeId = "";
@@ -397,6 +400,8 @@ export class Game {
     this.camera = new CameraRig(1);
     this.particles = new ParticleFX();
     this.particles.addTo(this.scene);
+    this.trail = new TrailRibbon();
+    this.trail.addTo(this.scene);
     this.fx = new Fx(this.renderer, this.scene, this.camera.camera);
     this.sky = new Sky();
     this.scene.add(this.sky.group);
@@ -538,6 +543,7 @@ export class Game {
     this.terrain.dispose();
     this.bird.dispose();
     this.particles.dispose();
+    this.trail.dispose();
     this.fx.dispose();
     this.sky.dispose();
     this.collect.dispose();
@@ -895,6 +901,13 @@ export class Game {
     }
     if (this.feverOn || this.boostTimer > 0 || this.bird.speed() > 48 || ((skin.magnetAlways || skin.id === "aurora") && this.bird.speed() > 24)) {
       this.emitTrail(dt);
+    }
+
+    // Ambient particles for whatever power-up is currently in effect.
+    this.powerFxAcc -= dt;
+    if (this.powerFxAcc <= 0) {
+      this.powerFxAcc = 0.05;
+      this.emitPowerFx();
     }
 
     this.atmosphereFxAcc -= dt;
@@ -1434,12 +1447,14 @@ export class Game {
         this.bird.vx += 36;
         this.bird.vy += 7;
         this.particles.burstRing(x, y, 0xff5a3a);
+        this.audio.boost();
         this.hud.toast("Rocket Speed 🚀", "power");
         this.shake(0.55);
         break;
       case "magnet":
         this.magnetTimer = MAGNET_TIME;
         this.particles.burstRing(x, y, 0x8a6cff);
+        this.audio.magnetOn();
         this.hud.toast(`Coin Magnet ${MAGNET_TIME}s 🧲`, "power");
         break;
       case "shield":
@@ -1501,37 +1516,73 @@ export class Game {
     return "";
   }
 
+  /** Current trail colour, from the equipped prize trail or the bird's skin. */
+  private trailColor(): [number, number, number] {
+    const prize = this.save.state.activeTrail ? TRAILS[this.save.state.activeTrail] : undefined;
+    if (prize && prize.colors.length) {
+      return prize.colors[Math.floor(this.hueT) % prize.colors.length]!;
+    }
+    switch (this.skin.id) {
+      case "aurora":
+        return hsl(this.hueT % 1, 0.9, 0.65);
+      case "phoenix":
+        return [1, 0.5, 0.16];
+      case "bluejay":
+        return [0.6, 0.85, 1];
+      case "owl":
+        return [0.75, 0.65, 1];
+      case "ember":
+        return [1, 0.55, 0.2];
+      default:
+        return [1, 0.95, 0.85];
+    }
+  }
+
+  /** Advance the trail hue so prize/aurora colours cycle smoothly (not strobe). */
+  private advanceTrailHue(dt: number): void {
+    const prize = this.save.state.activeTrail ? TRAILS[this.save.state.activeTrail] : undefined;
+    if (prize && prize.colors.length) this.hueT += dt * 2.4;
+    else if (this.skin.id === "aurora") this.hueT += dt * 0.45;
+  }
+
+  /** Streams the glowing ribbon behind the bird, matching the sparkle trail. */
+  private updateTrailRibbon(dt: number): void {
+    this.advanceTrailHue(dt);
+    const c = this.trailColor();
+    this.trail.setColor(c[0], c[1], c[2]);
+    const show =
+      this.state === "playing" &&
+      (this.feverOn || this.boostTimer > 0 || this.bird.speed() > 48 || ((this.skin.magnetAlways || this.skin.id === "aurora") && this.bird.speed() > 24));
+    if (show) this.trail.push(this.bird.x, this.bird.y);
+    this.trail.update(dt, show ? 1 : 0);
+  }
+
   private emitTrail(dt: number): void {
     this.trailFxAcc -= dt;
     if (this.trailFxAcc > 0) return;
     this.trailFxAcc = this.bird.speed() > 82 ? 0.028 : 0.055;
-    // Prize trails override the skin trail — they were earned, show them off.
-    const prize = this.save.state.activeTrail ? TRAILS[this.save.state.activeTrail] : undefined;
-    if (prize && prize.colors.length) {
-      this.hueT += 1;
-      const c = prize.colors[Math.floor(this.hueT) % prize.colors.length]!;
-      this.particles.emitSparkle(this.bird.x - 0.4, this.bird.y, c[0], c[1], c[2]);
-      if (this.bird.speed() > 68) this.particles.emitWingTrails(this.bird.x, this.bird.y, this.bird.speed());
-      return;
-    }
-    const s = this.skin.id;
-    if (s === "aurora") {
-      this.hueT += 0.05;
-      const h = this.hueT % 1;
-      const c = hsl(h, 0.9, 0.65);
-      this.particles.emitSparkle(this.bird.x - 0.4, this.bird.y, c[0], c[1], c[2]);
-    } else if (s === "phoenix") {
-      this.particles.emitSparkle(this.bird.x - 0.4, this.bird.y, 1, 0.35 + Math.random() * 0.3, 0.1);
-    } else if (s === "bluejay") {
-      this.particles.emitSparkle(this.bird.x - 0.4, this.bird.y, 0.6, 0.85, 1);
-    } else if (s === "owl") {
-      this.particles.emitSparkle(this.bird.x - 0.4, this.bird.y, 0.75, 0.65, 1);
-    } else if (s === "ember") {
-      this.particles.emitSparkle(this.bird.x - 0.4, this.bird.y, 1, 0.55, 0.2);
-    } else {
-      this.particles.emitSparkle(this.bird.x - 0.4, this.bird.y);
-    }
+    const c = this.trailColor();
+    this.particles.emitSparkle(this.bird.x - 0.4, this.bird.y, c[0], c[1], c[2]);
     if (this.bird.speed() > 68) this.particles.emitWingTrails(this.bird.x, this.bird.y, this.bird.speed());
+  }
+
+  /** Ambient particles for the power-up currently in effect. */
+  private emitPowerFx(): void {
+    const x = this.bird.x;
+    const y = this.bird.y;
+    if (this.powers.has("goldenwings")) {
+      this.particles.emitSparkle(x - Math.random() * 1.4, y + (Math.random() - 0.5) * 1.6, 1, 0.8 + Math.random() * 0.2, 0.3);
+    } else if (this.powers.has("magnet") || this.magnetTimer > 0) {
+      this.particles.emitSparkle(x + 1.5 + Math.random() * 2.5, y + (Math.random() - 0.5) * 2.2, 0.55, 0.42, 1);
+    }
+    if (this.shield > 0) {
+      this.particles.emitSparkle(x + (Math.random() - 0.5) * 1.8, y + (Math.random() - 0.5) * 1.8, 0.35, 0.85, 1);
+    }
+    if (this.powers.has("wingboost")) this.particles.emitWind(x, y, 0.6);
+    if (this.powers.has("longglide")) this.particles.emitWind(x, y, 0.35);
+    if (this.powers.has("cloudboost")) this.particles.emitWind(x, y, 0.2);
+    if (this.powers.has("feather")) this.particles.emitSparkle(x - 0.5, y + 0.3, 1, 0.98, 0.85);
+    if (this.boostTimer > 0) this.particles.emitSparkle(x - 0.6, y - 0.2, 1, 0.45, 0.15);
   }
 
   private render(visDt: number, rawDt: number): void {
@@ -1547,6 +1598,7 @@ export class Game {
     this.bird.syncVisual(visDt, diving, glow, this.elapsed, this.terrain);
     this.massRace.syncVisual(visDt, this.bird.x);
     this.finishRemaining = this.finishGate.update(visDt, this.bird.x);
+    this.updateTrailRibbon(visDt);
     this.particles.update(visDt);
     this.camera.update(rawDt, this.bird, playing, this.terrain.heightAt(this.bird.x));
     this.livingBg.update(rawDt, this.bird.x, this.bird.y);
@@ -2136,6 +2188,8 @@ export class Game {
     this.pendingXp = 0;
     this.xpFlush = 0;
     this.trailFxAcc = 0;
+    this.powerFxAcc = 0;
+    this.trail.clear();
     this.atmosphereFxAcc = 0;
     this.magnetTimer = 0;
     this.shield = 0;

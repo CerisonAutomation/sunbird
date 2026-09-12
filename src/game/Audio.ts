@@ -290,6 +290,20 @@ export class GameAudio {
     this.noiseBurst(0.16, 1300, 0.07);
   }
 
+  /** Coin magnet: a bright swirling shimmer as loose change flies your way. */
+  magnetOn(): void {
+    this.tone(1046.5, 0.1, "sine", 0.08, 1567.98);
+    this.tone(1567.98, 0.16, "triangle", 0.07, 2093);
+    this.noiseBurst(0.14, 2400, 0.04);
+  }
+
+  /** Rocket boost: a low whoosh rising into a bright flare. */
+  boost(): void {
+    this.tone(110, 0.32, "sawtooth", 0.09, 660);
+    this.noiseBurst(0.3, 1200, 0.1);
+    this.tone(440, 0.16, "square", 0.05, 880);
+  }
+
   purchase(): void {
     this.tone(523.25, 0.1, "triangle", 0.09, 659.25);
     this.tone(783.99, 0.2, "triangle", 0.09, 1046.5);
@@ -427,23 +441,36 @@ export class GameAudio {
 
   private tone(freq: number, dur: number, type: OscillatorType, gain: number, slideTo?: number): void {
     if (!this.ctx || !this.sfxBus || !this.reverbSend || this.muted || !this.started) return;
-    const o = this.ctx.createOscillator();
-    const g = this.ctx.createGain();
-    o.type = type;
     const t = this.ctx.currentTime;
-    o.frequency.setValueAtTime(freq, t);
-    if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(40, slideTo), t + dur);
+    const g = this.ctx.createGain();
+    // Click-free envelope: a ~5 ms rise, then exponential decay.
     const effGain = Math.max(0.0001, gain * this.sfxVol);
-    g.gain.setValueAtTime(effGain, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(effGain, t + 0.005);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g);
     g.connect(this.sfxBus);
     const send = this.ctx.createGain();
     send.gain.value = 0.35;
     g.connect(send);
     send.connect(this.reverbSend);
-    o.start();
-    o.stop(t + dur + 0.03);
+
+    const voice = (detune: number, vol: number): void => {
+      const o = this.ctx!.createOscillator();
+      o.type = type;
+      o.detune.value = detune;
+      const vg = this.ctx!.createGain();
+      vg.gain.value = vol;
+      o.frequency.setValueAtTime(freq, t);
+      if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(40, slideTo), t + dur);
+      o.connect(vg);
+      vg.connect(g);
+      o.start();
+      o.stop(t + dur + 0.03);
+    };
+    // A gently detuned second voice thickens every sound into a small chorus
+    // without raising the overall level (0.8 + 0.4 ≈ the single voice).
+    voice(0, 0.8);
+    voice(6, 0.4);
   }
 
   private noiseBurst(dur: number, freq: number, gain: number): void {
