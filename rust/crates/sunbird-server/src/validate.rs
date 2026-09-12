@@ -9,8 +9,8 @@
 //!
 //! Design rules:
 //!   * The envelope is derived from the client's own physics ceiling, not
-//!     invented. `MAX_SPEED_FEVER` (128) × wingboost `speedMult` (1.5)
-//!     + `BOOST_EXTRA_SPEED` (42) = 234 units/sec, per `Bird.ts` and
+//!     invented: `MAX_SPEED_FEVER` (128) × wingboost `speedMult` (1.5) plus
+//!     `BOOST_EXTRA_SPEED` (42) = 234 units/sec, per `Bird.ts` and
 //!     `PowerUps.ts`. Everything here is that number plus headroom.
 //!   * The check is **time-aware**. Clients legitimately drop frames, so a
 //!     fixed per-frame cap would false-reject a stuttering connection. The
@@ -81,7 +81,6 @@ pub struct MotionPolicy {
     pub tick_hz: f64,
     pub max_speed_units_per_sec: f64,
     pub speed_headroom_factor: f64,
-    pub min_sample_interval: Duration,
     pub max_sample_interval: Duration,
     pub max_coordinate_abs: f64,
     pub max_altitude_abs: f64,
@@ -99,11 +98,6 @@ impl Default for MotionPolicy {
             tick_hz,
             max_speed_units_per_sec: 234.0,
             speed_headroom_factor: 2.0,
-            // A quarter of the nominal tick period. The floor exists so a client
-            // sending faster than the wire rate is not granted a proportionally
-            // larger allowance per frame — otherwise a burst of small-interval
-            // frames becomes a teleport one frame at a time.
-            min_sample_interval: Duration::from_secs_f64(1.0 / (tick_hz * 4.0)),
             max_sample_interval: Duration::from_secs(2),
             max_coordinate_abs: 1_000_000.0,
             max_altitude_abs: 100_000.0,
@@ -157,9 +151,14 @@ impl MotionPolicy {
             return Err(MotionRejection::DistanceRegression);
         }
 
+        // The interval floor is a quarter of the nominal tick period. It exists
+        // so a client sending faster than the wire rate is not granted a
+        // proportionally larger allowance per frame — without it, a burst of
+        // small-interval frames becomes a teleport one frame at a time.
+        let min_interval = Duration::from_secs_f64(1.0 / (self.tick_hz * 4.0));
         let elapsed = now
             .saturating_duration_since(baseline.at)
-            .clamp(self.min_sample_interval, self.max_sample_interval)
+            .clamp(min_interval, self.max_sample_interval)
             .as_secs_f64();
         let allowed = self.max_speed_units_per_sec * elapsed * self.speed_headroom_factor;
 

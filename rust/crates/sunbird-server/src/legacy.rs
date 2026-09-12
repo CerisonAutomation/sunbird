@@ -683,9 +683,13 @@ mod tests {
         }
     }
 
+    /// One row of a packed `state` frame: id, x, y, rot, distance. Aliased
+    /// because the bare tuple trips `clippy::type_complexity`.
+    type WirePilot = (String, f64, f64, f64, f64);
+
     /// Drain a socket's outbound queue and return the pilots in the newest
     /// `state` frame, i.e. exactly what that player's browser would render.
-    fn latest_state(rx: &mut mpsc::Receiver<Outbox>) -> Option<Vec<(String, f64, f64, f64, f64)>> {
+    fn latest_state(rx: &mut mpsc::Receiver<Outbox>) -> Option<Vec<WirePilot>> {
         let mut found = None;
         while let Ok(item) = rx.try_recv() {
             if let Outbox::Frame(text) = item {
