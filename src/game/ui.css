@@ -1488,16 +1488,6 @@ button {
 }
 
 
-.vip-chip {
-  background: linear-gradient(135deg, #b9a4ff, #7a5cff);
-  color: #fff;
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 12px;
-  font-weight: 700;
-  box-shadow: 0 3px 0 rgba(42, 28, 40, 0.12);
-}
-
 .code-row {
   display: flex;
   justify-content: space-between;
@@ -2651,6 +2641,9 @@ button {
   animation: playPulse 2s ease-in-out infinite;
 }
 .play-again-btn:active { transform: translateY(3px); box-shadow: 0 3px 0 #d44528; }
+@media (hover: hover) {
+  .play-again-btn:hover { filter: brightness(1.05); }
+}
 
 /* ---------- 10. REWARD COUNTER ANIMATION ---------- */
 .reward-count {
@@ -3267,6 +3260,20 @@ button {
 .hero { padding-top: 42px; }
 .hero-sun { opacity: 0.55; }
 @media (prefers-reduced-motion: reduce) { .hero-bird { animation: none; } }
+
+/* ---------- hero button label / hint typography (was missing! buttons stacked
+   label+hint via .hero's flex-col but the spans inherited full button font) ---------- */
+.hero-label {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.hero-hint {
+  font-family: var(--body);
+  font-size: 11.5px;
+  font-weight: 500;
+  opacity: 0.8;
+}
 
 /* ---------- roast-fix: tofu-proof icons, swatches, pass clarity ---------- */
 .nav-btn i .ti { width: 20px; height: 20px; display: inline-block; vertical-align: -3px; }
@@ -3966,11 +3973,18 @@ button:focus-visible, .toggle:focus-visible {
   background: linear-gradient(180deg, #fff8ea, rgba(255, 255, 255, 0.85));
   box-shadow: 0 6px 0 rgba(216, 90, 40, 0.25), 0 14px 28px -10px rgba(216, 90, 40, 0.4);
   min-height: 76px;
+  animation: playPulse 2.4s ease-in-out infinite;
 }
 .mode-card-main.primary .mode-name { font-size: 18px; }
 .mode-card-main.primary .mode-desc { font-size: 12px; }
+@media (hover: hover) {
+  .mode-card-main.primary:hover {
+    filter: brightness(1.04);
+  }
+}
 /* WCAG 2.5.8: menu targets never smaller than 44px. */
 .mode-card-main, .pvp-mode, .nav-btn, .rank-card { min-height: 44px; }
 @media (prefers-reduced-motion: reduce) {
+  .mode-card-main.primary { animation: none; }
   .mode-card-main.primary:hover, .mode-card-main.primary:active { transform: none; }
 }
