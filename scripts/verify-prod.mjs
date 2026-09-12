@@ -30,24 +30,43 @@ const MAX_TOTAL_JS = 2_500_000; // 2.5 MB
 const MAX_LARGEST_JS = 1_500_000; // 1.5 MB
 
 // Coverage: a *ratchet*, not a blanket bar. A naive "80% everywhere" gate would
-// permanently block PRs on this project (the three.js rendering/GL code is not
-// unit-testable and drags the total to ~11%). Instead we enforce the two things
-// that actually matter in production:
-//   (a) the correctness-critical "source of truth" modules each stay above a
-//       per-module floor (determinism, persistence-adjacent, progression, and
-//       the viral/experiment codec), so a future edit can't silently drop
-//       their coverage, and
+// permanently block PRs on this project (the three.js rendering/GL/DOM layer is
+// not unit-testable — Game, HUD, Sky, Trail, ParticleFX, MenuSky, Weather,
+// Collectibles, Racer, Ghost, Input, Audio, CameraRig, LivingBackground, Fx,
+// FinishGate, Leaderboard, Social, Squad, Payments, platform — and drags the
+// total down). Instead we enforce the two things that actually matter:
+//   (a) every *unit-testable* module (the correctness-critical "source of
+//       truth" — determinism, persistence-adjacent, progression, economy,
+//       events, and the viral/experiment codec) stays above its own floor, so
+//       a future edit can't silently drop a module's coverage, and
 //   (b) the *total* coverage can never fall below its committed floor — it
 //       only ratchets upward as tests accumulate.
-const CORE_FLOORS = {
-  "Surprises.ts": 90,
-  "pvp.ts": 90,
+//
+// Each floor sits a few points under today's measured coverage so a one-line
+// change can't flake the gate, while deleting a test file or gutting a module
+// trips it immediately.
+const MODULE_FLOORS = {
+  "Achievements.ts": 95,
+  "Campaign.ts": 95,
+  "Challenges.ts": 78,
   "Economy.ts": 95,
+  "Engagement.ts": 88,
   "Events.ts": 95,
   "Experiments.ts": 95,
-  "Challenges.ts": 78,
+  "FirstFlight.ts": 95,
+  "Mastery.ts": 95,
+  "Missions.ts": 82,
+  "Modes.ts": 95,
+  "PowerUps.ts": 88,
+  "RoomInvite.ts": 88,
+  "SeasonPass.ts": 82,
+  "Surprises.ts": 90,
+  "Tournaments.ts": 92,
+  "math.ts": 82,
+  "pvp.ts": 90,
+  "season.ts": 90,
 };
-const TOTAL_LINES_FLOOR = 11; // current 11.54%, ratcheted up over time
+const TOTAL_LINES_FLOOR = 18; // current 18.02%, ratcheted up over time
 
 const BANNED = [
   { re: /\bconsole\.(log|warn|info)\s*\(/, label: "console.log/warn/info" },
@@ -95,13 +114,13 @@ try {
     if (base && base.endsWith(".ts")) byBasename.set(base, data);
   }
   const belowFloor = [];
-  for (const [file, floor] of Object.entries(CORE_FLOORS)) {
+  for (const [file, floor] of Object.entries(MODULE_FLOORS)) {
     const data = byBasename.get(file);
     const pct = data?.lines?.pct ?? 0;
     if (pct < floor) belowFloor.push(`${file}: ${pct.toFixed(1)}% < ${floor}%`);
   }
   if (belowFloor.length) {
-    fail(`Core logic coverage regressed below its floor:\n${belowFloor.join("\n")}`);
+    fail(`Module coverage regressed below its floor:\n${belowFloor.join("\n")}`);
   }
 } catch (e) {
   fail(`Coverage gate could not run: ${e instanceof Error ? e.message : e}`);
@@ -159,7 +178,7 @@ console.log("\n─────────────────────�
 console.log("✅ PRODUCTION READY");
 console.log(`   debug artifacts : clean`);
 console.log(`   determinism     : enforced by deterministic-sim suite (npm test)`);
-console.log(`   coverage        : total ${coveragePct.toFixed(1)}% + core-module floors`);
+console.log(`   coverage        : total ${coveragePct.toFixed(1)}% + ${Object.keys(MODULE_FLOORS).length} module floors`);
 console.log(`   JS total        : ${(totalJs / 1e6).toFixed(2)} MB / ${(MAX_TOTAL_JS / 1e6).toFixed(2)} MB`);
 console.log(`   JS largest      : ${(largest.size / 1e6).toFixed(2)} MB / ${(MAX_LARGEST_JS / 1e6).toFixed(2)} MB`);
 console.log("─────────────────────────────────────────────\n");
