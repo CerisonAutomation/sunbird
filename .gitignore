@@ -51,3 +51,4 @@ sunbird-crazy.zip
 dist-generic/
 sunbird-generic.zip
 dist-itch/
+*.png  # screenshot artifacts — do not version
