@@ -26,23 +26,40 @@ start). To enable it:
 3. Optionally set `VITE_LEADERBOARD_SALT` (build) and `LEADERBOARD_SALT`
    (functions) to require HMAC-signed score submissions.
 
-**Multiplayer on Vercel:** the static frontend cannot host the WebSocket room
-server, so run the Rust `sunbird-server` on any WebSocket-capable host (a
-small VPS, Fly.io, Railway, etc.):
+**Multiplayer:** the Rust `sunbird-server` owns the WebSocket room protocol
+(`GET /ws`, 15 Hz state, server-refereed finishes). It is **live on a GCP
+free-tier VM**:
+
+- Host: `sunbird-mp` — e2-micro, `us-central1-a`, Ubuntu 24.04, 30 GB
+  standard disk, 4 GB swap (e2-micro has 1 GB RAM), external IP
+  `34.123.76.46`, running as a hardened systemd unit (`User=nobody`,
+  `MemoryMax=700M`, restart-on-failure). Always-free eligible.
+- Endpoint: `ws://34.123.76.46:8080/ws` — two-client join/welcome/peers/
+  start smoke-tested against the live VM.
+- Redeploy after server changes: `bash rust/deploy/gcloud/deploy.sh`
+  (cross-compiles for linux/amd64 in Docker, ships, restarts the service).
+
+**TLS note:** pages served over HTTPS (portals, Vercel) cannot open a plain
+`ws://` connection (mixed content). Portals currently build with
+`VITE_MULTIPLAYER_URL=` (solo field, honestly labelled) until a domain is
+pointed at the VM. To enable `wss://`: add an `A` record for your domain →
+`34.123.76.46`, then give Caddy (already installed on the VM) a one-line
+Caddyfile — it mints the Let's Encrypt cert automatically:
+
+```
+mp.yourdomain.com {
+    reverse_proxy /ws localhost:8080
+}
+```
+
+and set `VITE_MULTIPLAYER_URL=wss://mp.yourdomain.com` in the build env.
+
+For any other host, the manual equivalent is still:
 
 ```bash
 cargo build --release -p sunbird-server
 ./target/release/sunbird-server   # serves GET /ws on :8080
 ```
-
-Then set the env var in the Vercel project settings:
-
-```
-VITE_MULTIPLAYER_URL=wss://mp.example.com
-```
-
-and redeploy. Without it the game runs in solo/practice mode with local
-squadron pilots — fully playable, honestly labelled in the lobby UI.
 
 ## 2. Poki
 
