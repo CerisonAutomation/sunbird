@@ -105,8 +105,11 @@ export function formatDatePretty(iso: string): string {
 }
 
 export function formatDistance(m: number): string {
-  if (m >= 1000) return `${(m / 1000).toFixed(2)} km`;
-  return `${Math.floor(m)} m`;
+  // A corrupted/negative distance must never render as "-123 m" or "NaN m"
+  // in the HUD — clamp to a non-negative, finite value first.
+  const d = Number.isFinite(m) ? Math.max(0, m) : 0;
+  if (d >= 1000) return `${(d / 1000).toFixed(2)} km`;
+  return `${Math.floor(d)} m`;
 }
 
 /**

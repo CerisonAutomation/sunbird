@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDatePretty, truncate } from "../math";
+import { formatDatePretty, formatDistance, truncate } from "../math";
 
 describe("math string/date helpers", () => {
   it("truncate never splits a surrogate pair", () => {
@@ -37,5 +37,18 @@ describe("math string/date helpers", () => {
 
   it("formatDatePretty round-trips a non-numeric date", () => {
     expect(formatDatePretty("not-a-date")).toBe("not-a-date");
+  });
+
+  it("formatDistance formats metres and kilometres", () => {
+    expect(formatDistance(0)).toBe("0 m");
+    expect(formatDistance(999)).toBe("999 m");
+    expect(formatDistance(1000)).toBe("1.00 km");
+    expect(formatDistance(3121)).toBe("3.12 km");
+  });
+
+  it("formatDistance never renders garbage for a bad value", () => {
+    expect(formatDistance(-50)).toBe("0 m"); // clamp negative
+    expect(formatDistance(NaN)).toBe("0 m"); // NaN → 0
+    expect(formatDistance(Infinity)).toBe("0 m"); // Infinity → 0
   });
 });
