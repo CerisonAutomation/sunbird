@@ -127,6 +127,10 @@ export const SPLASH_QUIPS = [
   "That was a swan dive. You are not a swan",
   "The fish demand an apology",
   "Water landing! The geese are laughing",
+  "Soggy. Judged. 6/10 for commitment",
+  "The tide does not respect your personal best",
+  "You've invented swimming. Reluctantly",
+  "Somewhere a beach umbrella just closed in sympathy",
 ];
 
 export const SLEEP_QUIPS = [
@@ -138,6 +142,10 @@ export const SLEEP_QUIPS = [
   "Somewhere, a worm sighs in relief",
   "Sleep now. Revenge at sunrise",
   "The bird has left the flight simulator",
+  "You flew until the sky filed for overtime",
+  "The moon is covering your shift. Badly",
+  "Eyelids heavier than the headwind",
+  "Gravity tucked you in without asking",
 ];
 
 export const BIG_LAUNCH_QUIPS = [
@@ -149,6 +157,49 @@ export const BIG_LAUNCH_QUIPS = [
   "The clouds are pressing charges",
   "Physics rage-quit",
   "Air traffic control has questions",
+  "Local bird breaks sound barrier, polite about it",
+  "The ground waved bye-bye",
+  "That launch had a lawyer on retainer",
+  "Momentum called dibs on you",
+];
+
+/** Fresh pool: fever ignites. */
+export const FEVER_QUIPS = [
+  "The bird has entered its villain arc",
+  "Somewhere, the sun is taking notes",
+  "MAXIMUM BIRB",
+  "This is legally a heatwave now",
+  "The clouds are just spectators at this point",
+  "Molten. Fully molten",
+];
+
+/** Fresh pool: sky-gem pickups. */
+export const GEM_QUIPS = [
+  "That gem has been waiting its whole life for this",
+  "Sparkly. Like a very fast disco",
+  "The gem squealed. You heard nothing",
+  "One more and the ocean gets jealous",
+  "Polished to perfection — now it's yours",
+];
+
+/** Fresh pool: distance milestones. */
+export const MILESTONE_QUIPS = [
+  "The horizon just got smaller",
+  "Your legs are a rumor now",
+  "Distance: legally considered 'far'",
+  "The map is updating its notes on you",
+  "You're collecting horizon, one flap at a time",
+  "Somewhere a mile marker salutes",
+];
+
+/** Fresh pool: giving up mid-run. */
+export const SURRENDER_QUIPS = [
+  "The bird has chosen dignity. Bold move",
+  "Retreat? We call it 'tactical sunshine'",
+  "The sky will tell tales of your almost-flight",
+  "You can't lose if you're just resting. That's the rule",
+  "The worm breathes easy once more",
+  "Abort mission. The sun looked at us funny",
 ];
 
 /** Deterministic quip pick so tests can pin behaviour. */

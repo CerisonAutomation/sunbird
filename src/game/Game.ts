@@ -6,7 +6,8 @@ import { Bird, type BirdStepOpts } from "./Bird";
 import { CameraRig } from "./CameraRig";
 import { Collectibles, type CloudKind, type PickupKind } from "./Collectibles";
 import { evaluateNearMiss, FlowTuner, SessionGoals, type NearMiss } from "./Engagement";
-import { BIG_LAUNCH_QUIPS, SLEEP_QUIPS, SPLASH_QUIPS, SurpriseEngine, quip } from "./Surprises";
+import { BIG_LAUNCH_QUIPS, FEVER_QUIPS, GEM_QUIPS, MILESTONE_QUIPS, SLEEP_QUIPS, SPLASH_QUIPS, SURRENDER_QUIPS, SurpriseEngine, quip } from "./Surprises";
+import { Fx } from "./Fx";
 import { LaunchSystem, ratingLabel, type LaunchResult } from "./LaunchSystem";
 import { MASS_RACE_FIELD, MODES, modeById, RACE_FINISH, type ModeDef, type ModeId } from "./Modes";
 import { MassRace } from "./MassRace";
@@ -117,6 +118,9 @@ export class Game {
   private readonly bird: Bird;
   private readonly camera: CameraRig;
   private readonly particles: ParticleFX;
+  private readonly fx: Fx;
+  private readonly isMobile: boolean;
+  private useBloom = false;
   private readonly sky: Sky;
   private readonly mockPayments = new MockPaymentProvider();
   private readonly ads: AdProvider = new MockAdProvider();
@@ -354,6 +358,7 @@ export class Game {
     host.appendChild(canvas);
 
     const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+    this.isMobile = isMobile;
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: !isMobile,
@@ -392,6 +397,7 @@ export class Game {
     this.camera = new CameraRig(1);
     this.particles = new ParticleFX();
     this.particles.addTo(this.scene);
+    this.fx = new Fx(this.renderer, this.scene, this.camera.camera);
     this.sky = new Sky();
     this.scene.add(this.sky.group);
     this.sky.addLights(this.scene);
@@ -532,6 +538,7 @@ export class Game {
     this.terrain.dispose();
     this.bird.dispose();
     this.particles.dispose();
+    this.fx.dispose();
     this.sky.dispose();
     this.collect.dispose();
     this.p1?.dispose(this.scene);
@@ -961,6 +968,7 @@ export class Game {
         this.audio.duckMusic(0.5, 0.6);
         this.hud.toast(`${b.emoji} ${b.name}`, "island");
         this.flash("island");
+        this.glow(0.75);
         this.shake(0.7);
         this.haptic([40, 20, 60]);
         this.bonus += 80 * idx;
@@ -993,7 +1001,10 @@ export class Game {
         if (gem) {
           this.runGems += 1;
           this.particles.burstRing(x, y, 0x9ae8ff);
+          this.particles.emitSonicBoom(x, y);
+          this.glow(0.8);
           this.hud.toast(`Sky gem +${value}`, "gold");
+          if (this.runGems % 2 === 1) this.hud.toast(quip(GEM_QUIPS, this.runGems), "gold");
         }
         this.haptic(8);
       },
@@ -1039,6 +1050,11 @@ export class Game {
       this.nextMilestone += 500;
       this.audio.milestone();
       this.particles.emitSparkle(this.bird.x, this.bird.y);
+      // Every 1,000 m the sky heckles you — a wink to keep long runs fresh.
+      if (this.nextMilestone % 1000 === 0) {
+        this.hud.toast(quip(MILESTONE_QUIPS, this.nextMilestone), "cloud");
+        this.glow(0.25);
+      }
     }
     // STORMFRONT ESCALATION — the flagship hook: the storm is a character
     // with three acts. Same seed, same acts, for every pilot in the field.
@@ -1147,6 +1163,7 @@ export class Game {
         this.audio.goldenHour();
         this.hud.toast("🌇 GOLDEN HOUR — coins are worth double", "gold");
         this.flash("fever");
+        this.glow(0.8);
       } else if (!goldenNow && this.goldenHour) {
         this.goldenHour = false; // sun flask refilled the day
       }
@@ -1211,6 +1228,7 @@ export class Game {
       this.particles.burstRing(this.bird.x, this.bird.y, 0xffe08a);
       for (let i = 0; i < 10 + combo * 4; i++) this.particles.emitSparkle(this.bird.x, this.bird.y);
       this.flash("perfect");
+      this.glow(0.85);
       this.shake(0.35 + Math.min(0.4, combo * 0.06));
       // Hit stop: 2-frame freeze for cinematic impact.
       if (!this.save.state.settings.reduceMotion) {
@@ -1273,7 +1291,9 @@ export class Game {
       this.audio.setMusicMode("fever");
       this.hud.toast("FEVER", "fever");
       this.flash("fever");
+      this.glow(0.95);
       this.particles.emitConfetti(this.bird.x, this.bird.y);
+      this.hud.toast(quip(FEVER_QUIPS, this.perfectChain), "fever");
       this.telemetry.track("fever", { distance: Math.round(this.bird.x - this.startX) });
     }
   }
@@ -1334,6 +1354,7 @@ export class Game {
       this.particles.emitConfetti(x, y + 2);
       this.hud.toast(`RING CHAIN ×${this.ringChain} +${pts}`, "gold");
       this.flash("fever");
+      this.glow(0.6);
       this.audio.fanfare();
     } else {
       this.hud.toast(`Through the ring +${pts}`, "gold");
@@ -1358,6 +1379,7 @@ export class Game {
     this.shake(0.3);
     this.hud.toast("🎈 Balloon bounce! +150", "gold");
     this.flash("fever");
+    this.glow(0.7);
     this.haptic([20, 10, 40, 20, 60]);
     this.telemetry.track("balloon", {});
   }
@@ -1380,6 +1402,7 @@ export class Game {
         this.audio.duckMusic(0.6, 0.7);
         this.hud.toast(`ZENITH +${pts}`, "zenith");
         this.flash("perfect");
+        this.glow(0.8);
         this.haptic([60, 40, 80]);
         this.telemetry.track("zenith", { alt: Math.round(alt) });
       }
@@ -1439,8 +1462,11 @@ export class Game {
         break;
       case "goldenwings":
         this.particles.burstRing(x, y, 0xffd76a);
+        this.particles.emitConfetti(x, y + 2);
         this.flash("perfect");
+        this.glow(1.0);
         this.audio.island();
+        this.camera.punch(7);
         this.hud.toast("✨ GOLDEN WINGS ✨", "gold");
         break;
       case "cloudboost":
@@ -1535,7 +1561,12 @@ export class Game {
     const size = this.renderer.getSize(this.tmpSize);
     this.renderer.setViewport(0, 0, size.x, size.y);
     this.renderer.setScissorTest(false);
-    this.renderer.render(this.scene, this.camera.camera);
+    if (this.useBloom) {
+      this.updateGlowBase();
+      this.fx.render(rawDt);
+    } else {
+      this.renderer.render(this.scene, this.camera.camera);
+    }
   }
 
   /** Shared sky / fog / palette work, driven by whoever the camera follows. */
@@ -2749,6 +2780,8 @@ export class Game {
         const res = this.save.recordDuelResult(false, this.today);
         this.hud.toast(`⚔ Duel forfeited · ${res.delta} rating`, "warn");
       }
+      // A graceful retreat still deserves a punchline.
+      this.hud.toast(quip(SURRENDER_QUIPS, Math.round(this.bird.x)), "cloud");
     }
     this.duelActive = false;
     this.duelResult = "";
@@ -3121,6 +3154,10 @@ export class Game {
     this.audio.setMusicEnabled(s.music);
     this.audio.setVolumes(s.musicVolume, s.sfxVolume);
     this.camera.setReduceMotion(s.reduceMotion);
+    // Bloom is the expensive effect — desktop high/auto only, and never under
+    // reduced-motion (a steady glow reads as flicker to some players).
+    this.useBloom = !s.reduceMotion && !this.isMobile && s.quality !== "low";
+    if (!this.useBloom) this.fx.setBase(0);
     // Accessibility classes live on <html> so every overlay inherits them.
     document.documentElement.classList.toggle("a11y-color", s.colorAssist);
     document.documentElement.classList.toggle("a11y-bigtext", s.bigText);
@@ -3171,6 +3208,22 @@ export class Game {
 
   private shake(amount: number): void {
     this.camera.bump(amount);
+  }
+
+  /** Ambient bloom from game state, refreshed once per rendered frame. */
+  private updateGlowBase(): void {
+    if (!this.useBloom) return;
+    const golden = this.goldenHour ? 0.4 : 0;
+    const fever = this.feverOn ? 0.5 : 0;
+    const wings = this.powers.has("goldenwings") ? 0.45 : 0;
+    const boost = this.boostTimer > 0 ? 0.25 : 0;
+    this.fx.setBase(0.1 + Math.max(golden, fever, wings, boost));
+  }
+
+  /** Transient bloom spike on a trigger moment. */
+  private glow(amount: number): void {
+    if (!this.useBloom) return;
+    this.fx.pulse(amount);
   }
 
   private flash(kind: "perfect" | "fever" | "island" | "sleep"): void {
@@ -4060,6 +4113,7 @@ export class Game {
     this.renderer.setSize(w, h, false);
     this.camera.resize(w / Math.max(1, h));
     this.camera.setBaseFov(50);
+    this.fx.resize(w, h, this.dpr);
     if (this.p1 && this.p2) {
       const vertical = w / Math.max(1, h) >= 1.25;
       this.input.splitMode = this.versus ? (vertical ? "vertical" : "horizontal") : "off";

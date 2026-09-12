@@ -325,6 +325,7 @@ export class HUD {
   private readonly menuSky = new MenuSky();
   private menuCard!: HTMLElement;
   private pauseEl!: HTMLElement;
+  private pauseBtnEl!: HTMLElement;
   private contEl!: HTMLElement;
   private contCard!: HTMLElement;
   private adEl!: HTMLElement;
@@ -463,7 +464,7 @@ export class HUD {
           <div class="fever-label">FEVER</div>
           <div class="fever-bar"><div class="fever-fill" data-ref="feverFill"></div></div>
         </div>
-        <button class="icon-btn pause-btn" data-ui data-action="pause" aria-label="Pause">❙❙</button>
+        <button class="icon-btn pause-btn" data-ui data-action="pause" data-ref="pauseBtn" aria-label="Pause">❙❙</button>
         <div class="combo" data-ref="combo"></div>
         <div class="hint" data-ref="hint"></div>
         <div class="hand" data-ref="hand">☝</div>
@@ -539,6 +540,9 @@ export class HUD {
     // pass card reads as a glitch, not charm.
     this.menuSky.heroHost.classList.toggle("hidden", !(menuVisible && s.screen === "main"));
     this.pauseEl.classList.toggle("hidden", s.state !== "paused");
+    // The pause control only makes sense in live flight — hide it while the
+    // crash "second wind" card is up so it can't read as a dead button.
+    this.pauseBtnEl.classList.toggle("hidden", s.state !== "playing");
     this.contEl.classList.toggle("hidden", s.state !== "continue");
     this.adEl.classList.toggle("hidden", s.state !== "ad");
     this.overEl.classList.toggle("hidden", !(s.state === "gameover" && s.screen === "main"));
@@ -897,6 +901,7 @@ export class HUD {
     }
     this.menuCard = grab("menuCard");
     this.pauseEl = grab("pause");
+    this.pauseBtnEl = grab("pauseBtn");
     this.contEl = grab("continue");
     this.contCard = grab("contCard");
     this.adEl = grab("ad");
