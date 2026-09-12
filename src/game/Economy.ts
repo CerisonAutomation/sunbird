@@ -498,7 +498,7 @@ export const SKINS: SkinDef[] = [
 
   // --- Expanded catalogue (Elements · Cosmic · Seasonal · Tournament · Achievement collections) ---
   { id: "ember_wren", name: "Ember Wren", perk: "+3% speed · ember trail", price: 400, body: 0xcc4400, wing: 0xff8844, belly: 0xffddaa, beak: 0xffcc00, speedMult: 1.03, feverBonus: 0, daylightBonus: 0, magnetAlways: false, rarity: "common", collection: "elements" },
-  { id: "snow_owl", name: "Borealis", perk: "+8 s daylight", price: 550, body: 0x2fd6a0, wing: 0x8affd8, belly: 0xeafffa, beak: 0xffb020, speedMult: 1, feverBonus: 0, daylightBonus: 8, magnetAlways: false, rarity: "rare", collection: "elements" },
+  { id: "snow_owl", name: "Boreal Owl", perk: "+8 s daylight", price: 550, body: 0x2fd6a0, wing: 0x8affd8, belly: 0xeafffa, beak: 0xffb020, speedMult: 1, feverBonus: 0, daylightBonus: 8, magnetAlways: false, rarity: "rare", collection: "elements" },
   { id: "storm_rider", name: "Storm Rider", perk: "Weather immunity", price: 700, body: 0x2a3a5a, wing: 0x5a7a9a, belly: 0xd0e0f0, beak: 0xffa040, speedMult: 1.01, feverBonus: 1, daylightBonus: 0, magnetAlways: false, weatherProof: true, rarity: "rare", collection: "elements" },
   { id: "crystal", name: "Crystal Wing", perk: "+5% speed · +2 s daylight", price: 600, body: 0x88ccff, wing: 0xaaeeff, belly: 0xffffff, beak: 0xffd700, speedMult: 1.05, feverBonus: 0, daylightBonus: 2, magnetAlways: false, rarity: "rare", collection: "elements" },
   { id: "nebula", name: "Nebula", perk: "+3% speed · +3 s fever", price: 750, body: 0x6a3a8a, wing: 0xaa66cc, belly: 0xeeddff, beak: 0xffaa44, speedMult: 1.03, feverBonus: 3, daylightBonus: 0, magnetAlways: false, rarity: "epic", collection: "cosmic" },
