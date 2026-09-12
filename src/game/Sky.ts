@@ -367,7 +367,7 @@ export class Sky {
     scene.add(this.hemi);
     scene.add(this.sunLight);
     scene.add(this.sunLight.target);
-    scene.add(new THREE.AmbientLight(0xffecd6, 0.45));
+    scene.add(new THREE.AmbientLight(0xffecd6, 0.38));
   }
 
   /** Blend a world's signature sky over the time-of-day gradient. */
@@ -433,8 +433,9 @@ export class Sky {
     this.hemi.color.copy(this.mixHex(a.hemiSky, b.hemiSky, u));
     this.hemi.groundColor.copy(this.mixHex(a.hemiGround, b.hemiGround, u));
     this.sunLight.color.copy(this.mixHex(a.sun, b.sun, u));
-    this.sunLight.intensity = 0.35 + t * 0.7;
-    this.hemi.intensity = 0.7 + t * 0.4;
+    // Brighter key + richer fill so terrain reads crisp and defined.
+    this.sunLight.intensity = 0.4 + t * 0.78;
+    this.hemi.intensity = 0.74 + t * 0.42;
 
     const elev = 22 + t * 78;
     this.sun.position.set(36 + (1 - t) * 28, elev, -110);

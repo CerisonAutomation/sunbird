@@ -374,14 +374,14 @@ export class Game {
     this.renderer.setClearColor(0x87c8ee, 1);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.12;
+    this.renderer.toneMappingExposure = 1.18;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.dpr = this.preferredDpr();
     this.renderer.setPixelRatio(this.dpr);
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0x8ed0ee, 40, 220);
+    this.scene.fog = new THREE.Fog(0x8ed0ee, 62, 380);
 
     this.hud = new HUD(host);
     this.input = new Input(host, () => {
@@ -1639,8 +1639,8 @@ export class Game {
     if (this.scene.fog instanceof THREE.Fog) {
       this.scene.fog.color.copy(this.sky.fogColor).lerp(this.tmpColor.setHex(biome.fogTint), 0.25);
       // Thin the haze as we climb so the whole world opens up beneath the bird.
-      this.scene.fog.near = 40 + altT * 300;
-      this.scene.fog.far = 220 + altT * 900;
+      this.scene.fog.near = 62 + altT * 300;
+      this.scene.fog.far = 380 + altT * 900;
       this.renderer.setClearColor(this.scene.fog.color, 1);
     }
     this.altZone =

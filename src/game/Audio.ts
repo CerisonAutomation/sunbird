@@ -180,9 +180,10 @@ export class GameAudio {
   ): void {
     if (!this.ctx || !this.whooshGain || !this.whooshFilter || !this.windGain || this.adMuted) return;
     const t = this.ctx.currentTime;
+    // Fever swells the wind so the audio feels as hot as the visuals look.
     const whoosh =
       playing && grounded && speed > 8
-        ? Math.min(0.24, (speed / 90) * (diving ? 0.24 : 0.12))
+        ? Math.min(0.28, (speed / 90) * (diving ? 0.24 : 0.12) * (fever ? 1.35 : 1))
         : 0.0008;
     this.whooshGain.gain.setTargetAtTime(this.muted ? 0 : whoosh * this.sfxVol, t, 0.05);
     this.whooshFilter.frequency.setTargetAtTime(280 + speed * 18 + (diving ? 220 : 0), t, 0.08);
@@ -193,7 +194,6 @@ export class GameAudio {
 
     this.music?.setNight(1 - daylight);
     void dt;
-    void fever;
   }
 
   /* ---------- one-shots with juicy feedback ---------- */
