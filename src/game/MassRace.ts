@@ -232,11 +232,11 @@ export class MassRace {
    * Time-shifted multiplayer (the Real Racing 3 pattern): overlay real players
    * from the leaderboard onto local slots. Each ghost keeps the real pilot's
    * name and gets a skill derived from their submitted best distance, so a
-   * player who flew 3,000 m produces a genuinely hard double while a 600 m
+   * player who flew 4,000 m produces a genuinely hard double while a 600 m
    * newbie sits at the back. Returns how many ghosts were seated.
    */
   applyGhosts(rows: { name: string; distance: number }[], gate: number): number {
-    const span = gate > 0 ? gate : 3000;
+    const span = gate > 0 ? gate : 4000;
     const locals = this.rivals.filter((r) => r.kind === "local");
     let seated = 0;
     for (const row of rows) {
@@ -355,7 +355,7 @@ export class MassRace {
 
   /** Live roster for the top-of-screen bird bar. */
   roster(playerX: number, startX: number, finishDistance: number, playerName: string, playerHue = 0.06): RosterBird[] {
-    const span = finishDistance > 0 ? finishDistance : 3000;
+    const span = finishDistance > 0 ? finishDistance : 4000;
     const list: RosterBird[] = this.rivals.map((r) => ({
       id: r.id,
       name: r.name,

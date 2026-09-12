@@ -673,7 +673,7 @@ export class HUD {
           this.lastRosterAt = now;
           const leader = s.roster[0];
           const you = s.roster.find((r) => r.you);
-          const span = Math.max(1, s.raceFinish || 3000);
+          const span = Math.max(1, s.raceFinish || 4000);
           const gapM =
             leader && you && !you.finished
               ? Math.max(0, Math.round((leader.progress - you.progress) * span))
@@ -1110,7 +1110,7 @@ function renderLive(s: HudSnapshot): string {
     </div>
 
     <div class="lobby-rules">
-      <span><b>3,000 m</b> gate</span><span class="dot"></span>
+      <span><b>4,000 m</b> gate</span><span class="dot"></span>
       <span><b>${s.roomSize + 1}</b> birds</span><span class="dot"></span>
       <span>Same hills · same wind</span>
     </div>
@@ -1402,7 +1402,7 @@ function renderRank(s: HudSnapshot): string {
         <div><span>Best</span><b>×${s.duel.bestStreak}</b></div>
         <div><span>Prize</span><b>${s.duel.wins >= 10 ? "🐦 won" : `${s.duel.wins}/10`}</b></div>
       </div>
-      <button class="primary-btn hero" data-ui data-action="pvp-duel"><span class="hero-label">⚔ DUEL</span><span class="hero-hint">1v1 · first to 3,000 m · win 10 for the Hummingbird</span></button>
+      <button class="primary-btn hero" data-ui data-action="pvp-duel"><span class="hero-label">⚔ DUEL</span><span class="hero-hint">1v1 · first to 4,000 m · win 10 for the Hummingbird</span></button>
     </div>
     <button class="primary-btn race40 hero" data-ui data-action="pvp-ranked"><span class="hero-label">⚔ RACE RANKED</span><span class="hero-hint">climb or defend ${r.division}</span></button>
     <p class="fineprint">Your rating changes based on how you finish in ranked 40-bird races and duels. Reaching Sunbird Legend unlocks the Solstice bird. Seasons soft-reset monthly with a division reward.</p>
