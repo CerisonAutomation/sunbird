@@ -2588,42 +2588,6 @@ button {
 }
 .currency-item .coin-icon { color: #ffb020; }
 
-/* ---------- 6. VICTORY/DEFEAT ANIMATED BANNER ---------- */
-.victory-banner {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 20;
-  pointer-events: none;
-}
-.victory-text {
-  font-size: 64px;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-  animation: victorySlam 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-  text-shadow: 0 4px 0 rgba(42, 28, 40, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
-}
-.victory-text.win {
-  background: linear-gradient(135deg, #ffd76a, #ff8a4a);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-.victory-text.lose {
-  background: linear-gradient(135deg, #c8a0ff, #9060e0);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-@keyframes victorySlam {
-  0% { transform: scale(2.5); opacity: 0; }
-  50% { transform: scale(0.95); opacity: 1; }
-  70% { transform: scale(1.05); }
-  100% { transform: scale(1); opacity: 1; }
-}
-
 /* ---------- 7. MATCHMAKING ANIMATION ---------- */
 .matchmaking {
   position: absolute;
@@ -2656,41 +2620,6 @@ button {
   color: rgba(255, 255, 255, 0.7);
   letter-spacing: 0.08em;
 }
-
-/* ---------- 8. VS SCREEN ---------- */
-.vs-screen {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: rgba(20, 16, 40, 0.9);
-  z-index: 25;
-  gap: 12px;
-}
-.vs-title {
-  font-size: 48px;
-  font-weight: 900;
-  color: #ff6b4a;
-  text-shadow: 0 0 24px rgba(255, 107, 74, 0.5);
-  animation: vsPulse 0.5s ease;
-}
-@keyframes vsPulse {
-  0% { transform: scale(0.5); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
-}
-.vs-players {
-  display: flex;
-  gap: 40px;
-  align-items: center;
-}
-.vs-player {
-  text-align: center;
-  color: #fff;
-}
-.vs-player-name { font-size: 18px; font-weight: 700; margin-top: 8px; }
-.vs-player-rank { font-size: 12px; color: rgba(255, 255, 255, 0.6); }
 
 /* ---------- 9. PLAY AGAIN BUTTON (primary on results) ---------- */
 .play-again-btn {

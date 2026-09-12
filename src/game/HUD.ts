@@ -487,9 +487,7 @@ export class HUD {
 
       <div class="toasts" data-ref="toasts"></div>
       <div class="flash" data-ref="flash"></div>
-      <div class="victory-banner hidden" data-ref="victoryBanner"><div class="victory-text" data-ref="victoryText"></div></div>
       <div class="matchmaking hidden" data-ref="matchmaking"><div class="matchmaking-spinner"></div><div class="matchmaking-count" data-ref="matchmakingCount">0 pilots</div><div class="matchmaking-label" data-ref="matchmakingLabel">Searching for live pilots…</div><button class="soft-btn mm-cancel" data-ui data-action="mm-cancel">Cancel</button></div>
-      <div class="vs-screen hidden" data-ref="vsScreen"><div class="vs-title">VS</div><div class="vs-players"><div class="vs-player"><div class="vs-player-name" data-ref="vsP1">You</div></div><div class="vs-player"><div class="vs-player-name" data-ref="vsP2">Rival</div></div></div></div>
     `;
     parent.appendChild(this.root);
     this.bind();
