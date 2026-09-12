@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { Bird } from "./Bird";
 import { BIRD_RADIUS } from "./constants";
 import { LaunchSystem } from "./LaunchSystem";
-import { clamp, lerp, SeededRandom } from "./math";
+import { clamp, lerp, SeededRandom, truncate } from "./math";
 import type { TerrainSystem } from "./TerrainSystem";
 
 /**
@@ -248,7 +248,7 @@ export class MassRace {
     for (const row of rows) {
       const slot = locals[seated];
       if (!slot) break;
-      const name = row.name.trim().slice(0, 14);
+      const name = truncate(row.name.trim(), 14);
       if (!name) continue;
       const skill = clamp(0.3 + 0.6 * (row.distance / span), 0.3, 1);
       slot.name = name;
@@ -331,7 +331,7 @@ export class MassRace {
         rival.kind = "remote";
         rival.ghost = false;
       }
-      rival.name = typeof snap.name === "string" ? snap.name.slice(0, 14) : rival.name;
+      rival.name = typeof snap.name === "string" ? truncate(snap.name, 14) : rival.name;
       rival.bird.x = snap.x;
       rival.bird.y = snap.y;
       rival.bird.rotation = snap.rotation;

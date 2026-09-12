@@ -1,4 +1,4 @@
-import { dateSeed } from "./math";
+import { dateSeed, truncate } from "./math";
 
 /**
  * Global leaderboard.
@@ -78,7 +78,7 @@ export function isLeaderboardOnline(): boolean {
 export function loadPilotName(fallbackId: string): string {
   try {
     const v = localStorage.getItem(NAME_KEY);
-    if (v && v.trim()) return v.trim().slice(0, 14);
+    if (v && v.trim()) return truncate(v.trim(), 14);
   } catch {
     /* private mode */
   }
@@ -86,7 +86,7 @@ export function loadPilotName(fallbackId: string): string {
 }
 
 export function savePilotName(name: string): string {
-  const clean = name.replace(/[^\p{L}\p{N} _.-]/gu, "").trim().slice(0, 14) || "Pilot";
+  const clean = truncate(name.replace(/[^\p{L}\p{N} _.-]/gu, "").trim(), 14) || "Pilot";
   try {
     localStorage.setItem(NAME_KEY, clean);
   } catch {
@@ -279,7 +279,7 @@ export class Leaderboard {
     const id = String(r.deviceId ?? r.id ?? "");
     return {
       id,
-      name: String(r.name ?? "Pilot").slice(0, 14),
+      name: truncate(String(r.name ?? "Pilot"), 14),
       value: metricOf(base, metric),
       ...base,
       skin: String(r.skin ?? "sunbird"),

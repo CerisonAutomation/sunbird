@@ -1,4 +1,5 @@
 import type { NetTransport, RemoteSnapshot } from "./MassRace";
+import { truncate } from "./math";
 import { PROTOCOL_VERSION } from "./protocol/v1";
 
 /**
@@ -301,7 +302,7 @@ export class RealtimeClient implements NetTransport {
           const existing = this.tracks.get(p.id);
           const t = this.track(p.id);
           const wasReady = t.ready;
-          t.name = typeof p.name === "string" ? p.name.slice(0, 14) : t.name;
+          t.name = typeof p.name === "string" ? truncate(p.name, 14) : t.name;
           t.hue = Number.isFinite(p.hue) ? p.hue : t.hue;
           t.skin = p.skin || t.skin;
           t.ready = Boolean(p.ready);
