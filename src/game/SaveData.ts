@@ -4,6 +4,7 @@ import {
   INTERSTITIAL_EVERY,
   NEST_MULT_PER_LEVEL,
   SAVE_KEY,
+  SAVE_KEY_CORRUPT,
   SAVE_KEY_V1,
   VIP_DAILY_GIFT,
   VIP_DAYS,
@@ -283,6 +284,9 @@ function parseRival(v: unknown): RivalState {
 
 export class SaveData {
   state: SaveState;
+  /** True when the on-disk save was unreadable this session and we booted
+   *  clean. The corrupt payload is parked under SAVE_KEY_CORRUPT, not lost. */
+  recoveredFromCorruption = false;
 
   constructor() {
     this.state = this.load();
@@ -290,8 +294,9 @@ export class SaveData {
 
   private load(): SaveState {
     const d = defaults();
+    let raw: string | null = null;
     try {
-      const raw = localStorage.getItem(SAVE_KEY) ?? localStorage.getItem(SAVE_KEY_V1);
+      raw = localStorage.getItem(SAVE_KEY) ?? localStorage.getItem(SAVE_KEY_V1);
       if (!raw) {
         this.persistNow(d);
         return d;
@@ -447,6 +452,18 @@ export class SaveData {
         social: parseSocial(p.social),
       };
     } catch {
+      // Corruption recovery: never destroy a player's data. If we actually read
+      // a blob but couldn't parse it, park it under a dedicated key before
+      // booting clean, so it survives for manual recovery instead of being
+      // silently overwritten by the next persist().
+      if (raw !== null) {
+        this.recoveredFromCorruption = true;
+        try {
+          localStorage.setItem(SAVE_KEY_CORRUPT, raw);
+        } catch {
+          /* ignore — nothing more we can do */
+        }
+      }
       return d;
     }
   }

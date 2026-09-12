@@ -94,6 +94,9 @@ export const CAMERA_LOOKAHEAD = 0.22;
 
 export const SAVE_KEY_V1 = "sunbird.save.v1";
 export const SAVE_KEY = "sunbird.save.v2";
+/** Where an unreadable save is parked before a clean boot, so player data is
+ *  never destroyed by the corruption-recovery path. */
+export const SAVE_KEY_CORRUPT = "sunbird.save.corrupt";
 
 export const DAYLIGHT_MAX_GOLD = 62;
 export const CONTINUE_COST = 80;

@@ -345,6 +345,10 @@ export class Game {
 
   constructor(private readonly host: HTMLElement) {
     this.save = new SaveData();
+    // Corruption recovery is a data-loss event worth knowing about: the blob is
+    // parked (not destroyed), but the player is silently starting fresh unless
+    // we say so. Track it once, and toast it below once the HUD exists.
+    if (this.save.recoveredFromCorruption) this.telemetry.track("save_corrupt_recovered", {});
     this.flow.load(this.save);
     this.goals = new SessionGoals(this.flow);
     this.missions = new Missions(this.save);
@@ -503,6 +507,7 @@ export class Game {
     const vipGift = this.save.claimVipDaily(this.today);
     window.setTimeout(() => {
       if (this.disposed) return;
+      if (this.save.recoveredFromCorruption) this.hud.toast("⚠ Save couldn't be read — kept a backup, starting fresh", "warn");
       if (streakReward > 0) this.hud.toast(`Day ${this.save.state.streak.days} streak · +${streakReward} coins`, "gold");
       if (vipGift > 0) this.hud.toast(`VIP daily gift · +${vipGift} coins`, "vip");
     }, 700);
