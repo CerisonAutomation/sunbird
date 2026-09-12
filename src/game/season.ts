@@ -4,6 +4,7 @@
  */
 
 export function seasonId(date = new Date()): string {
+  // Local calendar month, matching monthKey/weekBounds gameplay windows.
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 

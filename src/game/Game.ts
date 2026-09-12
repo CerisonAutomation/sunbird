@@ -5,7 +5,7 @@ import { BIOMES, biomeForIsland } from "./Biomes";
 import { TRACK_NAMES } from "./Music";
 import { Bird, type BirdStepOpts } from "./Bird";
 import { CameraRig } from "./CameraRig";
-import { Collectibles, type CloudKind, type PickupKind } from "./Collectibles";
+import { PICKUP_STYLE, Collectibles, type CloudKind, type PickupKind } from "./Collectibles";
 import { evaluateNearMiss, FlowTuner, SessionGoals, type NearMiss } from "./Engagement";
 import { BIG_LAUNCH_QUIPS, FEVER_QUIPS, GEM_QUIPS, MILESTONE_QUIPS, SLEEP_QUIPS, SPLASH_QUIPS, SURRENDER_QUIPS, SurpriseEngine, quip } from "./Surprises";
 import { Fx } from "./Fx";
@@ -65,7 +65,9 @@ import {
   ZENITH_SLOWMO,
 } from "./constants";
 import { BOOSTS, COLLECTIONS, GOLD, PROMO_CODES, SHOP_TRAILS, SKINS, STARTER_PACK, VIP, dailyDealBoost, skinById, type BoostView, type ShopTrailView, type SkinDef, type SkinView } from "./Economy";
+import { nextWings, wingsFor, wingsProgress, wingsPromotion } from "./Career";
 import { GhostPlayer, GhostRecorder } from "./Ghost";
+import { fetchRivalGhost, publishGhost } from "./GhostNet";
 import { HUD, type CalendarCard, type CheckoutMode, type DailyCard, type GauntletCard, type HudSnapshot, type LoadoutView, type RivalCard, type SeedMode, type UiScreen, type UiState } from "./HUD";
 import { divisionFor, duelOpponent, duelSkillFor, featuredRivals, nextDivision, seasonReward } from "./pvp";
 import { Input } from "./Input";
@@ -73,7 +75,7 @@ import { clamp, dateSeed, formatDatePretty, lerp, SeededRandom } from "./math";
 import { Missions, type MissionView, type QuestReward, type QuestView, type RunStats } from "./Missions";
 import { ParticleFX } from "./ParticleFX";
 import { TrailRibbon } from "./Trail";
-import {
+import { fetchServerEntitlements,
   consumeStripeReturn,
   ensureStripeJs,
   MockAdProvider,
@@ -133,6 +135,12 @@ export class Game {
   private readonly telemetry = new Telemetry();
   private readonly ghostRecorder = new GhostRecorder();
   private readonly ghostPlayer = new GhostPlayer();
+  /** Network rival ghost (async PvP on the daily seed) — amber silhouette. */
+  private readonly rivalGhostPlayer = new GhostPlayer();
+  private rivalGhostName = "";
+  private rivalGhostPassed = false;
+  /** Run counter — guards async ghost loads against arriving mid-next-run. */
+  private runEpoch = 0;
   private readonly livingBg = new LivingBackground();
   private terrain: TerrainSystem;
   private collect: Collectibles;
@@ -268,6 +276,12 @@ export class Game {
   private stormfront = false;
   /** Stormfront phase (1-3): the storm escalates as the field advances. */
   private stormPhase = 1;
+  /** First thermal of the run gets a toast; the HUD chip covers the rest. */
+  private thermalToasted = false;
+  /** Flight recap: downsampled [x, y] profile of the finished run. */
+  private flightPath: [number, number][] = [];
+  /** Weekly-event physics mods, cached at run start (hot path: every frame + every coin). */
+  private weeklyMods = { coinMult: 1, gravityMult: 1, windMult: 1, daylightMult: 1 };
   /** Golden Hour: the last stretch of daylight — 2× coins, amber world. */
   private goldenHour = false;
   private nextMilestone = 500;
@@ -407,7 +421,9 @@ export class Game {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.18;
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // PCFSoftShadowMap was removed in three r165+ — PCF with a slightly larger
+    // shadow map is the soft look without the console warning every load.
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.dpr = this.preferredDpr();
     this.renderer.setPixelRatio(this.dpr);
 
@@ -433,6 +449,8 @@ export class Game {
     this.bird = new Bird();
     this.bird.addTo(this.scene);
     this.ghostPlayer.addTo(this.scene);
+    this.rivalGhostPlayer.addTo(this.scene);
+    this.rivalGhostPlayer.setTint(0xffc86a, 0xffe8b0);
     this.scene.add(this.livingBg);
 
     this.camera = new CameraRig(1);
@@ -579,6 +597,8 @@ export class Game {
     window.removeEventListener("beforeinstallprompt", this.onBeforeInstall);
     window.removeEventListener("appinstalled", this.onInstalled);
     window.removeEventListener("focus", this.onFocus);
+    this.telemetry.flush();
+    this.telemetry.dispose();
     this.weather.dispose();
     this.net?.disconnect();
     this.massRace.dispose();
@@ -781,7 +801,7 @@ export class Game {
         // Slipstream: tucking behind a rival genuinely reduces your drag.
         dragMult: this.powers.dragMult() * this.massRace.draftFor(this.bird.x, this.bird.y),
         feather: this.powers.featherOn(),
-        gravityMult: this.eventRun ? weeklyEvent().mods.gravityMult : 1,
+        gravityMult: this.eventRun ? this.weeklyMods.gravityMult : 1,
       },
       this.terrain,
     );
@@ -812,6 +832,15 @@ export class Game {
     if (this.bird.justLanded) this.onLanding();
 
     this.ghostRecorder.sample(dt, this.runTime, this.bird.x, this.bird.y, this.bird.rotation);
+    if (this.rivalGhostPlayer.active) {
+      const rx = this.rivalGhostPlayer.update(this.runTime, dt);
+      if (rx !== null && !this.rivalGhostPassed && this.bird.x > rx + 0.5 && this.runTime > 4) {
+        this.rivalGhostPassed = true;
+        this.hud.toast(`👻 Passed ${this.rivalGhostName}'s flight!`, "gold");
+        this.audio.ding();
+        this.bonus += 60;
+      }
+    }
     if (this.ghostPlayer.active) {
       const gx = this.ghostPlayer.update(this.runTime, dt);
       if (gx !== null) {
@@ -834,7 +863,12 @@ export class Game {
     this.weather.update(dt, this.elapsed, this.bird, this.terrain, diving, {
       onThermalEnter: () => {
         this.audio.thermal();
-        if (this.hintTimer < 40) this.hud.toast("Thermal — release to ride it", "power");
+        // Once per run: after the first call-out the ♨ HUD chip carries the
+        // message — toasting every thermal doubled the same text on screen.
+        if (!this.thermalToasted && this.hintTimer < 40) {
+          this.thermalToasted = true;
+          this.hud.toast("Thermal — release to ride it", "power");
+        }
       },
       onGustStart: () => {
         this.audio.gust();
@@ -1062,7 +1096,7 @@ export class Game {
     }
 
     const magnetOn = this.feverOn || this.magnetTimer > 0 || skin.magnetAlways || this.powers.magnetOn();
-    this.collect.update(dt, this.bird, this.terrain, magnetOn, this.elapsed, {
+    this.collect.update(dt, this.bird, this.terrain, magnetOn, this.elapsed, this.powers.magnetScale(), {
       onCoin: (x, y, gem) => {
         const base = gem ? 5 : 1;
         const value = Math.round(
@@ -1072,7 +1106,7 @@ export class Game {
             (this.mode.id === "coinrush" ? 2 : 1) *
             this.challengeMods.coinMult *
             this.masteryPerk.coinMult *
-            (this.eventRun ? weeklyEvent().mods.coinMult : 1) *
+            (this.eventRun ? this.weeklyMods.coinMult : 1) *
             (this.goldenHour ? 2 : 1) *
             (this.stormfront && this.stormPhase >= 3 ? 2 : 1),
         );
@@ -1535,7 +1569,22 @@ export class Game {
     this.audio.powerup();
     this.particles.emitCollect(x, y);
     this.haptic([40, 30, 40, 30, 100]);
+    const wasLive = this.powers.has(kind);
     this.powers.add(kind);
+    // OVERCHARGE: doubling up while live promotes the power-up to tier II.
+    if (wasLive && this.powers.level(kind) === 2) {
+      // Impulse-style effects still fire — the promotion adds, never removes.
+      if (kind === "rocket") {
+        this.boostTimer = BOOST_TIME;
+        this.bird.vx += 42;
+        this.bird.vy += 8;
+        this.shake(0.55);
+      }
+      this.particles.burstRing(x, y, 0xffffff);
+      this.hud.toast(`⚡ OVERCHARGE II — ${PICKUP_STYLE[kind].label}`, "zenith");
+      this.shake(0.3);
+      return;
+    }
     switch (kind) {
       case "sun":
         this.daylight = Math.min(this.daylightMax(), this.daylight + PICKUP_SUN_TIME);
@@ -1611,7 +1660,9 @@ export class Game {
     const slope = this.terrain.slopeAt(this.bird.x);
     if (this.hintTimer < 2.6 && slope < -0.08) return "HOLD to dive";
     if (slope > 0.16 && this.bird.grounded && this.bird.speed() > 18) return "RELEASE to launch";
-    if (this.weather.inThermal && !this.input.diving) return "Riding the thermal!";
+    // No thermal line here: the ♨ HUD chip already says "release!" — three
+    // simultaneous thermal texts (toast + chip + hint) was the worst offender
+    // of the multiple-text bug.
     if (this.terrain.isOcean(this.bird.x + 40) && !this.terrain.isOcean(this.bird.x)) return "Build speed — then RELEASE";
     return "";
   }
@@ -1708,6 +1759,14 @@ export class Game {
     this.updateTrailRibbon(visDt);
     this.particles.update(visDt);
     this.camera.update(rawDt, this.bird, playing, this.terrain.heightAt(this.bird.x));
+    // Sink foreground props that would cross the bird's sight line (per-view
+    // in split-screen so neither player loses their bird behind a tree).
+    this.terrain.updateOcclusion(
+      [{ x: this.bird.x, y: this.bird.y }],
+      this.camera.camera.position.x,
+      this.camera.camera.position.y,
+      this.camera.camera.position.z,
+    );
     this.livingBg.update(rawDt, this.bird.x, this.bird.y);
 
     this.applyWorldLook(this.bird.x, this.bird.altitude);
@@ -1767,6 +1826,17 @@ export class Game {
     p2.updateCamera(rawDt, playing, this.terrain);
 
     const lead = p1.bird.x >= p2.bird.x ? p1 : p2;
+    // Occlusion against both birds, sampled from the lead camera — a prop that
+    // blocks either player's view sinks out of the way.
+    this.terrain.updateOcclusion(
+      [
+        { x: p1.bird.x, y: p1.bird.y },
+        { x: p2.bird.x, y: p2.bird.y },
+      ],
+      lead.camera.camera.position.x,
+      lead.camera.camera.position.y,
+      lead.camera.camera.position.z,
+    );
     this.applyWorldLook(lead.bird.x, lead.bird.altitude);
     this.terrain.update(lead.bird.x);
     this.audio.update(rawDt, lead.bird.speed(), playing && this.input.diving, lead.bird.grounded, false, 1, playing, 0);
@@ -1827,11 +1897,13 @@ export class Game {
     this.challengeRun = opts?.challenge ?? "";
     this.challengeMods = this.challengeRun === "daily" ? modsFor(dailyChallenge(this.today).modifier.id) : NO_MODS;
     this.eventRun = Boolean(opts?.event);
+    if (this.eventRun) this.weeklyMods = weeklyEvent().mods;
     this.serverPlaceApplied = false;
     this.goldenHour = false;
     this.nextMilestone = 500;
     this.rivalBeatenToast = false;
     this.stormPhase = 1;
+    this.thermalToasted = false;
     // Stormfront survives only through launchMatch(); any other entry resets.
     if (!opts?.storm) this.stormfront = false;
     this.challengeOutcome = "";
@@ -1848,8 +1920,8 @@ export class Game {
     this.daylight =
       (this.mode.clock > 0 ? this.mode.clock : this.daylightMax()) *
       this.challengeMods.daylightMult *
-      (this.eventRun ? weeklyEvent().mods.daylightMult : 1);
-    this.weather.windMult = (this.eventRun ? weeklyEvent().mods.windMult : 1) * (this.stormfront ? 1.7 : 1);
+      (this.eventRun ? this.weeklyMods.daylightMult : 1);
+    this.weather.windMult = (this.eventRun ? this.weeklyMods.windMult : 1) * (this.stormfront ? 1.7 : 1);
     this.weather.stormfront = this.stormfront;
     if (this.stormfront) this.hud.toast("⛈ STORMFRONT — same storm for every pilot. Survive and outfly.", "warn");
     // Mass Race: build the 40-bird grid on the *same* seed so the field is
@@ -2037,9 +2109,21 @@ export class Game {
     this.flow.noteRun(stats.distance, this.perfects, this.launch.goods + this.launch.greats + this.launch.perfects, this.save);
     this.terrain.setDifficulty(this.flow.difficulty());
 
+    // Publish this flight to the ghost network (daily seed only, best-per-
+    // pilot kept server-side; silent no-op without a backend).
+    if (this.seedMode === "today" && !this.versus && !this.seed.startsWith("fly-") && stats.distance > 100) {
+      void publishGhost({
+        seed: this.seed,
+        deviceId: this.save.state.deviceId,
+        name: this.racedName(),
+        distance: stats.distance,
+        samples: this.ghostRecorder.snapshot(),
+      });
+    }
     // One-off "fresh hills" runs have no stable seed to build a personal best
     // on, so skip ghost recording for them (the ghost only ever replays a
-    // run on identical terrain).
+    // run on identical terrain). The seedMode check above already keeps them
+    // off the ghost network; this guard keeps them out of local replays too.
     const beatGhost = this.seed.startsWith("fly-") ? false : this.ghostRecorder.commit(this.seed, stats.distance);
     if (beatGhost) {
       this.hud.toast("New personal ghost recorded", "gold");
@@ -2167,7 +2251,27 @@ export class Game {
       }
     }
     const score = this.score();
+    // FLIGHT RECAP — the run's altitude profile, drawn on the results card.
+    // The ghost recorder already sampled the whole flight; thin it to ~72
+    // points and normalize x to metres-from-start.
+    {
+      const s = this.ghostRecorder.snapshot();
+      const pts: [number, number][] = [];
+      const step = Math.max(1, Math.floor(s.length / 72));
+      for (let i = 0; i < s.length; i += step) pts.push([s[i]![1] - this.startX, s[i]![2]]);
+      if (s.length > 0) pts.push([s[s.length - 1]![1] - this.startX, s[s.length - 1]![2]]);
+      this.flightPath = pts.length >= 3 ? pts : [];
+    }
+    const lifetimeBefore = this.save.state.lifetime.distance;
     this.save.recordRun(stats.distance, this.runCoins, score, this.today, this.island, this.terrain.biomeAt(this.bird.x).id);
+    // CAREER WINGS promotion — a lifetime rank-up is rare; make it land.
+    const promo = wingsPromotion(lifetimeBefore, this.save.state.lifetime.distance);
+    if (promo) {
+      this.audio.fanfare();
+      this.particles.emitConfetti(this.bird.x, this.bird.y + 4);
+      this.hud.toast(`${promo.icon} ${promo.name.toUpperCase()} — lifetime rank earned`, "gold");
+      this.telemetry.track("wings_promo", { tier: promo.id });
+    }
     this.save.addLifetimeZeniths(stats.zenith);
     this.save.addLifetimeSunflowers(this.runSunflowers);
     // distance XP is awarded at the end; everything else accrued live during the flight
@@ -2332,7 +2436,24 @@ export class Game {
     this.lastBiomeId = idle ? "" : this.terrain.biomeAt(this.startX).id;
     this.ghostRecorder.reset();
     this.ghostPlayer.reset();
-    if (!idle) this.ghostPlayer.load(this.seed);
+    this.rivalGhostPlayer.reset();
+    this.rivalGhostPlayer.loadRecord(null);
+    this.rivalGhostPassed = false;
+    this.runEpoch += 1;
+    if (!idle) {
+      this.ghostPlayer.load(this.seed);
+      // Async PvP: chase a REAL player's flight on today's hills. Arrives
+      // quietly a moment into the run; a dead backend costs nothing.
+      if (this.seedMode === "today" && !this.versus && !this.massRace.active) {
+        const epoch = this.runEpoch;
+        void fetchRivalGhost(this.seed, this.save.state.deviceId, this.save.state.bestDistance).then((rg) => {
+          if (!rg || this.disposed || epoch !== this.runEpoch || this.state !== "playing") return;
+          this.rivalGhostName = rg.name;
+          this.rivalGhostPlayer.loadRecord({ seed: this.seed, distance: rg.distance, samples: rg.samples });
+          this.hud.toast(`👻 ${rg.name} flew ${Math.round(rg.distance)} m here — chase them`, "quest");
+        });
+      }
+    }
     this.launch.reset();
     this.powers.reset();
     this.runGems = 0;
@@ -3159,6 +3280,24 @@ export class Game {
     this.checkoutOk = true;
     this.setScreen("checkout");
     this.setState("menu");
+    // Upgrade the receipt to server-verified once the webhook lands (webhooks
+    // typically beat the redirect, but poll once more after a short grace).
+    void this.syncServerEntitlements();
+    window.setTimeout(() => void this.syncServerEntitlements(), 5000);
+  }
+
+  /** Pull webhook-verified purchases from the backend and grant any missing.
+   * Silent no-op when no backend is configured — local flow is unchanged. */
+  private async syncServerEntitlements(): Promise<void> {
+    const skus = await fetchServerEntitlements(this.save.state.deviceId);
+    if (this.disposed || skus.length === 0) return;
+    for (const sku of skus) {
+      const owned =
+        sku === "sunbird_gold" ? this.save.state.gold
+        : sku === "sunbird_vip" ? this.save.isVipActive()
+        : this.save.state.starterPack;
+      if (!owned) this.grantSku(sku, "stripe_webhook");
+    }
   }
 
   private grantSku(sku: Sku, source: string): void {
@@ -3183,6 +3322,8 @@ export class Game {
   private restore(): void {
     this.restoreMessage = "Checking…";
     this.bump();
+    // Server-verified entitlements first (authoritative), local receipts second.
+    void this.syncServerEntitlements();
     void this.mockPayments.restore().then((skus) => {
       if (this.disposed) return;
       let found = false;
@@ -3923,6 +4064,20 @@ export class Game {
     return { cycleDay: cal.cycleDay, claimedToday, days };
   }
 
+  private wingsCard(): HudSnapshot["wings"] {
+    const life = this.save.state.lifetime.distance;
+    const cur = wingsFor(life);
+    const next = nextWings(life);
+    return {
+      icon: cur.icon,
+      name: cur.name,
+      progress: wingsProgress(life),
+      nextName: next ? next.tier.name : "",
+      nextNeeded: next ? next.needed : 0,
+      lifetime: life,
+    };
+  }
+
   private rivalCard(): RivalCard {
     const r = this.save.state.rival;
     const div = divisionFor(r.rating);
@@ -4070,6 +4225,8 @@ export class Game {
       adTotal: this.ads.duration,
       adReason: this.adReason,
       seedLabel: this.seedLabel(),
+      wings: this.wingsCard(),
+      flightPath: this.state === "gameover" ? this.flightPath : [],
       rivalBanner: this.rival && this.rivalResult === "" ? `${this.rival.name}|${this.rival.distance}` : "",
       seedMode: this.seedMode,
       wallet: st.wallet,
