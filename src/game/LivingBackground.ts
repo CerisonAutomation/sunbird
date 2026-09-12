@@ -101,21 +101,21 @@ export class LivingBackground extends THREE.Group {
 
     // Soft background cloud sprites at varying depths.
     this.cloudTex = makeCloudTexture();
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < 5; i++) {
       const mat = new THREE.SpriteMaterial({
         map: this.cloudTex,
         transparent: true,
-        opacity: 0.1 + (i / 9) * 0.12,
+        opacity: 0.07 + (i / 5) * 0.09,
         depthWrite: false,
         fog: false,
       });
       const sp = new THREE.Sprite(mat);
-      const scale = 14 + (i / 9) * 22;
+      const scale = 14 + (i / 5) * 22;
       sp.scale.set(scale, scale * 0.42, 1);
       sp.userData = {
-        ox: (i / 9) * 220 - 60,
+        ox: (i / 5) * 220 - 60,
         oy: 30 + (i % 4) * 11,
-        depth: 0.04 + (i / 9) * 0.18,
+        depth: 0.04 + (i / 5) * 0.18,
       };
       this.clouds.push(sp);
       this.add(sp);

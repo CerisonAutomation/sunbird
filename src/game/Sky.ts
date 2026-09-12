@@ -199,7 +199,7 @@ export class Sky {
     );
     this.group.add(this.sun);
 
-    this.sunGlow = makeGlow(0xffe08a, 48);
+    this.sunGlow = makeGlow(0xffc86a, 76);
     this.group.add(this.sunGlow);
 
     this.moon = new THREE.Mesh(
@@ -278,7 +278,7 @@ export class Sky {
     // Soft, deep background cloud banks create altitude scale without adding
     // interaction noise. They are parallaxed independently from the hills.
     this.hazeTex = makeHazeTexture();
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 6; i++) {
       const mat = new THREE.SpriteMaterial({
         map: this.hazeTex,
         color: 0xffffff,
@@ -288,7 +288,7 @@ export class Sky {
         fog: false,
       });
       const sprite = new THREE.Sprite(mat);
-      const baseX = -260 + i * 62 + (i % 3) * 13;
+      const baseX = -260 + i * 90 + (i % 3) * 13;
       const baseY = 16 + (i % 4) * 10;
       sprite.position.set(baseX, baseY, -50 - (i % 3) * 18);
       sprite.scale.set(38 + (i % 3) * 12, 13 + (i % 2) * 5, 1);
@@ -454,14 +454,14 @@ export class Sky {
     // Space scenery fades in with altitude (the stratosphere opens out) and is
     // also present at night, so a midnight coast shows the full deep sky.
     const space = Math.max(saturate((0.25 - t) / 0.25), smoothstep(0.35, 0.9, this.altT));
-    this.milkyWay.material.opacity = space * 0.5;
+    this.milkyWay.material.opacity = space * 0.32;
     for (const n of this.nebulas) {
       const nx = n.userData.baseX as number;
       const ny = n.userData.baseY as number;
       // Very slow drift so the nebulae feel alive, not painted on.
       n.position.x = nx + Math.sin(time * 0.02 + ny) * 14;
       n.position.y = ny + Math.cos(time * 0.015 + nx) * 10;
-      (n.material as THREE.SpriteMaterial).opacity = space * 0.16;
+      (n.material as THREE.SpriteMaterial).opacity = space * 0.09;
     }
     for (const p of this.planets) {
       (p.mesh.material as THREE.MeshBasicMaterial).opacity = space;
@@ -476,7 +476,7 @@ export class Sky {
       -240,
     );
 
-    const hazeAlpha = (0.11 + this.hazeDensity * 0.12) * (1 - this.altT * 0.75) * (0.5 + t * 0.5);
+    const hazeAlpha = (0.07 + this.hazeDensity * 0.09) * (1 - this.altT * 0.75) * (0.5 + t * 0.5);
     for (const sprite of this.haze) {
       const mat = sprite.material as THREE.SpriteMaterial;
       const phase = sprite.userData.phase as number;

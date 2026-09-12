@@ -131,6 +131,10 @@ export const SPLASH_QUIPS = [
   "The tide does not respect your personal best",
   "You've invented swimming. Reluctantly",
   "Somewhere a beach umbrella just closed in sympathy",
+  "You didn't land. You filed a water report",
+  "The fish have accepted your résumé",
+  "Splash. The ocean is calling HR",
+  "Belly-flop so clean the seagulls applauded",
 ];
 
 export const SLEEP_QUIPS = [
@@ -146,6 +150,9 @@ export const SLEEP_QUIPS = [
   "The moon is covering your shift. Badly",
   "Eyelids heavier than the headwind",
   "Gravity tucked you in without asking",
+  "The moon has taken over. Chaos follows",
+  "Fell asleep like a professional. Fully certified",
+  "The stars are just tucking you in now",
 ];
 
 export const BIG_LAUNCH_QUIPS = [
@@ -161,6 +168,10 @@ export const BIG_LAUNCH_QUIPS = [
   "The ground waved bye-bye",
   "That launch had a lawyer on retainer",
   "Momentum called dibs on you",
+  "Gravity is checking its insurance policy",
+  "That flap violated several physics bylaws",
+  "The sky wasn't ready for that. Rude of you",
+  "Zero to hero in one flap. The worms gasped",
 ];
 
 /** Fresh pool: fever ignites. */
@@ -171,6 +182,9 @@ export const FEVER_QUIPS = [
   "This is legally a heatwave now",
   "The clouds are just spectators at this point",
   "Molten. Fully molten",
+  "The thermometer just gave up and left",
+  "You're flying like you stole the wind",
+  "Wings are now 100% afterburner, 0% regret",
 ];
 
 /** Fresh pool: sky-gem pickups. */
@@ -190,6 +204,9 @@ export const MILESTONE_QUIPS = [
   "The map is updating its notes on you",
   "You're collecting horizon, one flap at a time",
   "Somewhere a mile marker salutes",
+  "Your shadow is running late",
+  "The birds in the next valley are gossiping about you",
+  "A new distance record. The previous one is filing a complaint",
 ];
 
 /** Fresh pool: giving up mid-run. */
@@ -200,6 +217,9 @@ export const SURRENDER_QUIPS = [
   "You can't lose if you're just resting. That's the rule",
   "The worm breathes easy once more",
   "Abort mission. The sun looked at us funny",
+  "The sun respects a graceful exit",
+  "We'll call it a 'strategic sunset'",
+  "The horizon accepts your surrender with dignity",
 ];
 
 /** Deterministic quip pick so tests can pin behaviour. */
