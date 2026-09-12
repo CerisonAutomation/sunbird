@@ -86,10 +86,31 @@ jobs:
       - name: Publish test failures as annotations
         if: failure() && steps.test.outcome == 'failure'
         run: |
-          grep -E "^(error|test result: FAILED|failures:|---- .* stdout ----)|panicked at" /tmp/test.log \
-            | head -40 | while IFS= read -r line; do
-            echo "::error::${line}"
+          # -A3 after "panicked at" because the assertion message -- the only
+          # part that says WHICH case failed -- is on the following lines, and
+          # a bare grep of the header line tells you nothing.
+          grep -A3 "panicked at" /tmp/test.log | head -40 | while IFS= read -r line; do
+            [ -n "$line" ] && echo "::error::${line}"
           done
+          {
+            echo '### cargo test output'
+            echo '```'
+            tail -n 120 /tmp/test.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Post test log to the PR
+        if: failure() && steps.test.outcome == 'failure' && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          {
+            echo '### `cargo test` output (job '"$GITHUB_RUN_ID"')'
+            echo '```'
+            grep -B2 -A6 "panicked at" /tmp/test.log | tail -n 120
+            echo '```'
+          } > /tmp/test-body.md
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file /tmp/test-body.md
       - name: Release build
         run: cargo build --workspace --release
       - uses: actions/upload-artifact@v4
