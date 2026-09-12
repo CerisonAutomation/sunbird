@@ -1527,6 +1527,22 @@ function renderMain(s: HudSnapshot): string {
   return `
     <header class="hero">
       <div class="hero-sun" aria-hidden="true"></div>
+      <svg class="hero-bird" viewBox="0 0 64 64" role="img" aria-hidden="true">
+        <!-- A clean sunbird mark (no baked-in wordmark, no full app-icon scene)
+             so the title "SUNBIRD" below reads exactly once and the bird never
+             doubles the menu's painted sky. -->
+        <path d="M8 42 L2 34 L5 44 L3 50 L12 45 Z" fill="#e06a35"/>
+        <path d="M8 44 L3 50 L6 54 L13 48 Z" fill="#be4824"/>
+        <ellipse cx="30" cy="36" rx="17" ry="11" fill="#ff7a45"/>
+        <ellipse cx="33" cy="40" rx="11" ry="6" fill="#ffe6c4"/>
+        <path d="M24 26 Q14 12 6 16 Q14 22 24 30 Z" fill="#c85228"/>
+        <path d="M26 30 Q14 14 4 20 Q15 24 27 34 Z" fill="#ff9a62"/>
+        <path d="M46 34 L58 37 L46 40 Z" fill="#ffb020"/>
+        <circle cx="41" cy="32" r="3.4" fill="#fff"/>
+        <circle cx="42.4" cy="31.4" r="1.7" fill="#2a1c28"/>
+        <circle cx="43" cy="30.8" r="0.7" fill="#fff"/>
+        <path d="M36 27 Q42 27.5 44 30 Q40 29.6 37 29.4 Z" fill="#d84a2e"/>
+      </svg>
       <div class="hero-title">
         <span class="hero-kicker">chase the daylight</span>
         <h1>SUNBIRD</h1>

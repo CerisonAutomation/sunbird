@@ -968,16 +968,3 @@ h2 {
     right: 14px;
   }
 }
-
-/* Hero lockup: the sun and the wordmark hug so the flying sunbird and the
-   title read as one composition — the title sits right against the sun. */
-.hero {
-  gap: 0;
-  margin-bottom: 4px;
-}
-.hero-sun {
-  margin-bottom: 2px;
-}
-.hero-kicker {
-  letter-spacing: 0.3em;
-}

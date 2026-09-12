@@ -3302,10 +3302,26 @@ button {
 /* crafted SVG mode icons */
 .mode-icon-lg .mi { width: 40px; height: 40px; display: block; margin: 0 auto; filter: drop-shadow(0 2px 3px rgba(60, 30, 20, 0.18)); }
 .mode-card-main:active .mi { transform: scale(0.92); }
-/* Hero: sun + wordmark sit tight together; the flying canvas sunbird
-   (menu-hero-layer) is the only bird, so nothing overlaps the title. */
-.hero { padding-top: 0; gap: 4px; }
-.hero-sun { opacity: 1; }
+/* Hero: the sunbird mark perches on the sun, gently bobbing above the title. */
+.hero-bird {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  width: 96px;
+  height: 96px;
+  margin-left: -48px;
+  overflow: visible;
+  filter: drop-shadow(0 6px 14px rgba(120, 60, 20, 0.35));
+  animation: heroBob 3.4s ease-in-out infinite;
+  z-index: 2;
+}
+@keyframes heroBob {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-7px) rotate(2deg); }
+}
+.hero { padding-top: 64px; }
+.hero-sun { opacity: 0.55; }
+@media (prefers-reduced-motion: reduce) { .hero-bird { animation: none; } }
 
 /* ---------- roast-fix: tofu-proof icons, swatches, pass clarity ---------- */
 .tab-icon .ti, .nav-btn i .ti { width: 20px; height: 20px; display: inline-block; vertical-align: -3px; }
