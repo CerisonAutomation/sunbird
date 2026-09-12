@@ -348,12 +348,6 @@ export class HUD {
   private goalStrip!: HTMLElement;
   private goalPop!: HTMLElement;
   private standingsEl!: HTMLElement;
-  private posBadgeEl!: HTMLElement;
-  private raceProgEl!: HTMLElement;
-  private raceProgFill!: HTMLElement;
-  private raceDotYou!: HTMLElement;
-  private raceDotLeader!: HTMLElement;
-  private lastPlace = 0;
   private rosterBar!: HTMLElement;
   private matchmakingEl!: HTMLElement;
   private matchmakingCount!: HTMLElement;
@@ -426,8 +420,6 @@ export class HUD {
             <div class="stat-value coin" data-ref="coins">0</div>
           </div>
         </div>
-        <div class="position-badge hidden" data-ref="positionBadge">1<span class="pos-suffix">st</span></div>
-        <div class="race-progress hidden" data-ref="raceProgress"><div class="race-progress-fill" data-ref="raceProgressFill" style="width:0%"></div><div class="race-progress-dot you" data-ref="raceDotYou" style="left:0%"></div><div class="race-progress-dot leader" data-ref="raceDotLeader" style="left:0%"></div><span class="race-progress-finish">🏁</span></div>
         <div class="speedlines" data-ref="speedlines"></div>
         <div class="alt-gauge" data-ref="altGauge">
           <div class="alt-track">
@@ -725,30 +717,9 @@ export class HUD {
       // roster so it never rebuilds mid-frame more than ~5×/s.
       this.standingsEl.classList.toggle("hidden", s.standings.length === 0);
 
-      // Live position badge + race progress strip — mass race only. These were
-      // static markup once; now they follow the standings every frame.
-      const you = s.standings.find((r) => r.you);
-      const leader = s.standings[0];
-      const showRace = s.massRace && s.raceFinishM > 0 && Boolean(you) && s.standings.length > 0;
-      this.posBadgeEl.classList.toggle("hidden", !showRace);
-      this.raceProgEl.classList.toggle("hidden", !showRace);
-      if (showRace && you && leader) {
-        if (you.place !== this.lastPlace) {
-          this.lastPlace = you.place;
-          const suffix = you.place % 10 === 1 && you.place !== 11 ? "st" : you.place % 10 === 2 && you.place !== 12 ? "nd" : you.place % 10 === 3 && you.place !== 13 ? "rd" : "th";
-          this.posBadgeEl.innerHTML = `${you.place}<span class="pos-suffix">${suffix}</span>`;
-          this.posBadgeEl.classList.toggle("first", you.place === 1);
-          this.posBadgeEl.classList.toggle("top3", you.place > 1 && you.place <= 3);
-          this.posBadgeEl.classList.remove("pop");
-          void this.posBadgeEl.offsetWidth;
-          this.posBadgeEl.classList.add("pop");
-        }
-        const youF = Math.max(0, Math.min(1, you.distance / s.raceFinishM));
-        const leadF = Math.max(0, Math.min(1, leader.distance / s.raceFinishM));
-        this.setStyle(this.raceProgFill, "raceFill", "width", `${(youF * 100).toFixed(1)}%`);
-        this.setStyle(this.raceDotYou, "raceYou", "left", `${(youF * 100).toFixed(1)}%`);
-        this.setStyle(this.raceDotLeader, "raceLead", "left", `${(leadF * 100).toFixed(1)}%`);
-      }
+      // The top-of-screen roster bar now carries everything the old position
+      // badge + progress strip showed (place, gap to leader, full field line),
+      // so those two were removed to stop the same place/gap reading twice.
       if (s.standings.length) {
         const nowS = performance.now();
         const key = s.standings.map((r) => `${r.id}${r.place}${Math.round(r.distance / 12)}${r.finished ? "F" : ""}`).join("|");
@@ -952,11 +923,6 @@ export class HUD {
     this.goalStrip = grab("goalStrip");
     this.goalPop = grab("goalPop");
     this.standingsEl = grab("standings");
-    this.posBadgeEl = grab("positionBadge");
-    this.raceProgEl = grab("raceProgress");
-    this.raceProgFill = grab("raceProgressFill");
-    this.raceDotYou = grab("raceDotYou");
-    this.raceDotLeader = grab("raceDotLeader");
     this.rosterBar = grab("rosterBar");
     this.draftMeter = grab("draftMeter");
     this.finishCd = grab("finishCd");
