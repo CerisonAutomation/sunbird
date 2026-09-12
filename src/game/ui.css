@@ -3065,6 +3065,15 @@ button {
   width: 40px;
 }
 
+/* Room invite: copy-link and room-start actions inside the private-room card. */
+.invite-btn {
+  margin: 8px 0 6px;
+  font-size: 13px;
+}
+.room-fly {
+  margin-bottom: 0;
+}
+
 /* ---------- ≤360px: tiny-phone pixel-perfect pass ---------- */
 @media (max-width: 360px) {
   .hero-kicker {

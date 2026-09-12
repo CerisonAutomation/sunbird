@@ -1107,11 +1107,17 @@ function renderLive(s: HudSnapshot): string {
 
     <div class="race-grid">
       <div class="race-card">
-        <div class="race-card-h"><b>Private room</b><span>race friends</span></div>
+        <div class="race-card-h"><b>Private room</b><span>invite friends</span></div>
         <div class="code-row big">
           <span class="code">${s.roomCode ? escapeHtml(s.roomCode) : "— — — — —"}</span>
           <button class="mini-btn gold" data-ui data-action="host-room">${s.roomCode ? "New" : "Host"}</button>
         </div>
+        ${
+          s.roomCode
+            ? `<button class="soft-btn wide invite-btn" data-ui data-action="copy-invite">🔗 Copy invite link</button>
+               <button class="primary-btn race40 hero room-fly" data-ui data-action="start-room"><span class="hero-label">⚡ FLY · room ${escapeHtml(s.roomCode)}</span><span class="hero-hint">friends join your room by link</span></button>`
+            : ""
+        }
         <div class="redeem">
           <input data-ui data-ref="roomCode" maxlength="5" placeholder="CODE" autocomplete="off" style="text-transform:uppercase" />
           <button class="mini-btn" data-ui data-action="join-room">Join</button>

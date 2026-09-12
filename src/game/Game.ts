@@ -84,6 +84,7 @@ import { SaveData } from "./SaveData";
 import { SeasonPass, seasonId, seasonLabel, XP_RULES } from "./SeasonPass";
 import { buildShareCard, shareOrDownload } from "./Social";
 import { buildChallengeUrl, readChallengeFromUrl, type RivalChallenge } from "./Challenge";
+import { buildRoomInviteUrl, normalizeRoomCode, readRoomInviteFromUrl } from "./RoomInvite";
 import { initPlatform, isPortalBuild, portalTarget, type PlatformAdapter } from "../sdk/platform";
 import { LivingBackground } from "./LivingBackground";
 import { Sky } from "./Sky";
@@ -216,6 +217,8 @@ export class Game {
   private raceFinishTime = 0;
   private net: RealtimeClient | null = null;
   private roomCode = "";
+  /** Room invite (#room=) pending application on the first frame. */
+  private pendingRoomInvite = "";
   private roomSize = 40;
   private roomSkill: "chill" | "sharp" | "ace" = "sharp";
   private roomMuted = false;
@@ -416,6 +419,14 @@ export class Game {
       this.telemetry.track("rival_received", { distance: rival.distance });
     }
 
+    // Room invite links: #room=CODE → seat straight into that private room.
+    // Only honored when a realtime server is configured (portals ship none).
+    const roomInvite = isMultiplayerConfigured() ? readRoomInviteFromUrl() : null;
+    if (roomInvite) {
+      this.roomCode = roomInvite;
+      this.pendingRoomInvite = roomInvite;
+    }
+
     this.onFocus = () => {
       if (this.checkoutWaiting && this.screen === "checkout") {
         this.telemetry.track("stripe_return_focus", { sku: this.checkoutSku });
@@ -546,6 +557,17 @@ export class Game {
     this.pumpMatchmaking(raw);
     this.dayTick(raw);
     this.adaptQuality(raw);
+    // A #room= invite applies once the shell is live: open the lobby already
+    // seated in that room so the guest sees the host before committing.
+    if (this.pendingRoomInvite && this.state === "menu") {
+      const code = this.pendingRoomInvite;
+      this.pendingRoomInvite = "";
+      this.roomCode = code;
+      this.setScreen("live");
+      this.preseatLobby();
+      this.hud.toast(`🎟 Invited to room ${code} — press START to fly`, "gold");
+      this.telemetry.track("room_invite_opened", { room: code });
+    }
     // Club chat: light polling only while the Squad screen is on screen.
     if (this.screen === "squad" && this.state === "menu" && this.squad?.live) {
       this.squadPoll += raw;
@@ -2247,15 +2269,14 @@ export class Game {
         break;
       case "host-room": {
         this.roomCode = makeRoomCode();
-        void navigator.clipboard?.writeText(this.roomCode).catch(() => undefined);
-        this.hud.toast(`Room ${this.roomCode} copied — share it!`, "gold");
+        this.copyRoomInvite(this.roomCode);
         this.modeId = "massrace";
         this.mode = modeById("massrace");
         this.startRun();
         break;
       }
       case "join-room": {
-        const code = this.hud.readValue("roomCode").trim().toUpperCase().slice(0, 5);
+        const code = normalizeRoomCode(this.hud.readValue("roomCode"));
         if (!code) {
           this.hud.toast("Enter a 5-letter room code", "warn");
           break;
@@ -2263,6 +2284,22 @@ export class Game {
         this.roomCode = code;
         this.modeId = "massrace";
         this.mode = modeById("massrace");
+        this.startRun();
+        break;
+      }
+      case "copy-invite": {
+        if (this.roomCode) this.copyRoomInvite(this.roomCode);
+        else this.hud.toast("Host a room first to get an invite link", "warn");
+        break;
+      }
+      case "start-room": {
+        if (!this.roomCode) {
+          this.hud.toast("Host or join a room first", "warn");
+          break;
+        }
+        this.modeId = "massrace";
+        this.mode = modeById("massrace");
+        this.rankedRace = false;
         this.startRun();
         break;
       }
@@ -3486,6 +3523,25 @@ export class Game {
   /** Public-facing pilot identity: VIPs wear the crown in every roster. */
   private racedName(): string {
     return this.save.isVipActive() ? `♛ ${this.pilotName}`.slice(0, 16) : this.pilotName;
+  }
+
+  /** Copies the room invite link, preferring the native share sheet. */
+  private copyRoomInvite(code: string): void {
+    const url = buildRoomInviteUrl(code);
+    const nav = navigator as Navigator & { share?: (d: ShareData) => Promise<void> };
+    const text = `Join my Sunbird race room ${code}: ${url}`;
+    if (nav.share) {
+      void nav
+        .share({ title: "Sunbird race room", text, url })
+        .then(() => this.hud.toast(`Invite shared for room ${code}`, "gold"))
+        .catch(() => {
+          void navigator.clipboard?.writeText(url).catch(() => undefined);
+          this.hud.toast(`Invite link copied — room ${code}`, "gold");
+        });
+      return;
+    }
+    void navigator.clipboard?.writeText(url).catch(() => undefined);
+    this.hud.toast(`Invite link copied — send it to friends`, "gold");
   }
 
   private lastRunDistance(): number {
