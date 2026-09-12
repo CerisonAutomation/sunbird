@@ -103,6 +103,8 @@ export type HudSnapshot = {
   vipExpiredNotice: boolean;
   adsLeftToday: number;
   ghostDelta: number | null;
+  /** True when this finished run beat the previous personal-best distance. */
+  newBest: boolean;
   continueTimer: number;
   continueCost: number;
   canAffordContinue: boolean;
@@ -2130,6 +2132,8 @@ function renderGameOver(s: HudSnapshot): string {
       : "";
   return `
     <div class="zzz">z z z</div>
+    ${s.newBest ? `<div class="new-best">👑 NEW BEST · ${formatDistance(s.distance)}<small>your farthest flight yet</small></div>` : ""}
+    ${s.boardScope === "global" && s.boardMetric === "distance" && s.board && s.board.yourRank > 0 ? `<div class="reward-strip rank-strip">Leaderboard rank · <b>#${s.board.yourRank}</b> of ${s.board.total}</div>` : ""}
     <h2>Sunbird sleeps</h2>
     <p class="tagline">The daylight ran out.</p>
     <div class="over-stats">

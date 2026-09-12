@@ -1839,6 +1839,37 @@ button {
 }
 
 /* ---------------- near miss ---------------- */
+.new-best {
+  margin: 2px 0 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  text-align: center;
+  font-weight: 900;
+  font-size: 19px;
+  letter-spacing: 0.02em;
+  color: #5a3a00;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 55%),
+    linear-gradient(135deg, #fff3cf, #ffd76a);
+  border: 2px solid #e8a83a;
+  box-shadow: 0 4px 0 rgba(180, 120, 20, 0.35), 0 0 24px -4px rgba(255, 190, 60, 0.65);
+  animation: newbestpop 0.5s cubic-bezier(0.2, 1.5, 0.3, 1);
+}
+.new-best small {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8a5a12;
+  margin-top: 2px;
+}
+@keyframes newbestpop {
+  0% { transform: scale(0.7); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .new-best { animation: none; } }
+
 .nearmiss {
   background: linear-gradient(135deg, #ffe6a8, #ffd06a);
   color: #7a4a00;

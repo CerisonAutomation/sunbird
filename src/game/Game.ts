@@ -280,6 +280,10 @@ export class Game {
   private goalPop = "";
   private goalPopT = 0;
   private recordBanner = "";
+  /** Previous personal-best distance, captured at run start (for the record loop). */
+  private bestAtStart = 0;
+  private distanceRecordCrossed = false;
+  private newBest = false;
   private runGems = 0;
   private runRings = 0;
   private ringChain = 0;
@@ -1072,6 +1076,19 @@ export class Game {
         this.glow(0.25);
       }
     }
+    // Personal-best crossing: the single most addictive moment in the loop.
+    // Fire it once, mid-run, the instant you pass your old distance record —
+    // "beat your high score" is a feeling, not a post-run footnote.
+    if (!this.distanceRecordCrossed && this.bestAtStart > 0 && runDist > this.bestAtStart) {
+      this.distanceRecordCrossed = true;
+      this.audio.fanfare();
+      this.hud.toast("👑 NEW DISTANCE RECORD — keep flying!", "gold");
+      this.flash("perfect");
+      this.particles.emitConfetti(this.bird.x, this.bird.y + 4);
+      this.glow(0.9);
+      this.haptic([40, 30, 60]);
+      this.telemetry.track("record_crossed", { at: Math.round(runDist) });
+    }
     // STORMFRONT ESCALATION — the flagship hook: the storm is a character
     // with three acts. Same seed, same acts, for every pilot in the field.
     if (this.stormfront) {
@@ -1696,6 +1713,12 @@ export class Game {
   private startRun(opts?: { duel?: boolean; challenge?: "" | "daily" | `gauntlet${number}`; event?: boolean; storm?: boolean }): void {
     this.exitVersus();
     this.mode = modeById(this.modeId);
+    // Snapshot the record to beat BEFORE this run writes anything, so the
+    // mid-run "new record" moment and the results "NEW BEST" banner compare
+    // against the genuinely previous best.
+    this.bestAtStart = this.save.state.bestDistance;
+    this.distanceRecordCrossed = false;
+    this.newBest = false;
     // World variety: in the default "today" mode a plain casual flight gets
     // fresh random hills every run so no two free-flights look alike. An
     // explicit Yesterday/Random seed pick is honoured, and date-seeded
@@ -1902,7 +1925,8 @@ export class Game {
     this.runRecorded = true;
     this.bird.asleep = true;
     const stats = this.runStats();
-    this.telemetry.track("run_end", { mode: this.modeId, distance: Math.round(stats.distance) });
+    this.newBest = this.bestAtStart > 0 && stats.distance > this.bestAtStart;
+    this.telemetry.track("run_end", { mode: this.modeId, distance: Math.round(stats.distance), newBest: this.newBest });
 
     // A duel abandoned short of the line is a loss — no free retries on rating.
     if (this.duelActive && this.duelResult === "") {
@@ -1948,6 +1972,10 @@ export class Game {
       mode: this.modeId,
     });
     this.boardPage = null;
+    // Re-pull the board so the results screen (and the home screen) can show
+    // the just-earned rank. Local rows were already updated synchronously, so
+    // this resolves to the new standing without a network round-trip.
+    void this.refreshBoard(true);
     const improvedCups = this.cups.submit(this.modeId, {
       distance: stats.distance,
       altitude: this.maxAltitude,
@@ -3906,6 +3934,7 @@ export class Game {
       vipExpiredNotice: this.vipExpiredNotice,
       adsLeftToday: this.save.adsLeftToday(),
       ghostDelta: this.state === "playing" || this.state === "gameover" ? this.ghostDelta() : null,
+      newBest: this.newBest,
       continueTimer: this.continueTimer,
       continueCost: CONTINUE_COST,
       canAffordContinue: st.wallet >= CONTINUE_COST,
