@@ -491,9 +491,11 @@ export class Sky {
       -240,
     );
 
-    // Background haze kept light: thin altitude-readable banks, never overcast.
-    // (Density response cut ~40% — gameplay clouds in Collectibles are untouched.)
-    const hazeAlpha = (0.04 + this.hazeDensity * 0.055) * (1 - this.altT * 0.75) * (0.5 + t * 0.5);
+    // Background haze kept deliberately thin: altitude-readable banks, never
+    // overcast. Density response is cut a second time (~50% again) because the
+    // banks read as a grey wash over the hills rather than weather. Gameplay
+    // clouds in Collectibles are untouched — these are atmosphere only.
+    const hazeAlpha = (0.02 + this.hazeDensity * 0.026) * (1 - this.altT * 0.75) * (0.5 + t * 0.5);
     for (const sprite of this.haze) {
       const mat = sprite.material as THREE.SpriteMaterial;
       const phase = sprite.userData.phase as number;
@@ -501,7 +503,7 @@ export class Sky {
       sprite.position.x = (sprite.userData.baseX as number) - camX * (1 - parallax);
       sprite.position.y = (sprite.userData.baseY as number) + Math.sin(time * (0.09 + parallax * 0.08) + phase) * 1.2;
       mat.color.setHex(this.hazeTint);
-      mat.opacity = hazeAlpha * (0.72 + (phase % 1) * 0.25) * (this.hazeGlow ? 1.25 : 1);
+      mat.opacity = hazeAlpha * (0.72 + (phase % 1) * 0.25) * (this.hazeGlow ? 1.12 : 1);
     }
 
     this.group.position.set(camX, 0, 0);

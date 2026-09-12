@@ -419,7 +419,9 @@ export class Game {
     this.renderer.setClearColor(0x87c8ee, 1);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.27;
+    // 1.27 washed the highlights out under ACES; 1.16 keeps the sun bright
+    // but lets the hills hold their colour instead of turning milky.
+    this.renderer.toneMappingExposure = 1.16;
     this.renderer.shadowMap.enabled = true;
     // PCFSoftShadowMap was removed in three r165+ — PCF with a slightly larger
     // shadow map is the soft look without the console warning every load.
@@ -428,7 +430,9 @@ export class Game {
     this.renderer.setPixelRatio(this.dpr);
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0x8ed0ee, 62, 380);
+    // Fog pushed well past the action: at near=62 the hills the bird is about
+    // to fly through were already washed out, which read as permanent mist.
+    this.scene.fog = new THREE.Fog(0x8ed0ee, 118, 640);
 
     this.hud = new HUD(host);
     this.input = new Input(host, () => {
@@ -1805,8 +1809,8 @@ export class Game {
     if (this.scene.fog instanceof THREE.Fog) {
       this.scene.fog.color.copy(this.sky.fogColor).lerp(this.tmpColor.setHex(biome.fogTint), 0.25);
       // Thin the haze as we climb so the whole world opens up beneath the bird.
-      this.scene.fog.near = 62 + altT * 300;
-      this.scene.fog.far = 380 + altT * 900;
+      this.scene.fog.near = 118 + altT * 340;
+      this.scene.fog.far = 640 + altT * 1000;
       this.renderer.setClearColor(this.scene.fog.color, 1);
     }
     this.altZone =

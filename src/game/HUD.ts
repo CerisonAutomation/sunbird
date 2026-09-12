@@ -9,6 +9,7 @@ import type { RosterBird, Standing } from "./MassRace";
 import { VIP_DAILY_GIFT } from "./constants";
 import { COLLECTIONS, type BoostView, type ShopTrailView, type SkinView } from "./Economy";
 import { MenuSky } from "./MenuSky";
+import { rivalPalette, sunbirdSVG } from "./Sunbird";
 import { formatDistance } from "./math";
 import type { MissionView, QuestReward, QuestView } from "./Missions";
 import type { CampaignChapterView } from "./Campaign";
@@ -1156,6 +1157,9 @@ function renderMiniBoard(s: HudSnapshot): string {
     </section>`;
 }
 
+/** Seeded (non-live) rivals: same sunbird shape, muted plumage. */
+const GREY_PALETTE = { body: "#8a9bb0", belly: "#e8eef4", wingNear: "#a8b8c8", wingFar: "#68788c", beak: "#c8b48a", eye: "#232a33" } as const;
+
 function renderLive(s: HudSnapshot): string {
   const status = s.multiplayerLive
     ? s.netState === "racing" || s.netState === "lobby"
@@ -1166,12 +1170,43 @@ function renderLive(s: HudSnapshot): string {
     : `<span class="board-badge local">Solo field · practice</span>`;
 
   const featured = s.lobbyRivals.slice(0, 3);
+  // Everyone in the field, as real birds — live pilots in colour, seeded
+  // rivals in grey, plus the empty seats still waiting on a player.
+  const flock = s.lobbyRivals.slice(0, 8).map((r) => ({ name: r.name, live: r.tag.includes("live") }));
+  const openSeats = Math.max(0, s.roomSize + 1 - (flock.length + 1));
   return `
     ${head("Race Lobby", "back", status)}
     <div class="vs-stage" aria-label="You versus the featured rivals">
-      <div class="vs-you"><span class="vs-swatch" style="--body:#ff7a45;--wing:#ff9a62;--belly:#ffe6c4"><i class="w"></i><i class="b"></i><i class="e"></i></span><b>YOU</b><span class="vs-sub">${s.rival.divisionIcon} ${s.rival.division} · ${s.rival.rating}</span></div>
+      <div class="vs-you">
+        <span class="bird-badge you">${sunbirdSVG({ width: 86, flap: 0.62, title: "Your sunbird" })}</span>
+        <b>YOU</b>
+        <span class="vs-sub">${s.rival.divisionIcon} ${s.rival.division} · ${s.rival.rating}</span>
+      </div>
       <div class="vs-mark">VS</div>
-      <div class="vs-foes">${featured.map((r) => `<div class="vs-foe ${r.tag.includes("live") ? "live" : ""}"><span class="vs-swatch" style="${r.tag.includes("live") ? "--body:#5eb7ea;--wing:#83cbf2;--belly:#eaf6ff" : "--body:#8a9bb0;--wing:#a8b8c8;--belly:#e8eef4"}"><i class="w"></i><i class="b"></i><i class="e"></i></span><b>${escapeHtml(r.name)}</b><span class="vs-sub">${escapeHtml(r.tag)}</span></div>`).join("")}</div>
+      <div class="vs-foes">${featured
+        .map(
+          (r, i) => `<div class="vs-foe ${r.tag.includes("live") ? "live" : ""}">
+            <span class="bird-badge">${sunbirdSVG({ palette: rivalPalette(i), width: 62, flap: 0.3 + i * 0.16, title: r.name })}</span>
+            <b>${escapeHtml(r.name)}</b><span class="vs-sub">${escapeHtml(r.tag)}</span>
+          </div>`,
+        )
+        .join("")}</div>
+    </div>
+
+    <div class="flock-grid" aria-label="Rivals in this field">
+      ${flock
+        .map(
+          (r, i) => `<div class="flock-bird ${r.live ? "live" : ""}">
+            ${sunbirdSVG({ palette: r.live ? rivalPalette(i) : GREY_PALETTE, width: 46, flap: 0.2 + i * 0.11, title: r.name })}
+            <span class="flock-name">${escapeHtml(r.name)}</span>
+          </div>`,
+        )
+        .join("")}
+      ${
+        openSeats > 0
+          ? `<div class="flock-bird open"><span class="flock-seat">${openSeats}</span><span class="flock-name">open seat${openSeats === 1 ? "" : "s"}</span></div>`
+          : ""
+      }
     </div>
 
     <div class="lobby-rules">
@@ -1463,9 +1498,9 @@ function renderRank(s: HudSnapshot): string {
     <div class="section-title">Duels <small>ranked 1v1 · ±16 rating</small></div>
     <div class="duel-card">
       <div class="vs-stage slim">
-        <div class="vs-you"><span class="vs-swatch" style="--body:#ff7a45;--wing:#ff9a62;--belly:#ffe6c4"><i class="w"></i><i class="b"></i><i class="e"></i></span><b>YOU</b><span class="vs-sub">${r.rating}</span></div>
+        <div class="vs-you"><span class="bird-badge you">${sunbirdSVG({ width: 62, flap: 0.55, title: "Your sunbird" })}</span><b>YOU</b><span class="vs-sub">${r.rating}</span></div>
         <div class="vs-mark">VS</div>
-        <div class="vs-foes"><div class="vs-foe"><span class="vs-swatch" style="--body:#8a9bb0;--wing:#a8b8c8;--belly:#e8eef4"><i class="w"></i><i class="b"></i><i class="e"></i></span><b>${escapeHtml(s.duelFoe.name)}</b><span class="vs-sub">${escapeHtml(s.duelFoe.tag)} · ~${s.duelFoe.rating}</span></div></div>
+        <div class="vs-foes"><div class="vs-foe"><span class="bird-badge">${sunbirdSVG({ palette: rivalPalette(0), width: 54, flap: 0.35, title: s.duelFoe.name })}</span><b>${escapeHtml(s.duelFoe.name)}</b><span class="vs-sub">${escapeHtml(s.duelFoe.tag)} · ~${s.duelFoe.rating}</span></div></div>
       </div>
       <div class="rank-stats">
         <div><span>Duel W–L</span><b>${s.duel.wins}–${s.duel.losses}</b></div>
