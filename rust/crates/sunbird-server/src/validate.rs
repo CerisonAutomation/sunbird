@@ -94,11 +94,16 @@ pub struct MotionPolicy {
 
 impl Default for MotionPolicy {
     fn default() -> Self {
+        let tick_hz = 15.0;
         Self {
-            tick_hz: 15.0,
+            tick_hz,
             max_speed_units_per_sec: 234.0,
             speed_headroom_factor: 2.0,
-            min_sample_interval: Duration::from_micros(16_700),
+            // A quarter of the nominal tick period. The floor exists so a client
+            // sending faster than the wire rate is not granted a proportionally
+            // larger allowance per frame — otherwise a burst of small-interval
+            // frames becomes a teleport one frame at a time.
+            min_sample_interval: Duration::from_secs_f64(1.0 / (tick_hz * 4.0)),
             max_sample_interval: Duration::from_secs(2),
             max_coordinate_abs: 1_000_000.0,
             max_altitude_abs: 100_000.0,
