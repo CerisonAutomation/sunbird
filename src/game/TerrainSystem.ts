@@ -40,7 +40,14 @@ type Chunk = {
   id: number;
   group: THREE.Group;
   disposables: { dispose(): void }[];
+  /** Foreground-capable prop groups (z > 0 side): placements plus the
+   * instanced meshes that render them, so updateOcclusion can sink any prop
+   * about to cross the bird's sight line instead of hiding the bird. */
+  propGroups?: PropGroup[];
 };
+
+type Placement = { x: number; y: number; z: number; s: number; rot: number };
+type PropGroup = { props: Placement[]; parts: { inst: THREE.InstancedMesh; part: DecoPart }[]; faded: Set<number> };
 
 export type TerrainPalette = {
   farA: THREE.Color;
@@ -534,10 +541,10 @@ export class TerrainSystem {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     group.add(mesh);
-    this.placeDecor(id, group, disposables);
+    const propGroups = this.placeDecor(id, group, disposables);
     this.placeSunflowers(id, group, disposables);
     this.group.add(group);
-    this.chunks.set(id, { id, group, disposables });
+    this.chunks.set(id, { id, group, disposables, propGroups: propGroups.length ? propGroups : undefined });
   }
 
   private buildChunkGeo(id: number): THREE.BufferGeometry {
@@ -724,16 +731,16 @@ export class TerrainSystem {
     ];
   }
 
-  private placeDecor(id: number, group: THREE.Group, disposables: { dispose(): void }[]): void {
+  private placeDecor(id: number, group: THREE.Group, disposables: { dispose(): void }[]): PropGroup[] {
     const x0 = id * CHUNK_SIZE;
     const biome = this.biomeAt(x0 + CHUNK_SIZE / 2);
     const parts = this.decoParts.get(biome.deco);
-    if (!parts) return;
+    if (!parts) return [];
     // Per-chunk personality: density breathes chunk to chunk (sparse plains,
     // crowded groves) instead of a uniform 7-per-chunk carpet.
     const densJitter = 0.55 + hash01(id, this.seedN + 501) * 0.9;
     const count = Math.round(7 * biome.decoDensity * densJitter);
-    const placements: { x: number; y: number; z: number; s: number; rot: number }[] = [];
+    const placements: Placement[] = [];
     // Grove chunks (~1 in 5): props cluster tightly around one anchor point,
     // reading as a copse or an oasis rather than even scatter.
     const grove = hash01(id, this.seedN + 502) < 0.2;
@@ -753,8 +760,12 @@ export class TerrainSystem {
       const s = (behind ? 0.9 : 0.6) + r3 * 0.5;
       placements.push({ x, y: this.heightAt(x) - 0.2, z, s, rot: r2 * Math.PI * 2 });
     }
-    const emit = (partList: DecoPart[], list: { x: number; y: number; z: number; s: number; rot: number }[]): void => {
-      if (!list.length) return;
+    // Foreground prop groups feed updateOcclusion; `emit` hands back the
+    // instanced meshes it built so their matrices can be re-written per frame.
+    const propGroups: PropGroup[] = [];
+    const emit = (partList: DecoPart[], list: Placement[]): { inst: THREE.InstancedMesh; part: DecoPart }[] => {
+      if (!list.length) return [];
+      const made: { inst: THREE.InstancedMesh; part: DecoPart }[] = [];
       for (const part of partList) {
         const inst = new THREE.InstancedMesh(part.geo, part.mat, list.length);
         inst.castShadow = true;
@@ -770,9 +781,14 @@ export class TerrainSystem {
         inst.frustumCulled = false;
         group.add(inst);
         disposables.push({ dispose: () => inst.dispose() });
+        made.push({ inst, part });
       }
+      return made;
     };
-    emit(parts, placements);
+    const propParts = emit(parts, placements);
+    if (propParts.length && placements.some((p) => p.z > 3.5)) {
+      propGroups.push({ props: placements, parts: propParts, faded: new Set<number>() });
+    }
 
     // Landmarks: roughly one chunk in eight gets a single monument, chosen by
     // hash so the same seed always rebuilds the same world.
@@ -805,6 +821,11 @@ export class TerrainSystem {
             { ...spot, x: lx0 + 3.4, s: spot.s * 0.65, rot: spot.rot + 2.3 },
           ]);
         }
+        // Landmarks sit at z 6–9 on the camera side — prime occluders.
+        if (spot.z > 3.5 && lmParts.length) {
+          const made = emit(lmParts, [spot]);
+          if (made.length) propGroups.push({ props: [spot], parts: made, faded: new Set<number>() });
+        }
       }
     }
 
@@ -827,6 +848,88 @@ export class TerrainSystem {
     // one random scatter part per chunk keeps instancing cheap and looks varied
     const pick = this.scatterParts[Math.abs(id) % this.scatterParts.length];
     if (pick) emit([pick], scatter);
+    return propGroups;
+  }
+
+  /**
+   * Sink-and-shrink any foreground prop about to cross a bird's sight line, so
+   * the player never loses sight of the bird behind a tree (the classic
+   * side-scroller occlusion fade, done per instance via matrix rewrite — cheap:
+   * only chunks within ~1.5 chunk widths of the bird are touched, and only
+   * instances whose fade state changes write matrices).
+   */
+  updateOcclusion(views: { x: number; y: number }[], camX: number, camY: number, camZ: number): void {
+    if (views.length === 0 || camZ <= 4) return;
+    for (const chunk of this.chunks.values()) {
+      const groups = chunk.propGroups;
+      if (!groups) continue;
+      const cx0 = chunk.id * CHUNK_SIZE;
+      if (cx0 > views[0]!.x + CHUNK_SIZE * 1.5 || cx0 + CHUNK_SIZE < views[0]!.x - CHUNK_SIZE * 1.5) {
+        // Out of range: make sure nothing is left half-sunk from a flyby.
+        if (chunk.propGroups) this.restoreFaded(chunk.propGroups);
+        continue;
+      }
+      for (const g of groups) {
+        g.props.forEach((p, i) => {
+          let occ = 0;
+          if (p.z > 3.5) {
+            // Sight line from the camera through the bird plane, sampled at
+            // this prop's depth. A prop hides the bird when that sample lands
+            // inside its canopy volume.
+            const t = 1 - p.z / camZ;
+            if (t > 0) {
+              const top = p.y + 9.5 * p.s;
+              for (const v of views) {
+                const sx = camX + (v.x - camX) * t;
+                const sy = camY + (v.y - camY) * t;
+                const dx = Math.abs(p.x - sx);
+                const r = p.s * 3.4;
+                if (dx < r && sy > p.y - 2 && sy < top + 2) {
+                  occ = Math.max(occ, smoothstep(r, r * 0.35, dx));
+                }
+              }
+            }
+          }
+          const was = g.faded.has(i);
+          if (occ > 0.01) {
+            const f = 1 - occ * 0.94;
+            for (const { inst, part } of g.parts) {
+              tmpObj.position.set(p.x, p.y + part.y * p.s * f - occ * 2.6, p.z);
+              tmpObj.rotation.set(0, p.rot, 0);
+              tmpObj.scale.setScalar(p.s * part.s * f);
+              tmpObj.updateMatrix();
+              inst.setMatrixAt(i, tmpObj.matrix);
+              inst.instanceMatrix.needsUpdate = true;
+            }
+            g.faded.add(i);
+          } else if (was) {
+            this.restoreInstance(g, i);
+            g.faded.delete(i);
+          }
+        });
+      }
+    }
+  }
+
+  /** Restore every faded instance in these groups to its authored matrix. */
+  private restoreFaded(groups: PropGroup[]): void {
+    for (const g of groups) {
+      if (!g.faded.size) continue;
+      for (const i of g.faded) this.restoreInstance(g, i);
+      g.faded.clear();
+    }
+  }
+
+  private restoreInstance(g: PropGroup, i: number): void {
+    const p = g.props[i]!;
+    for (const { inst, part } of g.parts) {
+      tmpObj.position.set(p.x, p.y + part.y * p.s, p.z);
+      tmpObj.rotation.set(0, p.rot, 0);
+      tmpObj.scale.setScalar(p.s * part.s);
+      tmpObj.updateMatrix();
+      inst.setMatrixAt(i, tmpObj.matrix);
+      inst.instanceMatrix.needsUpdate = true;
+    }
   }
 
   /** Sunflower bounce pads in this chunk — placed on the flight line (z = 0). */

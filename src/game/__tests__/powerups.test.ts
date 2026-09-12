@@ -68,4 +68,67 @@ describe("PowerUps", () => {
     }
     expect(view[0]!.label.length).toBeGreaterThan(0);
   });
+
+  describe("overcharge (tier II)", () => {
+    it("second pickup while live promotes to level 2", () => {
+      p.add("wingboost");
+      expect(p.level("wingboost")).toBe(1);
+      p.add("wingboost");
+      expect(p.level("wingboost")).toBe(2);
+    });
+
+    it("tier II strengthens the effect", () => {
+      const p1 = new PowerUps();
+      p1.add("wingboost");
+      const p2 = new PowerUps();
+      p2.add("wingboost");
+      p2.add("wingboost");
+      expect(p2.liftMult()).toBeGreaterThan(p1.liftMult());
+
+      const g1 = new PowerUps();
+      g1.add("longglide");
+      const g2 = new PowerUps();
+      g2.add("longglide");
+      g2.add("longglide");
+      expect(g2.dragMult()).toBeLessThan(g1.dragMult());
+
+      const m = new PowerUps();
+      m.add("magnet");
+      expect(m.magnetScale()).toBe(1);
+      m.add("magnet");
+      expect(m.magnetScale()).toBeGreaterThan(1);
+    });
+
+    it("overcharged golden wings pays triple coins", () => {
+      p.add("goldenwings");
+      p.add("goldenwings");
+      expect(p.coinMult()).toBe(3);
+    });
+
+    it("level resets to 0 when the timer expires", () => {
+      p.add("feather");
+      p.add("feather");
+      expect(p.level("feather")).toBe(2);
+      p.tick(1000);
+      expect(p.level("feather")).toBe(0);
+      // A fresh pickup after expiry starts back at tier 1.
+      p.add("feather");
+      expect(p.level("feather")).toBe(1);
+    });
+
+    it("view() reports the level for the HUD badge", () => {
+      p.add("magnet");
+      p.add("magnet");
+      const v = p.view().find((x) => x.kind === "magnet")!;
+      expect(v.level).toBe(2);
+    });
+  });
+
+  it("reset clears levels along with timers", () => {
+    p.add("magnet");
+    p.add("magnet");
+    p.reset();
+    p.add("magnet");
+    expect(p.level("magnet")).toBe(1);
+  });
 });
