@@ -3,13 +3,15 @@ import { Tournaments, emptyTournamentState, tierFor, tournamentsForWeek, weekKey
 
 describe("tournament week key", () => {
   it("anchors to Monday and zero-pads the week", () => {
-    // 2026-09-10 is a Thursday → week 37 of 2026.
-    expect(weekKey(new Date("2026-09-10T12:00:00Z"))).toBe("2026-W37");
+    // 2026-09-10 is a Thursday → week 37 of 2026. weekKey anchors on the
+    // player-local day (same convention as dateSeed), so build dates from
+    // local parts instead of UTC-string literals that shift on other zones.
+    expect(weekKey(new Date(2026, 8, 10, 12))).toBe("2026-W37");
   });
 
   it("is stable across the whole week", () => {
-    const mon = weekKey(new Date("2026-09-07T00:00:00Z"));
-    const sun = weekKey(new Date("2026-09-13T23:59:59Z"));
+    const mon = weekKey(new Date(2026, 8, 7));
+    const sun = weekKey(new Date(2026, 8, 13, 23, 59, 59));
     expect(mon).toBe(sun);
   });
 });
@@ -23,10 +25,10 @@ describe("tournament rotation", () => {
   });
 
   it("is deterministic per week and differs across weeks", () => {
-    const w1 = tournamentsForWeek(new Date("2026-09-07T00:00:00Z"));
-    const w1b = tournamentsForWeek(new Date("2026-09-07T12:00:00Z"));
+    const w1 = tournamentsForWeek(new Date(2026, 8, 7));
+    const w1b = tournamentsForWeek(new Date(2026, 8, 7, 12));
     expect(w1.map((c) => c.id)).toEqual(w1b.map((c) => c.id));
-    const w2 = tournamentsForWeek(new Date("2026-09-14T00:00:00Z"));
+    const w2 = tournamentsForWeek(new Date(2026, 8, 14));
     expect(w2[0]!.id).not.toBe(w1[0]!.id);
   });
 
@@ -44,7 +46,7 @@ describe("tournament rotation", () => {
 });
 
 describe("tierFor", () => {
-  const def = tournamentsForWeek(new Date("2026-09-07T00:00:00Z"))[0]!;
+  const def = tournamentsForWeek(new Date(2026, 8, 7))[0]!;
   it("maps a value onto the highest tier reached", () => {
     expect(tierFor(def, 0)).toBeNull();
     expect(tierFor(def, def.cuts.bronze)).toBe("bronze");

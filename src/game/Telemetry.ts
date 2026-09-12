@@ -70,11 +70,21 @@ export class Telemetry {
     }
   }
 
+  private readonly onHide = (): void => {
+    if (document.visibilityState === "hidden") this.flush();
+  };
+
   private installFlushHook(): void {
     if (this.hookInstalled || typeof document === "undefined") return;
     this.hookInstalled = true;
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "hidden") this.flush();
-    });
+    document.addEventListener("visibilitychange", this.onHide);
+  }
+
+  /** Detach the flush hook — Game.dispose() calls this so React StrictMode's
+   * double-mount never leaves a zombie listener double-beaconing events. */
+  dispose(): void {
+    if (!this.hookInstalled || typeof document === "undefined") return;
+    this.hookInstalled = false;
+    document.removeEventListener("visibilitychange", this.onHide);
   }
 }

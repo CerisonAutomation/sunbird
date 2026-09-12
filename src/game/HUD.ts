@@ -115,6 +115,10 @@ export type HudSnapshot = {
   adTotal: number;
   adReason: "continue" | "interstitial";
   seedLabel: string;
+  /** Career wings: lifetime-distance rank shown on the title screen. */
+  wings: { icon: string; name: string; progress: number; nextName: string; nextNeeded: number; lifetime: number };
+  /** Flight recap: downsampled [metresFromStart, altitude] profile. */
+  flightPath: [number, number][];
   /** Active incoming rival challenge: "name|distance", or "" when none. */
   rivalBanner: string;
   seedMode: SeedMode;
@@ -339,6 +343,7 @@ export class HUD {
   private overEl!: HTMLElement;
   private overCard!: HTMLElement;
   private toastLayer!: HTMLElement;
+  private readonly liveToasts = new Map<string, { el: HTMLElement; count: number; timer: number }>();
   private flashEl!: HTMLElement;
   private comboEl!: HTMLElement;
   private biomeChip!: HTMLElement;
@@ -579,9 +584,16 @@ export class HUD {
       this.feverWrap.classList.toggle("on", s.feverOn);
       this.setStyle(this.feverFill, "feverFill", "width", `${Math.max(0, Math.min(1, s.fever)) * 100}%`);
 
+      // Timed power-ups live ONLY in the power strip (countdown bars) — chips
+      // here double-printed the same power-up (the old bug: pickup magnet fed
+      // both magnetTimer AND PowerUps, so "🧲" showed twice). Chips remain as
+      // a fallback for armed-boost timers the strip doesn't know about, plus
+      // shield stock and weather calls to action.
       const chips: string[] = [];
-      if (s.boostTimer > 0) chips.push(`<span class="pchip boost">🚀 boost</span>`);
-      if (s.magnetTimer > 0) chips.push(`<span class="pchip magnet">🧲 ${Math.ceil(s.magnetTimer)}s</span>`);
+      if (s.boostTimer > 0 && !s.powers.some((p) => p.kind === "rocket"))
+        chips.push(`<span class="pchip boost">🚀 boost</span>`);
+      if (s.magnetTimer > 0 && !s.powers.some((p) => p.kind === "magnet"))
+        chips.push(`<span class="pchip magnet">🧲 ${Math.ceil(s.magnetTimer)}s</span>`);
       if (s.shield > 0) chips.push(`<span class="pchip shield">🛡 ×${s.shield}</span>`);
       if (s.gust > 0.3) chips.push(`<span class="pchip gust">🌬 headwind — dive!</span>`);
       if (s.inThermal) chips.push(`<span class="pchip thermal">♨ thermal — release!</span>`);
@@ -618,13 +630,13 @@ export class HUD {
         this.launchBanner.className = `launch-banner ${s.launchRating} ${s.launchBannerT > 0 ? "show" : ""}`;
       }
 
-      const pkey = s.powers.map((p) => `${p.kind}${Math.ceil(p.time)}`).join(",");
+      const pkey = s.powers.map((p) => `${p.kind}${p.level}${Math.ceil(p.time)}`).join(",");
       if (pkey !== this.lastPowers) {
         this.lastPowers = pkey;
         this.powerStrip.innerHTML = s.powers
           .map(
             (p) =>
-              `<span class="pu" title="${escapeHtml(p.label)}"><i>${escapeHtml(p.icon)}</i><b style="width:${Math.max(0, Math.min(1, p.time / p.total)) * 100}%"></b><u>${Math.ceil(p.time)}</u></span>`,
+              `<span class="pu${p.time < 1.8 ? " expiring" : ""}${p.level === 2 ? " lv2" : ""}" title="${escapeHtml(p.label)}${p.level === 2 ? " II (overcharged)" : ""}"><i>${escapeHtml(p.icon)}</i>${p.level === 2 ? `<em class="pu-lv">II</em>` : ""}<b style="width:${Math.max(0, Math.min(1, p.time / p.total)) * 100}%"></b><u>${Math.ceil(p.time)}</u></span>`,
           )
           .join("");
       }
@@ -793,34 +805,49 @@ export class HUD {
     }
   }
 
-  /** Last time each exact toast message was shown (ms). Used to de-dupe. */
-  private readonly toastSeenAt = new Map<string, number>();
-
   toast(text: string, kind = "info"): void {
-    const now = performance.now();
-    // De-dupe: rapid-fire events (wind clouds, gems, pickups) must not print
-    // the same line down the screen over and over. If this exact message is
-    // still on screen, skip the duplicate instead of stacking a wall of text.
-    const seen = this.toastSeenAt.get(text);
-    if (seen !== undefined && now - seen < 2600) return;
-    this.toastSeenAt.set(text, now);
-
-    // Cap the visible stack so a burst can never pile more than a couple of
-    // pills down the column — the oldest is retired to make room.
-    while (this.toastLayer.childElementCount >= 3) {
-      this.toastLayer.firstElementChild?.remove();
+    // Dedup: firing the same line while it is still on screen bumps a ×n
+    // counter instead of stacking identical pills (ash storms, repeat
+    // pickups). Never show the same words twice at once.
+    const live = this.liveToasts.get(text);
+    if (live && live.el.isConnected) {
+      live.count += 1;
+      live.el.textContent = `${text} ×${live.count}`;
+      live.el.classList.remove("bump");
+      void live.el.offsetWidth;
+      live.el.classList.add("bump");
+      window.clearTimeout(live.timer);
+      live.timer = this.scheduleToastOut(live.el, text);
+      return;
     }
-
+    // Cap the stack — beyond 4 pills the oldest leaves immediately.
+    while (this.toastLayer.children.length >= 4) {
+      const oldest = this.toastLayer.firstElementChild;
+      if (!oldest) break;
+      for (const [k, v] of this.liveToasts) if (v.el === oldest) this.liveToasts.delete(k);
+      oldest.remove();
+    }
     const el = document.createElement("div");
     el.className = `toast ${kind}`;
     el.textContent = text;
     this.toastLayer.appendChild(el);
     requestAnimationFrame(() => el.classList.add("in"));
-    window.setTimeout(() => {
+    const timer = this.scheduleToastOut(el, text);
+    this.liveToasts.set(text, { el, count: 1, timer });
+  }
+
+  /** Long lines earn longer reads: 1.2 s base + 28 ms/char, capped at 4 s. */
+  private scheduleToastOut(el: HTMLElement, key: string): number {
+    const hold = Math.min(4000, 1200 + Math.max(0, el.textContent!.length - 16) * 28);
+    return window.setTimeout(() => {
       el.classList.remove("in");
       el.classList.add("out");
-      window.setTimeout(() => el.remove(), 420);
-    }, 1200);
+      window.setTimeout(() => {
+        el.remove();
+        const live = this.liveToasts.get(key);
+        if (live && live.el === el) this.liveToasts.delete(key);
+      }, 420);
+    }, hold);
   }
 
   flash(kind: "perfect" | "fever" | "island" | "sleep"): void {
@@ -1619,17 +1646,29 @@ function renderMain(s: HudSnapshot): string {
 
     <div class="hero-meta">
       <span class="pill seed-pill">${s.seedLabel}</span>
+      <span class="pill wings-pill" title="${formatDistance(s.wings.lifetime)} lifetime">${s.wings.icon} ${s.wings.name}</span>
     </div>
+    ${
+      s.wings.nextNeeded > 0
+        ? `<div class="wings-track" aria-label="Career progress"><i style="width:${Math.round(s.wings.progress * 100)}%"></i><span>${formatDistance(s.wings.nextNeeded)} to ${s.wings.nextName}</span></div>`
+        : ""
+    }
     ${s.rivalBanner ? renderRivalBanner(s.rivalBanner) : ""}
     ${seedPicker}
 
-    <!-- MAIN PLAY MODES: 1P · PVP · PVE · TOURNAMENT -->
-    <div class="mode-cards" role="group" aria-label="Play modes">
-      <button class="mode-card-main" data-ui data-action="pvp-practice">
+    <!-- PLAY: one primary action, then grouped secondary paths. All data-action
+         ids are unchanged — Game.handleAction is the contract. -->
+    <div class="section-title">Play <small>hold to dive · release to soar</small></div>
+    <div class="mode-cards hero-play" role="group" aria-label="Primary play">
+      <button class="mode-card-main primary" data-ui data-action="pvp-practice" aria-label="Play free flight now">
         <span class="mode-icon-lg"><svg class="mi" viewBox="0 0 48 48"><defs><linearGradient id="gSun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd76a"/><stop offset="1" stop-color="#ff9a3a"/></linearGradient></defs><circle cx="24" cy="22" r="9" fill="url(#gSun)"/><g stroke="url(#gSun)" stroke-width="3" stroke-linecap="round"><line x1="24" y1="5" x2="24" y2="10"/><line x1="24" y1="34" x2="24" y2="39"/><line x1="7" y1="22" x2="12" y2="22"/><line x1="36" y1="22" x2="41" y2="22"/><line x1="11.5" y1="9.5" x2="15" y2="13"/><line x1="33" y1="31" x2="36.5" y2="34.5"/><line x1="36.5" y1="9.5" x2="33" y2="13"/><line x1="15" y1="31" x2="11.5" y2="34.5"/></g><path d="M14 42 Q20 36 24 40 Q28 36 34 42" fill="none" stroke="#e8862a" stroke-width="2.6" stroke-linecap="round"/></svg></span>
-        <span class="mode-name">1 PLAYER</span>
+        <span class="mode-name">▶ FLY NOW — 1 PLAYER</span>
         <span class="mode-desc">Free flight — hold to dive, release to soar</span>
       </button>
+    </div>
+
+    <div class="section-title">More ways to fly <small>PvE · cups · live rooms</small></div>
+    <div class="mode-cards" role="group" aria-label="Play modes">
       <button class="mode-card-main pvp" data-ui data-action="open-live">
         <span class="mode-icon-lg"><svg class="mi" viewBox="0 0 48 48"><defs><linearGradient id="gPvp" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7a6a"/><stop offset="1" stop-color="#d84a5a"/></linearGradient></defs><g stroke="url(#gPvp)" stroke-width="3.4" stroke-linecap="round"><line x1="10" y1="10" x2="34" y2="34"/><line x1="38" y1="10" x2="14" y2="34"/></g><g stroke="#a83a4a" stroke-width="3.4" stroke-linecap="round"><line x1="31" y1="37" x2="37" y2="31"/><line x1="11" y1="31" x2="17" y2="37"/></g><circle cx="24" cy="22" r="4.5" fill="#fff" opacity="0.9"/></svg></span>
         <span class="mode-name">PVP</span>
@@ -1647,7 +1686,8 @@ function renderMain(s: HudSnapshot): string {
       </button>
     </div>
 
-    <button class="rank-card" data-ui data-action="open-rank" aria-label="View Rival rank">
+    <div class="section-title">Local rank <small>practice field · not global</small></div>
+    <button class="rank-card" data-ui data-action="open-rank" aria-label="View local Rival rank (practice field)">
       <span class="rank-div">${s.rival.divisionIcon} ${s.rival.division}</span>
       <span class="rank-num">${s.rival.rating}</span>
       <span class="rank-bar"><i style="width:${Math.round(s.rival.progress * 100)}%"></i></span>
@@ -1658,11 +1698,12 @@ function renderMain(s: HudSnapshot): string {
       } · 🔥${s.rival.streak} streak</span>
     </button>
 
-    <div class="pvp-modes" role="group" aria-label="Play modes">
-      <button class="pvp-mode rated" data-ui data-action="pvp-ranked"><i>🏆</i><b>Ranked 40</b><span>Rating moves</span></button>
-      <button class="pvp-mode rated" data-ui data-action="pvp-duel"><i>⚔</i><b>Duel 1v1</b><span>±16 rating</span></button>
-      <button class="pvp-mode" data-ui data-action="pvp-casual"><i>🐦</i><b>Casual 40</b><span>No rating</span></button>
-      <button class="pvp-mode storm" data-ui data-action="pvp-storm"><i>⛈</i><b>Stormfront</b><span>PvE × PvP</span></button>
+    <div class="section-title">Race formats <small>all on-device unless in a room</small></div>
+    <div class="pvp-modes" role="group" aria-label="Race formats">
+      <button class="pvp-mode rated" data-ui data-action="pvp-ranked"><i>🏆</i><b>Ranked 40</b><span>Local rating</span></button>
+      <button class="pvp-mode rated" data-ui data-action="pvp-duel"><i>⚔</i><b>Duel 1v1</b><span>Local ±16</span></button>
+      <button class="pvp-mode" data-ui data-action="pvp-casual"><i>🐦</i><b>Casual 40</b><span>Practice · no rating</span></button>
+      <button class="pvp-mode storm" data-ui data-action="pvp-storm"><i>⛈</i><b>Stormfront</b><span>Practice · PvE × PvP</span></button>
       <button class="pvp-mode" data-ui data-action="versus"><i>👥</i><b>Local 2P</b><span>Same screen</span></button>
     </div>
 
@@ -1971,7 +2012,7 @@ function renderSettings(s: HudSnapshot): string {
     <div class="setting-row"><span>Flights flown</span><b>${s.runsPlayed}</b></div>
     ${s.canInstall ? `<button class="soft-btn wide" data-ui data-action="install-app">⬇ Install Sunbird</button>` : ""}
     <button class="ghost-btn danger" data-ui data-action="reset-progress">${s.resetArmed ? "Tap again to erase everything" : "Reset progress"}</button>
-    <p class="fineprint">Sunbird 2.5 Pro · ${s.seedLabel}</p>
+    <p class="fineprint">Sunbird 1.0 · ${s.seedLabel}</p>
   `;
 }
 
@@ -2097,6 +2138,39 @@ function renderGoalList(goals: SessionGoal[]): string {
     .join("")}</div>`;
 }
 
+/** The run's silhouette: an SVG sparkline of the altitude profile. */
+export function renderFlightRecap(path: [number, number][]): string {
+  if (path.length < 3) return "";
+  const w = 320;
+  const hgt = 64;
+  let maxX = 1;
+  let maxY = 12;
+  for (const [x, y] of path) {
+    if (x > maxX) maxX = x;
+    if (y > maxY) maxY = y;
+  }
+  const px = (x: number): number => (x / maxX) * (w - 4) + 2;
+  const py = (y: number): number => hgt - 4 - (Math.max(0, y) / maxY) * (hgt - 10);
+  const line = path.map(([x, y], i) => `${i === 0 ? "M" : "L"}${px(x).toFixed(1)} ${py(y).toFixed(1)}`).join(" ");
+  const area = `${line} L${px(path[path.length - 1]![0]).toFixed(1)} ${hgt - 2} L${px(path[0]![0]).toFixed(1)} ${hgt - 2} Z`;
+  // Peak marker — the flight's zenith deserves a dot.
+  let peak = path[0]!;
+  for (const p of path) if (p[1] > peak[1]) peak = p;
+  return `
+    <div class="flight-recap" aria-label="Flight altitude profile">
+      <svg viewBox="0 0 ${w} ${hgt}" preserveAspectRatio="none">
+        <defs><linearGradient id="fr-g" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#ffb020" stop-opacity="0.55"/>
+          <stop offset="1" stop-color="#ffb020" stop-opacity="0.05"/>
+        </linearGradient></defs>
+        <path d="${area}" fill="url(#fr-g)"/>
+        <path d="${line}" fill="none" stroke="#e08a10" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="${px(peak[0]).toFixed(1)}" cy="${py(peak[1]).toFixed(1)}" r="3" fill="#ff6b4a"/>
+      </svg>
+      <span class="fr-peak">▲ ${Math.round(peak[1])} m peak</span>
+    </div>`;
+}
+
 function renderGameOver(s: HudSnapshot): string {
   if (s.versus && s.p1Stats && s.p2Stats) return renderVersusResult(s);
   const questTotal = s.claimedQuests.reduce((a, q) => a + q.reward, 0);
@@ -2141,6 +2215,7 @@ function renderGameOver(s: HudSnapshot): string {
     ${s.boardScope === "global" && s.boardMetric === "distance" && s.board && s.board.yourRank > 0 ? `<div class="reward-strip rank-strip">Leaderboard rank · <b>#${s.board.yourRank}</b> of ${s.board.total}</div>` : ""}
     <h2>Sunbird sleeps</h2>
     <p class="tagline">The daylight ran out.</p>
+    ${renderFlightRecap(s.flightPath)}
     <div class="over-stats">
       <div><span>Distance</span><b>${formatDistance(s.distance)}</b></div>
       <div><span>Score</span><b>${Math.floor(s.score).toLocaleString()}</b></div>
