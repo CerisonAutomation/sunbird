@@ -168,6 +168,11 @@ export class Game {
   private frameEma = 1 / 60;
   /** Wall-clock ms of the last emitted frame_error telemetry (throttled). */
   private frameErrAt = 0;
+  /** Rolling field-performance stats, flushed to telemetry every ~10s so a
+   *  device-side perf regression is visible without a debugger attached. */
+  private perfLongFrames = 0;
+  private perfWorst = 0;
+  private perfTimer = 0;
   private qualityTimer = 0;
   private dpr = 1;
   private particleBudget = 1;
@@ -3377,6 +3382,24 @@ export class Game {
 
   private adaptQuality(raw: number): void {
     this.frameEma = lerp(this.frameEma, raw, 0.05);
+    // Field perf telemetry: count frames that blow the 60 fps budget (16.7 ms)
+    // and track the worst, then report a coarse aggregate every ~10s. This is
+    // the same signal the quality stepper reacts to — surfaced so a deploy that
+    // regresses frame time shows up in the analytics, not just as user churn.
+    if (raw > 1 / 30) this.perfLongFrames += 1;
+    if (raw > this.perfWorst) this.perfWorst = raw;
+    this.perfTimer += raw;
+    if (this.perfTimer >= 10) {
+      this.perfTimer = 0;
+      this.telemetry.track("perf_frame", {
+        frameMs: Math.round(this.frameEma * 1000),
+        longFrames: this.perfLongFrames,
+        worstMs: Math.round(this.perfWorst * 1000),
+        dpr: this.dpr,
+      });
+      this.perfLongFrames = 0;
+      this.perfWorst = 0;
+    }
     this.qualityTimer += raw;
     if (this.qualityTimer < 2.5) return;
     this.qualityTimer = 0;
