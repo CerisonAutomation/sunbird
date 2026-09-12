@@ -159,6 +159,8 @@ export class Game {
   private zenithTimer = 0;
   private hitStopTimer = 0;
   private frameEma = 1 / 60;
+  /** Wall-clock ms of the last emitted frame_error telemetry (throttled). */
+  private frameErrAt = 0;
   private qualityTimer = 0;
   private dpr = 1;
   private particleBudget = 1;
@@ -675,6 +677,15 @@ export class Game {
     this.pushHud();
     } catch (err) {
       console.error("Sunbird frame error:", err);
+      // The loop must never die from a single bad frame, but a repeat offender
+      // is worth knowing about. Report the message only (no stack — that can
+      // carry device/URL fingerprints) through the existing telemetry bus, at
+      // most once a minute so a stuck frame can't flood the beacon.
+      const now = performance.now();
+      if (now - this.frameErrAt > 60_000) {
+        this.frameErrAt = now;
+        this.telemetry.track("frame_error", { message: String(err instanceof Error ? err.message : err).slice(0, 120) });
+      }
     }
   }
 
