@@ -275,6 +275,18 @@ export class RealtimeClient implements NetTransport {
       return; // Malformed frames are ignored rather than killing the session.
     }
 
+    // A frame that parses but is malformed (missing a field the switch below
+    // trusts, e.g. `{"type":"peers"}` with no `peers` array) must be dropped
+    // just like an unparseable one — never let a hostile/buggy server throw
+    // inside the socket handler.
+    try {
+      this.dispatch(msg);
+    } catch {
+      /* drop the malformed frame */
+    }
+  }
+
+  private dispatch(msg: ServerMsg): void {
     switch (msg.type) {
       case "welcome":
         this.selfId = msg.id;
@@ -285,11 +297,11 @@ export class RealtimeClient implements NetTransport {
         break;
       case "peers":
         for (const p of msg.peers) {
-          if (p.id === this.selfId) continue;
+          if (typeof p.id !== "string" || p.id === this.selfId) continue;
           const existing = this.tracks.get(p.id);
           const t = this.track(p.id);
           const wasReady = t.ready;
-          t.name = p.name.slice(0, 14);
+          t.name = typeof p.name === "string" ? p.name.slice(0, 14) : t.name;
           t.hue = Number.isFinite(p.hue) ? p.hue : t.hue;
           t.skin = p.skin || t.skin;
           t.ready = Boolean(p.ready);
@@ -313,9 +325,13 @@ export class RealtimeClient implements NetTransport {
       case "state": {
         this.serverClock = msg.t;
         for (const [id, x, y, rot, dist] of msg.pilots) {
-          if (id === this.selfId) continue;
+          // Validate at the boundary: a non-finite coordinate (NaN/Infinity)
+          // wouldn't throw, but it would poison the interpolation buffer and
+          // corrupt the rival's rendered position forever.
+          if (typeof id !== "string" || id === this.selfId) continue;
+          if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(rot)) continue;
           const t = this.track(id);
-          t.distance = dist;
+          t.distance = Number.isFinite(dist) ? dist : t.distance;
           t.lastSeen = this.clock;
           t.buffer.push({ t: msg.t, x, y, rot });
           // Two keyframes are enough to interpolate; drop anything older.

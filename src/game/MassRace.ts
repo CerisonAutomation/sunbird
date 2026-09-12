@@ -314,6 +314,11 @@ export class MassRace {
 
   private applyRemote(snapshots: RemoteSnapshot[]): void {
     for (const snap of snapshots) {
+      // Boundary validation: a snapshot is untrusted network data. A missing
+      // id or a non-finite coordinate must be dropped, not applied — a NaN
+      // here would corrupt the rival's sim state and its rendered transform.
+      if (typeof snap.id !== "string" || !snap.id) continue;
+      if (!Number.isFinite(snap.x) || !Number.isFinite(snap.y) || !Number.isFinite(snap.rotation)) continue;
       let rival = this.rivals.find((r) => r.id === snap.id);
       if (!rival) {
         // Promote a local slot so the field size stays constant when a real
@@ -326,7 +331,7 @@ export class MassRace {
         rival.kind = "remote";
         rival.ghost = false;
       }
-      rival.name = snap.name.slice(0, 14);
+      rival.name = typeof snap.name === "string" ? snap.name.slice(0, 14) : rival.name;
       rival.bird.x = snap.x;
       rival.bird.y = snap.y;
       rival.bird.rotation = snap.rotation;

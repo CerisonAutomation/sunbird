@@ -86,9 +86,9 @@ export class SquadClient {
         call<{ friends: Friend[]; clubId: number | null }>(`/profile?device=${encodeURIComponent(this.deviceId)}`),
         call<{ clubs: Club[]; mine: number | null }>(`/clubs?device=${encodeURIComponent(this.deviceId)}`),
       ]);
-      this.state.friends = profile.friends;
+      this.state.friends = Array.isArray(profile.friends) ? profile.friends : [];
       this.state.myClubId = profile.clubId;
-      this.state.clubs = clubs.clubs;
+      this.state.clubs = Array.isArray(clubs.clubs) ? clubs.clubs : [];
       if (this.state.myClubId) await this.pollChat(true);
     } catch (err) {
       this.state.error = err instanceof Error ? err.message : "Social server unreachable";
