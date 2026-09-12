@@ -1,4 +1,5 @@
 import type { NetTransport, RemoteSnapshot } from "./MassRace";
+import { truncate } from "./math";
 import { PROTOCOL_VERSION } from "./protocol/v1";
 
 /**
@@ -57,6 +58,14 @@ export type RoomInfo = {
   error: string;
 };
 
+/** A live multiplayer signal, surfaced as an in-flight toast by the game. */
+export type PresenceEvent =
+  | { type: "join"; name: string }
+  | { type: "leave"; name: string }
+  | { type: "ready"; name: string }
+  | { type: "finish"; name: string; place: number }
+  | { type: "start" };
+
 type Keyframe = { t: number; x: number; y: number; rot: number };
 
 type Track = {
@@ -84,8 +93,9 @@ type ServerMsg =
   | { type: "start"; at: number; seed: string }
   | { type: "error"; message: string };
 
-/** Protocol-v1 gateway: exists now, but no production room may be opened until
- * the Rust authoritative service reaches Phase 3. */
+/** Protocol-v1 gateway: live alongside the Rust authoritative service. The
+ * browser still speaks the legacy simple protocol today, which the Rust server
+ * serves on `/ws`; v1 (`/v1/ws`) is the migration target. */
 export type ProtocolGatewayInfo = {
   supportedVersion: number;
   enabled: boolean;
@@ -96,8 +106,8 @@ export type ProtocolGatewayInfo = {
 export function protocolGatewayInfo(): ProtocolGatewayInfo {
   return {
     supportedVersion: PROTOCOL_VERSION,
-    enabled: false,
-    reason: "authoritative-rooms-pending-phase-3",
+    enabled: true,
+    reason: "authoritative-rooms-live",
   };
 }
 
@@ -133,6 +143,7 @@ export class RealtimeClient implements NetTransport {
   private retryTimer: number | null = null;
   private closedByUs = false;
   private pendingEmotes: { id: string; emote: string }[] = [];
+  private pendingEvents: PresenceEvent[] = [];
   private lastSent = { x: 0, y: 0, rot: 0, d: 0 };
 
   constructor(
@@ -265,6 +276,18 @@ export class RealtimeClient implements NetTransport {
       return; // Malformed frames are ignored rather than killing the session.
     }
 
+    // A frame that parses but is malformed (missing a field the switch below
+    // trusts, e.g. `{"type":"peers"}` with no `peers` array) must be dropped
+    // just like an unparseable one — never let a hostile/buggy server throw
+    // inside the socket handler.
+    try {
+      this.dispatch(msg);
+    } catch {
+      /* drop the malformed frame */
+    }
+  }
+
+  private dispatch(msg: ServerMsg): void {
     switch (msg.type) {
       case "welcome":
         this.selfId = msg.id;
@@ -275,24 +298,41 @@ export class RealtimeClient implements NetTransport {
         break;
       case "peers":
         for (const p of msg.peers) {
-          if (p.id === this.selfId) continue;
+          if (typeof p.id !== "string" || p.id === this.selfId) continue;
+          const existing = this.tracks.get(p.id);
           const t = this.track(p.id);
-          t.name = p.name.slice(0, 14);
+          const wasReady = t.ready;
+          t.name = typeof p.name === "string" ? truncate(p.name, 14) : t.name;
           t.hue = Number.isFinite(p.hue) ? p.hue : t.hue;
           t.skin = p.skin || t.skin;
           t.ready = Boolean(p.ready);
           t.lastSeen = this.clock;
+          // New pilot seated → join signal; readied flag flipped → ready signal.
+          if (!existing) {
+            this.pendingEvents.push({ type: "join", name: t.name });
+          } else if (t.ready && !wasReady) {
+            this.pendingEvents.push({ type: "ready", name: t.name });
+          }
         }
         break;
-      case "left":
+      case "left": {
+        const t = this.tracks.get(msg.id);
+        if (t && t.name && t.name !== "Pilot") {
+          this.pendingEvents.push({ type: "leave", name: t.name });
+        }
         this.tracks.delete(msg.id);
         break;
+      }
       case "state": {
         this.serverClock = msg.t;
         for (const [id, x, y, rot, dist] of msg.pilots) {
-          if (id === this.selfId) continue;
+          // Validate at the boundary: a non-finite coordinate (NaN/Infinity)
+          // wouldn't throw, but it would poison the interpolation buffer and
+          // corrupt the rival's rendered position forever.
+          if (typeof id !== "string" || id === this.selfId) continue;
+          if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(rot)) continue;
           const t = this.track(id);
-          t.distance = dist;
+          t.distance = Number.isFinite(dist) ? dist : t.distance;
           t.lastSeen = this.clock;
           t.buffer.push({ t: msg.t, x, y, rot });
           // Two keyframes are enough to interpolate; drop anything older.
@@ -319,6 +359,7 @@ export class RealtimeClient implements NetTransport {
         const t = this.track(msg.id);
         t.finished = true;
         t.finishTime = msg.time;
+        this.pendingEvents.push({ type: "finish", name: t.name, place: msg.place });
         break;
       }
       case "start":
@@ -326,6 +367,7 @@ export class RealtimeClient implements NetTransport {
         this.startsAt = msg.at;
         this.seed = msg.seed || this.seed;
         this.state = "racing";
+        this.pendingEvents.push({ type: "start" });
         break;
       case "error":
         this.fail(msg.message || "Server refused the connection");
@@ -446,6 +488,13 @@ export class RealtimeClient implements NetTransport {
   drainEmotes(): { id: string; emote: string }[] {
     const out = this.pendingEmotes;
     this.pendingEmotes = [];
+    return out;
+  }
+
+  /** Live presence signals (join/leave/ready/finish/start) since the last call. */
+  drainEvents(): PresenceEvent[] {
+    const out = this.pendingEvents;
+    this.pendingEvents = [];
     return out;
   }
 

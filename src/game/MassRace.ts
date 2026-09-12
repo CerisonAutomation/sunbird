@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { Bird } from "./Bird";
 import { BIRD_RADIUS } from "./constants";
 import { LaunchSystem } from "./LaunchSystem";
-import { clamp, SeededRandom } from "./math";
+import { clamp, lerp, SeededRandom, truncate } from "./math";
 import type { TerrainSystem } from "./TerrainSystem";
 
 /**
@@ -36,6 +36,10 @@ export type Rival = {
   kind: RivalKind;
   bird: Bird;
   launch: LaunchSystem;
+  /** Bird position at the start of the last physics step (or the last remote
+   *  snapshot) — the "from" end of render interpolation. */
+  prevX: number;
+  prevY: number;
   /** how far ahead of a crest this pilot releases — their whole personality */
   lead: number;
   /** slow wobble in their crest judgement (amplitude, rate, phase) */
@@ -173,6 +177,8 @@ export class MassRace {
         kind: "local",
         bird,
         launch: new LaunchSystem(),
+        prevX: bird.x,
+        prevY: bird.y,
         lead,
         // Nobody reads a crest perfectly every time. A slow per-pilot wobble
         // keeps the field genuinely separated instead of collapsing onto a
@@ -232,17 +238,17 @@ export class MassRace {
    * Time-shifted multiplayer (the Real Racing 3 pattern): overlay real players
    * from the leaderboard onto local slots. Each ghost keeps the real pilot's
    * name and gets a skill derived from their submitted best distance, so a
-   * player who flew 3,000 m produces a genuinely hard double while a 600 m
+   * player who flew 4,000 m produces a genuinely hard double while a 600 m
    * newbie sits at the back. Returns how many ghosts were seated.
    */
   applyGhosts(rows: { name: string; distance: number }[], gate: number): number {
-    const span = gate > 0 ? gate : 3000;
+    const span = gate > 0 ? gate : 4000;
     const locals = this.rivals.filter((r) => r.kind === "local");
     let seated = 0;
     for (const row of rows) {
       const slot = locals[seated];
       if (!slot) break;
-      const name = row.name.trim().slice(0, 14);
+      const name = truncate(row.name.trim(), 14);
       if (!name) continue;
       const skill = clamp(0.3 + 0.6 * (row.distance / span), 0.3, 1);
       slot.name = name;
@@ -275,6 +281,10 @@ export class MassRace {
     this.clock += dt;
 
     for (const r of this.rivals) {
+      // Snapshot before any motion this step (or before a remote snapshot
+      // overwrites the position below), so the render can interpolate.
+      r.prevX = r.bird.x;
+      r.prevY = r.bird.y;
       if (r.kind === "remote" || r.finished) continue;
 
       // Policy: hold through the descent and the climb, release just before the
@@ -304,6 +314,11 @@ export class MassRace {
 
   private applyRemote(snapshots: RemoteSnapshot[]): void {
     for (const snap of snapshots) {
+      // Boundary validation: a snapshot is untrusted network data. A missing
+      // id or a non-finite coordinate must be dropped, not applied — a NaN
+      // here would corrupt the rival's sim state and its rendered transform.
+      if (typeof snap.id !== "string" || !snap.id) continue;
+      if (!Number.isFinite(snap.x) || !Number.isFinite(snap.y) || !Number.isFinite(snap.rotation)) continue;
       let rival = this.rivals.find((r) => r.id === snap.id);
       if (!rival) {
         // Promote a local slot so the field size stays constant when a real
@@ -316,7 +331,7 @@ export class MassRace {
         rival.kind = "remote";
         rival.ghost = false;
       }
-      rival.name = snap.name.slice(0, 14);
+      rival.name = typeof snap.name === "string" ? truncate(snap.name, 14) : rival.name;
       rival.bird.x = snap.x;
       rival.bird.y = snap.y;
       rival.bird.rotation = snap.rotation;
@@ -355,7 +370,7 @@ export class MassRace {
 
   /** Live roster for the top-of-screen bird bar. */
   roster(playerX: number, startX: number, finishDistance: number, playerName: string, playerHue = 0.06): RosterBird[] {
-    const span = finishDistance > 0 ? finishDistance : 3000;
+    const span = finishDistance > 0 ? finishDistance : 4000;
     const list: RosterBird[] = this.rivals.map((r) => ({
       id: r.id,
       name: r.name,
@@ -439,7 +454,7 @@ export class MassRace {
     return { rows: merged, place, total: rows.length };
   }
 
-  syncVisual(dt: number, cameraX: number): void {
+  syncVisual(dt: number, cameraX: number, interp = 1): void {
     if (!this.group.visible) return;
     this.flapT += dt;
 
@@ -450,7 +465,9 @@ export class MassRace {
       const flap = Math.sin(this.flapT * 14 + r.hue * 9) * 0.4;
       tmpColor.setHSL(r.hue, 0.62, r.kind === "remote" ? 0.68 : 0.55);
 
-      tmpObj.position.set(r.bird.x, r.bird.y, -3.5 - (r.hue - 0.5) * 5);
+      const x = lerp(r.prevX, r.bird.x, interp);
+      const y = lerp(r.prevY, r.bird.y, interp);
+      tmpObj.position.set(x, y, -3.5 - (r.hue - 0.5) * 5);
       tmpObj.rotation.set(0, 0, r.bird.rotation * 0.9);
       tmpObj.scale.set(1.05, 0.9, 0.9);
       tmpObj.updateMatrix();

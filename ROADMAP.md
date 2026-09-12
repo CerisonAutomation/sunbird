@@ -23,22 +23,23 @@ until proven otherwise. This file exists so the commit log can't overclaim.
 - Server-refereed race placements carry a visible "✓ refereed" stamp on the
   results card — honesty is the trust brand
 
-## 🟡 Written, tested, NOT deployed to production (single `wrangler deploy` away)
-- `backend/` — Cloudflare Workers + Durable Objects rooms, leaderboards, WS.
+## 🟡 Written, tested, NOT deployed to a public host yet
+- `rust/` — `sunbird-server` (rooms, 15 Hz state, server-refereed finishes).
   **WIRED END-TO-END in dev**: `.env.example` + the vite `/mp` proxy connect
-  the client to `wrangler dev` rooms; two real sockets joining the same DO
-  room and exchanging 15 Hz state is verified by test (`npm run test:mp`).
-  Production needs only the deploy + `VITE_MULTIPLAYER_URL=wss://…`.
+  the client to the Rust `/ws` socket; two real sockets joining the same room
+  and exchanging 15 Hz state is verified by test (`npm run test:mp`), and the
+  crate is CI-verified (fmt · clippy · tests · release build). Production
+  needs only a WebSocket-capable host + `VITE_MULTIPLAYER_URL=wss://…`.
 - `server/social/` — PGlite social layer (friends, squads, feed)
 - Without a configured URL the game still falls back to local squadron
   pilots with human-sounding names — the lobby badge says which one you got.
 
 ## 🔴 Aspirational (do not claim in commit messages)
-- `rust/` — protocol crate + server skeleton. Compiles in CI only. There is no
-  running Rust backend, no anti-cheat, no matchmaking. Phase 2 at best.
+- Anti-cheat and server-side matchmaking are still aspirational; rooms today
+  are in-memory and trust the client's position stream.
 
 ## Next (in order)
-1. Deploy `backend/` to Cloudflare free tier; swap daily leaderboard to it
+1. Deploy `sunbird-server` to a WebSocket host; point the daily leaderboard at it
 2. Real-player ghost replays on the daily seed (async PvP)
 3. First-run dive tutorial (30 s, once)
 4. Coin sinks: consumable modifiers, skin upcycling

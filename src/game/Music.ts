@@ -34,6 +34,12 @@ const PROG_A = ["C", "G", "Am", "F", "C", "G", "F", "G"];
 const PROG_B = ["Am", "F", "C", "G", "Am", "F", "C", "G"];
 const PROG_C = ["F", "G", "Em", "Am", "F", "G", "C", "C"];
 const PROG_D = ["Dm", "G", "C", "Am", "F", "G", "C", "G"];
+const PROG_E = ["C", "Am", "F", "G", "C", "Am", "F", "G"];
+const PROG_F = ["Am", "Em", "F", "C", "Am", "Em", "F", "C"];
+const PROG_G = ["C", "G", "Dm", "Am", "C", "G", "Dm", "Am"];
+const PROG_H = ["G", "C", "Am", "F", "G", "C", "Am", "F"];
+const PROG_I = ["F", "C", "Dm", "G", "F", "C", "Dm", "G"];
+const PROG_J = ["Am", "C", "G", "F", "Am", "C", "G", "F"];
 
 // Melodies: one entry per eighth note (0 = rest, -1 = hold previous)
 const MEL_A = [
@@ -82,6 +88,78 @@ const MEL_D = [
   79, -1, 76, -1, 72, -1, 0, 0,
 ];
 
+// Track 5 — Coral Breeze: bright, rippling, climbs and settles like surf.
+const MEL_E = [
+  72, 0, 74, 0, 76, 0, 79, 0,
+  76, 0, 72, 0, 69, 0, 72, 0,
+  65, 0, 69, 0, 72, 0, 74, 0,
+  74, 0, 72, 0, 71, 0, 72, 0,
+  72, 0, 76, 0, 79, 0, 81, 0,
+  79, 0, 76, 0, 72, 0, 76, 0,
+  77, 0, 76, 0, 74, 0, 72, 0,
+  74, -1, -1, 0, 0, 0, 0, 0,
+];
+
+// Track 6 — Moonlight Flutter: sparse, descending, a night that breathes.
+const MEL_F = [
+  69, 0, 72, 0, 76, 0, 72, 0,
+  71, 0, 74, 0, 76, 0, 74, 0,
+  65, 0, 69, 0, 72, 0, 74, 0,
+  72, 0, 69, 0, 65, 0, 67, 0,
+  69, 0, 72, 0, 76, 0, 79, 0,
+  76, 0, 74, 0, 71, 0, 74, 0,
+  77, 0, 74, 0, 72, 0, 69, 0,
+  72, -1, -1, -1, 0, 0, 0, 0,
+];
+
+// Track 7 — Glass Ocean: crystalline high sparkle over calm harmony.
+const MEL_G = [
+  76, 0, 79, 0, 84, 0, 81, 0,
+  79, 0, 76, 0, 74, 0, 76, 0,
+  74, 0, 72, 0, 69, 0, 72, 0,
+  69, 0, 72, 0, 76, 0, 74, 0,
+  76, 0, 79, 0, 84, 0, 86, 0,
+  84, 0, 81, 0, 79, 0, 76, 0,
+  74, 0, 72, 0, 69, 0, 72, 0,
+  74, -1, 72, -1, 0, 0, 0, 0,
+];
+
+// Track 8 — Trade Winds: broad stepwise phrases that push and ease.
+const MEL_H = [
+  74, 0, 71, 0, 72, 0, 74, 0,
+  76, 0, 79, 0, 76, 0, 74, 0,
+  72, 0, 69, 0, 72, 0, 76, 0,
+  74, 0, 72, 0, 69, 0, 65, 0,
+  74, 0, 71, 0, 72, 0, 74, 0,
+  79, 0, 76, 0, 74, 0, 72, 0,
+  69, 0, 72, 0, 76, 0, 74, 0,
+  72, -1, -1, 0, 0, 0, 0, 0,
+];
+
+// Track 9 — Golden Hour: held, warm notes that stretch the last light.
+const MEL_I = [
+  77, -1, 0, 0, 76, 0, 74, 0,
+  72, -1, 0, 0, 69, 0, 72, 0,
+  74, -1, 0, 0, 72, 0, 69, 0,
+  71, 0, 72, 0, 74, -1, 0, 0,
+  77, -1, 0, 0, 79, 0, 77, 0,
+  76, -1, 0, 0, 74, 0, 72, 0,
+  74, -1, 0, 0, 72, 0, 74, 0,
+  76, -1, 74, -1, 72, -1, 0, 0,
+];
+
+// Track 10 — Starlight: twinkling wide leaps between a warm low register.
+const MEL_J = [
+  81, 0, 76, 0, 81, 0, 84, 0,
+  79, 0, 76, 0, 72, 0, 76, 0,
+  74, 0, 71, 0, 74, 0, 76, 0,
+  77, 0, 74, 0, 72, 0, 69, 0,
+  81, 0, 76, 0, 81, 0, 86, 0,
+  84, 0, 81, 0, 79, 0, 76, 0,
+  74, 0, 71, 0, 74, 0, 79, 0,
+  77, -1, 76, -1, 72, -1, 0, 0,
+];
+
 // Whistle counter-melody used in fever (per eighth, section-agnostic)
 const WHISTLE = [
   0, 0, 84, 0, 83, 0, 81, 0,
@@ -97,13 +175,29 @@ const WHISTLE = [
 // Strum pattern per eighth: 1 = down, 2 = up, 0 = none (island strum D _ D U _ U D U)
 const STRUM = [1, 0, 1, 2, 0, 2, 1, 2];
 
-const SECTIONS: { prog: string[]; mel: number[] }[] = [
-  { prog: PROG_A, mel: MEL_A },
-  { prog: PROG_A, mel: MEL_A },
-  { prog: PROG_B, mel: MEL_B },
-  { prog: PROG_C, mel: MEL_C },
-  { prog: PROG_D, mel: MEL_D },
+export type Track = { name: string; prog: string[]; mel: number[]; mood: BiomeMusicStyle };
+
+/**
+ * Ten original island-folk compositions. Each is a full 8-bar song — its own
+ * chord progression, lead melody, and a `mood` matching the biome orchestration
+ * it was written for, so the shuffle can favor tracks that suit the current
+ * island and time of day while still cycling all ten.
+ */
+export const TRACKS: Track[] = [
+  { name: "Island Sunrise", prog: PROG_A, mel: MEL_A, mood: "bright" },
+  { name: "Lazy Current", prog: PROG_B, mel: MEL_B, mood: "airy" },
+  { name: "Hilltop Hop", prog: PROG_C, mel: MEL_C, mood: "bright" },
+  { name: "Sunset Glide", prog: PROG_D, mel: MEL_D, mood: "warm" },
+  { name: "Coral Breeze", prog: PROG_E, mel: MEL_E, mood: "airy" },
+  { name: "Moonlight Flutter", prog: PROG_F, mel: MEL_F, mood: "night" },
+  { name: "Glass Ocean", prog: PROG_G, mel: MEL_G, mood: "crystal" },
+  { name: "Trade Winds", prog: PROG_H, mel: MEL_H, mood: "wide" },
+  { name: "Golden Hour", prog: PROG_I, mel: MEL_I, mood: "warm" },
+  { name: "Starlight", prog: PROG_J, mel: MEL_J, mood: "night" },
 ];
+
+/** Track titles for the settings picker — keep in lockstep with TRACKS. */
+export const TRACK_NAMES: string[] = TRACKS.map((t) => t.name);
 
 // Per-biome orchestration keeps each island sonically distinct while all
 // variants share the same original melodic identity.
@@ -128,11 +222,21 @@ export class Music {
   private step = 0;
   private bar = 0;
   private section = 0;
+  /** Which tracks to play: "shuffle" cycles all ten in random order, or a
+   *  number pins one track. Mirrors the persisted settings value. */
+  private trackSel: number | "shuffle" = "shuffle";
+  private order: number[] = [];
+  private orderPos = 0;
+  /** Fired whenever the engine advances to a new track, with its title. */
+  onTrackChange: ((name: string) => void) | null = null;
   private bpm = BEAT_BPM;
   private night = 0;
   private biome: BiomeMusicStyle = "bright";
   private transpose = 0;
   private lastCutoff = 9000;
+  /** 0..1 — continuous intensity (speed / altitude / fever / danger / combos). */
+  private intensity = 0;
+  private intensityTarget = 0;
 
   private readonly bus: GainNode;
   private readonly filter: BiquadFilterNode;
@@ -144,6 +248,7 @@ export class Music {
   private readonly whistleGain: GainNode;
   private readonly padGain: GainNode;
   private readonly lullabyGain: GainNode;
+  private readonly tensionGain: GainNode;
   private readonly noise: AudioBuffer;
   private lullabyStep = 0;
   private baseLevel = 0;
@@ -178,11 +283,15 @@ export class Music {
     this.whistleGain = mk(0);
     this.padGain = mk(0);
     this.lullabyGain = mk(0);
+    this.tensionGain = mk(0);
 
     const len = ctx.sampleRate;
     this.noise = ctx.createBuffer(1, len, ctx.sampleRate);
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+
+    this.buildOrder();
+    this.section = this.order[0] ?? 0;
   }
 
   setMode(mode: MusicMode): void {
@@ -193,10 +302,27 @@ export class Music {
 
   setNight(t: number): void {
     this.night = Math.max(0, Math.min(1, t));
-    const cutoff = BIOME_MIX[this.biome].cutoff - this.night * 4200;
+    this.recomputeCutoff(0.6);
+  }
+
+  /** Continuous intensity — opens the filter and adds a tension hat layer. */
+  setIntensity(v: number): void {
+    const t = Math.max(0, Math.min(1, v));
+    if (Math.abs(t - this.intensityTarget) < 0.01) return;
+    this.intensityTarget = t;
+    const now = this.ctx.currentTime;
+    // The tension layer rides up quickly for responsiveness, decays a touch
+    // slower so a big moment lingers after the peak.
+    const style = BIOME_MIX[this.biome];
+    this.tensionGain.gain.setTargetAtTime(t * 0.5 * style.perc, now, t > this.intensity ? 0.1 : 0.4);
+    this.recomputeCutoff(0.3);
+  }
+
+  private recomputeCutoff(ramp: number): void {
+    const cutoff = BIOME_MIX[this.biome].cutoff - this.night * 4200 + this.intensityTarget * 3200;
     if (Math.abs(cutoff - this.lastCutoff) < 12) return;
     this.lastCutoff = cutoff;
-    this.filter.frequency.setTargetAtTime(cutoff, this.ctx.currentTime, 0.6);
+    this.filter.frequency.setTargetAtTime(cutoff, this.ctx.currentTime, ramp);
   }
 
   setLevel(level: number): void {
@@ -208,6 +334,63 @@ export class Music {
     if (style === this.biome) return;
     this.biome = style;
     this.apply();
+  }
+
+  /** Pin a single track (0..TRACK_NAMES.length-1) or "shuffle" to cycle all. */
+  setTrack(sel: number | "shuffle"): void {
+    this.trackSel = sel;
+    this.buildOrder();
+    this.orderPos = 0;
+    this.section = this.order[0] ?? 0;
+    if (this.timer !== null) this.onTrackChange?.(TRACKS[this.section]!.name);
+  }
+
+  get trackName(): string {
+    return TRACKS[this.section]?.name ?? "";
+  }
+
+  private buildOrder(): void {
+    if (this.trackSel === "shuffle") {
+      // Weighted draw without replacement: tracks whose mood matches the
+      // current biome come up sooner, nightfall favors night tracks and
+      // suppresses bright ones — but every track still plays each pass.
+      const pool = Array.from({ length: TRACKS.length }, (_, i) => i);
+      this.order = [];
+      while (pool.length) {
+        const weights = pool.map((i) => this.trackWeight(i));
+        const total = weights.reduce((a, b) => a + b, 0);
+        let r = Math.random() * total;
+        let pick = 0;
+        for (let i = 0; i < pool.length; i++) {
+          r -= weights[i]!;
+          if (r <= 0) {
+            pick = i;
+            break;
+          }
+        }
+        this.order.push(pool[pick]!);
+        pool.splice(pick, 1);
+      }
+      // Avoid opening on the track we just finished.
+      if (this.order.length > 1 && this.order[0] === this.section) {
+        const tmp = this.order[0]!;
+        this.order[0] = this.order[1]!;
+        this.order[1] = tmp;
+      }
+    } else {
+      this.order = [this.trackSel];
+    }
+  }
+
+  /** Sampling weight for a track given the current biome and time of day. */
+  private trackWeight(index: number): number {
+    const mood = TRACKS[index]!.mood;
+    if (mood === this.biome) return 3; // authored for this island
+    if (this.night > 0.6) {
+      if (mood === "night") return 2.5; // nightfall pulls toward the moon tracks
+      if (mood === "bright" || mood === "airy") return 0.35; // and away from sun
+    }
+    return 1;
   }
 
   duck(amount = 0.45, release = 0.5): void {
@@ -240,8 +423,9 @@ export class Music {
     // subtle underneath play, gone in fever where percussion drives.
     this.padGain.gain.setTargetAtTime(m === "menu" ? 0.16 : m === "play" ? 0.08 : 0, t, 0.8);
     this.lullabyGain.gain.setTargetAtTime(m === "sleep" ? 0.3 : 0, t, 0.6);
-    this.filter.frequency.setTargetAtTime(style.cutoff - this.night * 4200, t, 0.55);
-    this.lastCutoff = style.cutoff - this.night * 4200;
+    const cutoff = style.cutoff - this.night * 4200 + this.intensityTarget * 3200;
+    this.filter.frequency.setTargetAtTime(cutoff, t, 0.55);
+    this.lastCutoff = cutoff;
     this.bpm = m === "fever" ? style.fever : style.bpm;
 
     if (this.mode === "off" && m !== "off") this.start();
@@ -253,13 +437,18 @@ export class Music {
     this.nextTime = this.ctx.currentTime + 0.05;
     this.step = 0;
     this.bar = 0;
-    this.section = 0;
+    this.buildOrder();
+    this.orderPos = 0;
+    this.section = this.order[0] ?? 0;
     this.lullabyStep = 0;
+    if (this.mode !== "sleep") this.onTrackChange?.(TRACKS[this.section]!.name);
     this.timer = window.setInterval(() => this.tick(), TICK_MS);
   }
 
   private tick(): void {
     if (this.ctx.state !== "running") return;
+    // Smooth the intensity so the hat layer swells instead of stuttering.
+    this.intensity += (this.intensityTarget - this.intensity) * 0.12;
     while (this.nextTime < this.ctx.currentTime + LOOKAHEAD) {
       if (this.mode === "sleep") this.scheduleLullaby(this.nextTime);
       else this.scheduleStep(this.nextTime);
@@ -278,7 +467,14 @@ export class Music {
       this.bar += 1;
       if (this.bar >= 8) {
         this.bar = 0;
-        this.section = (this.section + 1) % SECTIONS.length;
+        this.orderPos = (this.orderPos + 1) % this.order.length;
+        // Reshuffle when a full shuffle cycle completes, so no two passes
+        // repeat the same sequence.
+        if (this.orderPos === 0 && this.trackSel === "shuffle") this.buildOrder();
+        this.section = this.order[this.orderPos]!;
+        // Sleep mode plays the lullaby, not the track — don't announce a
+        // "now playing" title for music the player can't hear.
+        if (this.mode !== "sleep") this.onTrackChange?.(TRACKS[this.section]!.name);
       }
     }
   }
@@ -287,7 +483,7 @@ export class Music {
     // Storm mode pulls the whole song down a minor third — same melody,
     // completely different weather.
     const stormShift = this.mode === "storm" ? -3 : 0;
-    const sec = SECTIONS[this.section]!;
+    const sec = TRACKS[this.section]!;
     const chordName = sec.prog[this.bar]!;
     const chord = UKE[chordName]!;
     const idx = this.bar * 8 + this.step;
@@ -331,6 +527,15 @@ export class Music {
       // Storm: relentless — kicks on every other eighth, like weather that won't quit.
       if (this.mode === "storm" && (this.step === 2 || this.step === 6)) this.kick(t, 0.55);
       if (this.step === 7 && this.bar % 2 === 1) this.shaker(t + beat * 0.22, 0.4);
+
+      // Tension layer: offbeat hats that swell with intensity, so the music
+      // climbs with speed, altitude and fever (SSX-style adaptive scoring).
+      if (this.intensity > 0.05 && this.step % 2 === 1) {
+        this.hat(t, 0.1 + this.intensity * 0.28, 6400 + this.intensity * 2600);
+      }
+      if (this.intensity > 0.6 && (this.step === 2 || this.step === 6)) {
+        this.hat(t + beat * 0.5, 0.08 + (this.intensity - 0.6) * 0.3, 8200);
+      }
     }
 
     // Whistle (fever)
@@ -561,6 +766,25 @@ export class Music {
     g.connect(this.percGain);
     src.start(t);
     src.stop(t + 0.1);
+  }
+
+  /** Bright, short hi-hat — the intensity layer's heartbeat. */
+  private hat(t: number, vel: number, freq: number): void {
+    const src = this.ctx.createBufferSource();
+    src.buffer = this.noise;
+    src.playbackRate.value = 1 + Math.random() * 0.08;
+    const f = this.ctx.createBiquadFilter();
+    f.type = "highpass";
+    f.frequency.value = freq;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.14 * vel, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.045);
+    src.connect(f);
+    f.connect(g);
+    g.connect(this.tensionGain);
+    src.start(t);
+    src.stop(t + 0.06);
   }
 
   private kick(t: number, vel: number): void {

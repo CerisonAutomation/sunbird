@@ -8,7 +8,7 @@ tokens, room registry, and a WebSocket transport for live rooms.
 | crate | what it is |
 | --- | --- |
 | `crates/sunbird-protocol` | Wire protocol v1 — closed message enums, size/length limits, parse helpers. Source of truth mirrored by `src/game/protocol/v1.ts`. |
-| `crates/sunbird-server` | Axum service — health/readiness/metrics, seat-token issuer (`auth.rs`), authoritative room registry (`rooms.rs`), WebSocket transport (`ws.rs`). |
+| `crates/sunbird-server` | Axum service — health/readiness/metrics, seat-token issuer (`auth.rs`), authoritative room registry (`rooms.rs`), WebSocket transport (`ws.rs`), and the legacy simple-protocol room service (`legacy.rs`) the shipped browser client speaks today. |
 
 ## Endpoints
 
@@ -20,7 +20,8 @@ tokens, room registry, and a WebSocket transport for live rooms.
 | `POST /v1/reconnect-token` | HMAC seat-token issue |
 | `GET /v1/degrade` | capability gate for the browser |
 | `GET /v1/rooms` | ops snapshot: rooms/seats/started counts |
-| `GET /v1/ws` | WebSocket — join/leave/ready/heartbeat/reconnect |
+| `GET /v1/ws` | WebSocket — protocol v1 join/leave/ready/heartbeat/reconnect |
+| `GET /ws` | WebSocket — legacy simple protocol (`state`/`emote`/`ready`/`finish`), the self-hostable room server the browser ships with |
 
 ## Room semantics
 
@@ -31,6 +32,15 @@ tokens, room registry, and a WebSocket transport for live rooms.
 - All pilots ready (≥2 seated) → `started` broadcast with a start timestamp.
 - Heartbeat timeout 45 s; a sweeper reaps silent seats every 15 s.
 - Reconnect bumps the seat generation, invalidating older tokens.
+
+### Legacy transport (`/ws`)
+
+- Same room codes / matchmaking / 40-pilot capacity as the client expects.
+- A single 15 Hz packed `state` broadcast per room; server-assigned `finish`
+  places (clients never decide who won).
+- `start` is broadcast once two pilots are seated (3 s countdown).
+- Stale seats are reaped after 60 s of silence; empty rooms are torn down
+  after a 60 s TTL.
 
 Concurrency rule: **no lock crosses an await**. `RoomManager` is fully
 synchronous behind `parking_lot::RwLock`; each socket has a writer task and

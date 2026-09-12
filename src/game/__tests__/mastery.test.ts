@@ -1,6 +1,17 @@
-import { describe, expect, it } from "vitest";
-import { MASTERY_COIN_PER_LEVEL, MASTERY_LEVELS, MASTERY_REWARDS, MASTERY_SKILLS, masteryLevel } from "../Mastery";
+import { beforeEach, describe, expect, it } from "vitest";
+import {
+  MASTERY_COIN_PER_LEVEL,
+  MASTERY_LEVELS,
+  MASTERY_REWARDS,
+  MASTERY_SKILLS,
+  NO_MASTERY_PERKS,
+  bankMasteryRun,
+  masteryLevel,
+  masteryPerks,
+  masteryViews,
+} from "../Mastery";
 import { MODES } from "../Modes";
+import { SaveData } from "../SaveData";
 
 describe("masteryLevel", () => {
   it("starts at 0 and reaches 5 at 100 runs", () => {
@@ -37,7 +48,6 @@ describe("mastery signature skills", () => {
 
   it("max-level perks stay within fair-play caps", () => {
     for (const [id, skill] of Object.entries(MASTERY_SKILLS)) {
-      // Perks must never regress below the level-4 coin bonus and stay modest (no grind-to-win blowouts).
       expect(skill.coinMult, `${id} coinMult`).toBeGreaterThanOrEqual(1 + 4 * MASTERY_COIN_PER_LEVEL);
       expect(skill.coinMult, `${id} coinMult`).toBeLessThanOrEqual(1.2);
       expect(skill.liftMult, `${id} liftMult`).toBeGreaterThanOrEqual(1);
@@ -54,5 +64,70 @@ describe("mastery signature skills", () => {
       const potency = (s.coinMult - 1) + (s.liftMult - 1) + s.daylightBonus + s.feverBonus;
       expect(potency, `${id} skill is decorative`).toBeGreaterThan(0.05);
     }
+  });
+});
+
+describe("mastery progression", () => {
+  let save: SaveData;
+
+  beforeEach(() => {
+    localStorage.clear();
+    save = new SaveData();
+  });
+
+  it("masteryPerks returns neutral perks at zero runs", () => {
+    expect(masteryPerks(save, "daytrip")).toEqual(NO_MASTERY_PERKS);
+  });
+
+  it("masteryPerks scales coin bonus with level", () => {
+    save.state.mastery.daytrip = 3; // level 1
+    const perks = masteryPerks(save, "daytrip");
+    expect(perks.level).toBe(1);
+    expect(perks.coinMult).toBeCloseTo(1.02, 4);
+    expect(perks.skillName).toBe("");
+  });
+
+  it("masteryPerks grants the signature skill at max level", () => {
+    save.state.mastery.daytrip = 100; // level 5
+    const perks = masteryPerks(save, "daytrip");
+    expect(perks.level).toBe(5);
+    expect(perks.skillName).toBe("Sunchaser");
+    expect(perks.daylightBonus).toBe(6);
+  });
+
+  it("masteryViews covers every mode with sane progress", () => {
+    save.state.mastery.race = 3;
+    const views = masteryViews(save);
+    expect(views).toHaveLength(8);
+    const race = views.find((v) => v.modeId === "race")!;
+    expect(race.level).toBe(1);
+    expect(race.progress).toBeGreaterThanOrEqual(0);
+    expect(race.progress).toBeLessThanOrEqual(1);
+    const untouched = views.find((v) => v.modeId === "zenith")!;
+    expect(untouched.level).toBe(0);
+    expect(untouched.progress).toBe(0);
+  });
+
+  it("bankMasteryRun banks a run and pays on a level crossing", () => {
+    save.state.mastery.daytrip = 2; // one short of level 1
+    const before = save.state.wallet;
+    const result = bankMasteryRun(save, "daytrip");
+    expect(result).not.toBeNull();
+    expect(result!.level).toBe(1);
+    expect(result!.coins).toBeGreaterThan(0);
+    expect(save.state.wallet).toBe(before + result!.coins);
+  });
+
+  it("bankMasteryRun returns null when no level is crossed", () => {
+    save.state.mastery.daytrip = 3; // already level 1
+    const result = bankMasteryRun(save, "daytrip"); // 4 runs → still level 1
+    expect(result).toBeNull();
+  });
+
+  it("bankMasteryRun grants the signature skill at max level", () => {
+    save.state.mastery.daytrip = 99;
+    const result = bankMasteryRun(save, "daytrip"); // → 100 → level 5
+    expect(result!.level).toBe(5);
+    expect(result!.skill?.name).toBe("Sunchaser");
   });
 });

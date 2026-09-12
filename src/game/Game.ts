@@ -2,11 +2,13 @@ import * as THREE from "three";
 import { Achievements } from "./Achievements";
 import { GameAudio } from "./Audio";
 import { BIOMES, biomeForIsland } from "./Biomes";
+import { TRACK_NAMES } from "./Music";
 import { Bird, type BirdStepOpts } from "./Bird";
 import { CameraRig } from "./CameraRig";
 import { Collectibles, type CloudKind, type PickupKind } from "./Collectibles";
 import { evaluateNearMiss, FlowTuner, SessionGoals, type NearMiss } from "./Engagement";
-import { BIG_LAUNCH_QUIPS, SLEEP_QUIPS, SPLASH_QUIPS, SurpriseEngine, quip } from "./Surprises";
+import { BIG_LAUNCH_QUIPS, FEVER_QUIPS, GEM_QUIPS, MILESTONE_QUIPS, SLEEP_QUIPS, SPLASH_QUIPS, SURRENDER_QUIPS, SurpriseEngine, quip } from "./Surprises";
+import { Fx } from "./Fx";
 import { LaunchSystem, ratingLabel, type LaunchResult } from "./LaunchSystem";
 import { MASS_RACE_FIELD, MODES, modeById, RACE_FINISH, type ModeDef, type ModeId } from "./Modes";
 import { MassRace } from "./MassRace";
@@ -67,9 +69,10 @@ import { GhostPlayer, GhostRecorder } from "./Ghost";
 import { HUD, type CalendarCard, type CheckoutMode, type DailyCard, type GauntletCard, type HudSnapshot, type LoadoutView, type RivalCard, type SeedMode, type UiScreen, type UiState } from "./HUD";
 import { divisionFor, duelOpponent, duelSkillFor, featuredRivals, nextDivision, seasonReward } from "./pvp";
 import { Input } from "./Input";
-import { clamp, dateSeed, formatDatePretty, lerp } from "./math";
+import { clamp, dateSeed, formatDatePretty, lerp, SeededRandom } from "./math";
 import { Missions, type MissionView, type QuestReward, type QuestView, type RunStats } from "./Missions";
 import { ParticleFX } from "./ParticleFX";
+import { TrailRibbon } from "./Trail";
 import {
   consumeStripeReturn,
   ensureStripeJs,
@@ -84,6 +87,9 @@ import { SaveData } from "./SaveData";
 import { SeasonPass, seasonId, seasonLabel, XP_RULES } from "./SeasonPass";
 import { buildShareCard, shareOrDownload } from "./Social";
 import { buildChallengeUrl, readChallengeFromUrl, type RivalChallenge } from "./Challenge";
+import { flag } from "./Flags";
+import { variant } from "./Experiments";
+import { buildRoomInviteUrl, normalizeRoomCode, readRoomInviteFromUrl } from "./RoomInvite";
 import { initPlatform, isPortalBuild, portalTarget, type PlatformAdapter } from "../sdk/platform";
 import { LivingBackground } from "./LivingBackground";
 import { Sky } from "./Sky";
@@ -116,6 +122,10 @@ export class Game {
   private readonly bird: Bird;
   private readonly camera: CameraRig;
   private readonly particles: ParticleFX;
+  private readonly trail: TrailRibbon;
+  private readonly fx: Fx;
+  private readonly isMobile: boolean;
+  private useBloom = false;
   private readonly sky: Sky;
   private readonly mockPayments = new MockPaymentProvider();
   private readonly ads: AdProvider = new MockAdProvider();
@@ -143,6 +153,10 @@ export class Game {
 
   private raf = 0;
   private acc = 0;
+  /** Bird position at the start of this frame's physics steps — the "from"
+   *  end of render interpolation (lerped toward this.bird.x/y each frame). */
+  private prevBirdX = 50;
+  private prevBirdY = 30;
   private last = 0;
   private elapsed = 0;
   private runTime = 0;
@@ -152,6 +166,13 @@ export class Game {
   private zenithTimer = 0;
   private hitStopTimer = 0;
   private frameEma = 1 / 60;
+  /** Wall-clock ms of the last emitted frame_error telemetry (throttled). */
+  private frameErrAt = 0;
+  /** Rolling field-performance stats, flushed to telemetry every ~10s so a
+   *  device-side perf regression is visible without a debugger attached. */
+  private perfLongFrames = 0;
+  private perfWorst = 0;
+  private perfTimer = 0;
   private qualityTimer = 0;
   private dpr = 1;
   private particleBudget = 1;
@@ -184,6 +205,8 @@ export class Game {
   private skimCd = 0;
   /** Rare delightful mid-run events (comedy + windfalls). */
   private readonly surprises = new SurpriseEngine();
+  /** Seeded RNG for surprises, so the same run seed yields the same events. */
+  private surpriseRng = new SeededRandom("surprises");
   private splashQuipN = 0;
   private shield = 0;
   private boostTimer = 0;
@@ -216,6 +239,8 @@ export class Game {
   private raceFinishTime = 0;
   private net: RealtimeClient | null = null;
   private roomCode = "";
+  /** Room invite (#room=) pending application on the first frame. */
+  private pendingRoomInvite = "";
   private roomSize = 40;
   private roomSkill: "chill" | "sharp" | "ace" = "sharp";
   private roomMuted = false;
@@ -271,7 +296,16 @@ export class Game {
   private goalPop = "";
   private goalPopT = 0;
   private recordBanner = "";
+  /** Previous personal-best distance, captured at run start (for the record loop). */
+  private bestAtStart = 0;
+  private distanceRecordCrossed = false;
+  private newBest = false;
   private runGems = 0;
+  private runRings = 0;
+  private ringChain = 0;
+  private ringChainTimer = 0;
+  private runBalloons = 0;
+  private runSunflowers = 0;
   private readonly powers = new PowerUps();
   private coach: FirstFlight | null = null;
   private mode: ModeDef = modeById("daytrip");
@@ -300,6 +334,7 @@ export class Game {
   private thermalEmitAcc = 0;
   private windEmitAcc = 0;
   private trailFxAcc = 0;
+  private powerFxAcc = 0;
   private atmosphereFxAcc = 0;
   private hueT = 0;
   private lastBiomeId = "";
@@ -314,6 +349,9 @@ export class Game {
   private referralMessage = "";
   private cloudMessage = "";
   private shareBusy = false;
+  /** A/B "results_cta_order" variant, resolved (and exposed) once on the
+   *  first results screen — sticky per device, logged via telemetry. */
+  private expShareFirst: "control" | "treatment" | null = null;
   private resetArmed = false;
   private resetTimer = 0;
 
@@ -324,6 +362,10 @@ export class Game {
 
   constructor(private readonly host: HTMLElement) {
     this.save = new SaveData();
+    // Corruption recovery is a data-loss event worth knowing about: the blob is
+    // parked (not destroyed), but the player is silently starting fresh unless
+    // we say so. Track it once, and toast it below once the HUD exists.
+    if (this.save.recoveredFromCorruption) this.telemetry.track("save_corrupt_recovered", {});
     this.flow.load(this.save);
     this.goals = new SessionGoals(this.flow);
     this.missions = new Missions(this.save);
@@ -331,6 +373,9 @@ export class Game {
     this.seasonPass = new SeasonPass(this.save);
     this.board = new Leaderboard(this.save.state.deviceId);
     this.telemetry.bindDevice(this.save.state.deviceId);
+    // Persistence failures (quota / blocked storage) lose progress silently
+    // unless we say so — route them through the same observability bus.
+    this.save.onPersistError = () => this.telemetry.track("save_persist_failed", {});
     this.cups = new Tournaments(this.save.state.tournaments);
     this.pilotName = this.save.state.pilotName || loadPilotName(this.save.state.deviceId);
     this.save.state.pilotName = this.pilotName;
@@ -347,6 +392,7 @@ export class Game {
     host.appendChild(canvas);
 
     const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+    this.isMobile = isMobile;
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: !isMobile,
@@ -359,20 +405,27 @@ export class Game {
     this.renderer.setClearColor(0x87c8ee, 1);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.12;
+    this.renderer.toneMappingExposure = 1.18;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.dpr = this.preferredDpr();
     this.renderer.setPixelRatio(this.dpr);
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0x8ed0ee, 40, 220);
+    this.scene.fog = new THREE.Fog(0x8ed0ee, 62, 380);
 
     this.hud = new HUD(host);
     this.input = new Input(host, () => {
       void this.audio.resume();
     });
     this.audio = new GameAudio();
+    // A tasteful "now playing" cue when the score moves to a new track — only
+    // when the game is at rest, so it never interrupts a run in flight.
+    this.audio.setOnTrackChange((name) => {
+      // A quiet "now playing" cue at rest and in flight — never while paused
+      // or during an ad, when the game (and audio) is muted or on hold.
+      if (this.state === "menu" || this.state === "playing") this.hud.toast(`♪ ${name}`, "info");
+    });
 
     this.terrain = new TerrainSystem(this.seed);
     this.scene.add(this.terrain.group);
@@ -385,6 +438,9 @@ export class Game {
     this.camera = new CameraRig(1);
     this.particles = new ParticleFX();
     this.particles.addTo(this.scene);
+    this.trail = new TrailRibbon();
+    this.trail.addTo(this.scene);
+    this.fx = new Fx(this.renderer, this.scene, this.camera.camera);
     this.sky = new Sky();
     this.scene.add(this.sky.group);
     this.sky.addLights(this.scene);
@@ -402,14 +458,26 @@ export class Game {
     this.camera.setIntro(1);
     this.audio.setMusicMode("menu");
 
-    // Rival links: #rival=seed.distance.name → same hills, their mark.
+    // Rival links: #rival=seed.distance.name[&mode=] → same hills, their mark.
     const rival = readChallengeFromUrl();
     if (rival) {
       this.rival = rival;
       this.rebuildWorld(rival.seed);
       this.seedMode = "random";
+      if (rival.mode && MODES.some((m) => m.id === rival.mode)) {
+        this.modeId = rival.mode as ModeId;
+        this.mode = modeById(this.modeId);
+      }
       this.hud.toast(`🥊 ${rival.name} challenged you: beat ${rival.distance} m on their hills`, "quest");
-      this.telemetry.track("rival_received", { distance: rival.distance });
+      this.telemetry.track("rival_received", { distance: rival.distance, mode: this.modeId });
+    }
+
+    // Room invite links: #room=CODE → seat straight into that private room.
+    // Only honored when a realtime server is configured (portals ship none).
+    const roomInvite = isMultiplayerConfigured() ? readRoomInviteFromUrl() : null;
+    if (roomInvite) {
+      this.roomCode = roomInvite;
+      this.pendingRoomInvite = roomInvite;
     }
 
     this.onFocus = () => {
@@ -470,6 +538,7 @@ export class Game {
     const vipGift = this.save.claimVipDaily(this.today);
     window.setTimeout(() => {
       if (this.disposed) return;
+      if (this.save.recoveredFromCorruption) this.hud.toast("⚠ Save couldn't be read — kept a backup, starting fresh", "warn");
       if (streakReward > 0) this.hud.toast(`Day ${this.save.state.streak.days} streak · +${streakReward} coins`, "gold");
       if (vipGift > 0) this.hud.toast(`VIP daily gift · +${vipGift} coins`, "vip");
     }, 700);
@@ -493,6 +562,9 @@ export class Game {
       this.bump();
     });
     if (seasonEnd) this.hud.toast(`⚔ Ranked season over · ${seasonEnd.division} reward +${seasonEnd.coins} coins`, "gold");
+    // Warm the embedded main-menu leaderboard on boot so it isn't empty on
+    // the first frame (serves the cache first, so this never blocks paint).
+    void this.refreshBoard();
     this.bump();
     this.pushHud();
   }
@@ -517,6 +589,8 @@ export class Game {
     this.terrain.dispose();
     this.bird.dispose();
     this.particles.dispose();
+    this.trail.dispose();
+    this.fx.dispose();
     this.sky.dispose();
     this.collect.dispose();
     this.p1?.dispose(this.scene);
@@ -542,6 +616,17 @@ export class Game {
     this.pumpMatchmaking(raw);
     this.dayTick(raw);
     this.adaptQuality(raw);
+    // A #room= invite applies once the shell is live: open the lobby already
+    // seated in that room so the guest sees the host before committing.
+    if (this.pendingRoomInvite && this.state === "menu") {
+      const code = this.pendingRoomInvite;
+      this.pendingRoomInvite = "";
+      this.roomCode = code;
+      this.setScreen("live");
+      this.preseatLobby();
+      this.hud.toast(`🎟 Invited to room ${code} — press START to fly`, "gold");
+      this.telemetry.track("room_invite_opened", { room: code });
+    }
     // Club chat: light polling only while the Squad screen is on screen.
     if (this.screen === "squad" && this.state === "menu" && this.squad?.live) {
       this.squadPoll += raw;
@@ -572,6 +657,10 @@ export class Game {
       if (this.zenithTimer <= 0) this.timeScale = 1;
     }
     const simDt = raw * this.timeScale;
+
+    // Snapshot before any physics advances so the render can interpolate.
+    this.prevBirdX = this.bird.x;
+    this.prevBirdY = this.bird.y;
 
     switch (this.state) {
       case "menu":
@@ -628,6 +717,15 @@ export class Game {
     this.pushHud();
     } catch (err) {
       console.error("Sunbird frame error:", err);
+      // The loop must never die from a single bad frame, but a repeat offender
+      // is worth knowing about. Report the message only (no stack — that can
+      // carry device/URL fingerprints) through the existing telemetry bus, at
+      // most once a minute so a stuck frame can't flood the beacon.
+      const now = performance.now();
+      if (now - this.frameErrAt > 60_000) {
+        this.frameErrAt = now;
+        this.telemetry.track("frame_error", { message: String(err instanceof Error ? err.message : err).slice(0, 120) });
+      }
     }
   }
 
@@ -689,6 +787,10 @@ export class Game {
     );
 
     if (this.bird.justLaunched) this.onLaunch();
+    if (this.bird.bounced) {
+      this.bird.bounced = false;
+      this.onSunflower();
+    }
 
     // First-flight coach: verify dive -> launch -> soar with real play signals.
     if (this.coach && !this.coach.done) {
@@ -864,6 +966,13 @@ export class Game {
       this.emitTrail(dt);
     }
 
+    // Ambient particles for whatever power-up is currently in effect.
+    this.powerFxAcc -= dt;
+    if (this.powerFxAcc <= 0) {
+      this.powerFxAcc = 0.05;
+      this.emitPowerFx();
+    }
+
     this.atmosphereFxAcc -= dt;
     if (this.atmosphereFxAcc <= 0) {
       const biomeFx = this.terrain.biomeAt(this.bird.x);
@@ -882,8 +991,15 @@ export class Game {
       if (this.splashQuipN % 3 === 1) this.hud.toast(quip(SPLASH_QUIPS, this.splashQuipN), "cloud");
     }
 
-    // Rare delight: golden geese, sneezes, encores. Never punishing.
-    const surprise = this.surprises.tick(dt, this.bird.x - this.startX, !this.bird.grounded && !this.bird.inWater && !this.bird.asleep);
+    // Rare delight: golden geese, sneezes, encores. Never punishing. Rolled on
+    // the run seed so the same hills yield the same surprises (and a race or
+    // daily challenge is never decided by cosmic RNG the field can't share).
+    const surprise = this.surprises.tick(
+      dt,
+      this.bird.x - this.startX,
+      !this.bird.grounded && !this.bird.inWater && !this.bird.asleep,
+      () => this.surpriseRng.next(),
+    );
     if (surprise) {
       this.hud.toast(surprise.toast, "gold");
       switch (surprise.kind) {
@@ -935,6 +1051,7 @@ export class Game {
         this.audio.duckMusic(0.5, 0.6);
         this.hud.toast(`${b.emoji} ${b.name}`, "island");
         this.flash("island");
+        this.glow(0.75);
         this.shake(0.7);
         this.haptic([40, 20, 60]);
         this.bonus += 80 * idx;
@@ -967,13 +1084,24 @@ export class Game {
         if (gem) {
           this.runGems += 1;
           this.particles.burstRing(x, y, 0x9ae8ff);
+          this.particles.emitSonicBoom(x, y);
+          this.glow(0.8);
           this.hud.toast(`Sky gem +${value}`, "gold");
+          if (this.runGems % 2 === 1) this.hud.toast(quip(GEM_QUIPS, this.runGems), "gold");
         }
         this.haptic(8);
       },
       onCloud: (kind, x, y) => this.onCloud(kind, x, y),
       onPickup: (kind, x, y) => this.onPickup(kind, x, y),
+      onRing: (x, y) => this.onRing(x, y),
+      onBalloon: (x, y) => this.onBalloon(x, y),
     });
+
+    // Ring chain cools off if the player eases off the sky line.
+    if (this.ringChainTimer > 0) {
+      this.ringChainTimer -= dt;
+      if (this.ringChainTimer <= 0) this.ringChain = 0;
+    }
 
     if (this.feverOn) {
       this.feverTimer -= dt;
@@ -987,13 +1115,14 @@ export class Game {
     this.scoreAccum += Math.max(0, this.bird.vx) * dt * (this.feverOn ? 2 : 1);
     if (this.bird.altitude > this.maxAltitude) {
       this.maxAltitude = this.bird.altitude;
-      if (this.maxAltitude > this.save.state.bestAltitude && this.save.state.bestAltitude > 40) {
-        this.save.noteRecords(this.maxAltitude, this.launch.best);
-        if (this.recordBanner !== "altitude") {
-          this.recordBanner = "altitude";
-          this.hud.toast("NEW ALTITUDE RECORD", "gold");
-          this.flash("perfect");
-        }
+      // Celebrate a mid-run record crossing exactly once, but never persist
+      // here — during a sustained climb this runs every physics step, and a
+      // synchronous localStorage write per step stalls the frame. finishRun()
+      // banks the real record with a single persist.
+      if (this.maxAltitude > this.save.state.bestAltitude && this.save.state.bestAltitude > 40 && this.recordBanner !== "altitude") {
+        this.recordBanner = "altitude";
+        this.hud.toast("NEW ALTITUDE RECORD", "gold");
+        this.flash("perfect");
       }
     }
     if (this.bird.speed() > this.maxSpeed) this.maxSpeed = this.bird.speed();
@@ -1005,6 +1134,24 @@ export class Game {
       this.nextMilestone += 500;
       this.audio.milestone();
       this.particles.emitSparkle(this.bird.x, this.bird.y);
+      // Every 1,000 m the sky heckles you — a wink to keep long runs fresh.
+      if (this.nextMilestone % 1000 === 0) {
+        this.hud.toast(quip(MILESTONE_QUIPS, this.nextMilestone), "cloud");
+        this.glow(0.25);
+      }
+    }
+    // Personal-best crossing: the single most addictive moment in the loop.
+    // Fire it once, mid-run, the instant you pass your old distance record —
+    // "beat your high score" is a feeling, not a post-run footnote.
+    if (!this.distanceRecordCrossed && this.bestAtStart > 0 && runDist > this.bestAtStart) {
+      this.distanceRecordCrossed = true;
+      this.audio.fanfare();
+      this.hud.toast("👑 NEW DISTANCE RECORD — keep flying!", "gold");
+      this.flash("perfect");
+      this.particles.emitConfetti(this.bird.x, this.bird.y + 4);
+      this.glow(0.9);
+      this.haptic([40, 30, 60]);
+      this.telemetry.track("record_crossed", { at: Math.round(runDist) });
     }
     // STORMFRONT ESCALATION — the flagship hook: the storm is a character
     // with three acts. Same seed, same acts, for every pilot in the field.
@@ -1113,6 +1260,7 @@ export class Game {
         this.audio.goldenHour();
         this.hud.toast("🌇 GOLDEN HOUR — coins are worth double", "gold");
         this.flash("fever");
+        this.glow(0.8);
       } else if (!goldenNow && this.goldenHour) {
         this.goldenHour = false; // sun flask refilled the day
       }
@@ -1135,6 +1283,7 @@ export class Game {
       coins: this.runCoins,
       clouds: this.runClouds,
       gems: this.runGems,
+      sunflowers: this.runSunflowers,
     });
     for (const g of done) {
       this.save.addCoins(g.reward);
@@ -1177,6 +1326,7 @@ export class Game {
       this.particles.burstRing(this.bird.x, this.bird.y, 0xffe08a);
       for (let i = 0; i < 10 + combo * 4; i++) this.particles.emitSparkle(this.bird.x, this.bird.y);
       this.flash("perfect");
+      this.glow(0.85);
       this.shake(0.35 + Math.min(0.4, combo * 0.06));
       // Hit stop: 2-frame freeze for cinematic impact.
       if (!this.save.state.settings.reduceMotion) {
@@ -1210,6 +1360,21 @@ export class Game {
     }
   }
 
+  /** Sunflower pad: a springy launch off a bloom — pure, reviewable bounce. */
+  private onSunflower(): void {
+    this.runSunflowers += 1;
+    this.bonus += 80;
+    this.awardXp(XP_RULES.coin);
+    this.audio.boing();
+    this.particles.burstRing(this.bird.x, this.bird.y, 0xffcf33);
+    this.particles.emitConfetti(this.bird.x, this.bird.y + 1);
+    this.camera.punch(4);
+    this.hud.toast("🌻 Sunflower bounce +80", "gold");
+    this.glow(0.55);
+    this.haptic([20, 10, 40]);
+    this.telemetry.track("sunflower", {});
+  }
+
   /** Landings feed straight back into momentum, so they get feedback too. */
   private onLanding(): void {
     const q = this.bird.landingQuality;
@@ -1239,7 +1404,9 @@ export class Game {
       this.audio.setMusicMode("fever");
       this.hud.toast("FEVER", "fever");
       this.flash("fever");
+      this.glow(0.95);
       this.particles.emitConfetti(this.bird.x, this.bird.y);
+      this.hud.toast(quip(FEVER_QUIPS, this.perfectChain), "fever");
       this.telemetry.track("fever", { distance: Math.round(this.bird.x - this.startX) });
     }
   }
@@ -1283,6 +1450,53 @@ export class Game {
     if (cb) this.bird.vx += 6;
   }
 
+  /** Threading a sky ring: a speed surge + score that scales with the chain. */
+  private onRing(x: number, y: number): void {
+    this.runRings += 1;
+    this.ringChainTimer = 2.8;
+    this.ringChain += 1;
+    const chainBonus = Math.min(4, this.ringChain) * 8;
+    const pts = 30 + chainBonus;
+    this.bonus += pts;
+    this.awardXp(XP_RULES.cloud);
+    this.audio.boing();
+    this.bird.vx += 8 + Math.min(14, this.ringChain * 2);
+    this.particles.burstRing(x, y, 0xffd76a);
+    this.particles.emitSonicBoom(x, y);
+    if (this.ringChain >= 3) {
+      this.particles.emitConfetti(x, y + 2);
+      this.hud.toast(`RING CHAIN ×${this.ringChain} +${pts}`, "gold");
+      this.flash("fever");
+      this.glow(0.6);
+      this.audio.fanfare();
+    } else {
+      this.hud.toast(`Through the ring +${pts}`, "gold");
+    }
+    this.haptic([20, 10, 30]);
+    this.telemetry.track("ring", { chain: this.ringChain });
+  }
+
+  /** Balloon pop: a springy launch back into the sky — pure, silly reward. */
+  private onBalloon(x: number, y: number): void {
+    this.runBalloons += 1;
+    this.bird.vy = Math.max(this.bird.vy, 46);
+    this.bird.vx += 18;
+    this.bird.grounded = false;
+    this.bird.inWater = false;
+    this.bonus += 150;
+    this.awardXp(XP_RULES.zenith);
+    this.audio.balloon();
+    this.particles.emitConfetti(x, y + 1);
+    this.particles.burstRing(x, y, 0xff6b6b);
+    this.camera.punch(6);
+    this.shake(0.3);
+    this.hud.toast("🎈 Balloon bounce! +150", "gold");
+    this.flash("fever");
+    this.glow(0.7);
+    this.haptic([20, 10, 40, 20, 60]);
+    this.telemetry.track("balloon", {});
+  }
+
   private checkZenith(): void {
     const vy = this.bird.vy;
     if (!this.bird.grounded && !this.bird.asleep && this.prevVy > 0 && vy <= 0) {
@@ -1301,6 +1515,7 @@ export class Game {
         this.audio.duckMusic(0.6, 0.7);
         this.hud.toast(`ZENITH +${pts}`, "zenith");
         this.flash("perfect");
+        this.glow(0.8);
         this.haptic([60, 40, 80]);
         this.telemetry.track("zenith", { alt: Math.round(alt) });
       }
@@ -1332,12 +1547,14 @@ export class Game {
         this.bird.vx += 36;
         this.bird.vy += 7;
         this.particles.burstRing(x, y, 0xff5a3a);
+        this.audio.boost();
         this.hud.toast("Rocket Speed 🚀", "power");
         this.shake(0.55);
         break;
       case "magnet":
         this.magnetTimer = MAGNET_TIME;
         this.particles.burstRing(x, y, 0x8a6cff);
+        this.audio.magnetOn();
         this.hud.toast(`Coin Magnet ${MAGNET_TIME}s 🧲`, "power");
         break;
       case "shield":
@@ -1360,8 +1577,11 @@ export class Game {
         break;
       case "goldenwings":
         this.particles.burstRing(x, y, 0xffd76a);
+        this.particles.emitConfetti(x, y + 2);
         this.flash("perfect");
+        this.glow(1.0);
         this.audio.island();
+        this.camera.punch(7);
         this.hud.toast("✨ GOLDEN WINGS ✨", "gold");
         break;
       case "cloudboost":
@@ -1396,37 +1616,73 @@ export class Game {
     return "";
   }
 
+  /** Current trail colour, from the equipped prize trail or the bird's skin. */
+  private trailColor(): [number, number, number] {
+    const prize = this.save.state.activeTrail ? TRAILS[this.save.state.activeTrail] : undefined;
+    if (prize && prize.colors.length) {
+      return prize.colors[Math.floor(this.hueT) % prize.colors.length]!;
+    }
+    switch (this.skin.id) {
+      case "aurora":
+        return hsl(this.hueT % 1, 0.9, 0.65);
+      case "phoenix":
+        return [1, 0.5, 0.16];
+      case "bluejay":
+        return [0.6, 0.85, 1];
+      case "owl":
+        return [0.75, 0.65, 1];
+      case "ember":
+        return [1, 0.55, 0.2];
+      default:
+        return [1, 0.95, 0.85];
+    }
+  }
+
+  /** Advance the trail hue so prize/aurora colours cycle smoothly (not strobe). */
+  private advanceTrailHue(dt: number): void {
+    const prize = this.save.state.activeTrail ? TRAILS[this.save.state.activeTrail] : undefined;
+    if (prize && prize.colors.length) this.hueT += dt * 2.4;
+    else if (this.skin.id === "aurora") this.hueT += dt * 0.45;
+  }
+
+  /** Streams the glowing ribbon behind the bird, matching the sparkle trail. */
+  private updateTrailRibbon(dt: number): void {
+    this.advanceTrailHue(dt);
+    const c = this.trailColor();
+    this.trail.setColor(c[0], c[1], c[2]);
+    const show =
+      this.state === "playing" &&
+      (this.feverOn || this.boostTimer > 0 || this.bird.speed() > 48 || ((this.skin.magnetAlways || this.skin.id === "aurora") && this.bird.speed() > 24));
+    if (show) this.trail.push(this.bird.x, this.bird.y);
+    this.trail.update(dt, show ? 1 : 0);
+  }
+
   private emitTrail(dt: number): void {
     this.trailFxAcc -= dt;
     if (this.trailFxAcc > 0) return;
     this.trailFxAcc = this.bird.speed() > 82 ? 0.028 : 0.055;
-    // Prize trails override the skin trail — they were earned, show them off.
-    const prize = this.save.state.activeTrail ? TRAILS[this.save.state.activeTrail] : undefined;
-    if (prize && prize.colors.length) {
-      this.hueT += 1;
-      const c = prize.colors[Math.floor(this.hueT) % prize.colors.length]!;
-      this.particles.emitSparkle(this.bird.x - 0.4, this.bird.y, c[0], c[1], c[2]);
-      if (this.bird.speed() > 68) this.particles.emitWingTrails(this.bird.x, this.bird.y, this.bird.speed());
-      return;
-    }
-    const s = this.skin.id;
-    if (s === "aurora") {
-      this.hueT += 0.05;
-      const h = this.hueT % 1;
-      const c = hsl(h, 0.9, 0.65);
-      this.particles.emitSparkle(this.bird.x - 0.4, this.bird.y, c[0], c[1], c[2]);
-    } else if (s === "phoenix") {
-      this.particles.emitSparkle(this.bird.x - 0.4, this.bird.y, 1, 0.35 + Math.random() * 0.3, 0.1);
-    } else if (s === "bluejay") {
-      this.particles.emitSparkle(this.bird.x - 0.4, this.bird.y, 0.6, 0.85, 1);
-    } else if (s === "owl") {
-      this.particles.emitSparkle(this.bird.x - 0.4, this.bird.y, 0.75, 0.65, 1);
-    } else if (s === "ember") {
-      this.particles.emitSparkle(this.bird.x - 0.4, this.bird.y, 1, 0.55, 0.2);
-    } else {
-      this.particles.emitSparkle(this.bird.x - 0.4, this.bird.y);
-    }
+    const c = this.trailColor();
+    this.particles.emitSparkle(this.bird.x - 0.4, this.bird.y, c[0], c[1], c[2]);
     if (this.bird.speed() > 68) this.particles.emitWingTrails(this.bird.x, this.bird.y, this.bird.speed());
+  }
+
+  /** Ambient particles for the power-up currently in effect. */
+  private emitPowerFx(): void {
+    const x = this.bird.x;
+    const y = this.bird.y;
+    if (this.powers.has("goldenwings")) {
+      this.particles.emitSparkle(x - Math.random() * 1.4, y + (Math.random() - 0.5) * 1.6, 1, 0.8 + Math.random() * 0.2, 0.3);
+    } else if (this.powers.has("magnet") || this.magnetTimer > 0) {
+      this.particles.emitSparkle(x + 1.5 + Math.random() * 2.5, y + (Math.random() - 0.5) * 2.2, 0.55, 0.42, 1);
+    }
+    if (this.shield > 0) {
+      this.particles.emitSparkle(x + (Math.random() - 0.5) * 1.8, y + (Math.random() - 0.5) * 1.8, 0.35, 0.85, 1);
+    }
+    if (this.powers.has("wingboost")) this.particles.emitWind(x, y, 0.6);
+    if (this.powers.has("longglide")) this.particles.emitWind(x, y, 0.35);
+    if (this.powers.has("cloudboost")) this.particles.emitWind(x, y, 0.2);
+    if (this.powers.has("feather")) this.particles.emitSparkle(x - 0.5, y + 0.3, 1, 0.98, 0.85);
+    if (this.boostTimer > 0) this.particles.emitSparkle(x - 0.6, y - 0.2, 1, 0.45, 0.15);
   }
 
   private render(visDt: number, rawDt: number): void {
@@ -1439,9 +1695,17 @@ export class Game {
     }
 
     const glow = this.feverOn || this.powers.has("goldenwings") || (this.skin.magnetAlways && this.bird.speed() > 30);
-    this.bird.syncVisual(visDt, diving, glow, this.elapsed, this.terrain);
-    this.massRace.syncVisual(visDt, this.bird.x);
+    // Render interpolation: draw the bird between the previous and current
+    // physics step so motion stays smooth above 60 Hz. The menu, sleep and
+    // game-over states step the bird directly (or not at all), so they draw
+    // at interp = 1; versus has its own interpolated path in renderVersus().
+    const interp = this.state === "playing" ? clamp(this.acc / PHYS_DT, 0, 1) : 1;
+    const visX = lerp(this.prevBirdX, this.bird.x, interp);
+    const visY = lerp(this.prevBirdY, this.bird.y, interp);
+    this.bird.syncVisual(visDt, diving, glow, this.elapsed, this.terrain, visX, visY);
+    this.massRace.syncVisual(visDt, this.bird.x, interp);
     this.finishRemaining = this.finishGate.update(visDt, this.bird.x);
+    this.updateTrailRibbon(visDt);
     this.particles.update(visDt);
     this.camera.update(rawDt, this.bird, playing, this.terrain.heightAt(this.bird.x));
     this.livingBg.update(rawDt, this.bird.x, this.bird.y);
@@ -1451,11 +1715,17 @@ export class Game {
 
     const dayT = Math.max(0, Math.min(1, this.daylight / this.daylightMax()));
     this.audio.update(rawDt, this.bird.speed(), diving, this.bird.grounded, this.feverOn, dayT, playing, this.weather.gust);
+    this.audio.setMusicIntensity(this.musicIntensity());
 
     const size = this.renderer.getSize(this.tmpSize);
     this.renderer.setViewport(0, 0, size.x, size.y);
     this.renderer.setScissorTest(false);
-    this.renderer.render(this.scene, this.camera.camera);
+    if (this.useBloom) {
+      this.updateGlowBase();
+      this.fx.render(rawDt);
+    } else {
+      this.renderer.render(this.scene, this.camera.camera);
+    }
   }
 
   /** Shared sky / fog / palette work, driven by whoever the camera follows. */
@@ -1476,8 +1746,8 @@ export class Game {
     if (this.scene.fog instanceof THREE.Fog) {
       this.scene.fog.color.copy(this.sky.fogColor).lerp(this.tmpColor.setHex(biome.fogTint), 0.25);
       // Thin the haze as we climb so the whole world opens up beneath the bird.
-      this.scene.fog.near = 40 + altT * 300;
-      this.scene.fog.far = 220 + altT * 900;
+      this.scene.fog.near = 62 + altT * 300;
+      this.scene.fog.far = 380 + altT * 900;
       this.renderer.setClearColor(this.scene.fog.color, 1);
     }
     this.altZone =
@@ -1489,8 +1759,9 @@ export class Game {
     const p1 = this.p1!;
     const p2 = this.p2!;
     const playing = this.state === "playing";
-    p1.syncVisual(visDt, playing && this.input.diving, this.elapsed, this.terrain);
-    p2.syncVisual(visDt, playing && this.input.diving2, this.elapsed, this.terrain);
+    const interp = playing ? clamp(this.acc / PHYS_DT, 0, 1) : 1;
+    p1.syncVisual(visDt, playing && this.input.diving, this.elapsed, this.terrain, interp);
+    p2.syncVisual(visDt, playing && this.input.diving2, this.elapsed, this.terrain, interp);
     this.particles.update(visDt);
     p1.updateCamera(rawDt, playing, this.terrain);
     p2.updateCamera(rawDt, playing, this.terrain);
@@ -1499,6 +1770,7 @@ export class Game {
     this.applyWorldLook(lead.bird.x, lead.bird.altitude);
     this.terrain.update(lead.bird.x);
     this.audio.update(rawDt, lead.bird.speed(), playing && this.input.diving, lead.bird.grounded, false, 1, playing, 0);
+    this.audio.setMusicIntensity(playing ? Math.min(1, lead.bird.speed() / 90 * 0.5 + Math.min(1, lead.bird.altitude / ALT_HIGH) * 0.3) : 0);
 
     const size = this.renderer.getSize(this.tmpSize);
     const vertical = size.x / Math.max(1, size.y) >= 1.25;
@@ -1529,6 +1801,24 @@ export class Game {
   private startRun(opts?: { duel?: boolean; challenge?: "" | "daily" | `gauntlet${number}`; event?: boolean; storm?: boolean }): void {
     this.exitVersus();
     this.mode = modeById(this.modeId);
+    // Snapshot the record to beat BEFORE this run writes anything, so the
+    // mid-run "new record" moment and the results "NEW BEST" banner compare
+    // against the genuinely previous best.
+    this.bestAtStart = this.save.state.bestDistance;
+    this.distanceRecordCrossed = false;
+    this.newBest = false;
+    // World variety: in the default "today" mode a plain casual flight gets
+    // fresh random hills every run so no two free-flights look alike. An
+    // explicit Yesterday/Random seed pick is honoured, and date-seeded
+    // daily/gauntlet runs plus shared-field races (duels, events, stormfront,
+    // mass races) keep their fixed seed so the field stays fair/comparable.
+    const casualRun =
+      this.seedMode === "today" && !opts?.duel && !opts?.challenge && !opts?.event && !opts?.storm && this.modeId !== "massrace";
+    if (casualRun) {
+      this.rebuildWorld(`fly-${Math.random().toString(36).slice(2, 10)}`);
+    } else if (opts?.challenge && this.seed !== this.today) {
+      this.rebuildWorld(this.today);
+    }
     // Duels and challenges only apply when their action explicitly asks for
     // them; every other launch path resets to a plain run.
     this.duelActive = Boolean(opts?.duel);
@@ -1723,7 +2013,8 @@ export class Game {
     this.runRecorded = true;
     this.bird.asleep = true;
     const stats = this.runStats();
-    this.telemetry.track("run_end", { mode: this.modeId, distance: Math.round(stats.distance) });
+    this.newBest = this.bestAtStart > 0 && stats.distance > this.bestAtStart;
+    this.telemetry.track("run_end", { mode: this.modeId, distance: Math.round(stats.distance), newBest: this.newBest });
 
     // A duel abandoned short of the line is a loss — no free retries on rating.
     if (this.duelActive && this.duelResult === "") {
@@ -1746,7 +2037,10 @@ export class Game {
     this.flow.noteRun(stats.distance, this.perfects, this.launch.goods + this.launch.greats + this.launch.perfects, this.save);
     this.terrain.setDifficulty(this.flow.difficulty());
 
-    const beatGhost = this.ghostRecorder.commit(this.seed, stats.distance);
+    // One-off "fresh hills" runs have no stable seed to build a personal best
+    // on, so skip ghost recording for them (the ghost only ever replays a
+    // run on identical terrain).
+    const beatGhost = this.seed.startsWith("fly-") ? false : this.ghostRecorder.commit(this.seed, stats.distance);
     if (beatGhost) {
       this.hud.toast("New personal ghost recorded", "gold");
       this.telemetry.track("ghost_new", { distance: Math.round(stats.distance) });
@@ -1766,6 +2060,10 @@ export class Game {
       mode: this.modeId,
     });
     this.boardPage = null;
+    // Re-pull the board so the results screen (and the home screen) can show
+    // the just-earned rank. Local rows were already updated synchronously, so
+    // this resolves to the new standing without a network round-trip.
+    void this.refreshBoard(true);
     const improvedCups = this.cups.submit(this.modeId, {
       distance: stats.distance,
       altitude: this.maxAltitude,
@@ -1871,6 +2169,7 @@ export class Game {
     const score = this.score();
     this.save.recordRun(stats.distance, this.runCoins, score, this.today, this.island, this.terrain.biomeAt(this.bird.x).id);
     this.save.addLifetimeZeniths(stats.zenith);
+    this.save.addLifetimeSunflowers(this.runSunflowers);
     // distance XP is awarded at the end; everything else accrued live during the flight
     this.awardXp(Math.round(stats.distance * XP_RULES.perMetre));
     const tierBefore = this.seasonPass.tier();
@@ -1989,6 +2288,7 @@ export class Game {
     this.skimTime = 0;
     this.skimCd = 0;
     this.surprises.reset();
+    this.surpriseRng = new SeededRandom(`${this.seed}:surprises`);
     this.feverTimer = 0;
     this.feverOn = false;
     this.feverReached = false;
@@ -2002,9 +2302,16 @@ export class Game {
     this.runClouds = 0;
     this.zeniths = 0;
     this.pickups = 0;
+    this.runRings = 0;
+    this.ringChain = 0;
+    this.ringChainTimer = 0;
+    this.runBalloons = 0;
+    this.runSunflowers = 0;
     this.pendingXp = 0;
     this.xpFlush = 0;
     this.trailFxAcc = 0;
+    this.powerFxAcc = 0;
+    this.trail.clear();
     this.atmosphereFxAcc = 0;
     this.magnetTimer = 0;
     this.shield = 0;
@@ -2184,15 +2491,14 @@ export class Game {
         break;
       case "host-room": {
         this.roomCode = makeRoomCode();
-        void navigator.clipboard?.writeText(this.roomCode).catch(() => undefined);
-        this.hud.toast(`Room ${this.roomCode} copied — share it!`, "gold");
+        this.copyRoomInvite(this.roomCode);
         this.modeId = "massrace";
         this.mode = modeById("massrace");
         this.startRun();
         break;
       }
       case "join-room": {
-        const code = this.hud.readValue("roomCode").trim().toUpperCase().slice(0, 5);
+        const code = normalizeRoomCode(this.hud.readValue("roomCode"));
         if (!code) {
           this.hud.toast("Enter a 5-letter room code", "warn");
           break;
@@ -2200,6 +2506,22 @@ export class Game {
         this.roomCode = code;
         this.modeId = "massrace";
         this.mode = modeById("massrace");
+        this.startRun();
+        break;
+      }
+      case "copy-invite": {
+        if (this.roomCode) this.copyRoomInvite(this.roomCode);
+        else this.hud.toast("Host a room first to get an invite link", "warn");
+        break;
+      }
+      case "start-room": {
+        if (!this.roomCode) {
+          this.hud.toast("Host or join a room first", "warn");
+          break;
+        }
+        this.modeId = "massrace";
+        this.mode = modeById("massrace");
+        this.rankedRace = false;
         this.startRun();
         break;
       }
@@ -2477,15 +2799,17 @@ export class Game {
         this.importCloud();
         break;
       case "throw-challenge": {
-        // Challenge link: this exact seed + this run's distance. Every player
-        // becomes a course designer with a posted time.
+        // Challenge link: this exact seed + this run's distance (+ mode). Every
+        // player becomes a course designer with a posted time. Native share
+        // sheet on mobile (one-tap to any messenger), clipboard otherwise.
+        // Gated behind the challengeShare flag so a rollout can be held back.
+        if (!flag("challengeShare")) break;
         const dist = Math.max(1, Math.round(this.lastRunDistance()));
-        const url = buildChallengeUrl(this.seed, dist, this.pilotName);
-        void navigator.clipboard
-          .writeText(`Beat ${dist} m on my hills → ${url}`)
-          .then(() => this.hud.toast("🥊 Challenge link copied — send it to a rival", "gold"))
-          .catch(() => this.hud.toast(url, "info"));
-        this.telemetry.track("rival_thrown", { distance: dist });
+        const mode = flag("modeAwareChallenge") ? this.modeId : undefined;
+        const url = buildChallengeUrl(this.seed, dist, this.pilotName, mode);
+        const text = `Beat my ${dist} m flight on these hills 🐦 → ${url}`;
+        this.shareText(text, `🥊 Challenge link copied — send it to a rival`);
+        this.telemetry.track("rival_thrown", { distance: dist, mode: this.modeId });
         break;
       }
       case "rematch":
@@ -2569,6 +2893,15 @@ export class Game {
         this.audio.ding();
         break;
       }
+      case "set-track": {
+        const cur = this.save.state.settings.musicTrack;
+        const next = cur === "shuffle" ? 0 : cur >= TRACK_NAMES.length - 1 ? "shuffle" : cur + 1;
+        this.save.state.settings.musicTrack = next;
+        this.save.persist();
+        this.applySettings();
+        this.audio.uiTick();
+        break;
+      }
       case "set-haptics":
         this.save.state.settings.haptics = !this.save.state.settings.haptics;
         this.save.persist();
@@ -2649,6 +2982,8 @@ export class Game {
         const res = this.save.recordDuelResult(false, this.today);
         this.hud.toast(`⚔ Duel forfeited · ${res.delta} rating`, "warn");
       }
+      // A graceful retreat still deserves a punchline.
+      this.hud.toast(quip(SURRENDER_QUIPS, Math.round(this.bird.x)), "cloud");
     }
     this.duelActive = false;
     this.duelResult = "";
@@ -3020,7 +3355,12 @@ export class Game {
     this.audio.setMuted(s.mute);
     this.audio.setMusicEnabled(s.music);
     this.audio.setVolumes(s.musicVolume, s.sfxVolume);
+    this.audio.setMusicTrack(s.musicTrack);
     this.camera.setReduceMotion(s.reduceMotion);
+    // Bloom is the expensive effect — desktop high/auto only, and never under
+    // reduced-motion (a steady glow reads as flicker to some players).
+    this.useBloom = !s.reduceMotion && !this.isMobile && s.quality !== "low";
+    if (!this.useBloom) this.fx.setBase(0);
     // Accessibility classes live on <html> so every overlay inherits them.
     document.documentElement.classList.toggle("a11y-color", s.colorAssist);
     document.documentElement.classList.toggle("a11y-bigtext", s.bigText);
@@ -3042,6 +3382,24 @@ export class Game {
 
   private adaptQuality(raw: number): void {
     this.frameEma = lerp(this.frameEma, raw, 0.05);
+    // Field perf telemetry: count frames that blow the 60 fps budget (16.7 ms)
+    // and track the worst, then report a coarse aggregate every ~10s. This is
+    // the same signal the quality stepper reacts to — surfaced so a deploy that
+    // regresses frame time shows up in the analytics, not just as user churn.
+    if (raw > 1 / 30) this.perfLongFrames += 1;
+    if (raw > this.perfWorst) this.perfWorst = raw;
+    this.perfTimer += raw;
+    if (this.perfTimer >= 10) {
+      this.perfTimer = 0;
+      this.telemetry.track("perf_frame", {
+        frameMs: Math.round(this.frameEma * 1000),
+        longFrames: this.perfLongFrames,
+        worstMs: Math.round(this.perfWorst * 1000),
+        dpr: this.dpr,
+      });
+      this.perfLongFrames = 0;
+      this.perfWorst = 0;
+    }
     this.qualityTimer += raw;
     if (this.qualityTimer < 2.5) return;
     this.qualityTimer = 0;
@@ -3071,6 +3429,22 @@ export class Game {
 
   private shake(amount: number): void {
     this.camera.bump(amount);
+  }
+
+  /** Ambient bloom from game state, refreshed once per rendered frame. */
+  private updateGlowBase(): void {
+    if (!this.useBloom) return;
+    const golden = this.goldenHour ? 0.4 : 0;
+    const fever = this.feverOn ? 0.5 : 0;
+    const wings = this.powers.has("goldenwings") ? 0.45 : 0;
+    const boost = this.boostTimer > 0 ? 0.25 : 0;
+    this.fx.setBase(0.1 + Math.max(golden, fever, wings, boost));
+  }
+
+  /** Transient bloom spike on a trigger moment. */
+  private glow(amount: number): void {
+    if (!this.useBloom) return;
+    this.fx.pulse(amount);
   }
 
   private flash(kind: "perfect" | "fever" | "island" | "sleep"): void {
@@ -3223,6 +3597,28 @@ export class Game {
       }
     }
     for (const e of net.drainEmotes()) this.massRace.showEmote(e.id, e.emote);
+    // Live multiplayer signals: surface presence changes as in-flight toasts
+    // so a connecting/leaving/finishing rival never goes unnoticed.
+    for (const e of net.drainEvents()) {
+      switch (e.type) {
+        case "join":
+          this.hud.toast(`🕊 ${e.name} joined the race`, "island");
+          this.audio.chirp();
+          break;
+        case "leave":
+          this.hud.toast(`👋 ${e.name} left`, "warn");
+          break;
+        case "ready":
+          this.hud.toast(`✅ ${e.name} is ready`, "cloud");
+          break;
+        case "finish":
+          this.hud.toast(`🏁 ${e.name} finished P${e.place}`, "gold");
+          break;
+        case "start":
+          this.hud.toast("🚦 Live race — GO!", "gold");
+          break;
+      }
+    }
     if (this.state === "playing" && this.massRace.active) {
       net.send(this.bird.x, this.bird.y, this.bird.rotation, Math.max(0, this.bird.x - this.startX));
     }
@@ -3391,6 +3787,9 @@ export class Game {
     this.screen = s;
     this.menuHold = 0;
     this.needRelease = true;
+    // Every return to the home screen refreshes the embedded leaderboard so a
+    // just-finished run shows up immediately (cache-first, non-blocking).
+    if (s === "main") void this.refreshBoard();
     this.bump();
   }
 
@@ -3401,6 +3800,30 @@ export class Game {
   /** Public-facing pilot identity: VIPs wear the crown in every roster. */
   private racedName(): string {
     return this.save.isVipActive() ? `♛ ${this.pilotName}`.slice(0, 16) : this.pilotName;
+  }
+
+  /** Copies the room invite link, preferring the native share sheet. */
+  private copyRoomInvite(code: string): void {
+    const url = buildRoomInviteUrl(code);
+    const text = `Join my Sunbird race room ${code}: ${url}`;
+    this.shareText(text, `Invite link copied — send it to friends`);
+  }
+
+  /** Native share sheet when available (mobile), clipboard + toast otherwise. */
+  private shareText(text: string, copiedToast: string): void {
+    const nav = navigator as Navigator & { share?: (d: ShareData) => Promise<void> };
+    if (nav.share && flag("nativeShare")) {
+      void nav
+        .share({ title: "Sunbird", text })
+        .then(() => this.hud.toast("Shared!", "gold"))
+        .catch(() => {
+          void navigator.clipboard?.writeText(text).catch(() => undefined);
+          this.hud.toast(copiedToast, "gold");
+        });
+      return;
+    }
+    void navigator.clipboard?.writeText(text).catch(() => undefined);
+    this.hud.toast(copiedToast, "gold");
   }
 
   private lastRunDistance(): number {
@@ -3420,11 +3843,23 @@ export class Game {
     };
   }
 
+  /** 0..1 — continuous musical intensity from the moment-to-moment flight. */
+  private musicIntensity(): number {
+    if (this.state !== "playing") return 0;
+    const speed = Math.min(1, this.bird.speed() / 90);
+    const alt = Math.min(1, this.bird.altitude / ALT_HIGH);
+    const fever = this.feverOn ? 1 : 0;
+    const danger = 1 - Math.max(0, Math.min(1, this.daylight / this.daylightMax()));
+    const chain = Math.min(1, this.ringChain / 4);
+    return Math.min(1, speed * 0.35 + alt * 0.22 + fever * 0.3 + danger * 0.12 + chain * 0.12);
+  }
+
   private score(): number {
     return (this.scoreAccum + this.bonus) * this.save.nestMultiplier();
   }
 
   private seedLabel(): string {
+    if (this.seed.startsWith("fly-")) return `Fresh hills · ${this.seed.slice(4).toUpperCase()}`;
     if (this.seedMode === "yesterday") return `Yesterday's hills · ${formatDatePretty(this.seed)}`;
     if (this.seedMode === "random") return `Wild hills · ${this.seed.replace("wild-", "").toUpperCase()}`;
     return `Hills of ${formatDatePretty(this.seed)}`;
@@ -3613,6 +4048,9 @@ export class Game {
       perfects: this.perfects,
       clouds: this.runClouds,
       zeniths: this.zeniths,
+      rings: this.runRings,
+      balloons: this.runBalloons,
+      sunflowers: this.runSunflowers,
       hint: this.state === "playing" ? this.coachHint() || this.hint : "",
       magnetTimer: this.magnetTimer,
       shield: this.shield,
@@ -3623,6 +4061,7 @@ export class Game {
       vipExpiredNotice: this.vipExpiredNotice,
       adsLeftToday: this.save.adsLeftToday(),
       ghostDelta: this.state === "playing" || this.state === "gameover" ? this.ghostDelta() : null,
+      newBest: this.newBest,
       continueTimer: this.continueTimer,
       continueCost: CONTINUE_COST,
       canAffordContinue: st.wallet >= CONTINUE_COST,
@@ -3682,6 +4121,12 @@ export class Game {
       cloudMessage: this.cloudMessage,
       canInstall: Boolean(this.deferredInstall) && !this.portalEnabled(),
       shareBusy: this.shareBusy,
+      expShareFirst:
+        this.state !== "gameover"
+          ? false
+          : (this.expShareFirst ??= variant(this.save.state.deviceId, "results_cta_order", 50, (v) => {
+              this.telemetry.track("experiment_exposure", { experiment: "results_cta_order", variant: v });
+            })) === "treatment",
       combo: Math.max(this.perfectChain, this.versus && this.p1 ? this.p1.launch.combo : this.launch.combo),
       speedNorm: Math.min(1, this.bird.speed() / 100),
       gust: this.weather.gust,
@@ -3906,6 +4351,7 @@ export class Game {
     this.renderer.setSize(w, h, false);
     this.camera.resize(w / Math.max(1, h));
     this.camera.setBaseFov(50);
+    this.fx.resize(w, h, this.dpr);
     if (this.p1 && this.p2) {
       const vertical = w / Math.max(1, h) >= 1.25;
       this.input.splitMode = this.versus ? (vertical ? "vertical" : "horizontal") : "off";

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { buildChallengeUrl } from "../Challenge";
 
 /**
  * The rival-link payload is `seed.distance.encodedName` inside
@@ -45,5 +46,25 @@ describe("rival challenge links", () => {
     const c = decode(encode("2026-09-11", 100, "<img onerror=x>"))!;
     expect(c.name).not.toContain("<");
     expect(c.name).not.toContain(">");
+  });
+});
+
+describe("mode-aware challenge links (real builder)", () => {
+  it("omits mode when none given (backward compatible)", () => {
+    const url = buildChallengeUrl("2026-09-12", 1234, "Pilot X");
+    expect(url).toContain("#rival=2026-09-12.1234.Pilot%20X");
+    expect(url).not.toContain("&mode=");
+  });
+
+  it("carries the mode as a sibling hash param when provided", () => {
+    const url = buildChallengeUrl("seed-1", 500, "Ace", "race");
+    expect(url).toContain("#rival=seed-1.500.Ace");
+    expect(url).toContain("&mode=race");
+  });
+
+  it("keeps the mode out of the dot payload so old parsers still work", () => {
+    const url = buildChallengeUrl("seed-1", 500, "Ace", "zenith");
+    const payload = url.split("#rival=")[1]!.split("&")[0]!;
+    expect(payload.split(".").length).toBe(3); // seed.distance.name only
   });
 });

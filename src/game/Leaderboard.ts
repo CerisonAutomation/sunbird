@@ -1,4 +1,4 @@
-import { dateSeed } from "./math";
+import { dateSeed, truncate } from "./math";
 
 /**
  * Global leaderboard.
@@ -78,7 +78,7 @@ export function isLeaderboardOnline(): boolean {
 export function loadPilotName(fallbackId: string): string {
   try {
     const v = localStorage.getItem(NAME_KEY);
-    if (v && v.trim()) return v.trim().slice(0, 14);
+    if (v && v.trim()) return truncate(v.trim(), 14);
   } catch {
     /* private mode */
   }
@@ -86,7 +86,7 @@ export function loadPilotName(fallbackId: string): string {
 }
 
 export function savePilotName(name: string): string {
-  const clean = name.replace(/[^\p{L}\p{N} _.-]/gu, "").trim().slice(0, 14) || "Pilot";
+  const clean = truncate(name.replace(/[^\p{L}\p{N} _.-]/gu, "").trim(), 14) || "Pilot";
   try {
     localStorage.setItem(NAME_KEY, clean);
   } catch {
@@ -164,6 +164,11 @@ export class Leaderboard {
 
   constructor(private readonly deviceId: string) {
     if (readLocal().length === 0) writeLocal(benchmarkRows());
+    // A run finished offline still belongs on the global board — retry the
+    // push the moment connectivity returns.
+    if (typeof window !== "undefined") {
+      window.addEventListener("online", () => this.uploadBest());
+    }
   }
 
   /** Cached page for instant paint; `fetch()` refreshes it in the background. */
@@ -178,6 +183,7 @@ export class Leaderboard {
 
     const task = (async (): Promise<BoardPage> => {
       if (API) {
+        this.uploadBest();
         try {
           const url = `${API}/board?scope=${scope}&metric=${metric}&device=${encodeURIComponent(this.deviceId)}`;
           const res = await fetch(url, { headers: { accept: "application/json" } });
@@ -239,6 +245,28 @@ export class Leaderboard {
     });
   }
 
+  /**
+   * Re-push this device's local best run to the server. Idempotent: the server
+   * keeps the best row per pilot (by distance), so replaying a stale upload
+   * can never regress the board. Fired when connectivity returns and when the
+   * board is opened, so a run finished offline still reaches the global ladder.
+   */
+  private uploadBest(): void {
+    const rows = readLocal().filter((r) => r.deviceId === this.deviceId);
+    if (rows.length === 0) return;
+    const best = rows.reduce((a, b) => (b.distance > a.distance ? b : a), rows[0]!);
+    void signScore(best.deviceId, best.distance, best.score).then((sig) =>
+      fetch(`${API}/score`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(sig ? { ...best, sig } : best),
+        keepalive: true,
+      }),
+    ).catch(() => {
+      /* best-effort — the next online event or board open retries */
+    });
+  }
+
   private normalize(raw: unknown, metric: BoardMetric): BoardEntry {
     const r = (raw ?? {}) as Record<string, unknown>;
     const num = (v: unknown): number => (Number.isFinite(Number(v)) ? Number(v) : 0);
@@ -251,7 +279,7 @@ export class Leaderboard {
     const id = String(r.deviceId ?? r.id ?? "");
     return {
       id,
-      name: String(r.name ?? "Pilot").slice(0, 14),
+      name: truncate(String(r.name ?? "Pilot"), 14),
       value: metricOf(base, metric),
       ...base,
       skin: String(r.skin ?? "sunbird"),

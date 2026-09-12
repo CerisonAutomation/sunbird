@@ -24,11 +24,14 @@ const MAX = 700;
 export class ParticleFX {
   readonly points: THREE.Points;
   private readonly particles: Particle[] = [];
+  /** Free list of reusable Particle objects — no per-spawn allocation, so
+   *  long-lived particles never churn V8's old generation (the #1 source of
+   *  sawtooth GC jank in particle systems). */
+  private readonly pool: Particle[] = [];
   private readonly pos: Float32Array;
   private readonly col: Float32Array;
   private readonly size: Float32Array;
   private readonly rings: THREE.Mesh[] = [];
-  private cursor = 0;
   private budget = 1;
 
   constructor() {
@@ -393,7 +396,11 @@ export class ParticleFX {
       const p = this.particles[i]!;
       p.life -= dt;
       if (p.life <= 0) {
-        this.particles.splice(i, 1);
+        // O(1) swap-remove (splice would shift the array and allocate), and
+        // return the dead particle to the pool for reuse.
+        this.particles[i] = this.particles[this.particles.length - 1]!;
+        this.particles.pop();
+        this.pool.push(p);
         continue;
       }
       p.x += p.vx * dt;
@@ -457,6 +464,7 @@ export class ParticleFX {
   }
 
   clear(): void {
+    for (const p of this.particles) this.pool.push(p);
     this.particles.length = 0;
     for (const r of this.rings) r.visible = false;
   }
@@ -470,16 +478,35 @@ export class ParticleFX {
     }
   }
 
-  private spawn(p: Particle): void {
+  private spawn(fields: Particle): void {
     // Adaptive quality sheds decorative particles first. Critical effects
     // still get through because their emitters issue several particles.
     if (this.budget < 1 && Math.random() > this.budget) return;
+    // Reuse a pooled object instead of storing the caller's literal: the
+    // literal is a short-lived young-gen allocation (scavenged for free), but
+    // the *particle* lives for many frames, so keeping it in a pool stops it
+    // from being promoted to and churning the old generation.
+    let p: Particle;
     if (this.particles.length >= MAX) {
-      this.particles[this.cursor % MAX] = p;
-      this.cursor += 1;
+      p = this.particles.shift()!; // at hard cap, recycle the oldest slot
     } else {
-      this.particles.push(p);
+      p = this.pool.pop() ?? {
+        x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, life: 0, max: 0, size: 0, r: 1, g: 1, b: 1, type: "dust",
+      };
     }
-    p.max = p.life;
+    p.x = fields.x;
+    p.y = fields.y;
+    p.z = fields.z;
+    p.vx = fields.vx;
+    p.vy = fields.vy;
+    p.vz = fields.vz;
+    p.life = fields.life;
+    p.max = fields.life;
+    p.size = fields.size;
+    p.r = fields.r;
+    p.g = fields.g;
+    p.b = fields.b;
+    p.type = fields.type;
+    this.particles.push(p);
   }
 }

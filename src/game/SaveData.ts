@@ -4,14 +4,17 @@ import {
   INTERSTITIAL_EVERY,
   NEST_MULT_PER_LEVEL,
   SAVE_KEY,
+  SAVE_KEY_CORRUPT,
   SAVE_KEY_V1,
   VIP_DAILY_GIFT,
   VIP_DAYS,
 } from "./constants";
 import { dateSeed } from "./math";
+import { TRACK_NAMES } from "./Music";
 import { defaultRival, rankSeasonId, ratingDelta, RIVAL_BASE_RATING, seasonReward, softResetRating, streakBonus, type RivalMatch, type RivalState } from "./pvp";
 import { seasonId } from "./season";
 import { emptyTournamentState, type TournamentState } from "./Tournaments";
+import { emptySocialState, type SocialState } from "./SocialSystem";
 
 export type HighScore = {
   date: string;
@@ -29,6 +32,8 @@ export type Settings = {
   music: boolean;
   musicVolume: number;
   sfxVolume: number;
+  /** Which music track to play: "shuffle" (all ten) or a 0-based track index. */
+  musicTrack: number | "shuffle";
   haptics: boolean;
   reduceMotion: boolean;
   /** Colorblind assist: shifts warning reds/greens to blue/orange + adds glyphs. */
@@ -43,6 +48,7 @@ export type LifetimeStats = {
   coins: number;
   zeniths: number;
   ghostBeats: number;
+  sunflowers: number;
 };
 
 export type SeasonState = {
@@ -120,6 +126,8 @@ export type SaveState = {
   campaignClaimed: string[];
   /** Weekly-event / monthly-theme progress windows. */
   events: { week: string; clearsThisWeek: number; month: string; clearsThisMonth: number; claimedTrailMonth: string };
+  /** Local-first social graph (friends, clubs, DMs, challenges, replays). */
+  social: SocialState;
 };
 
 export type DuelState = {
@@ -143,6 +151,7 @@ const DEFAULT_SETTINGS: Settings = {
   music: true,
   musicVolume: 0.8,
   sfxVolume: 0.9,
+  musicTrack: "shuffle",
   haptics: true,
   reduceMotion: false,
   colorAssist: false,
@@ -187,7 +196,7 @@ function defaults(): SaveState {
     claimedCollections: [],
     redeemedCodes: [],
     runsPlayed: 0,
-    lifetime: { distance: 0, coins: 0, zeniths: 0, ghostBeats: 0 },
+    lifetime: { distance: 0, coins: 0, zeniths: 0, ghostBeats: 0, sunflowers: 0 },
     achievements: [],
     season: { id: seasonId(), xp: 0, claimedFree: [], claimedPremium: [] },
     deviceId,
@@ -214,6 +223,7 @@ function defaults(): SaveState {
     mastery: {},
     campaignClaimed: [],
     events: { week: "", clearsThisWeek: 0, month: "", clearsThisMonth: 0, claimedTrailMonth: "" },
+    social: emptySocialState(),
   };
 }
 
@@ -228,6 +238,23 @@ function strArr(v: unknown): string[] {
 
 function numArr(v: unknown): number[] {
   return Array.isArray(v) ? v.map(Number).filter((n) => Number.isFinite(n)) : [];
+}
+
+function parseSocial(v: unknown): SocialState {
+  const d = emptySocialState();
+  if (!v || typeof v !== "object") return d;
+  const p = v as Partial<SocialState>;
+  return {
+    friends: Array.isArray(p.friends) ? (p.friends as SocialState["friends"]) : d.friends,
+    pendingRequests: strArr(p.pendingRequests),
+    incomingRequests: strArr(p.incomingRequests),
+    blocked: strArr(p.blocked),
+    club: p.club ?? null,
+    dmThreads: Array.isArray(p.dmThreads) ? (p.dmThreads as SocialState["dmThreads"]) : d.dmThreads,
+    challenges: Array.isArray(p.challenges) ? (p.challenges as SocialState["challenges"]) : d.challenges,
+    savedReplays: Array.isArray(p.savedReplays) ? (p.savedReplays as SocialState["savedReplays"]) : d.savedReplays,
+    socialQuestsClaimed: strArr(p.socialQuestsClaimed),
+  };
 }
 
 function parseRival(v: unknown): RivalState {
@@ -261,6 +288,13 @@ function parseRival(v: unknown): RivalState {
 
 export class SaveData {
   state: SaveState;
+  /** True when the on-disk save was unreadable this session and we booted
+   *  clean. The corrupt payload is parked under SAVE_KEY_CORRUPT, not lost. */
+  recoveredFromCorruption = false;
+  /** Invoked (throttled) when a persist fails — lets the game observe data-
+   *  loss risk instead of swallowing it silently. */
+  onPersistError: (() => void) | null = null;
+  private lastPersistErrorAt = 0;
 
   constructor() {
     this.state = this.load();
@@ -268,8 +302,9 @@ export class SaveData {
 
   private load(): SaveState {
     const d = defaults();
+    let raw: string | null = null;
     try {
-      const raw = localStorage.getItem(SAVE_KEY) ?? localStorage.getItem(SAVE_KEY_V1);
+      raw = localStorage.getItem(SAVE_KEY) ?? localStorage.getItem(SAVE_KEY_V1);
       if (!raw) {
         this.persistNow(d);
         return d;
@@ -322,6 +357,12 @@ export class SaveData {
             p.settings?.sfxVolume !== undefined
               ? Math.max(0, Math.min(1, Number(p.settings.sfxVolume) || 0))
               : 0.9,
+          musicTrack:
+            p.settings?.musicTrack === "shuffle"
+              ? "shuffle"
+              : typeof p.settings?.musicTrack === "number"
+                ? Math.max(0, Math.min(TRACK_NAMES.length - 1, Math.floor(p.settings.musicTrack)))
+                : "shuffle",
           haptics: p.settings?.haptics === undefined ? true : Boolean(p.settings.haptics),
           reduceMotion: Boolean(p.settings?.reduceMotion),
           colorAssist: Boolean(p.settings?.colorAssist),
@@ -343,6 +384,7 @@ export class SaveData {
           coins: num(p.lifetime?.coins),
           zeniths: num(p.lifetime?.zeniths),
           ghostBeats: num(p.lifetime?.ghostBeats),
+          sunflowers: num(p.lifetime?.sunflowers),
         },
         achievements: strArr(p.achievements),
         season:
@@ -421,8 +463,21 @@ export class SaveData {
                 claimedTrailMonth: String((p.events as Record<string, unknown>).claimedTrailMonth ?? ""),
               }
             : d.events,
+        social: parseSocial(p.social),
       };
     } catch {
+      // Corruption recovery: never destroy a player's data. If we actually read
+      // a blob but couldn't parse it, park it under a dedicated key before
+      // booting clean, so it survives for manual recovery instead of being
+      // silently overwritten by the next persist().
+      if (raw !== null) {
+        this.recoveredFromCorruption = true;
+        try {
+          localStorage.setItem(SAVE_KEY_CORRUPT, raw);
+        } catch {
+          /* ignore — nothing more we can do */
+        }
+      }
       return d;
     }
   }
@@ -431,7 +486,14 @@ export class SaveData {
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify(state));
     } catch {
-      /* ignore */
+      // A write that silently no-ops loses player progress with no signal. Call
+      // the observer (if any) — throttled here so a full/blocked store can't
+      // flood it — and otherwise keep playing rather than crashing the game.
+      const now = Date.now();
+      if (now - this.lastPersistErrorAt > 10_000) {
+        this.lastPersistErrorAt = now;
+        this.onPersistError?.();
+      }
     }
   }
 
@@ -459,6 +521,11 @@ export class SaveData {
 
   addLifetimeZeniths(n: number): void {
     this.state.lifetime.zeniths += n;
+    this.persist();
+  }
+
+  addLifetimeSunflowers(n: number): void {
+    this.state.lifetime.sunflowers += n;
     this.persist();
   }
 

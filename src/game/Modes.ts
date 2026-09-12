@@ -29,10 +29,10 @@ export const MODES: ModeDef[] = [
   {
     id: "race",
     name: "Race",
-    blurb: "First to the finish line 3,000 m out. Every second counts.",
+    blurb: "First to the finish line 4,000 m out. Every second counts.",
     icon: "🏁",
     clock: 0,
-    finish: 3000,
+    finish: 4000,
     scoreBy: "time",
     escalate: false,
   },
@@ -92,7 +92,7 @@ export const MODES: ModeDef[] = [
     blurb: "A full 40-bird field on identical hills. Out-fly the pack to the line.",
     icon: "🐦",
     clock: 0,
-    finish: 3000,
+    finish: 4000,
     scoreBy: "time",
     escalate: false,
   },
@@ -105,4 +105,6 @@ export function modeById(id: ModeId): ModeDef {
   return MODES.find((m) => m.id === id) ?? MODES[0]!;
 }
 
-export const RACE_FINISH = 3000;
+/** Finish distance for the local 2-player split-screen versus, matched to the
+ * online mass race so every PvP surface gets the same, unhurried pacing. */
+export const RACE_FINISH = 4000;

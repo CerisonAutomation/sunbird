@@ -25,6 +25,8 @@ export class GameAudio {
   private started = false;
   private pendingMode: MusicMode = "off";
   private pendingBiome: BiomeMusicStyle = "bright";
+  private pendingTrack: number | "shuffle" = "shuffle";
+  private onTrackChange: ((name: string) => void) | null = null;
 
   // Ascending musical coin streak tracker
   private coinStreak = 0;
@@ -74,6 +76,8 @@ export class GameAudio {
     this.music.setLevel(this.musicOn && !this.muted ? 0.64 * this.musicVol : 0);
     this.music.setBiome(this.pendingBiome);
     this.music.setMode(this.pendingMode);
+    this.music.setTrack(this.pendingTrack);
+    if (this.onTrackChange) this.music.onTrackChange = this.onTrackChange;
 
     this.buildWhoosh();
     this.buildWind();
@@ -159,6 +163,22 @@ export class GameAudio {
     this.music?.setBiome(style);
   }
 
+  /** Pin a track (0..9) or "shuffle" — persists via Settings. */
+  setMusicTrack(sel: number | "shuffle"): void {
+    this.pendingTrack = sel;
+    this.music?.setTrack(sel);
+  }
+
+  setOnTrackChange(cb: (name: string) => void): void {
+    this.onTrackChange = cb;
+    if (this.music) this.music.onTrackChange = cb;
+  }
+
+  /** 0..1 — adaptive music intensity (speed/altitude/fever/danger/combos). */
+  setMusicIntensity(v: number): void {
+    this.music?.setIntensity(v);
+  }
+
   duckMusic(amount = 0.4, release = 0.5): void {
     this.music?.duck(amount, release);
   }
@@ -175,9 +195,10 @@ export class GameAudio {
   ): void {
     if (!this.ctx || !this.whooshGain || !this.whooshFilter || !this.windGain || this.adMuted) return;
     const t = this.ctx.currentTime;
+    // Fever swells the wind so the audio feels as hot as the visuals look.
     const whoosh =
       playing && grounded && speed > 8
-        ? Math.min(0.24, (speed / 90) * (diving ? 0.24 : 0.12))
+        ? Math.min(0.28, (speed / 90) * (diving ? 0.24 : 0.12) * (fever ? 1.35 : 1))
         : 0.0008;
     this.whooshGain.gain.setTargetAtTime(this.muted ? 0 : whoosh * this.sfxVol, t, 0.05);
     this.whooshFilter.frequency.setTargetAtTime(280 + speed * 18 + (diving ? 220 : 0), t, 0.08);
@@ -188,7 +209,6 @@ export class GameAudio {
 
     this.music?.setNight(1 - daylight);
     void dt;
-    void fever;
   }
 
   /* ---------- one-shots with juicy feedback ---------- */
@@ -285,6 +305,20 @@ export class GameAudio {
     this.noiseBurst(0.16, 1300, 0.07);
   }
 
+  /** Coin magnet: a bright swirling shimmer as loose change flies your way. */
+  magnetOn(): void {
+    this.tone(1046.5, 0.1, "sine", 0.08, 1567.98);
+    this.tone(1567.98, 0.16, "triangle", 0.07, 2093);
+    this.noiseBurst(0.14, 2400, 0.04);
+  }
+
+  /** Rocket boost: a low whoosh rising into a bright flare. */
+  boost(): void {
+    this.tone(110, 0.32, "sawtooth", 0.09, 660);
+    this.noiseBurst(0.3, 1200, 0.1);
+    this.tone(440, 0.16, "square", 0.05, 880);
+  }
+
   purchase(): void {
     this.tone(523.25, 0.1, "triangle", 0.09, 659.25);
     this.tone(783.99, 0.2, "triangle", 0.09, 1046.5);
@@ -348,6 +382,14 @@ export class GameAudio {
   boing(): void {
     this.tone(220, 0.28, "sine", 0.12, 660);
     this.tone(330, 0.22, "triangle", 0.06, 880);
+  }
+
+  /** Balloon bounce: a taut rubber pop + a springy upward slide. */
+  balloon(): void {
+    this.noiseBurst(0.06, 2600, 0.16);
+    this.tone(220, 0.1, "sine", 0.12, 260);
+    this.tone(392, 0.2, "sine", 0.1, 660);
+    this.tone(523.25, 0.22, "triangle", 0.08, 880);
   }
 
   /** Short triumphant fanfare for surprise windfalls. */
@@ -414,23 +456,36 @@ export class GameAudio {
 
   private tone(freq: number, dur: number, type: OscillatorType, gain: number, slideTo?: number): void {
     if (!this.ctx || !this.sfxBus || !this.reverbSend || this.muted || !this.started) return;
-    const o = this.ctx.createOscillator();
-    const g = this.ctx.createGain();
-    o.type = type;
     const t = this.ctx.currentTime;
-    o.frequency.setValueAtTime(freq, t);
-    if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(40, slideTo), t + dur);
+    const g = this.ctx.createGain();
+    // Click-free envelope: a ~5 ms rise, then exponential decay.
     const effGain = Math.max(0.0001, gain * this.sfxVol);
-    g.gain.setValueAtTime(effGain, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(effGain, t + 0.005);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g);
     g.connect(this.sfxBus);
     const send = this.ctx.createGain();
     send.gain.value = 0.35;
     g.connect(send);
     send.connect(this.reverbSend);
-    o.start();
-    o.stop(t + dur + 0.03);
+
+    const voice = (detune: number, vol: number): void => {
+      const o = this.ctx!.createOscillator();
+      o.type = type;
+      o.detune.value = detune;
+      const vg = this.ctx!.createGain();
+      vg.gain.value = vol;
+      o.frequency.setValueAtTime(freq, t);
+      if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(40, slideTo), t + dur);
+      o.connect(vg);
+      vg.connect(g);
+      o.start();
+      o.stop(t + dur + 0.03);
+    };
+    // A gently detuned second voice thickens every sound into a small chorus
+    // without raising the overall level (0.8 + 0.4 ≈ the single voice).
+    voice(0, 0.8);
+    voice(6, 0.4);
   }
 
   private noiseBurst(dur: number, freq: number, gain: number): void {

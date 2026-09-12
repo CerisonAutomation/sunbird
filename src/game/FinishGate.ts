@@ -4,7 +4,7 @@ import type { TerrainSystem } from "./TerrainSystem";
 /**
  * A physical finish line for the race modes.
  *
- * Before this existed the finish was pure logic — you flew 3 km toward an
+ * Before this existed the finish was pure logic — you flew 4 km toward an
  * invisible trigger with nothing to aim at. A visible gate turns the last
  * stretch of a race into a readable, dramatic target: you can see it coming
  * over the crest, judge whether to dive or hold, and feel the pass.

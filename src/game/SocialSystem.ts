@@ -46,17 +46,30 @@ export type SocialState = {
   challenges: FriendChallenge[]; savedReplays: ReplayData[]; socialQuestsClaimed: string[];
 };
 
+/** A fresh, empty social state — shared so SaveData can default/migrate it. */
+export function emptySocialState(): SocialState {
+  return {
+    friends: [],
+    pendingRequests: [],
+    incomingRequests: [],
+    blocked: [],
+    club: null,
+    dmThreads: [],
+    challenges: [],
+    savedReplays: [],
+    socialQuestsClaimed: [],
+  };
+}
+
 export class SocialSystem {
   constructor(private save: SaveData) {}
   private ensureInit(): void {
-    const s = this.save.state as any;
-    if (!s.social) {
-      s.social = { friends: [], pendingRequests: [], incomingRequests: [], blocked: [],
-        club: null, dmThreads: [], challenges: [], savedReplays: [], socialQuestsClaimed: [] };
+    if (!this.save.state.social) {
+      this.save.state.social = emptySocialState();
       this.save.persist();
     }
   }
-  private get social(): SocialState { this.ensureInit(); return (this.save.state as any).social; }
+  private get social(): SocialState { this.ensureInit(); return this.save.state.social!; }
   sendFriendRequest(targetDeviceId: string, targetName: string): boolean {
     const s = this.social;
     if (targetDeviceId === this.save.state.deviceId) return false;

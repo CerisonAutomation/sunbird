@@ -42,8 +42,8 @@ jobs:
           path: dist/
           retention-days: 14
 
-  backend:
-    name: Backend typecheck
+  verify-prod:
+    name: Production gate (audit + budget + determinism)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -51,10 +51,10 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-      - run: npm ci
-        working-directory: backend
-      - run: npx tsc --noEmit
-        working-directory: backend
+      - name: Install dependencies
+        run: npm ci
+      - name: Autoperfect production mode
+        run: npm run verify:prod
 
   build-itch:
     name: Build (itch.io single-file)

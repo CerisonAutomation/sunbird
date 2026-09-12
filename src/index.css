@@ -376,15 +376,15 @@ textarea {
 /* Layered sun: warm disc + soft corona + slow breathing halo. */
 .hero-sun {
   position: relative;
-  width: 74px;
-  height: 74px;
+  width: 64px;
+  height: 64px;
   margin-bottom: 4px;
   border-radius: 50%;
   background: radial-gradient(circle at 38% 34%, #fff3c4 0%, #ffd166 45%, #ff9a3a 78%, #ff7a30 100%);
   box-shadow:
-    0 0 0 7px rgba(255, 200, 90, 0.28),
-    0 0 0 15px rgba(255, 170, 70, 0.14),
-    0 14px 34px rgba(255, 140, 50, 0.5);
+    0 0 0 5px rgba(255, 200, 90, 0.26),
+    0 0 0 11px rgba(255, 170, 70, 0.12),
+    0 10px 24px rgba(255, 140, 50, 0.45);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -396,9 +396,9 @@ textarea {
 @keyframes sun-breathe {
   50% {
     box-shadow:
-      0 0 0 9px rgba(255, 200, 90, 0.34),
-      0 0 0 20px rgba(255, 170, 70, 0.18),
-      0 18px 40px rgba(255, 140, 50, 0.55);
+      0 0 0 6px rgba(255, 200, 90, 0.32),
+      0 0 0 13px rgba(255, 170, 70, 0.16),
+      0 12px 28px rgba(255, 140, 50, 0.5);
   }
 }
 
@@ -836,6 +836,47 @@ h2 {
   background: #fff;
 }
 
+/* The most-used toast kinds were previously unstyled and fell back to cream —
+   give every one its intended colour so feedback actually reads at a glance. */
+.toast.gold {
+  background: linear-gradient(135deg, #ffe08a, #ffc14d);
+  color: #3a2a10;
+  box-shadow: 0 6px 0 rgba(120, 80, 10, 0.25), 0 0 18px rgba(255, 200, 60, 0.5);
+}
+
+.toast.warn {
+  background: #ff6b3d;
+  color: #fff;
+}
+
+.toast.info {
+  background: rgba(52, 58, 84, 0.92);
+  color: #fff;
+}
+
+.toast.power {
+  background: linear-gradient(135deg, #8a5cff, #6a3df0);
+  color: #fff;
+  box-shadow: 0 6px 0 rgba(60, 20, 120, 0.3), 0 0 18px rgba(140, 90, 255, 0.45);
+}
+
+.toast.quest {
+  background: linear-gradient(135deg, #34d0b4, #16a085);
+  color: #fff;
+}
+
+.toast.vip {
+  background: linear-gradient(135deg, #3a2a55, #221733);
+  color: #ffd76a;
+  box-shadow: 0 6px 0 rgba(20, 12, 32, 0.4), 0 0 18px rgba(200, 150, 255, 0.35);
+}
+
+.toast.zenith {
+  background: linear-gradient(135deg, #dff4ff, #9fd8ff);
+  color: #12395a;
+  box-shadow: 0 6px 0 rgba(20, 80, 140, 0.25), 0 0 18px rgba(160, 220, 255, 0.6);
+}
+
 .flash {
   position: absolute;
   inset: 0;
@@ -844,23 +885,31 @@ h2 {
 }
 
 .flash.show {
-  animation: flash 0.28s ease;
+  animation: flash 0.32s ease;
 }
 
+/* A layered core glow + edge vignette so big moments read as a full-frame
+   bloom pulse, not a flat wash. */
 .flash.perfect {
-  background: radial-gradient(circle, rgba(255, 224, 120, 0.45), transparent 55%);
+  background:
+    radial-gradient(circle at 50% 55%, rgba(255, 240, 170, 0.7), transparent 45%),
+    radial-gradient(circle at 50% 50%, transparent 60%, rgba(255, 200, 70, 0.28) 100%);
 }
 
 .flash.fever {
-  background: radial-gradient(circle, rgba(255, 110, 60, 0.4), transparent 55%);
+  background:
+    radial-gradient(circle at 50% 55%, rgba(255, 160, 90, 0.65), transparent 48%),
+    radial-gradient(circle at 50% 50%, transparent 58%, rgba(255, 90, 40, 0.32) 100%);
 }
 
 .flash.island {
-  background: radial-gradient(circle, rgba(120, 220, 255, 0.4), transparent 55%);
+  background:
+    radial-gradient(circle at 50% 55%, rgba(180, 235, 255, 0.65), transparent 48%),
+    radial-gradient(circle at 50% 50%, transparent 58%, rgba(80, 190, 255, 0.3) 100%);
 }
 
 .flash.sleep {
-  background: rgba(12, 10, 30, 0.35);
+  background: radial-gradient(circle at 50% 50%, transparent 40%, rgba(12, 10, 30, 0.55) 100%);
 }
 
 @keyframes pulse {
@@ -878,10 +927,16 @@ h2 {
 
 @keyframes flash {
   0% {
-    opacity: 0.9;
+    opacity: 1;
+    filter: saturate(1.6) brightness(1.25);
+  }
+  30% {
+    opacity: 0.85;
+    filter: saturate(1.3) brightness(1.1);
   }
   100% {
     opacity: 0;
+    filter: saturate(1) brightness(1);
   }
 }
 

@@ -58,7 +58,7 @@ export class FlowTuner {
 
 /* ========================================================== session goals */
 
-export type GoalKind = "distance" | "perfects" | "combo" | "altitude" | "coins" | "clouds" | "gems";
+export type GoalKind = "distance" | "perfects" | "combo" | "altitude" | "coins" | "clouds" | "gems" | "sunflowers";
 
 export type SessionGoal = {
   id: string;
@@ -80,6 +80,7 @@ const GOAL_SHAPES: { kind: GoalKind; base: number; scale: number; word: (n: numb
   { kind: "coins", base: 12, scale: 34, word: (n) => `Collect ${Math.round(n)} coins` },
   { kind: "clouds", base: 2, scale: 6, word: (n) => `Touch ${n} clouds` },
   { kind: "gems", base: 1, scale: 3, word: (n) => `Grab ${n} sky gems` },
+  { kind: "sunflowers", base: 2, scale: 6, word: (n) => `Bounce off ${n} sunflowers` },
 ];
 
 /**

@@ -4,6 +4,9 @@ node_modules/
 # Build output
 dist/
 
+# Test coverage
+coverage/
+
 # Environment variables
 .env
 .env.local
@@ -35,11 +38,6 @@ rust/target/
 # Graph-it
 .graph-it/
 .vercel
-
-# Cloudflare Workers backend
-backend/node_modules
-backend/.wrangler
-.wrangler/
 
 # Playwright MCP debug snapshots
 .playwright-mcp/

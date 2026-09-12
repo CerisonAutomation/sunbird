@@ -17,7 +17,7 @@ hex = "0.4"
 hmac = "0.12"
 http = "1"
 metrics = "0.23"
-metrics-exporter-prometheus = { version = "0.15", features = ["http_listener"] }
+metrics-exporter-prometheus = { version = "0.15", features = ["http-listener"] }
 parking_lot = "0.12"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }

@@ -9,6 +9,8 @@ on:
 jobs:
   build-test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: rust
@@ -21,6 +23,21 @@ jobs:
         with:
           workspaces: rust
       - name: Format
+        run: cargo fmt --all
+      - name: Commit formatting
+        # Apply rustfmt canonically and push the result back so the check
+        # below (and every future run) is against rustfmt's exact output.
+        # The follow-up run triggered by this push sees no diff and is a
+        # no-op, so this converges instead of looping.
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git commit -m "chore: apply cargo fmt"
+            git push
+          fi
+      - name: Format (check)
         run: cargo fmt --all --check
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings

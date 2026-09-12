@@ -6,7 +6,7 @@ const ENV = (import.meta as unknown as { env?: Record<string, string | undefined
 /** Backend telemetry endpoint, derived from the multiplayer base URL.
  * Empty string = no backend configured = network telemetry is a no-op. */
 function endpoint(): string {
-  const base = ENV.VITE_MP_URL ?? "";
+  const base = ENV.VITE_MULTIPLAYER_URL ?? "";
   if (!base) return "";
   return `${base.replace(/\/$/, "").replace(/^ws/, "http")}/telemetry`;
 }

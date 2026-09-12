@@ -97,11 +97,36 @@ export function formatDatePretty(iso: string): string {
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December",
   ];
-  if (!y || !m || !d) return iso;
+  // A malformed date must round-trip untouched rather than render a month
+  // that is `undefined` (e.g. "2026-13-05" → "undefined 5, 2026").
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return iso;
+  if (m < 1 || m > 12 || d < 1 || d > 31) return iso;
   return `${months[m - 1]} ${d}, ${y}`;
 }
 
 export function formatDistance(m: number): string {
-  if (m >= 1000) return `${(m / 1000).toFixed(2)} km`;
-  return `${Math.floor(m)} m`;
+  // A corrupted/negative distance must never render as "-123 m" or "NaN m"
+  // in the HUD — clamp to a non-negative, finite value first.
+  const d = Number.isFinite(m) ? Math.max(0, m) : 0;
+  if (d >= 1000) return `${(d / 1000).toFixed(2)} km`;
+  return `${Math.floor(d)} m`;
+}
+
+/**
+ * Truncate `str` to at most `max` Unicode code points without splitting a
+ * surrogate pair. `String.prototype.slice` counts UTF-16 code units, so a
+ * name containing an emoji (or any astral-plane character) sliced at the
+ * wrong boundary emits a lone surrogate — a corrupt string that renders as
+ * the replacement glyph �. Iterating code points avoids that entirely.
+ */
+export function truncate(str: string, max: number): string {
+  if (str.length <= max) return str;
+  let out = "";
+  let n = 0;
+  for (const ch of str) {
+    if (n >= max) break;
+    out += ch;
+    n++;
+  }
+  return out;
 }

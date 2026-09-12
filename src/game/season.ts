@@ -10,5 +10,8 @@ export function seasonId(date = new Date()): string {
 export function seasonLabel(id: string): string {
   const [y, m] = id.split("-").map(Number);
   const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-  return `${months[(m ?? 1) - 1]} ${y}`;
+  // A malformed id must round-trip untouched rather than render an
+  // `undefined`/`NaN` month (e.g. "2026-13" → "undefined 2026").
+  if (!Number.isFinite(y) || !Number.isFinite(m) || m < 1 || m > 12) return id;
+  return `${months[m - 1]} ${y}`;
 }

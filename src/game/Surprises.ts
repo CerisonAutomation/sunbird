@@ -81,10 +81,12 @@ const MIN_DISTANCE_M = 320;
 export class SurpriseEngine {
   private cooldown = 0;
   private fired = 0;
+  private lastKind: SurpriseKind | null = null;
 
   reset(): void {
     this.cooldown = 18; // small warm-up before the first one is possible
     this.fired = 0;
+    this.lastKind = null;
   }
 
   /**
@@ -99,7 +101,12 @@ export class SurpriseEngine {
     if (rng() >= p) return null;
     this.cooldown = COOLDOWN_S * (1 + this.fired * 0.5); // each one rarer than the last
     this.fired += 1;
-    return pickSurprise(rng);
+    // Never serve the exact same surprise twice in a row — variety is the point.
+    let surprise = pickSurprise(rng);
+    let guard = 0;
+    while (surprise.kind === this.lastKind && guard++ < 6) surprise = pickSurprise(rng);
+    this.lastKind = surprise.kind;
+    return surprise;
   }
 }
 
@@ -127,6 +134,14 @@ export const SPLASH_QUIPS = [
   "That was a swan dive. You are not a swan",
   "The fish demand an apology",
   "Water landing! The geese are laughing",
+  "Soggy. Judged. 6/10 for commitment",
+  "The tide does not respect your personal best",
+  "You've invented swimming. Reluctantly",
+  "Somewhere a beach umbrella just closed in sympathy",
+  "You didn't land. You filed a water report",
+  "The fish have accepted your résumé",
+  "Splash. The ocean is calling HR",
+  "Belly-flop so clean the seagulls applauded",
 ];
 
 export const SLEEP_QUIPS = [
@@ -138,6 +153,13 @@ export const SLEEP_QUIPS = [
   "Somewhere, a worm sighs in relief",
   "Sleep now. Revenge at sunrise",
   "The bird has left the flight simulator",
+  "You flew until the sky filed for overtime",
+  "The moon is covering your shift. Badly",
+  "Eyelids heavier than the headwind",
+  "Gravity tucked you in without asking",
+  "The moon has taken over. Chaos follows",
+  "Fell asleep like a professional. Fully certified",
+  "The stars are just tucking you in now",
 ];
 
 export const BIG_LAUNCH_QUIPS = [
@@ -149,6 +171,62 @@ export const BIG_LAUNCH_QUIPS = [
   "The clouds are pressing charges",
   "Physics rage-quit",
   "Air traffic control has questions",
+  "Local bird breaks sound barrier, polite about it",
+  "The ground waved bye-bye",
+  "That launch had a lawyer on retainer",
+  "Momentum called dibs on you",
+  "Gravity is checking its insurance policy",
+  "That flap violated several physics bylaws",
+  "The sky wasn't ready for that. Rude of you",
+  "Zero to hero in one flap. The worms gasped",
+];
+
+/** Fresh pool: fever ignites. */
+export const FEVER_QUIPS = [
+  "The bird has entered its villain arc",
+  "Somewhere, the sun is taking notes",
+  "MAXIMUM BIRB",
+  "This is legally a heatwave now",
+  "The clouds are just spectators at this point",
+  "Molten. Fully molten",
+  "The thermometer just gave up and left",
+  "You're flying like you stole the wind",
+  "Wings are now 100% afterburner, 0% regret",
+];
+
+/** Fresh pool: sky-gem pickups. */
+export const GEM_QUIPS = [
+  "That gem has been waiting its whole life for this",
+  "Sparkly. Like a very fast disco",
+  "The gem squealed. You heard nothing",
+  "One more and the ocean gets jealous",
+  "Polished to perfection — now it's yours",
+];
+
+/** Fresh pool: distance milestones. */
+export const MILESTONE_QUIPS = [
+  "The horizon just got smaller",
+  "Your legs are a rumor now",
+  "Distance: legally considered 'far'",
+  "The map is updating its notes on you",
+  "You're collecting horizon, one flap at a time",
+  "Somewhere a mile marker salutes",
+  "Your shadow is running late",
+  "The birds in the next valley are gossiping about you",
+  "A new distance record. The previous one is filing a complaint",
+];
+
+/** Fresh pool: giving up mid-run. */
+export const SURRENDER_QUIPS = [
+  "The bird has chosen dignity. Bold move",
+  "Retreat? We call it 'tactical sunshine'",
+  "The sky will tell tales of your almost-flight",
+  "You can't lose if you're just resting. That's the rule",
+  "The worm breathes easy once more",
+  "Abort mission. The sun looked at us funny",
+  "The sun respects a graceful exit",
+  "We'll call it a 'strategic sunset'",
+  "The horizon accepts your surrender with dignity",
 ];
 
 /** Deterministic quip pick so tests can pin behaviour. */

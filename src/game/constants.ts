@@ -29,6 +29,12 @@ export const MAX_SPEED_FEVER = 128;
 export const BIRD_RADIUS = 0.9;
 export const MIN_KEEP_SPEED = 6;
 
+/* Sunflower bounce pads — land on a bloom and spring straight back into the
+ * sky. Gentler than the balloon (an airborne rare), so they reward line
+ * choices without trivialising the ramps. */
+export const SUNFLOWER_VY = 30;
+export const SUNFLOWER_VX = 30;
+
 /* Landing quality: how much speed survives touching down.
  * alignment = 1 - |v·n| / |v|   (1 = perfectly tangential kiss) */
 export const LAND_PERFECT = 0.985;
@@ -88,11 +94,14 @@ export const CAMERA_LOOKAHEAD = 0.22;
 
 export const SAVE_KEY_V1 = "sunbird.save.v1";
 export const SAVE_KEY = "sunbird.save.v2";
+/** Where an unreadable save is parked before a clean boot, so player data is
+ *  never destroyed by the corruption-recovery path. */
+export const SAVE_KEY_CORRUPT = "sunbird.save.corrupt";
 
 export const DAYLIGHT_MAX_GOLD = 62;
 export const CONTINUE_COST = 80;
 export const CONTINUE_DAYLIGHT = 16;
-export const CONTINUE_TIMEOUT = 6;
+export const CONTINUE_TIMEOUT = 4;
 export const AD_DURATION = 4;
 export const INTERSTITIAL_EVERY = 3;
 

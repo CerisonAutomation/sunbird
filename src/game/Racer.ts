@@ -4,6 +4,7 @@ import { CameraRig } from "./CameraRig";
 import { Collectibles, type CloudKind } from "./Collectibles";
 import { BIRD_RADIUS, WATER_Y } from "./constants";
 import { LaunchSystem, type LaunchResult } from "./LaunchSystem";
+import { lerp } from "./math";
 import { PowerUps } from "./PowerUps";
 import type { SkinDef } from "./Economy";
 import type { ParticleFX } from "./ParticleFX";
@@ -61,6 +62,10 @@ export class Racer {
   };
 
   private skin: SkinDef | null = null;
+  /** Bird position at the start of the last physics step — the "from" end of
+   *  render interpolation, so the split-screen birds don't step at >60 Hz. */
+  private prevX = 0;
+  private prevY = 0;
 
   constructor(index: number, label: string, tint: number, terrain: TerrainSystem, scene: THREE.Scene) {
     this.index = index;
@@ -105,6 +110,10 @@ export class Racer {
   step(dt: number, diving: boolean, terrain: TerrainSystem, fx: ParticleFX, ev: RacerEvents): void {
     if (this.finished) diving = false;
     this.runTime += dt;
+    // Snapshot before physics advances so the render can interpolate between
+    // the previous and current step (mirrors the single-player bird).
+    this.prevX = this.bird.x;
+    this.prevY = this.bird.y;
     this.powers.tick(dt);
     this.launch.tick(dt);
     this.launch.observeInput(diving, this.runTime);
@@ -165,6 +174,16 @@ export class Racer {
         if (kind === "shield") this.powers.shield = Math.min(2, this.powers.shield + 1);
         ev.onPickup(kind, x, y, this);
       },
+      onRing: () => {
+        // AI pilots thread rings too — same small surge, keeps the field honest.
+        this.bird.vx += 8;
+      },
+      onBalloon: () => {
+        // Same bounce as the player, so a balloon never gifts an unfair lead.
+        this.bird.vy = Math.max(this.bird.vy, 42);
+        this.bird.vx += 14;
+        this.bird.grounded = false;
+      },
     });
 
     const sp = this.bird.speed();
@@ -197,8 +216,10 @@ export class Racer {
     if (this.powers.cloudBoostOn()) this.bird.vx += 6;
   }
 
-  syncVisual(dt: number, diving: boolean, time: number, terrain: TerrainSystem): void {
-    this.bird.syncVisual(dt, diving, this.powers.has("goldenwings"), time, terrain);
+  syncVisual(dt: number, diving: boolean, time: number, terrain: TerrainSystem, interp = 1): void {
+    const ox = lerp(this.prevX, this.bird.x, interp);
+    const oy = lerp(this.prevY, this.bird.y, interp);
+    this.bird.syncVisual(dt, diving, this.powers.has("goldenwings"), time, terrain, ox, oy);
   }
 
   updateCamera(dt: number, playing: boolean, terrain: TerrainSystem): void {

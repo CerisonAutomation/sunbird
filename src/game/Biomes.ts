@@ -373,12 +373,16 @@ export function tierForIsland(island: number): number {
   return Math.floor(Math.max(0, island) / BIOMES.length);
 }
 
-/** Ocean gap widens gradually with distance (capped so it stays crossable). */
+/**
+ * Ocean gap widens forever — every island asks for a little more air. Growth
+ * is deliberately gentle so it stays fair for many islands while still
+ * escalating without end (the "harder and harder" curve).
+ */
 export function gapEndFor(island: number): number {
-  return GAP_START + 148 + Math.min(64, island * 7);
+  return GAP_START + 148 + island * 7;
 }
 
-/** Launch ramp peak grows with the gap it has to clear. */
+/** Launch ramp peak grows to match the ever-wider gap it has to clear. */
 export function rampPeakFor(island: number): number {
-  return 28 + Math.min(18, island * 2);
+  return 28 + island * 2;
 }

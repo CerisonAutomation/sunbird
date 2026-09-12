@@ -1,10 +1,10 @@
 /**
  * @deprecated EXPERIMENTAL NODE PROTOTYPE — NOT FOR PRODUCTION.
  *
- * The supported production backend now lives in `backend/` (Cloudflare
- * Workers + Durable Objects, free plan) — see backend/README.md. This file
- * remains only as a plain-Node protocol reference; it is not part of the
- * production deployment artifact.
+ * The self-hostable production backend lives in `rust/` (the
+ * `sunbird-server` crate serves this exact simple protocol on `GET /ws`).
+ * This file remains only as a plain-Node protocol reference and in-memory
+ * leaderboard reference; it is not part of any deployment artifact.
  *
  *   npm i ws
  *   node server/sunbird-server.mjs
@@ -78,7 +78,7 @@ class Room {
     // A room becomes "racing" as soon as two pilots are present; solo players
     // still fly (against local squadron pilots) with zero waiting.
     if (this.pilots.size >= 2 && !this.startedAt) {
-      this.startedAt = Date.now() + 3000;
+      this.startedAt = Date.now() + 6000;
       this.broadcast({ type: "start", at: this.startedAt, seed: this.seed });
     }
   }

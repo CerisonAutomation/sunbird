@@ -56,6 +56,9 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: "ghost_25", title: "Ghost Hunter", desc: "Beat your ghost 25 times", rarity: "platinum", target: 25, metric: (s) => s.state.lifetime.ghostBeats },
   { id: "races_50", title: "Racing Legend", desc: "Complete 50 races", rarity: "gold", target: 50, metric: (s) => s.state.runsPlayed },
   { id: "flights_200", title: "Sky Master", desc: "Complete 200 flights", rarity: "platinum", target: 200, metric: (s) => s.state.runsPlayed },
+  { id: "sunflower_10", title: "Bloom Bouncer", desc: "Bounce off 10 sunflowers", rarity: "bronze", target: 10, metric: (s) => s.state.lifetime.sunflowers },
+  { id: "sunflower_50", title: "Sun Worshipper", desc: "Bounce off 50 sunflowers", rarity: "silver", target: 50, metric: (s) => s.state.lifetime.sunflowers },
+  { id: "sunflower_150", title: "Heliophile", desc: "Bounce off 150 sunflowers", rarity: "gold", target: 150, metric: (s) => s.state.lifetime.sunflowers },
 ];
 
 function totalMastery(s: SaveData): number {

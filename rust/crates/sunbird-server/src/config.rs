@@ -43,8 +43,10 @@ impl Config {
         let bind_addr = parse_addr("SUNBIRD_BIND_ADDR", environment)?;
         let public_origins = parse_origins("SUNBIRD_PUBLIC_ORIGINS", environment)?;
         let reconnect_secret = parse_secret("SUNBIRD_RECONNECT_HMAC_SECRET", environment)?;
-        let reconnect_grace = Duration::from_secs(parse_u64("SUNBIRD_RECONNECT_GRACE_SECONDS", 30, 1, 300)?);
-        let shutdown_grace = Duration::from_secs(parse_u64("SUNBIRD_SHUTDOWN_GRACE_SECONDS", 5, 1, 60)?);
+        let reconnect_grace =
+            Duration::from_secs(parse_u64("SUNBIRD_RECONNECT_GRACE_SECONDS", 30, 1, 300)?);
+        let shutdown_grace =
+            Duration::from_secs(parse_u64("SUNBIRD_SHUTDOWN_GRACE_SECONDS", 5, 1, 60)?);
         let metrics_bind = parse_optional_metrics_bind("SUNBIRD_METRICS_BIND_ADDR", environment)?;
 
         Ok(Self {
@@ -58,6 +60,7 @@ impl Config {
         })
     }
 
+    #[allow(dead_code)] // used by tests to build a self-contained config
     pub fn development_default() -> Self {
         Self {
             environment: Environment::Development,
@@ -66,12 +69,20 @@ impl Config {
             reconnect_secret: b"development-only-not-production-secret-32".to_vec(),
             reconnect_grace: Duration::from_secs(30),
             shutdown_grace: Duration::from_secs(5),
-            metrics_bind: Some("127.0.0.1:9090".parse().expect("valid metrics bind address")),
+            metrics_bind: Some(
+                "127.0.0.1:9090"
+                    .parse()
+                    .expect("valid metrics bind address"),
+            ),
         }
     }
 
     pub fn app_identity(&self) -> String {
-        format!("sunbird-server/{} {}", env!("CARGO_PKG_VERSION"), self.environment.as_str())
+        format!(
+            "sunbird-server/{} {}",
+            env!("CARGO_PKG_VERSION"),
+            self.environment.as_str()
+        )
     }
 
     pub fn reconnect_grace_ready(&self) -> bool {
@@ -80,7 +91,10 @@ impl Config {
 }
 
 fn parse_env(value: &str) -> Result<Environment> {
-    match env::var(value).unwrap_or_else(|_| "development".to_string()).as_str() {
+    match env::var(value)
+        .unwrap_or_else(|_| "development".to_string())
+        .as_str()
+    {
         "development" | "dev" => Ok(Environment::Development),
         "staging" | "stage" => Ok(Environment::Staging),
         "production" | "prod" => Ok(Environment::Production),
@@ -94,13 +108,19 @@ fn parse_addr(name: &str, environment: Environment) -> Result<SocketAddr> {
     } else {
         None
     };
-    let raw = env::var(name).ok().or_else(|| fallback.map(str::to_string)).ok_or_else(|| anyhow!("{name} is required outside development"))?;
-    raw.parse().with_context(|| format!("{name} must be a socket address, got {raw:?}"))
+    let raw = env::var(name)
+        .ok()
+        .or_else(|| fallback.map(str::to_string))
+        .ok_or_else(|| anyhow!("{name} is required outside development"))?;
+    raw.parse()
+        .with_context(|| format!("{name} must be a socket address, got {raw:?}"))
 }
 
 fn parse_optional_metrics_bind(name: &str, environment: Environment) -> Result<Option<SocketAddr>> {
     match env::var(name).ok() {
-        Some(raw) => Ok(Some(raw.parse().with_context(|| format!("{name} must be a socket address, got {raw:?}"))?)),
+        Some(raw) => Ok(Some(raw.parse().with_context(|| {
+            format!("{name} must be a socket address, got {raw:?}")
+        })?)),
         None if environment.metrics_is_public_by_default() => Ok(None),
         None => Ok(None),
     }
@@ -117,7 +137,8 @@ fn parse_origins(name: &str, environment: Environment) -> Result<Vec<String>> {
             out.push("*".to_string());
             continue;
         }
-        let parsed = url::Url::parse(token).with_context(|| format!("invalid {name} origin {token:?}"))?;
+        let parsed =
+            url::Url::parse(token).with_context(|| format!("invalid {name} origin {token:?}"))?;
         if environment.requires_tls_origins() && parsed.scheme() != "https" {
             bail!("{name} entries must use https outside development; got {token:?}");
         }

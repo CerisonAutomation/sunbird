@@ -15,6 +15,7 @@ import type { CampaignChapterView } from "./Campaign";
 import type { MonthlyTheme, WeeklyEvent } from "./Events";
 import type { SquadState } from "./Squad";
 import type { HighScore, Settings } from "./SaveData";
+import { TRACK_NAMES } from "./Music";
 import type { TierView } from "./SeasonPass";
 
 export type UiScreen =
@@ -91,6 +92,9 @@ export type HudSnapshot = {
   perfects: number;
   clouds: number;
   zeniths: number;
+  rings: number;
+  balloons: number;
+  sunflowers: number;
   hint: string;
   magnetTimer: number;
   shield: number;
@@ -101,6 +105,8 @@ export type HudSnapshot = {
   vipExpiredNotice: boolean;
   adsLeftToday: number;
   ghostDelta: number | null;
+  /** True when this finished run beat the previous personal-best distance. */
+  newBest: boolean;
   continueTimer: number;
   continueCost: number;
   canAffordContinue: boolean;
@@ -154,6 +160,8 @@ export type HudSnapshot = {
   cloudMessage: string;
   canInstall: boolean;
   shareBusy: boolean;
+  /** A/B test "results_cta_order": when true, the Share CTA leads the card. */
+  expShareFirst: boolean;
   combo: number;
   speedNorm: number;
   gust: number;
@@ -323,6 +331,7 @@ export class HUD {
   private readonly menuSky = new MenuSky();
   private menuCard!: HTMLElement;
   private pauseEl!: HTMLElement;
+  private pauseBtnEl!: HTMLElement;
   private contEl!: HTMLElement;
   private contCard!: HTMLElement;
   private adEl!: HTMLElement;
@@ -346,12 +355,6 @@ export class HUD {
   private goalStrip!: HTMLElement;
   private goalPop!: HTMLElement;
   private standingsEl!: HTMLElement;
-  private posBadgeEl!: HTMLElement;
-  private raceProgEl!: HTMLElement;
-  private raceProgFill!: HTMLElement;
-  private raceDotYou!: HTMLElement;
-  private raceDotLeader!: HTMLElement;
-  private lastPlace = 0;
   private rosterBar!: HTMLElement;
   private matchmakingEl!: HTMLElement;
   private matchmakingCount!: HTMLElement;
@@ -424,8 +427,6 @@ export class HUD {
             <div class="stat-value coin" data-ref="coins">0</div>
           </div>
         </div>
-        <div class="position-badge hidden" data-ref="positionBadge">1<span class="pos-suffix">st</span></div>
-        <div class="race-progress hidden" data-ref="raceProgress"><div class="race-progress-fill" data-ref="raceProgressFill" style="width:0%"></div><div class="race-progress-dot you" data-ref="raceDotYou" style="left:0%"></div><div class="race-progress-dot leader" data-ref="raceDotLeader" style="left:0%"></div><span class="race-progress-finish">🏁</span></div>
         <div class="speedlines" data-ref="speedlines"></div>
         <div class="alt-gauge" data-ref="altGauge">
           <div class="alt-track">
@@ -450,7 +451,7 @@ export class HUD {
           <button data-ui data-action="emote" data-id="👋">👋</button>
           <button data-ui data-action="emote" data-id="🔥">🔥</button>
           <button data-ui data-action="emote" data-id="😂">😂</button>
-          <button data-ui data-action="emote" data-id="👋">👋</button>
+          <button data-ui data-action="emote" data-id="🙌">🙌</button>
           <button data-ui data-action="emote" data-id="😱">😱</button>
           <button data-ui data-action="emote" data-id="👑">👑</button>
           <button data-ui data-action="emote" data-id="💨">💨</button>
@@ -469,7 +470,7 @@ export class HUD {
           <div class="fever-label">FEVER</div>
           <div class="fever-bar"><div class="fever-fill" data-ref="feverFill"></div></div>
         </div>
-        <button class="icon-btn pause-btn" data-ui data-action="pause" aria-label="Pause">❙❙</button>
+        <button class="icon-btn pause-btn" data-ui data-action="pause" data-ref="pauseBtn" aria-label="Pause">❙❙</button>
         <div class="combo" data-ref="combo"></div>
         <div class="hint" data-ref="hint"></div>
         <div class="hand" data-ref="hand">☝</div>
@@ -492,9 +493,7 @@ export class HUD {
 
       <div class="toasts" data-ref="toasts"></div>
       <div class="flash" data-ref="flash"></div>
-      <div class="victory-banner hidden" data-ref="victoryBanner"><div class="victory-text" data-ref="victoryText"></div></div>
       <div class="matchmaking hidden" data-ref="matchmaking"><div class="matchmaking-spinner"></div><div class="matchmaking-count" data-ref="matchmakingCount">0 pilots</div><div class="matchmaking-label" data-ref="matchmakingLabel">Searching for live pilots…</div><button class="soft-btn mm-cancel" data-ui data-action="mm-cancel">Cancel</button></div>
-      <div class="vs-screen hidden" data-ref="vsScreen"><div class="vs-title">VS</div><div class="vs-players"><div class="vs-player"><div class="vs-player-name" data-ref="vsP1">You</div></div><div class="vs-player"><div class="vs-player-name" data-ref="vsP2">Rival</div></div></div></div>
     `;
     parent.appendChild(this.root);
     this.bind();
@@ -541,10 +540,14 @@ export class HUD {
     this.menuEl.classList.toggle("hidden", !menuVisible);
     if (menuVisible) this.menuSky.resize(this.menuEl.clientWidth, this.menuEl.clientHeight);
     this.menuSky.setActive(menuVisible);
-    // The hero bird only plays on the title screen — flying over the shop or
-    // pass card reads as a glitch, not charm.
-    this.menuSky.heroHost.classList.toggle("hidden", !(menuVisible && s.screen === "main"));
+    // The static perched hero-bird SVG on the sun is the menu's bird. The
+    // canvas "hero bird" overlay used to draw a second swooping bird on top of
+    // it — two birds on one title screen. Keep it hidden so the mark reads once.
+    this.menuSky.heroHost.classList.add("hidden");
     this.pauseEl.classList.toggle("hidden", s.state !== "paused");
+    // The pause control only makes sense in live flight — hide it while the
+    // crash "second wind" card is up so it can't read as a dead button.
+    this.pauseBtnEl.classList.toggle("hidden", s.state !== "playing");
     this.contEl.classList.toggle("hidden", s.state !== "continue");
     this.adEl.classList.toggle("hidden", s.state !== "ad");
     this.overEl.classList.toggle("hidden", !(s.state === "gameover" && s.screen === "main"));
@@ -671,7 +674,7 @@ export class HUD {
           this.lastRosterAt = now;
           const leader = s.roster[0];
           const you = s.roster.find((r) => r.you);
-          const span = Math.max(1, s.raceFinish || 3000);
+          const span = Math.max(1, s.raceFinish || 4000);
           const gapM =
             leader && you && !you.finished
               ? Math.max(0, Math.round((leader.progress - you.progress) * span))
@@ -723,30 +726,9 @@ export class HUD {
       // roster so it never rebuilds mid-frame more than ~5×/s.
       this.standingsEl.classList.toggle("hidden", s.standings.length === 0);
 
-      // Live position badge + race progress strip — mass race only. These were
-      // static markup once; now they follow the standings every frame.
-      const you = s.standings.find((r) => r.you);
-      const leader = s.standings[0];
-      const showRace = s.massRace && s.raceFinishM > 0 && Boolean(you) && s.standings.length > 0;
-      this.posBadgeEl.classList.toggle("hidden", !showRace);
-      this.raceProgEl.classList.toggle("hidden", !showRace);
-      if (showRace && you && leader) {
-        if (you.place !== this.lastPlace) {
-          this.lastPlace = you.place;
-          const suffix = you.place % 10 === 1 && you.place !== 11 ? "st" : you.place % 10 === 2 && you.place !== 12 ? "nd" : you.place % 10 === 3 && you.place !== 13 ? "rd" : "th";
-          this.posBadgeEl.innerHTML = `${you.place}<span class="pos-suffix">${suffix}</span>`;
-          this.posBadgeEl.classList.toggle("first", you.place === 1);
-          this.posBadgeEl.classList.toggle("top3", you.place > 1 && you.place <= 3);
-          this.posBadgeEl.classList.remove("pop");
-          void this.posBadgeEl.offsetWidth;
-          this.posBadgeEl.classList.add("pop");
-        }
-        const youF = Math.max(0, Math.min(1, you.distance / s.raceFinishM));
-        const leadF = Math.max(0, Math.min(1, leader.distance / s.raceFinishM));
-        this.setStyle(this.raceProgFill, "raceFill", "width", `${(youF * 100).toFixed(1)}%`);
-        this.setStyle(this.raceDotYou, "raceYou", "left", `${(youF * 100).toFixed(1)}%`);
-        this.setStyle(this.raceDotLeader, "raceLead", "left", `${(leadF * 100).toFixed(1)}%`);
-      }
+      // The top-of-screen roster bar now carries everything the old position
+      // badge + progress strip showed (place, gap to leader, full field line),
+      // so those two were removed to stop the same place/gap reading twice.
       if (s.standings.length) {
         const nowS = performance.now();
         const key = s.standings.map((r) => `${r.id}${r.place}${Math.round(r.distance / 12)}${r.finished ? "F" : ""}`).join("|");
@@ -811,7 +793,24 @@ export class HUD {
     }
   }
 
+  /** Last time each exact toast message was shown (ms). Used to de-dupe. */
+  private readonly toastSeenAt = new Map<string, number>();
+
   toast(text: string, kind = "info"): void {
+    const now = performance.now();
+    // De-dupe: rapid-fire events (wind clouds, gems, pickups) must not print
+    // the same line down the screen over and over. If this exact message is
+    // still on screen, skip the duplicate instead of stacking a wall of text.
+    const seen = this.toastSeenAt.get(text);
+    if (seen !== undefined && now - seen < 2600) return;
+    this.toastSeenAt.set(text, now);
+
+    // Cap the visible stack so a burst can never pile more than a couple of
+    // pills down the column — the oldest is retired to make room.
+    while (this.toastLayer.childElementCount >= 3) {
+      this.toastLayer.firstElementChild?.remove();
+    }
+
     const el = document.createElement("div");
     el.className = `toast ${kind}`;
     el.textContent = text;
@@ -924,6 +923,7 @@ export class HUD {
     }
     this.menuCard = grab("menuCard");
     this.pauseEl = grab("pause");
+    this.pauseBtnEl = grab("pauseBtn");
     this.contEl = grab("continue");
     this.contCard = grab("contCard");
     this.adEl = grab("ad");
@@ -950,11 +950,6 @@ export class HUD {
     this.goalStrip = grab("goalStrip");
     this.goalPop = grab("goalPop");
     this.standingsEl = grab("standings");
-    this.posBadgeEl = grab("positionBadge");
-    this.raceProgEl = grab("raceProgress");
-    this.raceProgFill = grab("raceProgressFill");
-    this.raceDotYou = grab("raceDotYou");
-    this.raceDotLeader = grab("raceDotLeader");
     this.rosterBar = grab("rosterBar");
     this.draftMeter = grab("draftMeter");
     this.finishCd = grab("finishCd");
@@ -1089,6 +1084,51 @@ function renderBoard(s: HudSnapshot): string {
   `;
 }
 
+/** Compact top-wings leaderboard embedded on the main menu. */
+function renderMiniBoard(s: HudSnapshot): string {
+  const page = s.board;
+  const fmt = (v: number): string =>
+    s.boardMetric === "distance" || s.boardMetric === "altitude" ? `${Math.round(v)} m` : String(Math.round(v));
+  const medals = ["🥇", "🥈", "🥉"];
+  const rows =
+    page && page.entries.length
+      ? page.entries
+          .slice(0, 5)
+          .map(
+            (e, i) => `<div class="board-row ${e.you ? "you" : ""}">
+              <span class="bp">${i < 3 ? medals[i] : i + 1}</span>
+              <span class="bn">${escapeHtml(e.name)}</span>
+              <span class="bv">${fmt(e.value)}</span>
+            </div>`,
+          )
+          .join("")
+      : `<div class="board-row empty">${s.boardLoading ? "Loading leaderboard…" : "No flights yet — be first!"}</div>`;
+  // The competitiveness hook Tiny Wings reviewers kept praising: surface the
+  // player's own standing + personal best right on the home screen, not only
+  // on the full board, so "beat your high score" is always one glance away.
+  const ranked = Boolean(page && page.yourRank > 0);
+  const bestLabel =
+    s.boardMetric === "distance" && s.bestDistance > 0
+      ? `best ${formatDistance(s.bestDistance)}`
+      : s.boardMetric === "altitude" && s.bestAltitude > 0
+        ? `best ${Math.round(s.bestAltitude)} m`
+        : "";
+  const foot = ranked
+    ? `<div class="mini-board-foot">You're <b>#${page?.yourRank}</b> of ${page?.total}${bestLabel ? ` · ${bestLabel}` : ""}</div>`
+    : bestLabel
+      ? `<div class="mini-board-foot">Your ${bestLabel}</div>`
+      : "";
+  return `
+    <section class="mini-board" aria-label="Leaderboard">
+      <div class="mini-board-head">
+        <h2>🏆 Leaderboard</h2>
+        <button class="mini-btn" data-ui data-action="open-board">Full board ›</button>
+      </div>
+      <div class="board-list mini">${rows}</div>
+      ${foot}
+    </section>`;
+}
+
 function renderLive(s: HudSnapshot): string {
   const status = s.multiplayerLive
     ? s.netState === "racing" || s.netState === "lobby"
@@ -1108,7 +1148,7 @@ function renderLive(s: HudSnapshot): string {
     </div>
 
     <div class="lobby-rules">
-      <span><b>3,000 m</b> gate</span><span class="dot"></span>
+      <span><b>4,000 m</b> gate</span><span class="dot"></span>
       <span><b>${s.roomSize + 1}</b> birds</span><span class="dot"></span>
       <span>Same hills · same wind</span>
     </div>
@@ -1139,11 +1179,17 @@ function renderLive(s: HudSnapshot): string {
 
     <div class="race-grid">
       <div class="race-card">
-        <div class="race-card-h"><b>Private room</b><span>race friends</span></div>
+        <div class="race-card-h"><b>Private room</b><span>invite friends</span></div>
         <div class="code-row big">
           <span class="code">${s.roomCode ? escapeHtml(s.roomCode) : "— — — — —"}</span>
           <button class="mini-btn gold" data-ui data-action="host-room">${s.roomCode ? "New" : "Host"}</button>
         </div>
+        ${
+          s.roomCode
+            ? `<button class="soft-btn wide invite-btn" data-ui data-action="copy-invite">🔗 Copy invite link</button>
+               <button class="primary-btn race40 hero room-fly" data-ui data-action="start-room"><span class="hero-label">⚡ FLY · room ${escapeHtml(s.roomCode)}</span><span class="hero-hint">friends join your room by link</span></button>`
+            : ""
+        }
         <div class="redeem">
           <input data-ui data-ref="roomCode" maxlength="5" placeholder="CODE" autocomplete="off" style="text-transform:uppercase" />
           <button class="mini-btn" data-ui data-action="join-room">Join</button>
@@ -1400,7 +1446,7 @@ function renderRank(s: HudSnapshot): string {
         <div><span>Best</span><b>×${s.duel.bestStreak}</b></div>
         <div><span>Prize</span><b>${s.duel.wins >= 10 ? "🐦 won" : `${s.duel.wins}/10`}</b></div>
       </div>
-      <button class="primary-btn hero" data-ui data-action="pvp-duel"><span class="hero-label">⚔ DUEL</span><span class="hero-hint">1v1 · first to 3,000 m · win 10 for the Hummingbird</span></button>
+      <button class="primary-btn hero" data-ui data-action="pvp-duel"><span class="hero-label">⚔ DUEL</span><span class="hero-hint">1v1 · first to 4,000 m · win 10 for the Hummingbird</span></button>
     </div>
     <button class="primary-btn race40 hero" data-ui data-action="pvp-ranked"><span class="hero-label">⚔ RACE RANKED</span><span class="hero-hint">climb or defend ${r.division}</span></button>
     <p class="fineprint">Your rating changes based on how you finish in ranked 40-bird races and duels. Reaching Sunbird Legend unlocks the Solstice bird. Seasons soft-reset monthly with a division reward.</p>
@@ -1548,7 +1594,22 @@ function renderMain(s: HudSnapshot): string {
   return `
     <header class="hero">
       <div class="hero-sun" aria-hidden="true"></div>
-      <img class="hero-bird" src="./icons/icon-192.png" alt="" aria-hidden="true" />
+      <svg class="hero-bird" viewBox="0 0 64 64" role="img" aria-hidden="true">
+        <!-- A clean sunbird mark (no baked-in wordmark, no full app-icon scene)
+             so the title "SUNBIRD" below reads exactly once and the bird never
+             doubles the menu's painted sky. -->
+        <path d="M8 42 L2 34 L5 44 L3 50 L12 45 Z" fill="#e06a35"/>
+        <path d="M8 44 L3 50 L6 54 L13 48 Z" fill="#be4824"/>
+        <ellipse cx="30" cy="36" rx="17" ry="11" fill="#ff7a45"/>
+        <ellipse cx="33" cy="40" rx="11" ry="6" fill="#ffe6c4"/>
+        <path d="M24 26 Q14 12 6 16 Q14 22 24 30 Z" fill="#c85228"/>
+        <path d="M26 30 Q14 14 4 20 Q15 24 27 34 Z" fill="#ff9a62"/>
+        <path d="M46 34 L58 37 L46 40 Z" fill="#ffb020"/>
+        <circle cx="41" cy="32" r="3.4" fill="#fff"/>
+        <circle cx="42.4" cy="31.4" r="1.7" fill="#2a1c28"/>
+        <circle cx="43" cy="30.8" r="0.7" fill="#fff"/>
+        <path d="M36 27 Q42 27.5 44 30 Q40 29.6 37 29.4 Z" fill="#d84a2e"/>
+      </svg>
       <div class="hero-title">
         <span class="hero-kicker">chase the daylight</span>
         <h1>SUNBIRD</h1>
@@ -1567,7 +1628,7 @@ function renderMain(s: HudSnapshot): string {
       <button class="mode-card-main" data-ui data-action="pvp-practice">
         <span class="mode-icon-lg"><svg class="mi" viewBox="0 0 48 48"><defs><linearGradient id="gSun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd76a"/><stop offset="1" stop-color="#ff9a3a"/></linearGradient></defs><circle cx="24" cy="22" r="9" fill="url(#gSun)"/><g stroke="url(#gSun)" stroke-width="3" stroke-linecap="round"><line x1="24" y1="5" x2="24" y2="10"/><line x1="24" y1="34" x2="24" y2="39"/><line x1="7" y1="22" x2="12" y2="22"/><line x1="36" y1="22" x2="41" y2="22"/><line x1="11.5" y1="9.5" x2="15" y2="13"/><line x1="33" y1="31" x2="36.5" y2="34.5"/><line x1="36.5" y1="9.5" x2="33" y2="13"/><line x1="15" y1="31" x2="11.5" y2="34.5"/></g><path d="M14 42 Q20 36 24 40 Q28 36 34 42" fill="none" stroke="#e8862a" stroke-width="2.6" stroke-linecap="round"/></svg></span>
         <span class="mode-name">1 PLAYER</span>
-        <span class="mode-desc">Free flight — chase the daylight</span>
+        <span class="mode-desc">Free flight — hold to dive, release to soar</span>
       </button>
       <button class="mode-card-main pvp" data-ui data-action="open-live">
         <span class="mode-icon-lg"><svg class="mi" viewBox="0 0 48 48"><defs><linearGradient id="gPvp" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7a6a"/><stop offset="1" stop-color="#d84a5a"/></linearGradient></defs><g stroke="url(#gPvp)" stroke-width="3.4" stroke-linecap="round"><line x1="10" y1="10" x2="34" y2="34"/><line x1="38" y1="10" x2="14" y2="34"/></g><g stroke="#a83a4a" stroke-width="3.4" stroke-linecap="round"><line x1="31" y1="37" x2="37" y2="31"/><line x1="11" y1="31" x2="17" y2="37"/></g><circle cx="24" cy="22" r="4.5" fill="#fff" opacity="0.9"/></svg></span>
@@ -1626,6 +1687,8 @@ function renderMain(s: HudSnapshot): string {
 
     <div class="how"><div><b>HOLD</b> to dive</div><div class="dot"></div><div><b>RELEASE</b> to glide</div></div>
 
+    ${renderMiniBoard(s)}
+
     <nav class="nav-grid compact">
       <button class="nav-btn" data-ui data-action="mode-select"><i>🎯</i><span>Modes</span></button>
       <button class="nav-btn" data-ui data-action="open-challenges"><i>☀</i><span>Daily</span></button>
@@ -1642,15 +1705,6 @@ function renderMain(s: HudSnapshot): string {
       <button class="nav-btn" data-ui data-action="open-scores"><i>📈</i><span>Scores</span></button>
       <button class="nav-btn" data-ui data-action="open-account"><i>👤</i><span>Account</span></button>
       <button class="nav-btn" data-ui data-action="open-settings" aria-label="Settings"><i>⚙</i><span>Settings</span></button>
-    </nav>
-
-    <!-- Bottom Tab Navigation (Popular Game Pattern) -->
-    <nav class="bottom-tabs" data-ref="bottomTabs">
-      <button class="tab-item" data-ui data-action="open-rank"><span class="tab-icon"><svg viewBox="0 0 24 24" class="ti"><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="5" x2="17" y2="17"/><line x1="19" y1="5" x2="7" y2="17"/><line x1="15.5" y1="18.5" x2="18.5" y2="15.5"/><line x1="5.5" y1="15.5" x2="8.5" y2="18.5"/></g></svg></span><span class="tab-label">Rank</span></button>
-      <button class="tab-item" data-ui data-action="open-shop"><span class="tab-icon"><svg viewBox="0 0 24 24" class="ti"><path d="M6 8h12l-1.2 12H7.2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 8V6a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="2"/></svg></span><span class="tab-label">Shop</span></button>
-      <button class="tab-fly" data-ui data-action="pvp-practice" aria-label="Fly now"><span class="fly-disc"><svg viewBox="0 0 24 24" class="fi"><circle cx="12" cy="11" r="4.2" fill="currentColor"/><g stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="12" y1="2.5" x2="12" y2="5"/><line x1="12" y1="17" x2="12" y2="19.5"/><line x1="3.5" y1="11" x2="6" y2="11"/><line x1="18" y1="11" x2="20.5" y2="11"/><line x1="5.9" y1="4.9" x2="7.7" y2="6.7"/><line x1="16.3" y1="15.3" x2="18.1" y2="17.1"/><line x1="18.1" y1="4.9" x2="16.3" y2="6.7"/><line x1="7.7" y1="15.3" x2="5.9" y2="17.1"/></g></svg></span><span class="tab-label fly-label">Fly</span></button>
-      <button class="tab-item" data-ui data-action="open-pass"><span class="tab-icon"><svg viewBox="0 0 24 24" class="ti"><path d="M4 9a2 2 0 0 0 0 6v3h16v-3a2 2 0 0 1 0-6V6H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><line x1="14" y1="6" x2="14" y2="18" stroke="currentColor" stroke-width="2" stroke-dasharray="2 2.4"/></svg></span><span class="tab-label">Pass</span></button>
-      <button class="tab-item" data-ui data-action="open-settings"><span class="tab-icon"><svg viewBox="0 0 24 24" class="ti"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span><span class="tab-label">More</span></button>
     </nav>
 
     ${
@@ -1908,6 +1962,7 @@ function renderSettings(s: HudSnapshot): string {
     <div class="setting-row"><span>SFX Volume</span><button class="mini-btn" data-ui data-action="set-sfx-vol">${s.settings.mute ? "Muted" : `${sPct}%`}</button></div>
     ${toggle("Music", "music", s.settings.music)}
     <div class="setting-row"><span>Music Volume</span><button class="mini-btn" data-ui data-action="set-music-vol">${!s.settings.music ? "Off" : `${mPct}%`}</button></div>
+    <div class="setting-row"><span>Music Track</span><button class="mini-btn" data-ui data-action="set-track">${s.settings.musicTrack === "shuffle" ? "Shuffle (all 10)" : `${s.settings.musicTrack + 1}. ${TRACK_NAMES[s.settings.musicTrack] ?? ""}`}</button></div>
     ${toggle("Haptics", "haptics", s.settings.haptics)}
     ${toggle("Reduce motion", "motion", s.settings.reduceMotion)}
     ${toggle("Colorblind assist", "colorassist", s.settings.colorAssist)}
@@ -2082,6 +2137,8 @@ function renderGameOver(s: HudSnapshot): string {
       : "";
   return `
     <div class="zzz">z z z</div>
+    ${s.newBest ? `<div class="new-best">👑 NEW BEST · ${formatDistance(s.distance)}<small>your farthest flight yet</small></div>` : ""}
+    ${s.boardScope === "global" && s.boardMetric === "distance" && s.board && s.board.yourRank > 0 ? `<div class="reward-strip rank-strip">Leaderboard rank · <b>#${s.board.yourRank}</b> of ${s.board.total}</div>` : ""}
     <h2>Sunbird sleeps</h2>
     <p class="tagline">The daylight ran out.</p>
     <div class="over-stats">
@@ -2090,6 +2147,9 @@ function renderGameOver(s: HudSnapshot): string {
       <div><span>Coins</span><b>${s.coins}</b></div>
       <div><span>Perfects</span><b>${s.perfects}</b></div>
       <div><span>Zeniths</span><b>${s.zeniths}</b></div>
+      <div><span>Rings</span><b>${s.rings}</b></div>
+      <div><span>Balloons</span><b>${s.balloons}</b></div>
+      <div><span>Sunflowers</span><b>${s.sunflowers}</b></div>
       <div><span>Islands</span><b>${s.island + 1}</b></div>
     </div>
     ${s.ghostDelta !== null ? `<div class="reward-strip ${s.ghostDelta >= 0 ? "" : "nest"}">${s.ghostDelta >= 0 ? `Beat your ghost by ${Math.round(s.ghostDelta)}m! 👻` : `${Math.round(-s.ghostDelta)}m behind your best ghost`}</div>` : ""}
@@ -2102,8 +2162,11 @@ function renderGameOver(s: HudSnapshot): string {
     <div class="reached-strip">Reached <b>${s.biomeEmoji} ${s.biomeName}</b> · Island ${s.island + 1}</div>
     <button class="play-again-btn" data-ui data-action="retry">✈ FLY AGAIN</button>
     ${s.massRace && s.racePlace > 0 ? `<button class="soft-btn wide rematch" data-ui data-action="rematch">🔁 Rematch — same stakes</button>` : ""}
-    <button class="soft-btn wide" data-ui data-action="throw-challenge">🥊 Challenge a rival on these hills</button>
-    <button class="soft-btn wide" data-ui data-action="share" ${s.shareBusy ? "disabled" : ""}>${s.shareBusy ? "Preparing…" : "📤 Share this flight"}</button>
+    ${s.expShareFirst
+      ? `<button class="soft-btn wide" data-ui data-action="share" ${s.shareBusy ? "disabled" : ""}>${s.shareBusy ? "Preparing…" : "📤 Share this flight"}</button>
+         <button class="soft-btn wide" data-ui data-action="throw-challenge">🥊 Challenge a rival on these hills</button>`
+      : `<button class="soft-btn wide" data-ui data-action="throw-challenge">🥊 Challenge a rival on these hills</button>
+         <button class="soft-btn wide" data-ui data-action="share" ${s.shareBusy ? "disabled" : ""}>${s.shareBusy ? "Preparing…" : "📤 Share this flight"}</button>`}
     <div class="btn-row">
       <button class="soft-btn" data-ui data-action="open-shop">🛍 Shop</button>
       <button class="soft-btn" data-ui data-action="open-pass">🎟 Pass</button>

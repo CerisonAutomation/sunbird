@@ -29,6 +29,13 @@ const CREST_CONFIRM = 14;
 /** One smooth cosine arch of terrain with an authored intent. */
 type Segment = { start: number; len: number; height: number; base: number; baseNext: number };
 
+/** A sunflower bounce pad anchored to the hills. x/y are world coords. */
+type BouncePad = { x: number; y: number };
+
+/** Sunflower pads: spacing along the island, and the radius that triggers a bounce. */
+const PAD_SPACING = 165;
+const PAD_RADIUS = 3.2;
+
 type Chunk = {
   id: number;
   group: THREE.Group;
@@ -55,6 +62,8 @@ export class TerrainSystem {
   private readonly farMats: THREE.MeshBasicMaterial[] = [];
   private readonly farMeshes: THREE.Mesh[] = [];
   private readonly decoParts = new Map<DecoKind | LandmarkKind, DecoPart[]>();
+  /** Sunflower bounce-pad prop parts (gameplay props, not biome decor). */
+  private sunflowerParts: DecoPart[] = [];
   private scatterParts: DecoPart[] = [];
   private farCenter = -9999;
   private farIsland = -1;
@@ -66,6 +75,8 @@ export class TerrainSystem {
   /** Sorted crest x-positions — the AI's "where is the next lip" index. */
   private readonly crests: number[] = [];
   private crestScannedTo = -Infinity;
+  /** Deterministic sunflower bounce pads, cached per island (like segments). */
+  private readonly padCache = new Map<number, BouncePad[]>();
 
   constructor(seedStr: string) {
     this.seedStr = seedStr;
@@ -174,6 +185,20 @@ export class TerrainSystem {
     return lx >= GAP_START && lx < gapEndFor(this.islandIndex(x));
   }
 
+  /**
+   * The sunflower bounce pad at `x`, if any. Cheap: pads are cached per island
+   * (a handful per island), so this is a tiny linear scan over ~6 entries and
+   * is only ever called while the bird is grounded. Returns the pad's surface
+   * height when `x` is within a bloom's radius.
+   */
+  bouncePadAt(x: number): BouncePad | null {
+    const island = this.islandIndex(x);
+    for (const p of this.padsFor(island)) {
+      if (Math.abs(p.x - x) <= PAD_RADIUS) return p;
+    }
+    return null;
+  }
+
   islandIndex(x: number): number {
     return Math.max(0, Math.floor(x / ISLAND_PERIOD));
   }
@@ -196,6 +221,7 @@ export class TerrainSystem {
   invalidate(): void {
     this.hKey.fill(0x7fffffff);
     this.segCache.clear();
+    this.padCache.clear();
     this.crests.length = 0;
     this.crestScannedTo = -Infinity;
   }
@@ -322,6 +348,10 @@ export class TerrainSystem {
       p.geo.dispose();
       p.mat.dispose();
     }
+    for (const p of this.sunflowerParts) {
+      p.geo.dispose();
+      p.mat.dispose();
+    }
   }
 
   /* ------------------------------------------------------------ hills */
@@ -381,6 +411,42 @@ export class TerrainSystem {
       else hi = mid - 1;
     }
     return segs[lo]!;
+  }
+
+  /** Cached sunflower pads for one island (like `segmentAt`). */
+  private padsFor(island: number): BouncePad[] {
+    let pads = this.padCache.get(island);
+    if (!pads) {
+      pads = this.buildPads(island);
+      this.padCache.set(island, pads);
+      if (this.padCache.size > 6) {
+        const oldest = this.padCache.keys().next().value;
+        if (oldest !== undefined && oldest !== island) this.padCache.delete(oldest);
+      }
+    }
+    return pads;
+  }
+
+  /**
+   * Sunflower pads are seeded like everything else: a jittered position every
+   * ~PAD_SPACING units across the island's rolling hills, kept off the ocean,
+   * the launch ramp, steep faces and the tutorial shelf. They sit *on* the
+   * hill (z = 0, the flight line) so the bird visibly lands on the bloom.
+   */
+  private buildPads(island: number): BouncePad[] {
+    const rng = new SeededRandom(`${this.seedStr}:sunflower:${island}`);
+    const out: BouncePad[] = [];
+    const base = island * ISLAND_PERIOD;
+    const landLimit = RAMP_START - 34; // keep clear of the launch ramp
+    let lx = 120 + rng.range(0, 60);
+    while (lx < landLimit) {
+      const wx = base + lx;
+      if (wx >= 260 && !this.isOcean(wx) && Math.abs(this.slopeAt(wx)) < 0.42) {
+        out.push({ x: wx, y: this.heightAt(wx) });
+      }
+      lx += PAD_SPACING * (0.82 + rng.next() * 0.45);
+    }
+    return out;
   }
 
   private buildSegments(island: number): Segment[] {
@@ -469,6 +535,7 @@ export class TerrainSystem {
     mesh.receiveShadow = true;
     group.add(mesh);
     this.placeDecor(id, group, disposables);
+    this.placeSunflowers(id, group, disposables);
     this.group.add(group);
     this.chunks.set(id, { id, group, disposables });
   }
@@ -605,6 +672,18 @@ export class TerrainSystem {
       { geo: new THREE.CylinderGeometry(0.17, 0.17, 1.1, 6), mat: lam(0x59a866), y: 1.9, s: 1 },
       { geo: new THREE.SphereGeometry(0.14, 6, 5), mat: lam(0xff6a8a), y: 2.72, s: 1 }, // cactus flower
     ]);
+    // Sunflower bounce pads — a tall thin stalk with a big flattened golden
+    // bloom + brown heart. The squash is baked into the shared bloom geometry
+    // (flat along z) so the head reads as a disc facing the camera.
+    const bloomGeo = new THREE.IcosahedronGeometry(0.98, 0);
+    bloomGeo.scale(1, 1, 0.42);
+    this.sunflowerParts = [
+      { geo: new THREE.CylinderGeometry(0.12, 0.2, 2.4, 5), mat: lam(0x3f8a4a), y: 1.2, s: 1 },
+      { geo: new THREE.ConeGeometry(0.5, 1.1, 4), mat: lam(0x4f9a5a), y: 0.9, s: 1 }, // side leaf
+      { geo: bloomGeo, mat: lam(0xffcf33), y: 2.55, s: 1 },
+      { geo: new THREE.IcosahedronGeometry(0.44, 0), mat: lam(0x7a4a1a), y: 2.55, s: 1 },
+    ];
+    this.sunflowerParts[2]!.mat.emissive.setHex(0x4a2a00);
     for (const parts of this.decoParts.values()) {
       for (const p of parts) {
         const hexv = p.mat.color.getHex();
@@ -748,6 +827,32 @@ export class TerrainSystem {
     // one random scatter part per chunk keeps instancing cheap and looks varied
     const pick = this.scatterParts[Math.abs(id) % this.scatterParts.length];
     if (pick) emit([pick], scatter);
+  }
+
+  /** Sunflower bounce pads in this chunk — placed on the flight line (z = 0). */
+  private placeSunflowers(id: number, group: THREE.Group, disposables: { dispose(): void }[]): void {
+    const x0 = id * CHUNK_SIZE;
+    const island = this.islandIndex(x0 + CHUNK_SIZE / 2);
+    const pads = this.padsFor(island).filter((p) => p.x >= x0 - 4 && p.x < x0 + CHUNK_SIZE + 4);
+    if (!pads.length) return;
+    const parts = this.sunflowerParts;
+    if (!parts.length) return;
+    for (const part of parts) {
+      const inst = new THREE.InstancedMesh(part.geo, part.mat, pads.length);
+      inst.castShadow = true;
+      inst.receiveShadow = true;
+      pads.forEach((p, i) => {
+        tmpObj.position.set(p.x, p.y + part.y * part.s, 0);
+        tmpObj.rotation.set(0, 0, 0);
+        tmpObj.scale.setScalar(part.s);
+        tmpObj.updateMatrix();
+        inst.setMatrixAt(i, tmpObj.matrix);
+      });
+      inst.instanceMatrix.needsUpdate = true;
+      inst.frustumCulled = false;
+      group.add(inst);
+      disposables.push({ dispose: () => inst.dispose() });
+    }
   }
 
   /* ------------------------------------------------------------ far */

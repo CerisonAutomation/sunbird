@@ -11,11 +11,15 @@ runs in a clearly-labelled offline mode until you point it at a server.
 The UI never presents device-only data as if it were worldwide. That labelling
 is deliberate and should be kept.
 
-> **A production implementation of this entire contract ships in
-> [`backend/`](backend/README.md)** — Cloudflare Workers + Durable Objects,
-> running fully on the free plan (100k req/day, hibernating WebSocket rooms,
-> 5 GB SQLite leaderboard). Deploy with `cd backend && npx wrangler deploy`,
-> then set both env vars to the printed `workers.dev` URL.
+> **The multiplayer half of this contract ships in [`rust/`](rust/README.md)**
+> — the self-hosted `sunbird-server` serves the legacy WebSocket protocol on
+> `GET /ws` with server-authoritative finish order.
+>
+> **The leaderboard half ships in [`api/`](api/board.ts)** as Vercel Functions
+> (`GET /api/board`, `POST /api/score`), persisted in Vercel KV when
+> `KV_REST_API_URL` + `KV_REST_API_TOKEN` are set (in-memory fallback for
+> previews). Any host that speaks this JSON also works — see the reference
+> `server/sunbird-server.mjs` for an in-process implementation.
 
 ---
 
@@ -134,7 +138,7 @@ When both sides configure a shared salt, `POST /score` requires a `sig` field:
 sig = hex(HMAC-SHA256(salt, `${deviceId}|${distance}|${score}`))
 ```
 
-- **Server:** set `LEADERBOARD_SALT` in `backend/wrangler.jsonc` `vars` (or a wrangler secret).
+- **Server:** set `LEADERBOARD_SALT` in the Vercel Function environment (or a secret store).
 - **Client:** set `VITE_LEADERBOARD_SALT` at build time.
 - Unsigned posts are rejected with `403` when the server salt is set; when unset, the endpoint stays open (dev mode).
 
