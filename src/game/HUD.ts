@@ -445,7 +445,7 @@ export class HUD {
           <button data-ui data-action="emote" data-id="👋">👋</button>
           <button data-ui data-action="emote" data-id="🔥">🔥</button>
           <button data-ui data-action="emote" data-id="😂">😂</button>
-          <button data-ui data-action="emote" data-id="👋">👋</button>
+          <button data-ui data-action="emote" data-id="🙌">🙌</button>
           <button data-ui data-action="emote" data-id="😱">😱</button>
           <button data-ui data-action="emote" data-id="👑">👑</button>
           <button data-ui data-action="emote" data-id="💨">💨</button>

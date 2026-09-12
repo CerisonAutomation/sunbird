@@ -70,7 +70,7 @@ export const TERRAIN_FACE_DEPTH = 42;
 export const VISIBLE_CHUNKS_BACK = 4;
 export const VISIBLE_CHUNKS_FWD = 14;
 
-export const DAYLIGHT_MAX = 52;
+export const DAYLIGHT_MAX = 70;
 export const DAYLIGHT_ISLAND_REFILL = 15;
 export const DAYLIGHT_OCEAN_PENALTY = 4.5;
 
@@ -89,9 +89,9 @@ export const CAMERA_LOOKAHEAD = 0.22;
 export const SAVE_KEY_V1 = "sunbird.save.v1";
 export const SAVE_KEY = "sunbird.save.v2";
 
-export const DAYLIGHT_MAX_GOLD = 62;
+export const DAYLIGHT_MAX_GOLD = 82;
 export const CONTINUE_COST = 80;
-export const CONTINUE_DAYLIGHT = 16;
+export const CONTINUE_DAYLIGHT = 20;
 export const CONTINUE_TIMEOUT = 6;
 export const AD_DURATION = 4;
 export const INTERSTITIAL_EVERY = 3;

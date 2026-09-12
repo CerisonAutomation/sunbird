@@ -3598,6 +3598,12 @@ button:focus-visible, .toggle:focus-visible {
     radial-gradient(120% 80% at 50% -20%, rgba(255, 220, 130, 0.35), rgba(255, 220, 130, 0) 60%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 248, 225, 0.6));
 }
+.skin-card.r-mythic {
+  box-shadow: var(--elev-1), 0 0 0 1.5px rgba(154, 124, 255, 0.65), 0 0 28px -4px rgba(154, 124, 255, 0.55);
+  background:
+    radial-gradient(120% 80% at 50% -20%, rgba(186, 160, 255, 0.4), rgba(186, 160, 255, 0) 62%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(240, 234, 255, 0.62));
+}
 .skin-card.equipped {
   border-color: rgba(255, 176, 32, 0.9);
   box-shadow: var(--elev-1), 0 0 0 2px rgba(255, 176, 32, 0.5), 0 0 20px -2px rgba(255, 176, 32, 0.45);

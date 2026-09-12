@@ -21,7 +21,7 @@ export const MODES: ModeDef[] = [
     name: "Day Trip",
     blurb: "Chase the sunset across the islands. Reach land to win back daylight.",
     icon: "☀",
-    clock: 52,
+    clock: 70,
     finish: 0,
     scoreBy: "distance",
     escalate: false,
