@@ -34,13 +34,47 @@ until proven otherwise. This file exists so the commit log can't overclaim.
 - Without a configured URL the game still falls back to local squadron
   pilots with human-sounding names — the lobby badge says which one you got.
 
+## 🟡 Written and tested in CI, not yet exercised in production
+- `protocol/contract.json` — the single machine-checked source of truth for the
+  wire protocol. Asserted by **both** implementations:
+  `src/game/__tests__/protocol-contract.test.ts` and
+  `rust/crates/sunbird-protocol/tests/contract.rs`. This exists because the
+  "Rust is the source of truth, TS mirrors it" comment had already gone false:
+  `ServerMessage::Snapshot` shipped in Rust with no TypeScript counterpart, so
+  the browser would have thrown on the first authoritative snapshot. The
+  mirror is now fixed *and* pinned.
+- `rust/crates/sunbird-server/src/validate.rs` — server-authoritative movement
+  envelope. Client `state` frames are now checked for finiteness, world bounds,
+  distance regression and a **time-aware** speed cap derived from the client's
+  own physics ceiling (234 u/s = 128 fever × 1.5 wingboost + 42 boost), then
+  canonicalised to wire precision. Rejections are dropped and counted as
+  `sunbird_legacy_state_rejected_total{reason=…}`; the seat is never dropped.
+  Rust tests are CI-verified only — the authoring sandbox has no toolchain.
+- `scripts/botsim.mjs` — 40 headless pilots on the real wire protocol, seeded
+  and reproducible. Gated in `.github/workflows/botsim.yml`: the Node reference
+  job reports cheat containment, the Rust job **gates** on it
+  (`--require-anticheat`). Measured locally against the reference server:
+  40/40 connected in 42 ms, roster 40/40, broadcast cadence p95 66.8 ms, 13
+  unique finish places, 4/4 mid-race resumes, 62.72 KB/s per client.
+
 ## 🔴 Aspirational (do not claim in commit messages)
-- Anti-cheat and server-side matchmaking are still aspirational; rooms today
-  are in-memory and trust the client's position stream.
+- Server-side matchmaking is still aspirational; rooms are in-memory.
+- Anti-cheat is **partial, not finished**. Movement plausibility is enforced
+  (above), but identity, rate limiting and score-submission trust are not.
+  Measured for the record: botsim logged **16,150 relayed cheats** against the
+  unvalidated Node reference server, which is exactly the class of hole the
+  Rust validator closes and the CI gate now guards.
 
 ## Next (in order)
-1. Deploy `sunbird-server` to a WebSocket host; point the daily leaderboard at it
-2. Real-player ghost replays on the daily seed (async PvP)
-3. First-run dive tutorial (30 s, once)
-4. Coin sinks: consumable modifiers, skin upcycling
-5. Port `main`'s 25-trail catalogue behind the trail palette test
+1. Get `botsim.yml` green on a few PRs, then retire `scripts/mp-smoke.mjs`
+   (botsim supersedes it: 40 clients vs 2, and it is actually in CI)
+2. Deploy `sunbird-server` to a WebSocket host; point the daily leaderboard at it
+3. Wire the client to consume the `snapshot` message it can now parse — the
+   parser is no longer the blocker for authoritative rooms
+4. Real-player ghost replays on the daily seed (async PvP)
+5. First-run dive tutorial (30 s, once)
+6. Coin sinks: consumable modifiers, skin upcycling
+7. Port `main`'s 25-trail catalogue behind the trail palette test
+
+See `ARCHITECTURE_REVIEW.md` for the full comparison against the
+"TMULTIWORLDS" Bevy/Replicon proposal, including what was rejected and why.

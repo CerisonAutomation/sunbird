@@ -51,3 +51,6 @@ sunbird-crazy.zip
 dist-generic/
 sunbird-generic.zip
 dist-itch/
+
+# botsim CI reports (uploaded as artifacts, never committed)
+botsim-*.json

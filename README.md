@@ -11,7 +11,7 @@
 - **Bundler** — Vite 7 + Tailwind CSS v4
 - **Physics** — Fixed-step client simulation with skill-based launch windows
 - **Payments** — Stripe Payment Links (no backend required); portal builds strip all payment surfaces
-- **Multiplayer** — Self-hosted Rust room server ([rust/](./rust/)) with server-authoritative finish order
+- **Multiplayer** — Self-hosted Rust room server ([rust/](./rust/)) with server-authoritative finish order **and** a movement envelope that rejects impossible client positions
 - **Leaderboard** — Vercel Functions ([api/](./api/)) + Vercel KV, with on-device fallback ([LEADERBOARD_API.md](./LEADERBOARD_API.md))
 - **PWA** — Service worker (build-stamped cache) + Web App Manifest
 
@@ -54,6 +54,8 @@ Copy `.env.example` → `.env.local`. All variables are optional — the game ru
 | `npm run verify` | typecheck + test + build |
 | `npm run lint` | ESLint over src, scripts |
 | `npm run test:mp` | Two-client multiplayer smoke test (needs the room server running) |
+| `npm run botsim` | Headless load test: N real WebSocket pilots on the wire protocol |
+| `npm run botsim:40` | 40-pilot load + anti-cheat + resume run (the CI gate) |
 | `npm run physcheck` | Physics determinism harness |
 | `npm run gen-icons` | Regenerate PWA icons |
 

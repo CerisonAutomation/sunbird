@@ -3,6 +3,7 @@ mod config;
 mod legacy;
 mod metrics;
 mod rooms;
+mod validate;
 mod ws;
 
 use anyhow::Context;
