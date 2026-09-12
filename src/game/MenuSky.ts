@@ -328,18 +328,49 @@ export class MenuSky {
     };
   }
 
+  /**
+   * The hero bird's screen position (canvas pixels). It orbits the hero sun
+   * so the menu reads as "one sunbird on the sun" — the way players remember
+   * it. When the sun isn't on screen (a sub-menu), fall back to the classic
+   * wide figure-of-eight sweep.
+   */
+  private heroPoint(t: number): { x: number; y: number } {
+    const sun = this.sunCenter();
+    if (sun) {
+      return {
+        x: sun.x + Math.sin(t * 0.55) * 46 + Math.sin(t * 0.93 + 2.1) * 16,
+        y: sun.y + Math.cos(t * 0.5 + 1.1) * 28 + Math.sin(t * 0.71) * 12,
+      };
+    }
+    const p = this.heroPos(t);
+    return { x: p.x * this.width, y: p.y * this.height };
+  }
+
+  /** Centre of the `.hero-sun` element in hero-canvas pixels, or null. */
+  private sunCenter(): { x: number; y: number } | null {
+    const sun = this.heroHost.parentElement?.querySelector<HTMLElement>(".hero-sun");
+    if (!sun || sun.offsetWidth === 0 || sun.offsetHeight === 0) return null;
+    const heroRect = this.heroCanvas.getBoundingClientRect();
+    const sunRect = sun.getBoundingClientRect();
+    if (heroRect.width === 0 || sunRect.width === 0) return null;
+    return {
+      x: sunRect.left + sunRect.width / 2 - heroRect.left,
+      y: sunRect.top + sunRect.height / 2 - heroRect.top,
+    };
+  }
+
   private drawHero(ctx: CanvasRenderingContext2D, w: number, h: number, dt: number): void {
     const t = this.reduceMotion ? 4.2 : this.time;
-    const p = this.heroPos(t);
-    const ahead = this.heroPos(t + 0.12);
+    const p = this.heroPoint(t);
+    const ahead = this.heroPoint(t + 0.12);
     const vx = ahead.x - p.x;
     const vy = ahead.y - p.y;
-    const heading = Math.atan2(vy * h, vx * w);
+    const heading = Math.atan2(vy, vx);
     const dirRight = Math.cos(heading) >= 0;
 
-    const x = p.x * w;
-    const y = p.y * h;
-    const size = Math.max(18, Math.min(w, h) * 0.055);
+    const x = p.x;
+    const y = p.y;
+    const size = Math.max(22, Math.min(w, h) * 0.06);
 
     if (dt > 0) {
       this.heroFlap += dt * (7 + Math.abs(Math.sin(t * 0.42)) * 4);
