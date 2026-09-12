@@ -1909,6 +1909,14 @@ button {
   letter-spacing: 0.02em;
 }
 .board-list.mini { max-height: 230px; }
+.mini-board-foot {
+  margin-top: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #6a5a62;
+  text-align: center;
+}
+.mini-board-foot b { color: #b06a10; }
 
 /* ---------------- tournaments ---------------- */
 .cup-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }

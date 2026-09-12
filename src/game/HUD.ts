@@ -1097,6 +1097,21 @@ function renderMiniBoard(s: HudSnapshot): string {
           )
           .join("")
       : `<div class="board-row empty">${s.boardLoading ? "Loading leaderboard…" : "No flights yet — be first!"}</div>`;
+  // The competitiveness hook Tiny Wings reviewers kept praising: surface the
+  // player's own standing + personal best right on the home screen, not only
+  // on the full board, so "beat your high score" is always one glance away.
+  const ranked = Boolean(page && page.yourRank > 0);
+  const bestLabel =
+    s.boardMetric === "distance" && s.bestDistance > 0
+      ? `best ${formatDistance(s.bestDistance)}`
+      : s.boardMetric === "altitude" && s.bestAltitude > 0
+        ? `best ${Math.round(s.bestAltitude)} m`
+        : "";
+  const foot = ranked
+    ? `<div class="mini-board-foot">You're <b>#${page?.yourRank}</b> of ${page?.total}${bestLabel ? ` · ${bestLabel}` : ""}</div>`
+    : bestLabel
+      ? `<div class="mini-board-foot">Your ${bestLabel}</div>`
+      : "";
   return `
     <section class="mini-board" aria-label="Leaderboard">
       <div class="mini-board-head">
@@ -1104,6 +1119,7 @@ function renderMiniBoard(s: HudSnapshot): string {
         <button class="mini-btn" data-ui data-action="open-board">Full board ›</button>
       </div>
       <div class="board-list mini">${rows}</div>
+      ${foot}
     </section>`;
 }
 
