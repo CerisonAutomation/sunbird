@@ -87,6 +87,7 @@ import { SaveData } from "./SaveData";
 import { SeasonPass, seasonId, seasonLabel, XP_RULES } from "./SeasonPass";
 import { buildShareCard, shareOrDownload } from "./Social";
 import { buildChallengeUrl, readChallengeFromUrl, type RivalChallenge } from "./Challenge";
+import { flag } from "./Flags";
 import { buildRoomInviteUrl, normalizeRoomCode, readRoomInviteFromUrl } from "./RoomInvite";
 import { initPlatform, isPortalBuild, portalTarget, type PlatformAdapter } from "../sdk/platform";
 import { LivingBackground } from "./LivingBackground";
@@ -448,14 +449,18 @@ export class Game {
     this.camera.setIntro(1);
     this.audio.setMusicMode("menu");
 
-    // Rival links: #rival=seed.distance.name → same hills, their mark.
+    // Rival links: #rival=seed.distance.name[&mode=] → same hills, their mark.
     const rival = readChallengeFromUrl();
     if (rival) {
       this.rival = rival;
       this.rebuildWorld(rival.seed);
       this.seedMode = "random";
+      if (rival.mode && MODES.some((m) => m.id === rival.mode)) {
+        this.modeId = rival.mode as ModeId;
+        this.mode = modeById(this.modeId);
+      }
       this.hud.toast(`🥊 ${rival.name} challenged you: beat ${rival.distance} m on their hills`, "quest");
-      this.telemetry.track("rival_received", { distance: rival.distance });
+      this.telemetry.track("rival_received", { distance: rival.distance, mode: this.modeId });
     }
 
     // Room invite links: #room=CODE → seat straight into that private room.
@@ -2785,15 +2790,17 @@ export class Game {
         this.importCloud();
         break;
       case "throw-challenge": {
-        // Challenge link: this exact seed + this run's distance. Every player
-        // becomes a course designer with a posted time.
+        // Challenge link: this exact seed + this run's distance (+ mode). Every
+        // player becomes a course designer with a posted time. Native share
+        // sheet on mobile (one-tap to any messenger), clipboard otherwise.
+        // Gated behind the challengeShare flag so a rollout can be held back.
+        if (!flag("challengeShare")) break;
         const dist = Math.max(1, Math.round(this.lastRunDistance()));
-        const url = buildChallengeUrl(this.seed, dist, this.pilotName);
-        void navigator.clipboard
-          .writeText(`Beat ${dist} m on my hills → ${url}`)
-          .then(() => this.hud.toast("🥊 Challenge link copied — send it to a rival", "gold"))
-          .catch(() => this.hud.toast(url, "info"));
-        this.telemetry.track("rival_thrown", { distance: dist });
+        const mode = flag("modeAwareChallenge") ? this.modeId : undefined;
+        const url = buildChallengeUrl(this.seed, dist, this.pilotName, mode);
+        const text = `Beat my ${dist} m flight on these hills 🐦 → ${url}`;
+        this.shareText(text, `🥊 Challenge link copied — send it to a rival`);
+        this.telemetry.track("rival_thrown", { distance: dist, mode: this.modeId });
         break;
       }
       case "rematch":
@@ -3771,20 +3778,25 @@ export class Game {
   /** Copies the room invite link, preferring the native share sheet. */
   private copyRoomInvite(code: string): void {
     const url = buildRoomInviteUrl(code);
-    const nav = navigator as Navigator & { share?: (d: ShareData) => Promise<void> };
     const text = `Join my Sunbird race room ${code}: ${url}`;
-    if (nav.share) {
+    this.shareText(text, `Invite link copied — send it to friends`);
+  }
+
+  /** Native share sheet when available (mobile), clipboard + toast otherwise. */
+  private shareText(text: string, copiedToast: string): void {
+    const nav = navigator as Navigator & { share?: (d: ShareData) => Promise<void> };
+    if (nav.share && flag("nativeShare")) {
       void nav
-        .share({ title: "Sunbird race room", text, url })
-        .then(() => this.hud.toast(`Invite shared for room ${code}`, "gold"))
+        .share({ title: "Sunbird", text })
+        .then(() => this.hud.toast("Shared!", "gold"))
         .catch(() => {
-          void navigator.clipboard?.writeText(url).catch(() => undefined);
-          this.hud.toast(`Invite link copied — room ${code}`, "gold");
+          void navigator.clipboard?.writeText(text).catch(() => undefined);
+          this.hud.toast(copiedToast, "gold");
         });
       return;
     }
-    void navigator.clipboard?.writeText(url).catch(() => undefined);
-    this.hud.toast(`Invite link copied — send it to friends`, "gold");
+    void navigator.clipboard?.writeText(text).catch(() => undefined);
+    this.hud.toast(copiedToast, "gold");
   }
 
   private lastRunDistance(): number {

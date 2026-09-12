@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "verify": "npm run typecheck && npm run test && npm run build",
+    "verify:prod": "node scripts/verify-prod.mjs",
     "test:mp": "node scripts/mp-smoke.mjs",
     "build:web": "vite build",
     "build:poki": "VITE_PORTAL_TARGET=poki VITE_MULTIPLAYER_URL= vite build --outDir dist-poki && node scripts/package-portal.mjs poki",
