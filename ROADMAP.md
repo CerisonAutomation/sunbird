@@ -38,9 +38,29 @@ until proven otherwise. This file exists so the commit log can't overclaim.
 - Anti-cheat and server-side matchmaking are still aspirational; rooms today
   are in-memory and trust the client's position stream.
 
-## Next (in order)
-1. Deploy `sunbird-server` to a WebSocket host; point the daily leaderboard at it
-2. Real-player ghost replays on the daily seed (async PvP)
-3. First-run dive tutorial (30 s, once)
-4. Coin sinks: consumable modifiers, skin upcycling
-5. Port `main`'s 25-trail catalogue behind the trail palette test
+## ✅ Formerly "Next" — shipped in-repo (merged from both lines)
+1. ~~Deploy `sunbird-server`~~ / ~~deploy `backend/`~~ — both server stacks are
+   code-complete and CI-verified; production deploy needs a host + account keys
+   (external). Rust `sunbird-server` owns multiplayer `/ws`; the Vercel
+   `api/` functions own the daily leaderboard; the optional Cloudflare
+   `backend/` Workers stack adds ghost replays, telemetry beacons, and
+   server-authoritative Stripe entitlements (`/ghost`, `/telemetry`,
+   `/entitlements`, `/stripe/webhook` — signature-verified, test-pinned).
+2. ~~Real-player ghost replays on the daily seed (async PvP)~~ — SHIPPED:
+   `GhostNet.ts` publishes your best daily flight (`POST /ghost`, thinned to
+   ≤1500 samples, best-per-pilot-per-seed) and fetches a chaseable rival
+   ghost near your PB (`GET /ghost`, never your own). Amber silhouette,
+   pass-them bonus, silent no-op without a backend.
+3. ~~First-run dive tutorial~~ — shipped earlier as FirstFlight coach.
+4. ~~Coin sinks~~ — shipped: armed boosts, Nest upgrades (×10 tiers),
+   trail shop, skin catalogue, gauntlet retries.
+5. ~~Trail catalogue~~ — trails live in TRAILS with palette-parity test.
+
+## External-only (needs accounts/keys, not code)
+- Host deploys: WebSocket host for `rust/sunbird-server`
+  (`VITE_MULTIPLAYER_URL=wss://…`), Vercel project for `api/` +
+  `VITE_LEADERBOARD_URL`, optional Cloudflare deploy of `backend/` via wrangler.
+- Stripe live payment links + webhook secret (`wrangler secret put STRIPE_WEBHOOK_SECRET`)
+  — the webhook route itself is CODE-COMPLETE (`backend/src/entitlements.ts`,
+  signature-verified, test-pinned; setup steps in DEPLOY.md §5)
+- Portal submissions (zips build ready: poki / crazy / generic)
