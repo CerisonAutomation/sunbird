@@ -419,7 +419,7 @@ export class Game {
     this.renderer.setClearColor(0x87c8ee, 1);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.18;
+    this.renderer.toneMappingExposure = 1.27;
     this.renderer.shadowMap.enabled = true;
     // PCFSoftShadowMap was removed in three r165+ — PCF with a slightly larger
     // shadow map is the soft look without the console warning every load.
@@ -3397,13 +3397,21 @@ export class Game {
     this.shareBusy = true;
     this.bump();
     try {
+      // Fuse the two viral halves: the image card carries its own beat-me
+      // link, so one share (not card + separate link) is the whole loop.
+      // Gated behind challengeShare like throw-challenge — rollout-safe.
+      const dist = Math.max(0, this.bird.x - this.startX);
+      const challengeUrl = flag("challengeShare")
+        ? buildChallengeUrl(this.seed, Math.max(1, Math.round(dist)), this.pilotName, flag("modeAwareChallenge") ? this.modeId : undefined)
+        : undefined;
       const card = await buildShareCard({
-        distance: Math.max(0, this.bird.x - this.startX),
+        distance: dist,
         coins: this.runCoins,
         score: this.score(),
         skin: this.skin,
         referralCode: this.save.state.referralCode,
         seedLabel: this.seedLabel(),
+        challengeUrl,
       });
       const result = await shareOrDownload(card, undefined, !this.portalEnabled());
       this.telemetry.track("share_run", { result });

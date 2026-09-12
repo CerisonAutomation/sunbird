@@ -2,6 +2,21 @@ import type { SkinDef } from "./Economy";
 
 export type ShareCard = { blob: Blob | null; dataUrl: string; text: string };
 
+/**
+ * Pure share-text builder — the viral payload without canvas.
+ * Text is the channel that survives: native share sheets, clipboard, and
+ * portal iframes (where image downloads are QA-flagged) all carry it.
+ * Kept pure so the link grammar is test-pinned without a canvas.
+ */
+export function buildShareText(opts: {
+  distance: number;
+  referralCode: string;
+  challengeUrl?: string;
+}): string {
+  const base = `I flew ${Math.floor(opts.distance)}m in Sunbird 🌤️ Use my code ${opts.referralCode} for a bonus!`;
+  return opts.challengeUrl ? `${base} Beat me here: ${opts.challengeUrl}` : base;
+}
+
 /** Draws a shareable "flight card" summarizing a run onto a canvas. */
 export async function buildShareCard(opts: {
   distance: number;
@@ -10,6 +25,8 @@ export async function buildShareCard(opts: {
   skin: SkinDef;
   referralCode: string;
   seedLabel: string;
+  /** Zero-server rival link — fused into the card so the image carries its own rematch. */
+  challengeUrl?: string;
 }): Promise<ShareCard> {
   const w = 1000;
   const h = 620;
@@ -86,10 +103,18 @@ export async function buildShareCard(opts: {
   ctx.font = "500 16px Fredoka, sans-serif";
   ctx.fillStyle = "rgba(255,255,255,0.8)";
   ctx.fillText(`Play free · friend code ${opts.referralCode}`, 64, 368);
+  if (opts.challengeUrl) {
+    ctx.fillStyle = "rgba(255,255,255,0.92)";
+    ctx.fillText("Same hills, same wind — the link in the shared text is the rematch", 64, 344);
+  }
 
   const dataUrl = canvas.toDataURL("image/png");
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
-  const text = `I flew ${Math.floor(opts.distance)}m in Sunbird 🌤️ Use my code ${opts.referralCode} for a bonus!`;
+  const text = buildShareText({
+    distance: opts.distance,
+    referralCode: opts.referralCode,
+    challengeUrl: opts.challengeUrl,
+  });
   return { blob, dataUrl, text };
 }
 

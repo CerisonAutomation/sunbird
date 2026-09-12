@@ -434,8 +434,9 @@ export class Sky {
     this.hemi.groundColor.copy(this.mixHex(a.hemiGround, b.hemiGround, u));
     this.sunLight.color.copy(this.mixHex(a.sun, b.sun, u));
     // Brighter key + richer fill so terrain reads crisp and defined.
-    this.sunLight.intensity = 0.4 + t * 0.78;
-    this.hemi.intensity = 0.74 + t * 0.42;
+    // Day grade lifted ~15% for a premium well-lit look under ACES.
+    this.sunLight.intensity = 0.46 + t * 0.86;
+    this.hemi.intensity = 0.8 + t * 0.46;
 
     const elev = 22 + t * 78;
     this.sun.position.set(36 + (1 - t) * 28, elev, -110);
@@ -490,7 +491,9 @@ export class Sky {
       -240,
     );
 
-    const hazeAlpha = (0.07 + this.hazeDensity * 0.09) * (1 - this.altT * 0.75) * (0.5 + t * 0.5);
+    // Background haze kept light: thin altitude-readable banks, never overcast.
+    // (Density response cut ~40% — gameplay clouds in Collectibles are untouched.)
+    const hazeAlpha = (0.04 + this.hazeDensity * 0.055) * (1 - this.altT * 0.75) * (0.5 + t * 0.5);
     for (const sprite of this.haze) {
       const mat = sprite.material as THREE.SpriteMaterial;
       const phase = sprite.userData.phase as number;

@@ -1656,13 +1656,19 @@ function renderMain(s: HudSnapshot): string {
     ${s.rivalBanner ? renderRivalBanner(s.rivalBanner) : ""}
     ${seedPicker}
 
-    <!-- MAIN PLAY MODES: 1P · PVP · PVE · TOURNAMENT -->
-    <div class="mode-cards" role="group" aria-label="Play modes">
-      <button class="mode-card-main" data-ui data-action="pvp-practice">
+    <!-- PLAY: one primary action, then grouped secondary paths. All data-action
+         ids are unchanged — Game.handleAction is the contract. -->
+    <div class="section-title">Play <small>hold to dive · release to soar</small></div>
+    <div class="mode-cards hero-play" role="group" aria-label="Primary play">
+      <button class="mode-card-main primary" data-ui data-action="pvp-practice" aria-label="Play free flight now">
         <span class="mode-icon-lg"><svg class="mi" viewBox="0 0 48 48"><defs><linearGradient id="gSun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd76a"/><stop offset="1" stop-color="#ff9a3a"/></linearGradient></defs><circle cx="24" cy="22" r="9" fill="url(#gSun)"/><g stroke="url(#gSun)" stroke-width="3" stroke-linecap="round"><line x1="24" y1="5" x2="24" y2="10"/><line x1="24" y1="34" x2="24" y2="39"/><line x1="7" y1="22" x2="12" y2="22"/><line x1="36" y1="22" x2="41" y2="22"/><line x1="11.5" y1="9.5" x2="15" y2="13"/><line x1="33" y1="31" x2="36.5" y2="34.5"/><line x1="36.5" y1="9.5" x2="33" y2="13"/><line x1="15" y1="31" x2="11.5" y2="34.5"/></g><path d="M14 42 Q20 36 24 40 Q28 36 34 42" fill="none" stroke="#e8862a" stroke-width="2.6" stroke-linecap="round"/></svg></span>
-        <span class="mode-name">1 PLAYER</span>
+        <span class="mode-name">▶ FLY NOW — 1 PLAYER</span>
         <span class="mode-desc">Free flight — hold to dive, release to soar</span>
       </button>
+    </div>
+
+    <div class="section-title">More ways to fly <small>PvE · cups · live rooms</small></div>
+    <div class="mode-cards" role="group" aria-label="Play modes">
       <button class="mode-card-main pvp" data-ui data-action="open-live">
         <span class="mode-icon-lg"><svg class="mi" viewBox="0 0 48 48"><defs><linearGradient id="gPvp" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7a6a"/><stop offset="1" stop-color="#d84a5a"/></linearGradient></defs><g stroke="url(#gPvp)" stroke-width="3.4" stroke-linecap="round"><line x1="10" y1="10" x2="34" y2="34"/><line x1="38" y1="10" x2="14" y2="34"/></g><g stroke="#a83a4a" stroke-width="3.4" stroke-linecap="round"><line x1="31" y1="37" x2="37" y2="31"/><line x1="11" y1="31" x2="17" y2="37"/></g><circle cx="24" cy="22" r="4.5" fill="#fff" opacity="0.9"/></svg></span>
         <span class="mode-name">PVP</span>
@@ -1680,7 +1686,8 @@ function renderMain(s: HudSnapshot): string {
       </button>
     </div>
 
-    <button class="rank-card" data-ui data-action="open-rank" aria-label="View Rival rank">
+    <div class="section-title">Local rank <small>practice field · not global</small></div>
+    <button class="rank-card" data-ui data-action="open-rank" aria-label="View local Rival rank (practice field)">
       <span class="rank-div">${s.rival.divisionIcon} ${s.rival.division}</span>
       <span class="rank-num">${s.rival.rating}</span>
       <span class="rank-bar"><i style="width:${Math.round(s.rival.progress * 100)}%"></i></span>
@@ -1691,11 +1698,12 @@ function renderMain(s: HudSnapshot): string {
       } · 🔥${s.rival.streak} streak</span>
     </button>
 
-    <div class="pvp-modes" role="group" aria-label="Play modes">
-      <button class="pvp-mode rated" data-ui data-action="pvp-ranked"><i>🏆</i><b>Ranked 40</b><span>Rating moves</span></button>
-      <button class="pvp-mode rated" data-ui data-action="pvp-duel"><i>⚔</i><b>Duel 1v1</b><span>±16 rating</span></button>
-      <button class="pvp-mode" data-ui data-action="pvp-casual"><i>🐦</i><b>Casual 40</b><span>No rating</span></button>
-      <button class="pvp-mode storm" data-ui data-action="pvp-storm"><i>⛈</i><b>Stormfront</b><span>PvE × PvP</span></button>
+    <div class="section-title">Race formats <small>all on-device unless in a room</small></div>
+    <div class="pvp-modes" role="group" aria-label="Race formats">
+      <button class="pvp-mode rated" data-ui data-action="pvp-ranked"><i>🏆</i><b>Ranked 40</b><span>Local rating</span></button>
+      <button class="pvp-mode rated" data-ui data-action="pvp-duel"><i>⚔</i><b>Duel 1v1</b><span>Local ±16</span></button>
+      <button class="pvp-mode" data-ui data-action="pvp-casual"><i>🐦</i><b>Casual 40</b><span>Practice · no rating</span></button>
+      <button class="pvp-mode storm" data-ui data-action="pvp-storm"><i>⛈</i><b>Stormfront</b><span>Practice · PvE × PvP</span></button>
       <button class="pvp-mode" data-ui data-action="versus"><i>👥</i><b>Local 2P</b><span>Same screen</span></button>
     </div>
 

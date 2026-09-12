@@ -3951,3 +3951,26 @@ button:focus-visible, .toggle:focus-visible {
   color: #a05a00;
   letter-spacing: 0.04em;
 }
+
+/* ---------- menu IA: one primary CTA, grouped secondaries ----------
+   Expert pass: the old main screen gave 4 equal cards + 5 race buttons +
+   15 nav buttons equal weight (Hick's law violation, no primary CTA).
+   All data-action ids are unchanged — this is visual hierarchy only. */
+.mode-cards.hero-play { grid-template-columns: minmax(0, 1fr); margin: 8px 0 4px; }
+.mode-card-main.primary {
+  flex-direction: row;
+  gap: 12px;
+  padding: 16px 14px;
+  text-align: left;
+  border-color: rgba(255, 107, 74, 0.45);
+  background: linear-gradient(180deg, #fff8ea, rgba(255, 255, 255, 0.85));
+  box-shadow: 0 6px 0 rgba(216, 90, 40, 0.25), 0 14px 28px -10px rgba(216, 90, 40, 0.4);
+  min-height: 76px;
+}
+.mode-card-main.primary .mode-name { font-size: 18px; }
+.mode-card-main.primary .mode-desc { font-size: 12px; }
+/* WCAG 2.5.8: menu targets never smaller than 44px. */
+.mode-card-main, .pvp-mode, .nav-btn, .rank-card { min-height: 44px; }
+@media (prefers-reduced-motion: reduce) {
+  .mode-card-main.primary:hover, .mode-card-main.primary:active { transform: none; }
+}

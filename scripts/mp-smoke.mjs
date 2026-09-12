@@ -22,7 +22,10 @@ a.on("message", (d) => {
   if (m.type === "state" && m.pilots.length > 0) liveFrames++;
 });
 b.on("open", () => {
-  const t = setInterval(() => b.send(JSON.stringify({ type: "state", x: Math.random() * 500, y: 30, rot: 0, d: 100 })), 100);
+  // Field names must match the wire protocol: { x, y, r, d } (see
+  // Realtime.send and the server's In::State) — `rot` was a stale name
+  // that serde rejected, so no pilot ever had live state.
+  const t = setInterval(() => b.send(JSON.stringify({ type: "state", x: Math.random() * 500, y: 30, r: 0, d: 100 })), 100);
   b.on("close", () => clearInterval(t));
 });
 
