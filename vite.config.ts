@@ -66,6 +66,13 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/mp/, "/ws"),
       },
+      // Social server (friends/clubs/chat) — same pattern as /mp: the browser
+      // talks same-origin, vite tunnels to the PGlite server on :8788.
+      "/social": {
+        target: "http://localhost:8788",
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/social/, ""),
+      },
     },
   },
   resolve: {

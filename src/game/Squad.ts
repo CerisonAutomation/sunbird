@@ -9,7 +9,7 @@
  * offline UI rather than breaking the menu.
  */
 
-const API = (import.meta.env.VITE_SOCIAL_URL ?? "").replace(/\/$/, "");
+const API = (import.meta.env.VITE_SOCIAL_URL ?? (import.meta.env.DEV ? "/social" : "")).replace(/\/$/, "");
 
 export type Friend = { name: string; code: string; club_id: number | null };
 export type Club = { id: number; name: string; motto: string; members: number };
