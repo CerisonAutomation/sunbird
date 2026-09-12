@@ -10,6 +10,7 @@ import {
   VIP_DAYS,
 } from "./constants";
 import { dateSeed } from "./math";
+import { TRACK_NAMES } from "./Music";
 import { defaultRival, rankSeasonId, ratingDelta, RIVAL_BASE_RATING, seasonReward, softResetRating, streakBonus, type RivalMatch, type RivalState } from "./pvp";
 import { seasonId } from "./season";
 import { emptyTournamentState, type TournamentState } from "./Tournaments";
@@ -31,6 +32,8 @@ export type Settings = {
   music: boolean;
   musicVolume: number;
   sfxVolume: number;
+  /** Which music track to play: "shuffle" (all ten) or a 0-based track index. */
+  musicTrack: number | "shuffle";
   haptics: boolean;
   reduceMotion: boolean;
   /** Colorblind assist: shifts warning reds/greens to blue/orange + adds glyphs. */
@@ -148,6 +151,7 @@ const DEFAULT_SETTINGS: Settings = {
   music: true,
   musicVolume: 0.8,
   sfxVolume: 0.9,
+  musicTrack: "shuffle",
   haptics: true,
   reduceMotion: false,
   colorAssist: false,
@@ -353,6 +357,12 @@ export class SaveData {
             p.settings?.sfxVolume !== undefined
               ? Math.max(0, Math.min(1, Number(p.settings.sfxVolume) || 0))
               : 0.9,
+          musicTrack:
+            p.settings?.musicTrack === "shuffle"
+              ? "shuffle"
+              : typeof p.settings?.musicTrack === "number"
+                ? Math.max(0, Math.min(TRACK_NAMES.length - 1, Math.floor(p.settings.musicTrack)))
+                : "shuffle",
           haptics: p.settings?.haptics === undefined ? true : Boolean(p.settings.haptics),
           reduceMotion: Boolean(p.settings?.reduceMotion),
           colorAssist: Boolean(p.settings?.colorAssist),

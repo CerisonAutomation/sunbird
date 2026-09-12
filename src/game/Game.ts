@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { Achievements } from "./Achievements";
 import { GameAudio } from "./Audio";
 import { BIOMES, biomeForIsland } from "./Biomes";
+import { TRACK_NAMES } from "./Music";
 import { Bird, type BirdStepOpts } from "./Bird";
 import { CameraRig } from "./CameraRig";
 import { Collectibles, type CloudKind, type PickupKind } from "./Collectibles";
@@ -408,6 +409,11 @@ export class Game {
       void this.audio.resume();
     });
     this.audio = new GameAudio();
+    // A tasteful "now playing" cue when the score moves to a new track — only
+    // when the game is at rest, so it never interrupts a run in flight.
+    this.audio.setOnTrackChange((name) => {
+      if (this.state === "menu") this.hud.toast(`♪ ${name}`, "info");
+    });
 
     this.terrain = new TerrainSystem(this.seed);
     this.scene.add(this.terrain.group);
@@ -2867,6 +2873,15 @@ export class Game {
         this.audio.ding();
         break;
       }
+      case "set-track": {
+        const cur = this.save.state.settings.musicTrack;
+        const next = cur === "shuffle" ? 0 : cur >= TRACK_NAMES.length - 1 ? "shuffle" : cur + 1;
+        this.save.state.settings.musicTrack = next;
+        this.save.persist();
+        this.applySettings();
+        this.audio.uiTick();
+        break;
+      }
       case "set-haptics":
         this.save.state.settings.haptics = !this.save.state.settings.haptics;
         this.save.persist();
@@ -3320,6 +3335,7 @@ export class Game {
     this.audio.setMuted(s.mute);
     this.audio.setMusicEnabled(s.music);
     this.audio.setVolumes(s.musicVolume, s.sfxVolume);
+    this.audio.setMusicTrack(s.musicTrack);
     this.camera.setReduceMotion(s.reduceMotion);
     // Bloom is the expensive effect — desktop high/auto only, and never under
     // reduced-motion (a steady glow reads as flicker to some players).

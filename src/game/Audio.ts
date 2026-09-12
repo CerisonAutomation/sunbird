@@ -25,6 +25,8 @@ export class GameAudio {
   private started = false;
   private pendingMode: MusicMode = "off";
   private pendingBiome: BiomeMusicStyle = "bright";
+  private pendingTrack: number | "shuffle" = "shuffle";
+  private onTrackChange: ((name: string) => void) | null = null;
 
   // Ascending musical coin streak tracker
   private coinStreak = 0;
@@ -74,6 +76,8 @@ export class GameAudio {
     this.music.setLevel(this.musicOn && !this.muted ? 0.64 * this.musicVol : 0);
     this.music.setBiome(this.pendingBiome);
     this.music.setMode(this.pendingMode);
+    this.music.setTrack(this.pendingTrack);
+    if (this.onTrackChange) this.music.onTrackChange = this.onTrackChange;
 
     this.buildWhoosh();
     this.buildWind();
@@ -157,6 +161,17 @@ export class GameAudio {
     if (style === this.pendingBiome) return;
     this.pendingBiome = style;
     this.music?.setBiome(style);
+  }
+
+  /** Pin a track (0..9) or "shuffle" — persists via Settings. */
+  setMusicTrack(sel: number | "shuffle"): void {
+    this.pendingTrack = sel;
+    this.music?.setTrack(sel);
+  }
+
+  setOnTrackChange(cb: (name: string) => void): void {
+    this.onTrackChange = cb;
+    if (this.music) this.music.onTrackChange = cb;
   }
 
   /** 0..1 — adaptive music intensity (speed/altitude/fever/danger/combos). */

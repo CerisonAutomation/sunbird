@@ -15,6 +15,7 @@ import type { CampaignChapterView } from "./Campaign";
 import type { MonthlyTheme, WeeklyEvent } from "./Events";
 import type { SquadState } from "./Squad";
 import type { HighScore, Settings } from "./SaveData";
+import { TRACK_NAMES } from "./Music";
 import type { TierView } from "./SeasonPass";
 
 export type UiScreen =
@@ -1959,6 +1960,7 @@ function renderSettings(s: HudSnapshot): string {
     <div class="setting-row"><span>SFX Volume</span><button class="mini-btn" data-ui data-action="set-sfx-vol">${s.settings.mute ? "Muted" : `${sPct}%`}</button></div>
     ${toggle("Music", "music", s.settings.music)}
     <div class="setting-row"><span>Music Volume</span><button class="mini-btn" data-ui data-action="set-music-vol">${!s.settings.music ? "Off" : `${mPct}%`}</button></div>
+    <div class="setting-row"><span>Music Track</span><button class="mini-btn" data-ui data-action="set-track">${s.settings.musicTrack === "shuffle" ? "Shuffle (all 10)" : `${s.settings.musicTrack + 1}. ${TRACK_NAMES[s.settings.musicTrack] ?? ""}`}</button></div>
     ${toggle("Haptics", "haptics", s.settings.haptics)}
     ${toggle("Reduce motion", "motion", s.settings.reduceMotion)}
     ${toggle("Colorblind assist", "colorassist", s.settings.colorAssist)}

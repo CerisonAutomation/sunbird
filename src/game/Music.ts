@@ -34,6 +34,12 @@ const PROG_A = ["C", "G", "Am", "F", "C", "G", "F", "G"];
 const PROG_B = ["Am", "F", "C", "G", "Am", "F", "C", "G"];
 const PROG_C = ["F", "G", "Em", "Am", "F", "G", "C", "C"];
 const PROG_D = ["Dm", "G", "C", "Am", "F", "G", "C", "G"];
+const PROG_E = ["C", "Am", "F", "G", "C", "Am", "F", "G"];
+const PROG_F = ["Am", "Em", "F", "C", "Am", "Em", "F", "C"];
+const PROG_G = ["C", "G", "Dm", "Am", "C", "G", "Dm", "Am"];
+const PROG_H = ["G", "C", "Am", "F", "G", "C", "Am", "F"];
+const PROG_I = ["F", "C", "Dm", "G", "F", "C", "Dm", "G"];
+const PROG_J = ["Am", "C", "G", "F", "Am", "C", "G", "F"];
 
 // Melodies: one entry per eighth note (0 = rest, -1 = hold previous)
 const MEL_A = [
@@ -82,6 +88,78 @@ const MEL_D = [
   79, -1, 76, -1, 72, -1, 0, 0,
 ];
 
+// Track 5 — Coral Breeze: bright, rippling, climbs and settles like surf.
+const MEL_E = [
+  72, 0, 74, 0, 76, 0, 79, 0,
+  76, 0, 72, 0, 69, 0, 72, 0,
+  65, 0, 69, 0, 72, 0, 74, 0,
+  74, 0, 72, 0, 71, 0, 72, 0,
+  72, 0, 76, 0, 79, 0, 81, 0,
+  79, 0, 76, 0, 72, 0, 76, 0,
+  77, 0, 76, 0, 74, 0, 72, 0,
+  74, -1, -1, 0, 0, 0, 0, 0,
+];
+
+// Track 6 — Moonlight Flutter: sparse, descending, a night that breathes.
+const MEL_F = [
+  69, 0, 72, 0, 76, 0, 72, 0,
+  71, 0, 74, 0, 76, 0, 74, 0,
+  65, 0, 69, 0, 72, 0, 74, 0,
+  72, 0, 69, 0, 65, 0, 67, 0,
+  69, 0, 72, 0, 76, 0, 79, 0,
+  76, 0, 74, 0, 71, 0, 74, 0,
+  77, 0, 74, 0, 72, 0, 69, 0,
+  72, -1, -1, -1, 0, 0, 0, 0,
+];
+
+// Track 7 — Glass Ocean: crystalline high sparkle over calm harmony.
+const MEL_G = [
+  76, 0, 79, 0, 84, 0, 81, 0,
+  79, 0, 76, 0, 74, 0, 76, 0,
+  74, 0, 72, 0, 69, 0, 72, 0,
+  69, 0, 72, 0, 76, 0, 74, 0,
+  76, 0, 79, 0, 84, 0, 86, 0,
+  84, 0, 81, 0, 79, 0, 76, 0,
+  74, 0, 72, 0, 69, 0, 72, 0,
+  74, -1, 72, -1, 0, 0, 0, 0,
+];
+
+// Track 8 — Trade Winds: broad stepwise phrases that push and ease.
+const MEL_H = [
+  74, 0, 71, 0, 72, 0, 74, 0,
+  76, 0, 79, 0, 76, 0, 74, 0,
+  72, 0, 69, 0, 72, 0, 76, 0,
+  74, 0, 72, 0, 69, 0, 65, 0,
+  74, 0, 71, 0, 72, 0, 74, 0,
+  79, 0, 76, 0, 74, 0, 72, 0,
+  69, 0, 72, 0, 76, 0, 74, 0,
+  72, -1, -1, 0, 0, 0, 0, 0,
+];
+
+// Track 9 — Golden Hour: held, warm notes that stretch the last light.
+const MEL_I = [
+  77, -1, 0, 0, 76, 0, 74, 0,
+  72, -1, 0, 0, 69, 0, 72, 0,
+  74, -1, 0, 0, 72, 0, 69, 0,
+  71, 0, 72, 0, 74, -1, 0, 0,
+  77, -1, 0, 0, 79, 0, 77, 0,
+  76, -1, 0, 0, 74, 0, 72, 0,
+  74, -1, 0, 0, 72, 0, 74, 0,
+  76, -1, 74, -1, 72, -1, 0, 0,
+];
+
+// Track 10 — Starlight: twinkling wide leaps between a warm low register.
+const MEL_J = [
+  81, 0, 76, 0, 81, 0, 84, 0,
+  79, 0, 76, 0, 72, 0, 76, 0,
+  74, 0, 71, 0, 74, 0, 76, 0,
+  77, 0, 74, 0, 72, 0, 69, 0,
+  81, 0, 76, 0, 81, 0, 86, 0,
+  84, 0, 81, 0, 79, 0, 76, 0,
+  74, 0, 71, 0, 74, 0, 79, 0,
+  77, -1, 76, -1, 72, -1, 0, 0,
+];
+
 // Whistle counter-melody used in fever (per eighth, section-agnostic)
 const WHISTLE = [
   0, 0, 84, 0, 83, 0, 81, 0,
@@ -97,13 +175,29 @@ const WHISTLE = [
 // Strum pattern per eighth: 1 = down, 2 = up, 0 = none (island strum D _ D U _ U D U)
 const STRUM = [1, 0, 1, 2, 0, 2, 1, 2];
 
-const SECTIONS: { prog: string[]; mel: number[] }[] = [
-  { prog: PROG_A, mel: MEL_A },
-  { prog: PROG_A, mel: MEL_A },
-  { prog: PROG_B, mel: MEL_B },
-  { prog: PROG_C, mel: MEL_C },
-  { prog: PROG_D, mel: MEL_D },
+export type Track = { name: string; prog: string[]; mel: number[] };
+
+/**
+ * Ten original island-folk compositions. Each is a full 8-bar song — its own
+ * chord progression and lead melody — so a long session never loops the same
+ * phrase twice. The engine rotates through them (or loops a pinned one), and
+ * biome/mode orchestration layers on top without changing the melody.
+ */
+export const TRACKS: Track[] = [
+  { name: "Island Sunrise", prog: PROG_A, mel: MEL_A },
+  { name: "Lazy Current", prog: PROG_B, mel: MEL_B },
+  { name: "Hilltop Hop", prog: PROG_C, mel: MEL_C },
+  { name: "Sunset Glide", prog: PROG_D, mel: MEL_D },
+  { name: "Coral Breeze", prog: PROG_E, mel: MEL_E },
+  { name: "Moonlight Flutter", prog: PROG_F, mel: MEL_F },
+  { name: "Glass Ocean", prog: PROG_G, mel: MEL_G },
+  { name: "Trade Winds", prog: PROG_H, mel: MEL_H },
+  { name: "Golden Hour", prog: PROG_I, mel: MEL_I },
+  { name: "Starlight", prog: PROG_J, mel: MEL_J },
 ];
+
+/** Track titles for the settings picker — keep in lockstep with TRACKS. */
+export const TRACK_NAMES: string[] = TRACKS.map((t) => t.name);
 
 // Per-biome orchestration keeps each island sonically distinct while all
 // variants share the same original melodic identity.
@@ -128,6 +222,13 @@ export class Music {
   private step = 0;
   private bar = 0;
   private section = 0;
+  /** Which tracks to play: "shuffle" cycles all ten in random order, or a
+   *  number pins one track. Mirrors the persisted settings value. */
+  private trackSel: number | "shuffle" = "shuffle";
+  private order: number[] = [];
+  private orderPos = 0;
+  /** Fired whenever the engine advances to a new track, with its title. */
+  onTrackChange: ((name: string) => void) | null = null;
   private bpm = BEAT_BPM;
   private night = 0;
   private biome: BiomeMusicStyle = "bright";
@@ -188,6 +289,9 @@ export class Music {
     this.noise = ctx.createBuffer(1, len, ctx.sampleRate);
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+
+    this.buildOrder();
+    this.section = this.order[0] ?? 0;
   }
 
   setMode(mode: MusicMode): void {
@@ -230,6 +334,39 @@ export class Music {
     if (style === this.biome) return;
     this.biome = style;
     this.apply();
+  }
+
+  /** Pin a single track (0..TRACK_NAMES.length-1) or "shuffle" to cycle all. */
+  setTrack(sel: number | "shuffle"): void {
+    this.trackSel = sel;
+    this.buildOrder();
+    this.orderPos = 0;
+    this.section = this.order[0] ?? 0;
+    if (this.timer !== null) this.onTrackChange?.(TRACKS[this.section]!.name);
+  }
+
+  get trackName(): string {
+    return TRACKS[this.section]?.name ?? "";
+  }
+
+  private buildOrder(): void {
+    if (this.trackSel === "shuffle") {
+      this.order = Array.from({ length: TRACKS.length }, (_, i) => i);
+      // Fisher-Yates; avoid opening on the track we just finished.
+      for (let i = this.order.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = this.order[i]!;
+        this.order[i] = this.order[j]!;
+        this.order[j] = tmp;
+      }
+      if (this.order.length > 1 && this.order[0] === this.section) {
+        const tmp = this.order[0]!;
+        this.order[0] = this.order[1]!;
+        this.order[1] = tmp;
+      }
+    } else {
+      this.order = [this.trackSel];
+    }
   }
 
   duck(amount = 0.45, release = 0.5): void {
@@ -276,8 +413,11 @@ export class Music {
     this.nextTime = this.ctx.currentTime + 0.05;
     this.step = 0;
     this.bar = 0;
-    this.section = 0;
+    this.buildOrder();
+    this.orderPos = 0;
+    this.section = this.order[0] ?? 0;
     this.lullabyStep = 0;
+    this.onTrackChange?.(TRACKS[this.section]!.name);
     this.timer = window.setInterval(() => this.tick(), TICK_MS);
   }
 
@@ -303,7 +443,12 @@ export class Music {
       this.bar += 1;
       if (this.bar >= 8) {
         this.bar = 0;
-        this.section = (this.section + 1) % SECTIONS.length;
+        this.orderPos = (this.orderPos + 1) % this.order.length;
+        // Reshuffle when a full shuffle cycle completes, so no two passes
+        // repeat the same sequence.
+        if (this.orderPos === 0 && this.trackSel === "shuffle") this.buildOrder();
+        this.section = this.order[this.orderPos]!;
+        this.onTrackChange?.(TRACKS[this.section]!.name);
       }
     }
   }
@@ -312,7 +457,7 @@ export class Music {
     // Storm mode pulls the whole song down a minor third — same melody,
     // completely different weather.
     const stormShift = this.mode === "storm" ? -3 : 0;
-    const sec = SECTIONS[this.section]!;
+    const sec = TRACKS[this.section]!;
     const chordName = sec.prog[this.bar]!;
     const chord = UKE[chordName]!;
     const idx = this.bar * 8 + this.step;
