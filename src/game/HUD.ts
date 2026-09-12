@@ -160,6 +160,8 @@ export type HudSnapshot = {
   cloudMessage: string;
   canInstall: boolean;
   shareBusy: boolean;
+  /** A/B test "results_cta_order": when true, the Share CTA leads the card. */
+  expShareFirst: boolean;
   combo: number;
   speedNorm: number;
   gust: number;
@@ -2160,8 +2162,11 @@ function renderGameOver(s: HudSnapshot): string {
     <div class="reached-strip">Reached <b>${s.biomeEmoji} ${s.biomeName}</b> · Island ${s.island + 1}</div>
     <button class="play-again-btn" data-ui data-action="retry">✈ FLY AGAIN</button>
     ${s.massRace && s.racePlace > 0 ? `<button class="soft-btn wide rematch" data-ui data-action="rematch">🔁 Rematch — same stakes</button>` : ""}
-    <button class="soft-btn wide" data-ui data-action="throw-challenge">🥊 Challenge a rival on these hills</button>
-    <button class="soft-btn wide" data-ui data-action="share" ${s.shareBusy ? "disabled" : ""}>${s.shareBusy ? "Preparing…" : "📤 Share this flight"}</button>
+    ${s.expShareFirst
+      ? `<button class="soft-btn wide" data-ui data-action="share" ${s.shareBusy ? "disabled" : ""}>${s.shareBusy ? "Preparing…" : "📤 Share this flight"}</button>
+         <button class="soft-btn wide" data-ui data-action="throw-challenge">🥊 Challenge a rival on these hills</button>`
+      : `<button class="soft-btn wide" data-ui data-action="throw-challenge">🥊 Challenge a rival on these hills</button>
+         <button class="soft-btn wide" data-ui data-action="share" ${s.shareBusy ? "disabled" : ""}>${s.shareBusy ? "Preparing…" : "📤 Share this flight"}</button>`}
     <div class="btn-row">
       <button class="soft-btn" data-ui data-action="open-shop">🛍 Shop</button>
       <button class="soft-btn" data-ui data-action="open-pass">🎟 Pass</button>

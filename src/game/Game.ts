@@ -88,6 +88,7 @@ import { SeasonPass, seasonId, seasonLabel, XP_RULES } from "./SeasonPass";
 import { buildShareCard, shareOrDownload } from "./Social";
 import { buildChallengeUrl, readChallengeFromUrl, type RivalChallenge } from "./Challenge";
 import { flag } from "./Flags";
+import { variant } from "./Experiments";
 import { buildRoomInviteUrl, normalizeRoomCode, readRoomInviteFromUrl } from "./RoomInvite";
 import { initPlatform, isPortalBuild, portalTarget, type PlatformAdapter } from "../sdk/platform";
 import { LivingBackground } from "./LivingBackground";
@@ -343,6 +344,9 @@ export class Game {
   private referralMessage = "";
   private cloudMessage = "";
   private shareBusy = false;
+  /** A/B "results_cta_order" variant, resolved (and exposed) once on the
+   *  first results screen — sticky per device, logged via telemetry. */
+  private expShareFirst: "control" | "treatment" | null = null;
   private resetArmed = false;
   private resetTimer = 0;
 
@@ -4094,6 +4098,12 @@ export class Game {
       cloudMessage: this.cloudMessage,
       canInstall: Boolean(this.deferredInstall) && !this.portalEnabled(),
       shareBusy: this.shareBusy,
+      expShareFirst:
+        this.state !== "gameover"
+          ? false
+          : (this.expShareFirst ??= variant(this.save.state.deviceId, "results_cta_order", 50, (v) => {
+              this.telemetry.track("experiment_exposure", { experiment: "results_cta_order", variant: v });
+            })) === "treatment",
       combo: Math.max(this.perfectChain, this.versus && this.p1 ? this.p1.launch.combo : this.launch.combo),
       speedNorm: Math.min(1, this.bird.speed() / 100),
       gust: this.weather.gust,
