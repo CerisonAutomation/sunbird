@@ -49,7 +49,11 @@ until proven otherwise. This file exists so the commit log can't overclaim.
   own physics ceiling (234 u/s = 128 fever × 1.5 wingboost + 42 boost), then
   canonicalised to wire precision. Rejections are dropped and counted as
   `sunbird_legacy_state_rejected_total{reason=…}`; the seat is never dropped.
-  Rust tests are CI-verified only — the authoring sandbox has no toolchain.
+- `rust/crates/sunbird-protocol/src/lib.rs` — `Limits` was the only type in the
+  protocol missing `rename_all = "camelCase"`, so `GET /v1/hello` emitted
+  `max_json_payload_bytes` and the browser client's parser threw. Fixed and
+  pinned by `hello_limits_are_camel_case_on_the_wire`. Found by the contract
+  suite, which is the only reason it was found.
 - `scripts/botsim.mjs` — 40 headless pilots on the real wire protocol, seeded
   and reproducible. Gated in `.github/workflows/botsim.yml`: the Node reference
   job reports cheat containment, the Rust job **gates** on it
@@ -66,8 +70,8 @@ until proven otherwise. This file exists so the commit log can't overclaim.
   Rust validator closes and the CI gate now guards.
 
 ## Next (in order)
-1. Get `botsim.yml` green on a few PRs, then retire `scripts/mp-smoke.mjs`
-   (botsim supersedes it: 40 clients vs 2, and it is actually in CI)
+1. Retire `scripts/mp-smoke.mjs` once this PR has been green a while — botsim
+   supersedes it (40 clients vs 2, and it is actually wired into CI)
 2. Wire the client to consume the `snapshot` message it can now parse — the
    parser is no longer the blocker for authoritative rooms
 

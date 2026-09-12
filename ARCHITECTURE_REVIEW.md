@@ -110,6 +110,35 @@ are what the suite compares against the contract.
 | Widened `limits.maxNameChars` from 14 to 20 | **failed**: `expected 14 to be 20` |
 | (reverted) | 24/24 pass |
 
+### 2.1 The contract then caught a second, live bug — in Rust this time
+
+Running the new Rust contract suite in CI produced:
+
+```
+serverMessages.hello failed to parse: JSON parse failed: missing field `max_json_payload_bytes`
+```
+
+`Limits` was the **only type in the entire protocol** without
+`#[serde(rename_all = "camelCase")]` — `PilotPublic`, `RoomPublic`, `SeatGrant`,
+`ServerSnapshot`, `SnapshotPilot`, `ClientMessage`, `ServerMessage` and
+`ProtocolError` all have it. So `GET /v1/hello` emitted:
+
+```json
+{"limits":{"version":1,"max_json_payload_bytes":8192,"max_name_chars":14}}
+```
+
+while the browser requires camelCase (`src/game/protocol/v1.ts:227` calls
+`requireNumber(data.limits.maxJsonPayloadBytes, ...)`) and its parser threw
+`limits.maxJsonPayloadBytes is required as a number`. Nothing in the repo
+expects the snake_case form, so the crate was the side that was wrong.
+
+Fixed at the source, and pinned by `hello_limits_are_camel_case_on_the_wire`,
+which asserts the wire keys and that the emitted frame round-trips.
+
+That is two independent wire-incompatibility bugs — one in each direction — in a
+protocol that a comment asserted could not drift. It is the strongest evidence
+in this document that the check was worth more than the fixes.
+
 ---
 
 ## 3. Adopted: server authority over movement
@@ -166,13 +195,37 @@ ops can tell a cheater from a buggy client.
 end-to-end ones are the ones that matter: `a_teleport_never_reaches_another_pilot`
 asserts the *broadcast content*, not the validator's return value.
 
-> ⚠️ **Not compiled here.** This sandbox has no Rust toolchain and no network
-> route to rustup or `static.rust-lang.org` (both fail at TLS:
-> `SSL_ERROR_SYSCALL`), no root, and no `rustc` apt candidate. `rust/README.md`
-> already documents this exact constraint. These Rust changes are verified by
-> `.github/workflows/rust.yml` (fmt · clippy `-D warnings` · test · release
-> build) and the new `load-authoritative` botsim job — not by me, locally.
-> Everything in §4 and §5 *was* executed here.
+### Verified in CI (this sandbox cannot compile Rust)
+
+This sandbox has no Rust toolchain and no route to one: `sh.rustup.rs`,
+`static.rust-lang.org` **and `crates.io` are all unreachable** (TLS
+`SSL_ERROR_SYSCALL`), there is no root for apt, and no `rustc` candidate. So the
+Rust was verified by pushing the branch and reading CI:
+
+| Check | Result |
+| --- | --- |
+| `cargo fmt --check` | pass |
+| `cargo clippy --workspace --all-targets -- -D warnings` | **pass** (after 3 fixes, below) |
+| `cargo test --workspace` | **pass** (after 1 real bug fix, below) |
+| `cargo build --release` | pass |
+| botsim 40 vs the Rust server, `--require-anticheat` | **pass** |
+
+Getting there took four CI cycles, because the Actions log bundle and the
+artifact blob host are *also* unreachable from here. `rust.yml` now republishes
+clippy/test diagnostics as check annotations and posts the failing output to the
+PR, which is what finally made the errors readable.
+
+**Clippy found three defects in my own Rust** — all real, all mine:
+
+1. `field tick_hz is never read`. My first fix derived `min_sample_interval`
+   from a *local* `tick_hz` in `Default`, which writes the field but never reads
+   it; `dead_code` is about reads. The stored field is gone and `admit()` now
+   computes the interval floor from `self.tick_hz` at the point of use.
+2. `type_complexity` on the packed-state tuple — aliased as `WirePilot`.
+3. `doc list item without indentation` — a doc continuation line began with
+   `+ `, which rustdoc parses as a new unindented Markdown bullet.
+
+**`cargo test` then found a genuine production bug on `main`** — see §2.1.
 
 ---
 
@@ -319,7 +372,12 @@ same binary that would record ghost replays, and `ROADMAP.md` already lists
 | `scripts/botsim.mjs` 40 pilots | **PASS**, 9/9 gates |
 | `scripts/botsim.mjs --require-anticheat` | **FAIL** as designed against the unvalidated reference server (exit 1) |
 | Contract mutation test | drift detected both ways, then reverted |
-| `cargo test` / `cargo clippy` | **not run — no toolchain available here** |
+| `cargo fmt` / `clippy` / `test` / `build` | **pass in CI** (PR #4, `build-test`) |
+| botsim 40 vs Rust server, `--require-anticheat` | **pass in CI** (PR #4, `load-authoritative`) |
+| All PR checks | **11/11 pass** |
+
+Locally the Rust could not be compiled (no toolchain, and `crates.io` is
+unreachable), so every Rust claim above comes from CI, not from me.
 
 ### Still open
 

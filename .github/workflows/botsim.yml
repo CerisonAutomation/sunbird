@@ -26,6 +26,9 @@ jobs:
   load-reference:
     name: 40 bots vs Node reference server
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -59,6 +62,32 @@ jobs:
         if: always()
         run: cat /tmp/reference-server.log
 
+      # The Actions log bundle and the artifact blob host are unreachable from
+      # some sandboxes, so the headline numbers are posted to the PR directly.
+      - name: Post botsim report to the PR
+        if: always() && github.event_name == 'pull_request'
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          {
+            echo "### botsim — Node reference server (containment reported, not gated)"
+            echo '```'
+            jq -r '
+              "connected        \(.report.connected)/\(.report.players)  roster \(.report.rosterMax)",
+              "cadence p50/p95  \(.report.frameIntervalMs.p50)/\(.report.frameIntervalMs.p95) ms",
+              "state frames     p50 \(.report.stateFrames.p50)  min \(.report.stateFrames.min)",
+              "finish           \(.report.finish.count) finishes, \(.report.finish.unique) unique places",
+              "resume           \(.report.resume.resumed)/\(.report.resume.dropped) re-seated",
+              "bandwidth        \(.report.bandwidth.perClientKBps) KB/s per client",
+              "cheat leaks      \(.report.cheatContainment.leaks)  \(.report.cheatContainment.byReason)",
+              "gates failed     \([.gates[] | select(.pass == false and .optional != true)] | length)"
+            ' botsim-reference.json
+            echo '```'
+          } > /tmp/botsim-body.md
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file /tmp/botsim-body.md
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -69,6 +98,9 @@ jobs:
   load-authoritative:
     name: 40 bots vs Rust authoritative server (anti-cheat gated)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     defaults:
       run:
         working-directory: rust
@@ -128,6 +160,32 @@ jobs:
       - name: Server log
         if: always()
         run: cat /tmp/authoritative-server.log
+
+      # The Actions log bundle and the artifact blob host are unreachable from
+      # some sandboxes, so the headline numbers are posted to the PR directly.
+      - name: Post botsim report to the PR
+        if: always() && github.event_name == 'pull_request'
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          {
+            echo "### botsim — Rust authoritative server (`--require-anticheat`)"
+            echo '```'
+            jq -r '
+              "connected        \(.report.connected)/\(.report.players)  roster \(.report.rosterMax)",
+              "cadence p50/p95  \(.report.frameIntervalMs.p50)/\(.report.frameIntervalMs.p95) ms",
+              "state frames     p50 \(.report.stateFrames.p50)  min \(.report.stateFrames.min)",
+              "finish           \(.report.finish.count) finishes, \(.report.finish.unique) unique places",
+              "resume           \(.report.resume.resumed)/\(.report.resume.dropped) re-seated",
+              "bandwidth        \(.report.bandwidth.perClientKBps) KB/s per client",
+              "cheat leaks      \(.report.cheatContainment.leaks)  \(.report.cheatContainment.byReason)",
+              "gates failed     \([.gates[] | select(.pass == false and .optional != true)] | length)"
+            ' botsim-authoritative.json
+            echo '```'
+          } > /tmp/botsim-body.md
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file /tmp/botsim-body.md
 
       - uses: actions/upload-artifact@v4
         if: always()
