@@ -14,10 +14,10 @@ use serde_json::{json, Map, Value};
 use std::collections::BTreeSet;
 use std::path::Path;
 use sunbird_protocol::{
-    parse_client_message, parse_server_message, ClientMessage, ServerMessage, MAX_ERROR_MESSAGE_CHARS,
-    MAX_IDEMPOTENCY_CHARS, MAX_JSON_PAYLOAD_BYTES, MAX_NAME_CHARS, MAX_ROOM_CODE_CHARS,
-    MAX_SEED_CHARS, MAX_SKIN_CHARS, PROTOCOL_MIN_VERSION, PROTOCOL_VERSION, SESSION_MAX_TOKEN_CHARS,
-    SESSION_MIN_TOKEN_CHARS,
+    parse_client_message, parse_server_message, ClientMessage, ServerMessage,
+    MAX_ERROR_MESSAGE_CHARS, MAX_IDEMPOTENCY_CHARS, MAX_JSON_PAYLOAD_BYTES, MAX_NAME_CHARS,
+    MAX_ROOM_CODE_CHARS, MAX_SEED_CHARS, MAX_SKIN_CHARS, PROTOCOL_MIN_VERSION, PROTOCOL_VERSION,
+    SESSION_MAX_TOKEN_CHARS, SESSION_MIN_TOKEN_CHARS,
 };
 
 const CONTRACT_PATH: &str = concat!(
@@ -26,9 +26,8 @@ const CONTRACT_PATH: &str = concat!(
 );
 
 fn contract() -> Value {
-    let raw = std::fs::read_to_string(CONTRACT_PATH).unwrap_or_else(|err| {
-        panic!("cannot read protocol contract at {CONTRACT_PATH}: {err}")
-    });
+    let raw = std::fs::read_to_string(CONTRACT_PATH)
+        .unwrap_or_else(|err| panic!("cannot read protocol contract at {CONTRACT_PATH}: {err}"));
     serde_json::from_str(&raw).expect("protocol contract is valid JSON")
 }
 
@@ -59,7 +58,9 @@ fn protocol_version_matches_contract() {
     );
     assert_eq!(
         PROTOCOL_MIN_VERSION,
-        c["minProtocolVersion"].as_u64().expect("minProtocolVersion") as u32
+        c["minProtocolVersion"]
+            .as_u64()
+            .expect("minProtocolVersion") as u32
     );
 }
 
@@ -67,8 +68,13 @@ fn protocol_version_matches_contract() {
 fn wire_limits_match_contract() {
     let limits = object(&contract(), "limits");
     let expect = |key: &str, actual: usize| {
-        let declared = limits[key].as_u64().unwrap_or_else(|| panic!("limits.{key}"));
-        assert_eq!(actual, declared as usize, "limit \"{key}\" drifted from the contract");
+        let declared = limits[key]
+            .as_u64()
+            .unwrap_or_else(|| panic!("limits.{key}"));
+        assert_eq!(
+            actual, declared as usize,
+            "limit \"{key}\" drifted from the contract"
+        );
     };
     expect("maxJsonPayloadBytes", MAX_JSON_PAYLOAD_BYTES);
     expect("maxNameChars", MAX_NAME_CHARS);
@@ -109,7 +115,10 @@ fn every_declared_server_variant_parses_and_round_trips() {
         parse_server_message(&payload, MAX_JSON_PAYLOAD_BYTES).is_err(),
         "server accepted an undeclared variant: {unknown}"
     );
-    assert!(seen.contains("snapshot"), "snapshot variant missing from contract");
+    assert!(
+        seen.contains("snapshot"),
+        "snapshot variant missing from contract"
+    );
 }
 
 #[test]
@@ -218,7 +227,10 @@ fn every_client_variant_is_closed() {
         }),
     ];
     for tag in known {
-        assert!(declared.contains(&tag), "enum variant \"{tag}\" is absent from the contract");
+        assert!(
+            declared.contains(&tag),
+            "enum variant \"{tag}\" is absent from the contract"
+        );
     }
     assert!(
         declared.contains("heartbeat"),

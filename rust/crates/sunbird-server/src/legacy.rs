@@ -330,8 +330,16 @@ impl LegacyRooms {
                 // The *place* is already server-assigned by arrival order. The
                 // reported time and distance are still client claims, so they
                 // are bounded here rather than trusted.
-                let time = if time.is_finite() { time.clamp(0.0, 86_400.0) } else { 0.0 };
-                let distance = if d.is_finite() { d.clamp(0.0, self.policy.max_distance) } else { 0.0 };
+                let time = if time.is_finite() {
+                    time.clamp(0.0, 86_400.0)
+                } else {
+                    0.0
+                };
+                let distance = if d.is_finite() {
+                    d.clamp(0.0, self.policy.max_distance)
+                } else {
+                    0.0
+                };
                 finish(room, id, time, distance);
             }
         }
@@ -686,21 +694,19 @@ mod tests {
                     Err(_) => continue,
                 };
                 if value["type"] == "state" {
-                    let pilots = value["pilots"]
-                        .as_array()
-                        .map(|rows| {
-                            rows.iter()
-                                .map(|row| {
-                                    (
-                                        row[0].as_str().unwrap_or_default().to_string(),
-                                        row[1].as_f64().unwrap_or_default(),
-                                        row[2].as_f64().unwrap_or_default(),
-                                        row[3].as_f64().unwrap_or_default(),
-                                        row[4].as_f64().unwrap_or_default(),
-                                    )
-                                })
-                                .collect()
-                                });
+                    let pilots = value["pilots"].as_array().map(|rows| {
+                        rows.iter()
+                            .map(|row| {
+                                (
+                                    row[0].as_str().unwrap_or_default().to_string(),
+                                    row[1].as_f64().unwrap_or_default(),
+                                    row[2].as_f64().unwrap_or_default(),
+                                    row[3].as_f64().unwrap_or_default(),
+                                    row[4].as_f64().unwrap_or_default(),
+                                )
+                            })
+                            .collect()
+                    });
                     found = pilots;
                 }
             }
@@ -710,9 +716,7 @@ mod tests {
 
     fn seat(rooms: &LegacyRooms, id: &str, code: &str) -> mpsc::Receiver<Outbox> {
         let (tx, rx) = mpsc::channel::<Outbox>(OUT_QUEUE);
-        rooms
-            .join(&identity(id, code), tx)
-            .expect("seat a pilot");
+        rooms.join(&identity(id, code), tx).expect("seat a pilot");
         rx
     }
 
@@ -722,7 +726,16 @@ mod tests {
         let mut alice = seat(&rooms, "alice", "HONST");
         let mut bob = seat(&rooms, "bob", "HONST");
 
-        rooms.on_message("HONST", "alice", In::State { x: 100.0, y: 20.0, r: 0.1, d: 100.0 });
+        rooms.on_message(
+            "HONST",
+            "alice",
+            In::State {
+                x: 100.0,
+                y: 20.0,
+                r: 0.1,
+                d: 100.0,
+            },
+        );
         rooms.tick();
 
         let seen = latest_state(&mut bob).expect("bob receives a state frame");
@@ -745,7 +758,16 @@ mod tests {
         let _alice = seat(&rooms, "alice", "CHEAT");
         let mut bob = seat(&rooms, "bob", "CHEAT");
 
-        rooms.on_message("CHEAT", "alice", In::State { x: 100.0, y: 20.0, r: 0.1, d: 100.0 });
+        rooms.on_message(
+            "CHEAT",
+            "alice",
+            In::State {
+                x: 100.0,
+                y: 20.0,
+                r: 0.1,
+                d: 100.0,
+            },
+        );
         rooms.tick();
         let _ = latest_state(&mut bob);
 
@@ -753,18 +775,30 @@ mod tests {
         rooms.on_message(
             "CHEAT",
             "alice",
-            In::State { x: 400_000.0, y: 20.0, r: 0.1, d: 400_000.0 },
+            In::State {
+                x: 400_000.0,
+                y: 20.0,
+                r: 0.1,
+                d: 400_000.0,
+            },
         );
         rooms.tick();
 
         let seen = latest_state(&mut bob).expect("bob still receives frames");
-        let alice = seen.iter().find(|(id, ..)| id == "alice").expect("alice is present");
+        let alice = seen
+            .iter()
+            .find(|(id, ..)| id == "alice")
+            .expect("alice is present");
         assert!(
             alice.1 < 1_000.0,
             "a teleport reached another pilot: x = {}",
             alice.1
         );
-        assert!(alice.4 < 1_000.0, "a distance teleport reached another pilot: d = {}", alice.4);
+        assert!(
+            alice.4 < 1_000.0,
+            "a distance teleport reached another pilot: d = {}",
+            alice.4
+        );
     }
 
     #[test]
@@ -774,7 +808,16 @@ mod tests {
         let mut bob = seat(&rooms, "bob", "ABSUR");
 
         for bogus in [f64::NAN, f64::INFINITY, 1e300, -1e300] {
-            rooms.on_message("ABSUR", "alice", In::State { x: bogus, y: 20.0, r: 0.0, d: 10.0 });
+            rooms.on_message(
+                "ABSUR",
+                "alice",
+                In::State {
+                    x: bogus,
+                    y: 20.0,
+                    r: 0.0,
+                    d: 10.0,
+                },
+            );
         }
         rooms.tick();
 
@@ -795,16 +838,27 @@ mod tests {
         rooms.on_message(
             "ROUND",
             "alice",
-            In::State { x: 123.456_789, y: 45.678_912, r: 0.123_456_789, d: 9_876.543_21 },
+            In::State {
+                x: 123.456_789,
+                y: 45.678_912,
+                r: 0.123_456_789,
+                d: 9_876.543_21,
+            },
         );
         rooms.tick();
 
         let seen = latest_state(&mut bob).expect("state frame");
-        let alice = seen.iter().find(|(id, ..)| id == "alice").expect("alice present");
+        let alice = seen
+            .iter()
+            .find(|(id, ..)| id == "alice")
+            .expect("alice present");
         assert_eq!(alice.1, 123.46, "x was not rounded to wire precision");
         assert_eq!(alice.2, 45.68, "y was not rounded to wire precision");
         assert_eq!(alice.3, 0.12, "rotation was not rounded to wire precision");
-        assert_eq!(alice.4, 9_876.54, "distance was not rounded to wire precision");
+        assert_eq!(
+            alice.4, 9_876.54,
+            "distance was not rounded to wire precision"
+        );
     }
 
     #[test]
@@ -814,8 +868,22 @@ mod tests {
         let _bob = seat(&rooms, "bob", "PLACE");
 
         // Alice claims a world-record time but arrives second.
-        rooms.on_message("PLACE", "bob", In::Finish { time: 99.0, d: 1_000.0 });
-        rooms.on_message("PLACE", "alice", In::Finish { time: 0.001, d: 1_000.0 });
+        rooms.on_message(
+            "PLACE",
+            "bob",
+            In::Finish {
+                time: 99.0,
+                d: 1_000.0,
+            },
+        );
+        rooms.on_message(
+            "PLACE",
+            "alice",
+            In::Finish {
+                time: 0.001,
+                d: 1_000.0,
+            },
+        );
         rooms.tick();
 
         let alice_place = drain_for_place(&mut alice, "alice");
@@ -828,7 +896,14 @@ mod tests {
         let mut alice = seat(&rooms, "alice", "FTIME");
         let _bob = seat(&rooms, "bob", "FTIME");
 
-        rooms.on_message("FTIME", "alice", In::Finish { time: f64::INFINITY, d: 1e300 });
+        rooms.on_message(
+            "FTIME",
+            "alice",
+            In::Finish {
+                time: f64::INFINITY,
+                d: 1e300,
+            },
+        );
         rooms.tick();
 
         let mut time = None;
@@ -840,7 +915,10 @@ mod tests {
             }
         }
         let time = time.expect("a finish frame was broadcast");
-        assert!(time.is_finite() && (0.0..=86_400.0).contains(&time), "unbounded time reached the wire: {time}");
+        assert!(
+            time.is_finite() && (0.0..=86_400.0).contains(&time),
+            "unbounded time reached the wire: {time}"
+        );
     }
 
     fn drain_for_place(rx: &mut mpsc::Receiver<Outbox>, id: &str) -> Option<usize> {

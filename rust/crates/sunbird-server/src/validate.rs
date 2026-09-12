@@ -40,7 +40,12 @@ pub struct MotionSample {
 
 impl MotionSample {
     pub fn new(x: f64, y: f64, rot: f64, distance: f64) -> Self {
-        Self { x, y, rot, distance }
+        Self {
+            x,
+            y,
+            rot,
+            distance,
+        }
     }
 }
 
@@ -124,7 +129,11 @@ impl MotionPolicy {
         next: &MotionSample,
         now: Instant,
     ) -> Result<(), MotionRejection> {
-        if !next.x.is_finite() || !next.y.is_finite() || !next.rot.is_finite() || !next.distance.is_finite() {
+        if !next.x.is_finite()
+            || !next.y.is_finite()
+            || !next.rot.is_finite()
+            || !next.distance.is_finite()
+        {
             return Err(MotionRejection::NonFinite);
         }
         if next.x.abs() > self.max_coordinate_abs
@@ -202,9 +211,18 @@ mod tests {
         let m = &contract["movement"];
         let p = policy();
         assert_eq!(p.tick_hz, m["tickHz"].as_f64().unwrap());
-        assert_eq!(p.max_speed_units_per_sec, m["maxSpeedUnitsPerSec"].as_f64().unwrap());
-        assert_eq!(p.speed_headroom_factor, m["speedHeadroomFactor"].as_f64().unwrap());
-        assert_eq!(p.max_coordinate_abs, m["maxCoordinateAbs"].as_f64().unwrap());
+        assert_eq!(
+            p.max_speed_units_per_sec,
+            m["maxSpeedUnitsPerSec"].as_f64().unwrap()
+        );
+        assert_eq!(
+            p.speed_headroom_factor,
+            m["speedHeadroomFactor"].as_f64().unwrap()
+        );
+        assert_eq!(
+            p.max_coordinate_abs,
+            m["maxCoordinateAbs"].as_f64().unwrap()
+        );
         assert_eq!(p.max_altitude_abs, m["maxAltitudeAbs"].as_f64().unwrap());
         assert_eq!(p.max_rotation_abs, m["maxRotationAbs"].as_f64().unwrap());
         assert_eq!(p.max_distance, m["maxDistance"].as_f64().unwrap());
@@ -217,9 +235,17 @@ mod tests {
     #[test]
     fn first_sample_after_join_is_judged_on_envelope_alone() {
         let now = Instant::now();
-        assert!(policy().admit(None, &MotionSample::new(64.0, 12.0, 0.1, 0.0), now).is_ok());
+        assert!(policy()
+            .admit(None, &MotionSample::new(64.0, 12.0, 0.1, 0.0), now)
+            .is_ok());
         // A pilot may legitimately be far down the track when they join.
-        assert!(policy().admit(None, &MotionSample::new(180_000.0, 90.0, -0.4, 180_000.0), now).is_ok());
+        assert!(policy()
+            .admit(
+                None,
+                &MotionSample::new(180_000.0, 90.0, -0.4, 180_000.0),
+                now
+            )
+            .is_ok());
     }
 
     #[test]
@@ -304,12 +330,20 @@ mod tests {
             at: now,
         };
         assert_eq!(
-            p.admit(Some(&baseline), &MotionSample::new(499.0, 10.0, 0.0, 10.0), now),
+            p.admit(
+                Some(&baseline),
+                &MotionSample::new(499.0, 10.0, 0.0, 10.0),
+                now
+            ),
             Err(MotionRejection::DistanceRegression)
         );
         // Sub-tolerance wobble from interpolation noise is fine.
         assert!(p
-            .admit(Some(&baseline), &MotionSample::new(499.8, 10.0, 0.0, 499.7), now)
+            .admit(
+                Some(&baseline),
+                &MotionSample::new(499.8, 10.0, 0.0, 499.7),
+                now
+            )
             .is_ok());
     }
 
@@ -329,7 +363,10 @@ mod tests {
         ] {
             let verdict = p.admit(None, &sample, now);
             assert!(
-                matches!(verdict, Err(MotionRejection::NonFinite) | Err(MotionRejection::OutOfBounds)),
+                matches!(
+                    verdict,
+                    Err(MotionRejection::NonFinite) | Err(MotionRejection::OutOfBounds)
+                ),
                 "sample {sample:?} was admitted with verdict {verdict:?}"
             );
         }
@@ -351,7 +388,11 @@ mod tests {
         let p = policy();
         for raw in [-500.123_45, -0.001, 0.0, 1.004, 12_345.678_9] {
             let rounded = p.canonicalise(MotionSample::new(raw, raw, raw, raw.abs()));
-            assert!((rounded.x - raw).abs() <= 0.005, "{raw} rounded to {}", rounded.x);
+            assert!(
+                (rounded.x - raw).abs() <= 0.005,
+                "{raw} rounded to {}",
+                rounded.x
+            );
         }
     }
 
@@ -363,7 +404,9 @@ mod tests {
         ))
         .expect("read contract");
         let contract: serde_json::Value = serde_json::from_str(&raw).expect("parse contract");
-        let declared = contract["movement"]["maxStateDeltaXPerTick"].as_f64().unwrap();
+        let declared = contract["movement"]["maxStateDeltaXPerTick"]
+            .as_f64()
+            .unwrap();
         // The contract cap is the nominal allowance, rounded down.
         let p = policy();
         let nominal = p.max_speed_units_per_sec / p.tick_hz * p.speed_headroom_factor;
@@ -374,7 +417,10 @@ mod tests {
     fn rejection_labels_are_stable() {
         assert_eq!(MotionRejection::NonFinite.as_str(), "nonFinite");
         assert_eq!(MotionRejection::OutOfBounds.as_str(), "outOfBounds");
-        assert_eq!(MotionRejection::DistanceRegression.as_str(), "distanceRegression");
+        assert_eq!(
+            MotionRejection::DistanceRegression.as_str(),
+            "distanceRegression"
+        );
         assert_eq!(MotionRejection::SpeedCap.as_str(), "speedCap");
     }
 }
