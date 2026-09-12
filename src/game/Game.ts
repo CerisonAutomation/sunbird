@@ -421,7 +421,9 @@ export class Game {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.18;
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // PCFSoftShadowMap was removed in three r165+ — PCF with a slightly larger
+    // shadow map is the soft look without the console warning every load.
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.dpr = this.preferredDpr();
     this.renderer.setPixelRatio(this.dpr);
 
@@ -1757,6 +1759,14 @@ export class Game {
     this.updateTrailRibbon(visDt);
     this.particles.update(visDt);
     this.camera.update(rawDt, this.bird, playing, this.terrain.heightAt(this.bird.x));
+    // Sink foreground props that would cross the bird's sight line (per-view
+    // in split-screen so neither player loses their bird behind a tree).
+    this.terrain.updateOcclusion(
+      [{ x: this.bird.x, y: this.bird.y }],
+      this.camera.camera.position.x,
+      this.camera.camera.position.y,
+      this.camera.camera.position.z,
+    );
     this.livingBg.update(rawDt, this.bird.x, this.bird.y);
 
     this.applyWorldLook(this.bird.x, this.bird.altitude);
@@ -1816,6 +1826,17 @@ export class Game {
     p2.updateCamera(rawDt, playing, this.terrain);
 
     const lead = p1.bird.x >= p2.bird.x ? p1 : p2;
+    // Occlusion against both birds, sampled from the lead camera — a prop that
+    // blocks either player's view sinks out of the way.
+    this.terrain.updateOcclusion(
+      [
+        { x: p1.bird.x, y: p1.bird.y },
+        { x: p2.bird.x, y: p2.bird.y },
+      ],
+      lead.camera.camera.position.x,
+      lead.camera.camera.position.y,
+      lead.camera.camera.position.z,
+    );
     this.applyWorldLook(lead.bird.x, lead.bird.altitude);
     this.terrain.update(lead.bird.x);
     this.audio.update(rawDt, lead.bird.speed(), playing && this.input.diving, lead.bird.grounded, false, 1, playing, 0);
