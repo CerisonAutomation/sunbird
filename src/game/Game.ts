@@ -1224,6 +1224,7 @@ export class Game {
       coins: this.runCoins,
       clouds: this.runClouds,
       gems: this.runGems,
+      sunflowers: this.runSunflowers,
     });
     for (const g of done) {
       this.save.addCoins(g.reward);
@@ -2101,6 +2102,7 @@ export class Game {
     const score = this.score();
     this.save.recordRun(stats.distance, this.runCoins, score, this.today, this.island, this.terrain.biomeAt(this.bird.x).id);
     this.save.addLifetimeZeniths(stats.zenith);
+    this.save.addLifetimeSunflowers(this.runSunflowers);
     // distance XP is awarded at the end; everything else accrued live during the flight
     this.awardXp(Math.round(stats.distance * XP_RULES.perMetre));
     const tierBefore = this.seasonPass.tier();

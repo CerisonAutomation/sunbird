@@ -44,6 +44,7 @@ export type LifetimeStats = {
   coins: number;
   zeniths: number;
   ghostBeats: number;
+  sunflowers: number;
 };
 
 export type SeasonState = {
@@ -190,7 +191,7 @@ function defaults(): SaveState {
     claimedCollections: [],
     redeemedCodes: [],
     runsPlayed: 0,
-    lifetime: { distance: 0, coins: 0, zeniths: 0, ghostBeats: 0 },
+    lifetime: { distance: 0, coins: 0, zeniths: 0, ghostBeats: 0, sunflowers: 0 },
     achievements: [],
     season: { id: seasonId(), xp: 0, claimedFree: [], claimedPremium: [] },
     deviceId,
@@ -364,6 +365,7 @@ export class SaveData {
           coins: num(p.lifetime?.coins),
           zeniths: num(p.lifetime?.zeniths),
           ghostBeats: num(p.lifetime?.ghostBeats),
+          sunflowers: num(p.lifetime?.sunflowers),
         },
         achievements: strArr(p.achievements),
         season:
@@ -481,6 +483,11 @@ export class SaveData {
 
   addLifetimeZeniths(n: number): void {
     this.state.lifetime.zeniths += n;
+    this.persist();
+  }
+
+  addLifetimeSunflowers(n: number): void {
+    this.state.lifetime.sunflowers += n;
     this.persist();
   }
 
