@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { saturate, smoothstep } from "./math";
+import { drawSunDisc } from "./Sunbird";
 import type { TerrainPalette } from "./TerrainSystem";
 
 type SkyStop = {
@@ -111,7 +112,8 @@ export class Sky {
   readonly hemi: THREE.HemisphereLight;
   readonly sunLight: THREE.DirectionalLight;
   private readonly skyMat: THREE.ShaderMaterial;
-  private readonly sun: THREE.Mesh;
+  private readonly sun: THREE.Sprite;
+  private readonly sunTex: THREE.CanvasTexture;
   private readonly sunGlow: THREE.Sprite;
   private readonly moon: THREE.Mesh;
   private readonly moonGlow: THREE.Sprite;
@@ -192,10 +194,24 @@ export class Sky {
     const skyMesh = new THREE.Mesh(new THREE.SphereGeometry(420, 24, 16), this.skyMat);
     this.group.add(skyMesh);
 
-    const sunGeo = new THREE.SphereGeometry(10, 16, 12);
-    this.sun = new THREE.Mesh(
-      sunGeo,
-      new THREE.MeshBasicMaterial({ color: 0xfff2b0, fog: false, toneMapped: false }),
+    // The in-flight sun is the *same* disc as the title screen's: painted by
+    // Sunbird.drawSunDisc from SUN_STOPS, so the sun you start under and the
+    // sun you fly toward are one object rather than a flat yellow ball.
+    const sunCanvas = document.createElement("canvas");
+    sunCanvas.width = 256;
+    sunCanvas.height = 256;
+    drawSunDisc(sunCanvas.getContext("2d")!, 128, 128, 128);
+    this.sunTex = new THREE.CanvasTexture(sunCanvas);
+    this.sunTex.colorSpace = THREE.SRGBColorSpace;
+    this.sun = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: this.sunTex,
+        color: 0xfff2b0,
+        fog: false,
+        toneMapped: false,
+        transparent: true,
+        depthWrite: false,
+      }),
     );
     this.group.add(this.sun);
 
@@ -441,8 +457,8 @@ export class Sky {
     const elev = 22 + t * 78;
     this.sun.position.set(36 + (1 - t) * 28, elev, -110);
     this.sunGlow.position.copy(this.sun.position);
-    (this.sun.material as THREE.MeshBasicMaterial).color.copy(this.mixHex(a.sun, b.sun, u));
-    this.sun.scale.setScalar(0.85 + t * 0.4);
+    (this.sun.material as THREE.SpriteMaterial).color.copy(this.mixHex(a.sun, b.sun, u));
+    this.sun.scale.setScalar((0.85 + t * 0.4) * 26);
 
     this.moon.position.set(-8, 20 + (1 - t) * 68, -120);
     this.moonGlow.position.copy(this.moon.position);
@@ -532,6 +548,7 @@ export class Sky {
         else mat.dispose();
       }
     });
+    this.sunTex.dispose();
     this.hazeTex.dispose();
     this.milkyWayTex.dispose();
     this.nebulaTex.dispose();

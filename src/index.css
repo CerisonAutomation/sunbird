@@ -373,33 +373,30 @@ textarea {
   margin-bottom: 8px;
 }
 
-/* Layered sun: warm disc + soft corona + slow breathing halo. */
-.hero-sun {
+/* The sun. Geometry and gradient now live in Sunbird.ts (SUN_STOPS) and are
+   rendered as inline SVG, so the title screen, the lobby and the in-game sun
+   sprite are one definition instead of three drifting copies. This rule only
+   positions it and keeps the warm cast the old box-shadow gave. */
+.hero-sun-wrap {
   position: relative;
   width: 64px;
   height: 64px;
   margin-bottom: 4px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 38% 34%, #fff3c4 0%, #ffd166 45%, #ff9a3a 78%, #ff7a30 100%);
-  box-shadow:
-    0 0 0 5px rgba(255, 200, 90, 0.26),
-    0 0 0 11px rgba(255, 170, 70, 0.12),
-    0 10px 24px rgba(255, 140, 50, 0.45);
+  filter: drop-shadow(0 10px 24px rgba(255, 140, 50, 0.45));
 }
+.hero-sun { display: block; width: 64px; height: 64px; }
 
 @media (prefers-reduced-motion: no-preference) {
   .hero-sun {
+    /* Was an animated box-shadow; the corona is inside the SVG now, so the
+       breath is a transform — cheaper, and it scales the rings with it. */
     animation: sun-breathe 4.2s ease-in-out infinite;
+    transform-origin: 50% 50%;
   }
 }
 
 @keyframes sun-breathe {
-  50% {
-    box-shadow:
-      0 0 0 6px rgba(255, 200, 90, 0.32),
-      0 0 0 13px rgba(255, 170, 70, 0.16),
-      0 12px 28px rgba(255, 140, 50, 0.5);
-  }
+  50% { transform: scale(1.055); }
 }
 
 .hero-title {

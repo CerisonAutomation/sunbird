@@ -16,7 +16,7 @@
  *    source of visible flashing (blank canvas until the next 30 Hz tick).
  */
 
-import { drawSunbird } from "./Sunbird.js";
+import { FLAP_NEUTRAL, drawSunbird } from "./Sunbird.js";
 
 type Flocker = {
   x: number;
@@ -260,8 +260,14 @@ export class MenuSky {
   private drawFlocker(ctx: CanvasRenderingContext2D, bird: Flocker, w: number, h: number): void {
     const x = bird.x * w;
     const y = bird.y * h + Math.sin(this.time * 0.9 + bird.flap * 0.15) * (h * 0.004);
-    const size = Math.max(6, 9 * bird.scale);
-    const flap = Math.sin(bird.flap) * 0.7;
+    // The shared bird is `size` px WIDE (64 units end to end), where the old
+    // menu-local one spanned ~1.81 * size. Scaled up to match, so the flock
+    // reads exactly as big on screen as it did before the extraction.
+    const size = Math.max(11, 16 * bird.scale);
+    // Centred on FLAP_NEUTRAL, not on zero: that is the pose the title-screen
+    // bird is drawn in, so a ±0.5 beat sweeps the wings symmetrically through
+    // it instead of hanging below it for most of the cycle.
+    const flap = FLAP_NEUTRAL + Math.sin(bird.flap) * 0.5;
 
     // Every flock member is the same sunbird: near ones show full plumage,
     // far ones fade toward a deep-orange silhouette so they still read as
