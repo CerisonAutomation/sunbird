@@ -28,7 +28,6 @@ type Flocker = {
 };
 
 const FLOCK_SIZE = 18;
-const TRAIL_LEN = 16;
 
 export class MenuSky {
   readonly host: HTMLDivElement;
@@ -51,14 +50,9 @@ export class MenuSky {
 
   // Cached per-resize scenery (rebuilt only when the canvas really changes).
   private skyGrad: CanvasGradient | null = null;
-  private bloomGrad: CanvasGradient | null = null;
   private hazeGrad: CanvasGradient | null = null;
   private hillFar: Path2D | null = null;
   private hillNear: Path2D | null = null;
-
-  // Hero sunbird — the player's bird swooping through its own menu sky.
-  private readonly trail: { x: number; y: number }[] = [];
-  private heroFlap = 0;
 
   constructor() {
     this.reduceMotion =
@@ -165,7 +159,7 @@ export class MenuSky {
 
   /** Gradients + hill silhouettes are rebuilt only on a real resize. */
   private buildScenery(): void {
-    const { ctx, width: w, height: h } = this;
+    const { ctx, height: h } = this;
 
     const sky = ctx.createLinearGradient(0, 0, 0, h);
     sky.addColorStop(0, "#1d3f6b");
@@ -175,14 +169,8 @@ export class MenuSky {
     sky.addColorStop(1, "#f6b96f");
     this.skyGrad = sky;
 
-    const sunX = w * 0.76;
-    const sunY = h * 0.34;
-    const bloom = ctx.createRadialGradient(sunX, sunY, 4, sunX, sunY, h * 0.5);
-    bloom.addColorStop(0, "rgba(255, 244, 205, 0.95)");
-    bloom.addColorStop(0.16, "rgba(255, 226, 150, 0.5)");
-    bloom.addColorStop(1, "rgba(255, 200, 120, 0)");
-    this.bloomGrad = bloom;
-
+    // No painted sun here — the paper card's own hero-sun disc is the one sun
+    // on the title screen. A second bloom at the top-right read as a stray sun.
     const haze = ctx.createLinearGradient(0, h * 0.55, 0, h);
     haze.addColorStop(0, "rgba(255, 214, 160, 0)");
     haze.addColorStop(1, "rgba(255, 198, 138, 0.22)");
@@ -215,8 +203,6 @@ export class MenuSky {
 
     ctx.fillStyle = this.skyGrad!;
     ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = this.bloomGrad!;
-    ctx.fillRect(0, 0, w, h);
 
     this.band(ctx, w, h, 0.4, 0.16, "rgba(255,255,255,0.30)", 0.16);
     this.band(ctx, w, h, 0.3, 0.2, "rgba(255,255,255,0.22)", 0.3);
@@ -234,10 +220,6 @@ export class MenuSky {
       if (dt > 0) this.step(bird, dt);
       this.drawFlocker(ctx, bird, w, h);
     }
-
-    // Hero flies on its own transparent overlay so it soars OVER the UI card.
-    this.hctx.clearRect(0, 0, w, h);
-    this.drawHero(this.hctx, w, h, dt);
   }
 
   /* ------------------------------------------------------------- hero bird */
@@ -312,58 +294,6 @@ export class MenuSky {
       ctx.arc(size * 0.385, -size * 0.125, size * 0.025, 0, Math.PI * 2);
       ctx.fill();
     }
-  }
-
-  /**
-   * The hero sunbird swoops along a slow figure-of-eight (two incommensurate
-   * sines, so the path never visibly repeats), banking into turns and leaving
-   * a short ember trail — the menu shows the bird you actually fly.
-   */
-  private heroPos(t: number): { x: number; y: number } {
-    // Stay in the top band of the screen: full-width sweeps, but never lower
-    // than ~32% down so the bird plays around the logo, not over body copy.
-    return {
-      x: 0.5 + 0.4 * Math.sin(t * 0.21) + 0.07 * Math.sin(t * 0.53 + 1.2),
-      y: 0.16 + 0.1 * Math.sin(t * 0.42 + 0.8) + 0.05 * Math.sin(t * 0.17),
-    };
-  }
-
-  private drawHero(ctx: CanvasRenderingContext2D, w: number, h: number, dt: number): void {
-    const t = this.reduceMotion ? 4.2 : this.time;
-    const p = this.heroPos(t);
-    const ahead = this.heroPos(t + 0.12);
-    const vx = ahead.x - p.x;
-    const vy = ahead.y - p.y;
-    const heading = Math.atan2(vy * h, vx * w);
-    const dirRight = Math.cos(heading) >= 0;
-
-    const x = p.x * w;
-    const y = p.y * h;
-    const size = Math.max(18, Math.min(w, h) * 0.055);
-
-    if (dt > 0) {
-      this.heroFlap += dt * (7 + Math.abs(Math.sin(t * 0.42)) * 4);
-      this.trail.push({ x, y });
-      if (this.trail.length > TRAIL_LEN) this.trail.shift();
-    }
-
-    // Ember trail — fading, shrinking dots along the recent path.
-    for (let i = 0; i < this.trail.length; i++) {
-      const k = i / TRAIL_LEN;
-      const tp = this.trail[i]!;
-      ctx.fillStyle = `rgba(255, 190, 110, ${0.05 + k * 0.2})`;
-      ctx.beginPath();
-      ctx.arc(tp.x, tp.y, size * 0.1 + k * size * 0.16, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(heading * 0.5); // soften banking so it never looks acrobatic
-    if (!dirRight) ctx.scale(-1, 1);
-    const flap = Math.sin(this.heroFlap) * 0.85;
-    this.drawSunbird(ctx, size, flap, 1);
-    ctx.restore();
   }
 
   /* ---------------------------------------------------------- distant flock */
