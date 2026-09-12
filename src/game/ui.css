@@ -3302,24 +3302,26 @@ button {
 /* crafted SVG mode icons */
 .mode-icon-lg .mi { width: 40px; height: 40px; display: block; margin: 0 auto; filter: drop-shadow(0 2px 3px rgba(60, 30, 20, 0.18)); }
 .mode-card-main:active .mi { transform: scale(0.92); }
-/* Hero: the sunbird mark perches on the sun, gently bobbing above the title. */
+/* Hero: the sunbird mark perches on the sun, gently bobbing above the title.
+   Kept small enough to sit *on* the disc (never dwarf it) so the sun reads as
+   the sun and the bird reads as its rider, not a second oversized emblem. */
 .hero-bird {
   position: absolute;
-  top: 4px;
+  top: 5px;
   left: 50%;
-  width: 96px;
-  height: 96px;
-  margin-left: -48px;
+  width: 56px;
+  height: 56px;
+  margin-left: -28px;
   overflow: visible;
-  filter: drop-shadow(0 6px 14px rgba(120, 60, 20, 0.35));
+  filter: drop-shadow(0 4px 9px rgba(120, 60, 20, 0.3));
   animation: heroBob 3.4s ease-in-out infinite;
   z-index: 2;
 }
 @keyframes heroBob {
   0%, 100% { transform: translateY(0) rotate(-2deg); }
-  50% { transform: translateY(-7px) rotate(2deg); }
+  50% { transform: translateY(-5px) rotate(2deg); }
 }
-.hero { padding-top: 64px; }
+.hero { padding-top: 42px; }
 .hero-sun { opacity: 0.55; }
 @media (prefers-reduced-motion: reduce) { .hero-bird { animation: none; } }
 

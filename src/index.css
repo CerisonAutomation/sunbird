@@ -376,15 +376,15 @@ textarea {
 /* Layered sun: warm disc + soft corona + slow breathing halo. */
 .hero-sun {
   position: relative;
-  width: 74px;
-  height: 74px;
+  width: 64px;
+  height: 64px;
   margin-bottom: 4px;
   border-radius: 50%;
   background: radial-gradient(circle at 38% 34%, #fff3c4 0%, #ffd166 45%, #ff9a3a 78%, #ff7a30 100%);
   box-shadow:
-    0 0 0 7px rgba(255, 200, 90, 0.28),
-    0 0 0 15px rgba(255, 170, 70, 0.14),
-    0 14px 34px rgba(255, 140, 50, 0.5);
+    0 0 0 5px rgba(255, 200, 90, 0.26),
+    0 0 0 11px rgba(255, 170, 70, 0.12),
+    0 10px 24px rgba(255, 140, 50, 0.45);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -396,9 +396,9 @@ textarea {
 @keyframes sun-breathe {
   50% {
     box-shadow:
-      0 0 0 9px rgba(255, 200, 90, 0.34),
-      0 0 0 20px rgba(255, 170, 70, 0.18),
-      0 18px 40px rgba(255, 140, 50, 0.55);
+      0 0 0 6px rgba(255, 200, 90, 0.32),
+      0 0 0 13px rgba(255, 170, 70, 0.16),
+      0 12px 28px rgba(255, 140, 50, 0.5);
   }
 }
 
