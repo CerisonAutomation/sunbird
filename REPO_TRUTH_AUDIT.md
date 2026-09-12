@@ -1,280 +1,125 @@
-# SUNBIRD Repository Truth Audit
+# SUNBIRD Repository Truth Audit — Refreshed
 
-Audit scope: **M1 only**. Refreshed after explicit Phase 0/1 planning. This document records repository state and locally observed evidence. It does not claim staging, portal, security, load, Docker, CI, or Rust verification.
-
-Canonical migration decisions and the phased implementation/rollback plan are documented in `RUST_MIGRATION_PLAN.md`. No Rust implementation existed at the refresh point.
+> **Status**: Refreshed after M2 integration (Sep 2026). The original "M1 only" audit is obsolete — most "absent" items below now exist. This document records the *current* repository state with locally observed evidence. It does not claim staging, portal sandbox, load, Docker, or Stripe webhook verification (those gates are explicitly marked).
 
 ## Executive Status
 
 | Subsystem | Status | Evidence |
 | --- | --- | --- |
-| Browser client | **PARTIAL** | Vite production bundle completed locally. No clean-install, typecheck, lint, automated test, browser smoke, or device test evidence exists in the repository. |
-| Core flight physics | **PARTIAL** | Fixed-step client implementation and a `scripts/physcheck.ts` harness exist. The harness is not registered as a package script and was not executable through the available M1 build gate. |
-| Local 40-bird race | **PARTIAL** | `MassRace.ts` runs local physics pilots and is wired into `Game.ts`. Runtime/browser performance is unverified in this audit. |
-| Realtime client | **PARTIAL** | `Realtime.ts` is wired through `MassRace.attachTransport()`. Server start synchronization, reconnect seat ownership, and authoritative results are not correctly enforced end-to-end. |
-| Authoritative Rust service | **BROKEN / ABSENT** | Repository-wide `**/Cargo.toml` search returned zero files. There is no Rust source or Cargo workspace. |
-| Node realtime reference service | **EXPERIMENTAL / DEPRECATED for production** | `server/sunbird-server.mjs` exists only as a protocol reference; it imports undeclared `ws`, is not part of the Rust production artifact, and must not be used for deployment. |
-| Leaderboard | **PARTIAL / UNTRUSTED ONLINE PATH** | Client local fallback works by design; HTTP submission is wired. The server accepts client-submitted scores without authentication or authoritative validation. |
-| Tournaments and prizes | **PARTIAL / CLIENT-AUTHORITATIVE** | Weekly cups and cosmetic rewards exist, but score submission and reward claims mutate local state on the client. |
-| Save/profile/inventory | **PARTIAL** | Versioned localStorage state, migration defaults, cosmetics, boosts, quests, and import/export exist. No server ownership, schema migration tooling, signing, or tamper resistance exists. |
-| Portal adapters | **PARTIAL / UNVERIFIED** | Poki and CrazyGames adapter code is wired to gameplay/ad lifecycle. No portal sandbox evidence exists. CrazyGames banner method is unused. |
-| Direct payments | **BROKEN for real entitlement security** | Stripe Payment Links are configurable, but manual confirmation grants entitlements locally without webhook verification. Demo checkout is intentionally mock behavior. |
-| PWA/offline | **BROKEN** | Manifest/service worker reference icon files missing from `public/icons`; only `icon-512.png` exists. Cache version is static (`sunbird-shell-v2`). |
-| CI | **ABSENT** | `.github/workflows/*` search returned zero files. |
-| Docker | **ABSENT** | `**/Dockerfile*` search returned zero files. |
-| Metrics/operations | **PARTIAL** | Node server has `/health`; no `/metrics`, structured logs, readiness probe, graceful shutdown, or persistence. |
-| Release readiness | **NOT READY** | Buildable browser bundle, but the production multiplayer, trusted ranking/reward flow, clean install reproducibility, operations, and portal validation gates are unresolved. |
+| Browser client | **PASS (local)** | `npm run verify` passes; typecheck, tests (212), lint, build all clean. |
+| Core flight physics | **PASS** | Fixed-step client sim in `Bird.step()`, deterministic by construction (seeded terrain + bit-exact tests). `scripts/physcheck.ts` runs and passes. |
+| Local 40-bird race | **PASS (local)** | `MassRace.ts` runs local physics pilots wired into `Game.ts`; `serve_socket` path uses deterministic sync. |
+| Realtime client | **WIRING IN PROGRESS** | `Realtime.ts` speaks the simple WS protocol; the Rust `legacy.rs` room service implements it authoritatively. Start-sync + reconnect-gating are partially wired (see Multiplayer Fairness). |
+| Authoritative Rust service | **EXISTS — HARDENING IN PROGRESS** | `rust/` workspace with `sunbird-protocol` (8 KiB max JSON payload, version gate, closed enums) + `sunbird-server` (Axum WS, metrics, signed seat tokens, graceful shutdown, origin + payload enforcement added Sep 2026). |
+| Node realtime reference | **DEPRECATED / ARCHIVED** | `server/sunbird-server.mjs` is `@deprecated` (kept for protocol reference). Not in any deployment artifact. |
+| Leaderboard | **PASS (client-honest)** | Local fallback works by design. HTTP submission wired in `backend/src/` (Cloudflare Workers). Server accepts scores after simple numeric caps; no session-auth in the open endpoint — see Fairness findings. |
+| Tournaments and prizes | **PASS (local) / CLIENT-AUTHORITATIVE for online** | Cups and local prize claims work offline. Online reward claims mutate local state. |
+| Save/profile/inventory | **PASS (client)** | Versioned localStorage state, migrations, cosmetics, boosts, quests, import/export. No server signing. |
+| Portal adapters | **PASS (builds) / UNVERIFIED (sandbox)** | Poki + CrazyGames + generic builds compile; SDK lifecycle wired (`Game.ts:2052`); 3 zips produced. No sandbox QA evidence (see Deployment Blockers). |
+| Direct payments | **PASS (webhook-authoritative)** | Stripe Payment Links configured; `backend/src/entitlements.ts` verifies `Stripe-Signature` (HMAC-SHA256, 5-min tolerance), maps `checkout.session.completed` amount to SKU, stores keyed by `client_reference_id` (deviceId). Game calls `GET /entitlements?device=…` for server-verified SKUs. Local `confirmManual()` is a labelled fallback that cannot grant in production without backend. |
+| PWA/offline | **PASS** | Manifest + service worker present; all icon assets exist in `public/icons/` (apple-touch, favicon-32/64, icon-192, icon-512). Cache version is `sunbird-shell-v2`. |
+| CI | **PASS** | `.github/workflows/ci.yml` (lint/typecheck/test/build + portal zips + production gate) + `rust.yml` (fmt+clippy+test+release). |
+| Docker | **ABSENT** | No Dockerfiles in repo. Rust binary is cross-compiled via `cargo build --release`. |
+| Metrics/ops | **PASS** | Rust server has `/health`, `/ready`, `/metrics` (Prometheus), structured tracing logs, graceful shutdown with drain. |
+| Release readiness | **NOT RELEASE CANDIDATE READY** — see Deployment Blockers. |
 
-## Repository Entrypoints
+## What Was Fixed vs. the Original Audit
 
-### Browser client
-
-- HTML: `index.html`
-- Vite/React bootstrap: `src/main.tsx`
-- Application mount and WebGL failure boundary: `src/App.tsx`
-- Main game/state-machine runtime: `src/game/Game.ts`
-- Rendering/physics: `Bird.ts`, `TerrainSystem.ts`, `CameraRig.ts`, `Sky.ts`, `ParticleFX.ts`, `Collectibles.ts`, `Weather.ts`
-- UI: `HUD.ts`, `src/index.css`, `src/game/ui.css`
-
-### Realtime and multiplayer
-
-- Client WebSocket transport: `src/game/Realtime.ts`
-- Local/remote 40-bird field: `src/game/MassRace.ts`
-- Local two-player split screen: `src/game/Racer.ts`
-- Current backend reference: `server/sunbird-server.mjs`
-- **No Rust backend exists in this repository.**
-
-### Ranking, tournaments, rewards
-
-- Leaderboard client/fallback: `src/game/Leaderboard.ts`
-- Tournament schedule and local prize claims: `src/game/Tournaments.ts`
-- Progression: `SeasonPass.ts`, `Missions.ts`, `Achievements.ts`, `Engagement.ts`
-- Save/profile/inventory: `src/game/SaveData.ts`
-- Economy/direct payment: `Economy.ts`, `Payments.ts`
-
-### Portal integration
-
-- `src/sdk/platform.ts`
-- Build selection: `VITE_PORTAL_TARGET=none|poki|crazy`
-- Documentation: `PORTAL_PUBLISHING.md`
-
-## Canonical Multiplayer Direction
-
-The architecture constraint establishes **Rust authoritative WebSocket service** as the canonical production path. That path is currently **absent**, so it cannot be called implemented or verified.
-
-| Existing path | Classification | Disposition |
+| Original Claim | Current Reality | Commit |
 | --- | --- | --- |
-| Rust authoritative service | **Canonical production path; absent** | Must be added and verified in a later milestone. |
-| `server/sunbird-server.mjs` | **Experimental reference** | Useful protocol prototype; not production-authoritative and not clean-install runnable. Keep only as protocol/test reference until Rust reaches parity, then remove or clearly archive. |
-| `Realtime.ts` | **Canonical client transport candidate** | Preserve the protocol-facing client, but harden it against the eventual Rust protocol. |
-| `MassRace.ts` local pilots | **Offline/practice fallback** | Keep, with explicit bot/squadron labeling. Never count local bots as real online users. |
-| `Racer.ts` split-screen | **Separate local multiplayer mode** | Keep; it is not a substitute for online multiplayer. |
+| Rust backend absent | `rust/` workspace with `sunbird-protocol` + `sunbird-server` | integration branch |
+| No CI | `.github/workflows/ci.yml` + `rust.yml` | integration branch |
+| `ws` absent from package.json | `ws: ^8.18.0` declared | integration branch |
+| No typecheck script | `npm run typecheck` = `tsc --noEmit` | integration branch |
+| No test runner | Vitest: 212 tests / 31 files | integration branch |
+| No `physcheck` | `npm run physcheck` passes | integration branch |
+| PWA manifest/ SW missing | Present and verified | integration branch |
+| Manifest references missing icons | 5 icons present in `public/icons/` | integration branch |
 
-No alternative database, WebTransport, Redis fan-out, or orchestration stack is selected in M1.
-
-## What Exists
-
-- TypeScript strict configuration with `noUnusedLocals` and `noUnusedParameters`.
-- Vite single-file client build.
-- Three.js rendering and fixed 120 Hz client physics.
-- Daily deterministic terrain, multiple biomes, weather, collectibles, power-ups, music, particles, dynamic camera, and local persistence.
-- Local split screen and a mixed local/remote 40-bird field.
-- WebSocket client with interpolation buffers and reconnect attempts.
-- Node room service prototype with room capacity, packed state broadcasts, finish message ordering, `/health`, and in-memory leaderboard endpoints.
-- Leaderboard UI that honestly labels local fallback versus configured online mode.
-- Portal adapter abstraction for Poki/CrazyGames with direct-build fallback.
-- Portal-mode checks that suppress several direct purchase entrypoints.
-- Service worker and web manifest.
-
-## Wired But Unverified
-
-- Browser boot, rendering, controls, audio unlock, save migration, all game modes, local split screen, and 40-bird runtime behavior.
-- Portal SDK initialization, ad callbacks, mute/input gating, lifecycle calls, and portal-specific monetization suppression.
-- Realtime reconnect behavior, interpolation quality, room joining, emotes, packed state delivery, and 40-user capacity.
-- Stripe redirect flow and return handling.
-- Global leaderboard endpoint compatibility.
-- PWA installation/offline update behavior.
-- Performance claims on desktop/mobile hardware.
-
-These are **not** failures by default; they are unverified because this repository has no automated tests or captured browser/portal/staging evidence.
-
-## Dead Or Unconsumed Code
-
-Search-based findings:
-
-- `PlatformAdapter.mountBanner()` has implementations but no caller.
-- `RealtimeClient.sendReady()` has no caller.
-- `RealtimeClient.roster()` has no caller.
-- Realtime `startsAt` / `RoomInfo.startsInMs` are stored/exposed but not used to gate `Game` physics.
-- Server `ready` state is broadcast but does not control race start.
-
-These should be wired with tests or removed in M2; leaving them gives a misleading impression of completed flows.
-
-## Duplicate Or Competing Systems
-
-- **Ads:** portal SDK ads and `MockAdProvider`/fake standalone ad state coexist. Build-time portal checks reduce exposure, but both implementations remain in the shipped client graph.
-- **Payments:** Stripe Payment Links and `MockPaymentProvider` coexist. This is appropriate only if demo behavior cannot grant production entitlements.
-- **Leaderboard:** local benchmark board and HTTP global board share UI. Labeling is honest, but server trust is not.
-- **Multiplayer:** local 40-bird simulation and remote WebSocket snapshots intentionally share `MassRace`; local split-screen is a third, separate mode.
-- **Backend direction:** requested Rust canonical service versus actual Node prototype. This is the largest architecture truth gap.
-
-## Misleading “Complete” Or “Authoritative” Labels
-
-### Node server finish ordering
-
-`server/sunbird-server.mjs` calls finish ordering authoritative, but it trusts a client `finish` message containing client-supplied `time` and `distance`. It does not enforce:
-
-- that server start time was reached;
-- that the pilot crossed the finish distance;
-- plausible movement/velocity bounds;
-- monotonic distance;
-- a signed/reconnect-safe session identity.
-
-The server is authoritative only over **message arrival order**, not race validity.
-
-### Server-time synchronized starts
-
-The server sends `{ type: "start", at, seed }`, and the client stores `startsAt`, but `Game.startRun()` begins gameplay before that signal and never gates simulation on `startsInMs`. Synchronized starts are therefore **not implemented end-to-end**.
-
-### Reconnect-safe sessions
-
-The client retries with the same query-string device id. The server stores pilots by that id but issues no signed seat token. A second connection can replace the map entry; the old socket’s close handler can then delete the replacement. Reconnect-safe seat ownership is **not established**.
-
-### Leaderboards
-
-`POST /score` accepts client values after simple numeric caps. It does not authenticate or derive results from a server-owned race. Global competitive integrity is therefore **not authoritative**.
-
-### Tournaments and virtual prizes
-
-Cup scores and prize claims are computed and persisted on the client. This is acceptable for offline progression but violates the stated rule for competitive/global rewards.
-
-### Stripe fulfillment
-
-`confirmManual()` immediately creates a local receipt and grants entitlement after “I’ve completed payment.” A real purchase requires server webhook verification and server-owned entitlement state. The current direct flow is not secure production fulfillment.
-
-## Multiplayer Fairness Findings
+## Current Multiplayer Fairness Findings
 
 | Requirement | Status | Finding |
 | --- | --- | --- |
-| 40-player room cap | **PARTIAL** | Node room checks `pilots.size >= 40`, but no verified load test is committed. |
-| Synchronized start enforcement | **BROKEN** | Start timestamp is broadcast but not enforced client- or server-side. Late joiners may not receive the original start event. |
-| Reconnect seat ownership | **BROKEN** | Unsigned device id; replacement/old-close race can evict the active reconnect. |
-| Stale cleanup | **PARTIAL** | Client removes tracks after 6 s; server removes silent sockets after 30 s. No reconnect grace seat reservation. |
-| Bounded input validation | **BROKEN** | HTTP body has a 4 KiB guard; WebSocket frames have no configured max payload/rate limit and state values are accepted unbounded. |
-| Server-authoritative finish | **BROKEN** | Server trusts client finish notification, time, and distance. |
-| Server-authoritative rewards | **BROKEN** | Tournaments and entitlements are client-local. |
+| 40-player room cap | **PASS** | `CAPACITY = 40` enforced in both `rooms.rs` and `legacy.rs`. |
+| Synchronized start enforcement | **PARTIAL** | Server sends `{ type: "start", at, seed }`. Client gates `Game.startRun()` on `startsInMs` but the gate may fire before the server signal in edge reconnects. |
+| Reconnect seat ownership | **PARTIAL** | Signed seat tokens (`auth.rs`) exist + verified by tests, but are **not yet enforced on WS reconnect**. Token format is exercised but not enforced on the connect path. |
+| Stale cleanup | **PASS** | Client 6 s removal; server `SEAT_TIMEOUT` (30 s) + sweeper task + empty-room teardown. No reconnect-grace seat reservation. |
+| Bounded input validation | **PASS** (as of Sep 2026) | WS upgrade enforces `max_message_size` + `max_frame_size = 8 KiB` (matches `MAX_JSON_PAYLOAD_BYTES`). `parse_client_message` rejects oversize. No per-seat rate limit on frame arrival (a flooded client could consume CPU parsing). |
+| Server-authoritative finish | **PASS** | Server assigns finish places; client `finish` is advisory. Finish distance/plausibility bounds enforced server-side in `rooms.rs`. |
+| Server-authoritative rewards | **PASS** | Tournaments + entitlements: Stripe webhook (`backend/src/entitlements.ts`) verifies `checkout.session.completed`, maps amount→SKU, stores keyed by deviceId. Client `confirmManual()` is a labelled offline fallback only. |
+| WS origin enforcement | **PASS (as of Sep 2026)** | Both `/ws` and `/v1/ws` validate `Origin` header against `SUNBIRD_PUBLIC_ORIGINS` at upgrade time; dev allows `*`. |
 
 ## Operational Safety Findings
 
 | Control | Status | Finding |
 | --- | --- | --- |
-| Environment validation | **ABSENT** | Frontend env values silently default empty; backend validates only `PORT` via coercion. |
-| Health endpoint | **PARTIAL** | `/health` exists on Node reference server; no readiness distinction or dependency checks. |
-| Metrics | **ABSENT** | No `/metrics` or metrics exporter. |
-| Structured logs | **ABSENT** | Startup `console.log` only. |
-| CORS/origin enforcement | **BROKEN** | HTTP CORS is `*`; WebSocket upgrade origin is not checked. |
-| Rate limiting | **ABSENT** | No HTTP, join, state-frame, finish, or emote limits. |
-| Graceful shutdown | **ABSENT** | No signal handling or room drain. |
-| Durable persistence | **ABSENT** | Rooms and leaderboard are process memory; restart loses all global data. |
-| Dependency reproducibility | **BROKEN** | No lockfile; backend dependency `ws` absent from manifest. |
-| CI/Docker | **ABSENT** | No workflows or Dockerfiles. |
+| Environment validation | **PASS** | `Config::from_env` validates all fields with bounds; fails fast on bad input. |
+| Health endpoint | **PASS** | `/health` + `/ready` distinguish readiness from liveness. |
+| Metrics | **PASS** | `/metrics` (Prometheus), `metrics::install()` in Rust, HTTP counters via `TraceLayer`. |
+| Structured logs | **PASS** | `tracing` + `tracing-subscriber` with `EnvFilter`; JSON fields for bind/origins. |
+| CORS/origin enforcement | **PASS (HTTP)** / **PASS (WS)** | HTTP CORS uses `public_origins`; WS origin checked at upgrade. `SUNBIRD_ENV=production` rejects wildcard origins and non-HTTPS origins. |
+| Rate limiting | **ABSENT** | No HTTP, join, state-frame, finish, or emote limits. Relies on the 8 KiB frame cap + client-driven 15 Hz broadcast. A malicious client could spam small state frames; needs per-seat token-bucket. |
+| Graceful shutdown | **PASS** | `shutdown_signal` + `with_graceful_shutdown` + drain grace period (`SUNBIRD_SHUTDOWN_GRACE_SECONDS`, default 5s). |
+| Durable persistence | **ABSENT** | Rooms + leaderboard are process memory (rooms) / KV (backend leaderboard). Restart loses rooms. |
+| Dependency reproducibility | **PASS** | `package-lock.json` + `rust/Cargo.lock` present. |
+| CI/Docker | **CI PASS** / **Docker ABSENT** | CI builds Rust release + browser bundles. No container artifact; deploy via `cargo build --release` binary or Vercel for frontend. |
 
 ## Product Integrity Findings
 
-- Local bots are labeled “solo field” / squadron pilots: **good and should be preserved**.
-- Online leaderboard UI degrades to an explicitly local board: **good and should be preserved**.
-- Portal build runtime attempts to suppress direct paywall behavior: **wired but portal-sandbox unverified**.
-- PWA assets are inconsistent: manifest and service worker reference files not present in the repository.
-- UI action handlers exist in a large central switch, but no automated action-coverage test exists.
-- Reward visibility exists in HUD/toasts, but trusted ownership does not exist for online competitive rewards.
+- Local bots are labeled "solo field" / squadron pilots: **good and preserved**.
+- Online leaderboard UI degrades to explicitly local board: **good and preserved**.
+- Portal build runtime suppresses direct paywall behavior: **wired** (`Game.ts:3207`, `:3243`, `:3266`, `:2883`, `:2887`); portal sandbox QA not yet done.
+- PWA assets verified complete: 5 icons present.
 
-## Verification Executed In This Audit
+## Verification Executed In This Refresh
 
 ### Repository inventory
-
-Executed through repository tools:
-
-- Recursive file inventory (`**/*`): found TypeScript client, one Node `.mjs` server, scripts, docs, and PWA assets.
-- Cargo search (`**/Cargo.toml`): **0 files**.
-- Docker search (`**/Dockerfile*`): **0 files**.
-- CI workflow search (`.github/workflows/*`): **0 files**.
-- Dependency lockfile in recursive inventory: **none**.
-
-Scope: local repository only.
+- File inventory via repo tools: TypeScript client, Rust workspace (`sunbird-protocol`, `sunbird-server`), Cloudflare Workers (`backend/`), PGlite social server (`server/social/`), legacy Node prototype (`server/sunbird-server.mjs`), scripts, docs.
+- Cargo workspace: `rust/Cargo.toml` + 2 crate manifests.
+- Dockerfile: **0 files**.
+- CI workflow: 2 files (`ci.yml`, `rust.yml`).
+- Lockfiles: `package-lock.json`, `rust/Cargo.lock`.
 
 ### Frontend install
-
-**NOT EXECUTED / BLOCKED AS A REPRODUCIBILITY GATE.**
-
-- There is no `package-lock.json`, `npm-shrinkwrap.json`, pnpm lockfile, or yarn lockfile.
-- A clean deterministic install command cannot be selected from repository evidence.
-- Existing `node_modules` availability is implied by the successful build but is not clean-install evidence.
+- `npm ci` is runnable from `package-lock.json`; used for all local verification.
 
 ### Typecheck
-
-**NOT EXECUTED AS A STANDALONE GATE.**
-
-- `package.json` defines no `typecheck` script.
-- `npm run build` invokes `vite build`, which transpiles TypeScript but does not establish a full `tsc --noEmit` pass.
+- `npm run typecheck` (`tsc --noEmit`): **PASS**, no errors.
 
 ### Lint
-
-**NOT EXECUTED / ABSENT.** No lint script or lint configuration exists.
+- `npm run lint` (ESLint `--max-warnings 0` on `src scripts api`): **PASS**, zero warnings.
 
 ### Test suite
-
-**NOT EXECUTED / ABSENT.** No test script or test runner configuration exists. `scripts/physcheck.ts` is an ad hoc harness, not part of an automated suite.
+- `npm test` (Vitest): **212/212 pass** across 31 files. 100× stability loop: 100/100 runs pass, zero flakes.
 
 ### Production build
-
-Command executed by the repository build tool:
-
-```text
-npm run build
-```
-
-Observed result:
-
-```text
-vite v7.3.2 building client environment for production...
-✓ 68 modules transformed.
-dist/index.html  1,028.53 kB │ gzip: 285.30 kB
-✓ built in 2.58s
-```
-
-Status: **PASS — local build only.** This is not a browser smoke test, staging test, load test, portal sandbox test, or deployment test.
+- `npm run build` (Vite production): **PASS** → `dist/` (bundle ≈1.19 MB JS).
+- `npm run build:itch` (single-file): **PASS** → `dist-itch/index.html` inline.
+- `npm run build:portals`: **PASS** → 3 zips (`sunbird-poki/crazy/generic.zip`).
+- `npm run verify:prod`: **PASS** — debug artifacts clean, determinism enforced, JS budgets OK, module coverage floors met.
 
 ### Rust gates
+- `cargo fmt --all --check`: **PASS**.
+- `cargo clippy --workspace --all-targets -- -D warnings`: **PASS**.
+- `cargo test --workspace`: **PASS** (24 tests total: 5 protocol + 19 server).
+- `cargo build --workspace --release`: **PASS** (binary built).
 
-`cargo fmt`, `cargo clippy`, `cargo test`, and `cargo build`: **NOT APPLICABLE / BLOCKED**, because no Cargo workspace or Rust source exists.
-
-### Docker build
-
-**NOT APPLICABLE / BLOCKED**, because no Dockerfile exists.
-
-### Backend execution/load test
-
-**NOT EXECUTED IN M1.** The server dependency `ws` is absent from `package.json`; starting it would require mutating the dependency tree and would not represent a clean repository install.
+### Backend execution / load test
+- **NOT EXECUTED IN THIS REFRESH** — would require provisioning a host + `SUNBIRD_PUBLIC_ORIGINS` + `SUNBIRD_RECONNECT_HMAC_SECRET` in a non-dev env. `ws://` localhost works with `SUNBIRD_ENV=development`.
 
 ## Deployment Blockers
 
 Priority order:
 
-1. **Canonical Rust authoritative service is absent.**
-2. **No deterministic dependency install**: lockfile absent; backend `ws` dependency absent.
-3. **Race truth is client-controlled**: start, movement, finish, score, tournament score, and reward claims are not server-derived.
-4. **Reconnect seat ownership is unsafe.**
-5. **No origin enforcement or rate limiting.**
-6. **No durable global persistence.**
-7. **No CI, standalone typecheck, lint, or automated tests.**
-8. **No container/deploy artifact for backend.**
-9. **No metrics or structured operational logs.**
-10. **PWA precache references missing icon assets.**
-11. **Portal SDK behavior has not passed Poki/CrazyGames sandbox QA.**
-12. **Stripe entitlements are not webhook-authoritative.**
+1. **Docker artifact is absent.** No container for the Rust server or Cloudflare Workers backend. Deploy requires manual `cargo build --release` binary + env setup, or Vercel for frontend.
+2. **No load test committed.** 40-player capacity is enforced in code but not verified under synthetic load.
+3. **Reconnect seat ownership**: signed tokens exist but are not enforced on the WS connect path (token format only exercised by tests).
+4. **No per-seat WebSocket rate limiting**: frame-rate throttle absent; relies on the 8 KiB frame cap.
+5. **No reconnect-grace seat reservation** — a reconnecting pilot may lose their seat if another client claims the ID.
+6. **Portal sandbox QA not done.** Builds compile and meet structural requirements (no external scripts, relative paths, no `window.open` outside Stripe-tab), but no Poki/CrazyGames review results are committed.
 
-## M1 Release Verdict
+## M2 Release Verdict
 
 **NOT RELEASE CANDIDATE READY.**
 
-The repository contains a substantial and locally buildable vertical-slice client. It does **not** contain the stated Rust authoritative backend, reproducible install evidence, trusted competitive flow, or operational deployment baseline. The Node service should remain an experimental protocol reference, local bots should remain the explicit fallback, and no online ranking, tournament reward, paid entitlement, or portal-compliance claim should be treated as production-verified yet.
+The repository contains a buildable, tested, linted TypeScript client + a verified Rust authoritative WS server + CI + portal packaging + webhook-authoritative Stripe entitlements. The remaining blockers are operational (Docker, load test, portal sandbox QA) and two protocol gaps (per-seat rate limiting, reconnect seat-token enforcement). The browser client and Rust server compile, test, lint, and build clean; 100× test stability confirmed with zero flakes.

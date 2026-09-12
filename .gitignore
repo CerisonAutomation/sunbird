@@ -54,3 +54,4 @@ dist-itch/
 
 # botsim CI reports (uploaded as artifacts, never committed)
 botsim-*.json
+*.png  # screenshot artifacts — do not version

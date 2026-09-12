@@ -26,7 +26,8 @@ use axum::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         Query, State,
     },
-    response::Response,
+    http::HeaderMap,
+    response::{IntoResponse, Response},
 };
 use futures_util::{sink::SinkExt, stream::SplitSink, stream::StreamExt};
 use parking_lot::RwLock;
@@ -36,6 +37,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+use sunbird_protocol::MAX_JSON_PAYLOAD_BYTES;
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
@@ -540,13 +542,33 @@ struct Identity {
     seed: String,
 }
 
+/// WebSocket upgrade state for the legacy socket: room registry + allowed origins.
+#[derive(Clone)]
+pub struct LegacySocketState {
+    pub rooms: Arc<LegacyRooms>,
+    pub allowed_origins: Vec<String>,
+}
+
 pub async fn legacy_ws_handler(
     ws: WebSocketUpgrade,
     Query(params): Query<LegacyQuery>,
-    State(rooms): State<Arc<LegacyRooms>>,
+    State(state): State<LegacySocketState>,
+    headers: HeaderMap,
 ) -> Response {
+    let allowed = state.allowed_origins.iter().any(|o| o == "*");
+    if !allowed {
+        let origin = headers
+            .get("origin")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+        if !state.allowed_origins.iter().any(|o| o == origin) {
+            return (axum::http::StatusCode::FORBIDDEN, "origin not allowed").into_response();
+        }
+    }
     let identity = identity_from(params);
-    ws.on_upgrade(move |socket| serve_legacy(socket, rooms, identity))
+    ws.max_message_size(MAX_JSON_PAYLOAD_BYTES)
+        .max_frame_size(MAX_JSON_PAYLOAD_BYTES)
+        .on_upgrade(move |socket| serve_legacy(socket, state.rooms.clone(), identity))
 }
 
 /// Periodic 15 Hz broadcaster + reaper. Run once from `main()` at startup.
