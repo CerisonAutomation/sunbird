@@ -536,9 +536,10 @@ export class HUD {
     this.menuEl.classList.toggle("hidden", !menuVisible);
     if (menuVisible) this.menuSky.resize(this.menuEl.clientWidth, this.menuEl.clientHeight);
     this.menuSky.setActive(menuVisible);
-    // The hero bird only plays on the title screen — flying over the shop or
-    // pass card reads as a glitch, not charm.
-    this.menuSky.heroHost.classList.toggle("hidden", !(menuVisible && s.screen === "main"));
+    // The static perched hero-bird SVG on the sun is the menu's bird. The
+    // canvas "hero bird" overlay used to draw a second swooping bird on top of
+    // it — two birds on one title screen. Keep it hidden so the mark reads once.
+    this.menuSky.heroHost.classList.add("hidden");
     this.pauseEl.classList.toggle("hidden", s.state !== "paused");
     // The pause control only makes sense in live flight — hide it while the
     // crash "second wind" card is up so it can't read as a dead button.
