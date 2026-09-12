@@ -289,6 +289,7 @@ export class Game {
   private ringChain = 0;
   private ringChainTimer = 0;
   private runBalloons = 0;
+  private runSunflowers = 0;
   private readonly powers = new PowerUps();
   private coach: FirstFlight | null = null;
   private mode: ModeDef = modeById("daytrip");
@@ -735,6 +736,10 @@ export class Game {
     );
 
     if (this.bird.justLaunched) this.onLaunch();
+    if (this.bird.bounced) {
+      this.bird.bounced = false;
+      this.onSunflower();
+    }
 
     // First-flight coach: verify dive -> launch -> soar with real play signals.
     if (this.coach && !this.coach.done) {
@@ -1293,6 +1298,21 @@ export class Game {
       this.bonus += 6;
       this.audio.chirp();
     }
+  }
+
+  /** Sunflower pad: a springy launch off a bloom — pure, reviewable bounce. */
+  private onSunflower(): void {
+    this.runSunflowers += 1;
+    this.bonus += 80;
+    this.awardXp(XP_RULES.coin);
+    this.audio.boing();
+    this.particles.burstRing(this.bird.x, this.bird.y, 0xffcf33);
+    this.particles.emitConfetti(this.bird.x, this.bird.y + 1);
+    this.camera.punch(4);
+    this.hud.toast("🌻 Sunflower bounce +80", "gold");
+    this.glow(0.55);
+    this.haptic([20, 10, 40]);
+    this.telemetry.track("sunflower", {});
   }
 
   /** Landings feed straight back into momentum, so they get feedback too. */
@@ -2216,6 +2236,7 @@ export class Game {
     this.ringChain = 0;
     this.ringChainTimer = 0;
     this.runBalloons = 0;
+    this.runSunflowers = 0;
     this.pendingXp = 0;
     this.xpFlush = 0;
     this.trailFxAcc = 0;
@@ -3924,6 +3945,7 @@ export class Game {
       zeniths: this.zeniths,
       rings: this.runRings,
       balloons: this.runBalloons,
+      sunflowers: this.runSunflowers,
       hint: this.state === "playing" ? this.coachHint() || this.hint : "",
       magnetTimer: this.magnetTimer,
       shield: this.shield,

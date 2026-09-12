@@ -93,6 +93,7 @@ export type HudSnapshot = {
   zeniths: number;
   rings: number;
   balloons: number;
+  sunflowers: number;
   hint: string;
   magnetTimer: number;
   shield: number;
@@ -2144,6 +2145,7 @@ function renderGameOver(s: HudSnapshot): string {
       <div><span>Zeniths</span><b>${s.zeniths}</b></div>
       <div><span>Rings</span><b>${s.rings}</b></div>
       <div><span>Balloons</span><b>${s.balloons}</b></div>
+      <div><span>Sunflowers</span><b>${s.sunflowers}</b></div>
       <div><span>Islands</span><b>${s.island + 1}</b></div>
     </div>
     ${s.ghostDelta !== null ? `<div class="reward-strip ${s.ghostDelta >= 0 ? "" : "nest"}">${s.ghostDelta >= 0 ? `Beat your ghost by ${Math.round(s.ghostDelta)}m! 👻` : `${Math.round(-s.ghostDelta)}m behind your best ghost`}</div>` : ""}

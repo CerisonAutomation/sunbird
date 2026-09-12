@@ -24,6 +24,8 @@ import {
   OCEAN_FLOOR,
   STICK_ACCEL_DIVE,
   STICK_ACCEL_GLIDE,
+  SUNFLOWER_VX,
+  SUNFLOWER_VY,
   WATER_Y,
 } from "./constants";
 import { clamp, lerp, lerpAngle } from "./math";
@@ -63,6 +65,10 @@ export class Bird {
   inWater = false;
   justLanded = false;
   justLaunched = false;
+  /** True the frame a sunflower pad launches the bird — consumed by the Game. */
+  bounced = false;
+  /** Cooldown so a bounce can't instantly re-trigger on the same bloom. */
+  bounceCd = 0;
   wasGrounded = false;
   /** 0..1 — how tangential the last touchdown was (1 = butter). */
   landingQuality = 1;
@@ -204,6 +210,8 @@ export class Bird {
     this.inWater = false;
     this.justLanded = false;
     this.justLaunched = false;
+    this.bounced = false;
+    this.bounceCd = 0;
     this.wasGrounded = false;
     this.rotation = 0;
     this.squashAmt = 1;
@@ -364,6 +372,21 @@ export class Bird {
       this.vx = Math.max(this.vx, 7);
       if (this.y > WATER_Y - 0.2 && this.vy > 0) {
         this.vy *= 0.4;
+      }
+    }
+
+    // Sunflower bounce: land on a bloom (or roll onto one) and spring back up.
+    this.bounceCd = Math.max(0, this.bounceCd - dt);
+    if (this.bounceCd <= 0 && this.grounded && !this.inWater) {
+      const pad = terrain.bouncePadAt(this.x);
+      if (pad) {
+        this.bounceCd = 0.6;
+        this.bounced = true;
+        this.grounded = false;
+        this.inWater = false;
+        this.vy = SUNFLOWER_VY;
+        this.vx = Math.max(this.vx, SUNFLOWER_VX);
+        this.y = pad.y + BIRD_RADIUS + 0.4;
       }
     }
 

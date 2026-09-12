@@ -29,6 +29,12 @@ export const MAX_SPEED_FEVER = 128;
 export const BIRD_RADIUS = 0.9;
 export const MIN_KEEP_SPEED = 6;
 
+/* Sunflower bounce pads — land on a bloom and spring straight back into the
+ * sky. Gentler than the balloon (an airborne rare), so they reward line
+ * choices without trivialising the ramps. */
+export const SUNFLOWER_VY = 30;
+export const SUNFLOWER_VX = 30;
+
 /* Landing quality: how much speed survives touching down.
  * alignment = 1 - |v·n| / |v|   (1 = perfectly tangential kiss) */
 export const LAND_PERFECT = 0.985;
