@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
     defaults:
       run:
         working-directory: rust
@@ -48,12 +49,35 @@ jobs:
       # The Actions log bundle is not always retrievable (the results-receiver
       # host is unreachable from some sandboxes), so diagnostics are also
       # published as check annotations, which come back over api.github.com.
-      - name: Publish clippy diagnostics as annotations
+      - name: Publish clippy diagnostics
         if: failure() && steps.clippy.outcome == 'failure'
         run: |
-          grep -E '^[^[:space:]].*: (error|warning)' /tmp/clippy.log | head -40 | while IFS= read -r line; do
+          # Cargo-level failures (dependency resolution, manifest problems) print
+          # as a bare `error: ...` with no file path, which a path-shaped grep
+          # silently misses -- that is how the first attempt at this step
+          # "succeeded" while reporting nothing.
+          grep -E '(^|: )(error|warning)(\[|:)' /tmp/clippy.log | head -40 | while IFS= read -r line; do
             echo "::error::${line}"
           done
+          {
+            echo '### Clippy output'
+            echo '```'
+            tail -n 100 /tmp/clippy.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Post clippy log to the PR
+        if: failure() && steps.clippy.outcome == 'failure' && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          {
+            echo '### `cargo clippy` output (job '"$GITHUB_RUN_ID"')'
+            echo '```'
+            tail -n 120 /tmp/clippy.log
+            echo '```'
+          } > /tmp/clippy-body.md
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file /tmp/clippy-body.md
       - name: Test
         id: test
         run: |
