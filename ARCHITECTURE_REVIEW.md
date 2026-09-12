@@ -243,6 +243,8 @@ seeded reproducibility (`--seed`).
 
 ### Measured, against the reference server in this sandbox
 
+(Local numbers. The CI comparison of both servers is in §6 — use those.
+
 ```
 $ node scripts/botsim.mjs --url ws://127.0.0.1:8787 --players 40 --seconds 15
   connected   40/40 (42ms)   roster 40/40
@@ -254,13 +256,16 @@ $ node scripts/botsim.mjs --url ws://127.0.0.1:8787 --players 40 --seconds 15
   cheats      16150 LEAKED (absurd-magnitude:15538, teleport:612)
 botsim: PASS (0 gates failed)
 ```
+)
 
 `cadence p95 66.8ms` is 15 Hz to within a millisecond under 40 concurrent
 clients — the broadcast tick holds.
 
 ### The cheat number is the finding
 
-**16,150 leaks** against `server/sunbird-server.mjs`. That server stores client
+**16,150 leaks** in that local run against `server/sunbird-server.mjs` (CI's
+run of the same harness logged 16,082 — the count varies with timing, the
+behaviour does not). That server stores client
 state verbatim (`pilot.x = num(msg.x)`, no plausibility check), so it relays
 `1e300` coordinates and 50,000-unit teleports to every honest client in the
 room. This is measured, not asserted.
@@ -322,8 +327,9 @@ frame. Hiding them behind team/LOS/fog bits would delete the core experience
 to import a mechanic from a survival game with no equivalent tension.
 
 The one real concern underneath it — bandwidth — was addressed differently and
-without changing what players see: server-side canonicalisation (§3), measured
-at 62.72 KB/s per client for a full 40-pilot room.
+without changing what players see: server-side canonicalisation (§3). In CI it
+measured a **34.5% cut** in per-client bandwidth at identical cadence and roster
+size (79.56 → 52.11 KB/s); see §6.
 
 ### 5.3 Spatial audio gated by visibility — **rejected**
 
@@ -378,6 +384,35 @@ same binary that would record ghost replays, and `ROADMAP.md` already lists
 
 Locally the Rust could not be compiled (no toolchain, and `crates.io` is
 unreachable), so every Rust claim above comes from CI, not from me.
+
+### Same 40 bots, both servers — the comparison that justifies the work
+
+`botsim.yml` runs the identical harness against both implementations on every
+PR. Measured in CI (PR #4):
+
+| | Node reference | Rust authoritative |
+| --- | --- | --- |
+| connected | 40/40 | 40/40 |
+| roster | 40/40 | 40/40 |
+| cadence p50 / p95 | 65.9 / 67.1 ms | 65.2 / **66.9 ms** |
+| state frames p50 / min | 237 / 231 | 239 / 233 |
+| finish places | 8 finishes, 8 unique | 7 finishes, 7 unique |
+| mid-race resume | 4/4 | 4/4 |
+| bandwidth per client | 79.56 KB/s | **52.11 KB/s** |
+| **cheat leaks** | **16,082** | **0** |
+| gates failed | 0 | 0 |
+
+Two things fall out of that table:
+
+1. **Cheat containment is total, not partial.** The same 40 bots — including
+   four sending `1e300` coordinates and 50,000-unit teleports — produce
+   **16,082** impossible positions relayed to honest clients against the
+   reference server, and **0** against the Rust server. That is `validate.rs`
+   measured end-to-end, not asserted.
+2. **Canonicalisation cut per-client bandwidth by 34.5%** (79.56 → 52.11 KB/s)
+   at identical cadence and roster size. Rounding to wire precision was sold as
+   a hygiene fix; it turned out to be the larger of the two wins. At a 40-pilot
+   room that is ~1.1 MB/s off a single slice.
 
 ### Still open
 

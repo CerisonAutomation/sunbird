@@ -59,15 +59,16 @@ until proven otherwise. This file exists so the commit log can't overclaim.
   job reports cheat containment, the Rust job **gates** on it
   (`--require-anticheat`). Measured locally against the reference server:
   40/40 connected in 42 ms, roster 40/40, broadcast cadence p95 66.8 ms, 13
-  unique finish places, 4/4 mid-race resumes, 62.72 KB/s per client.
+  unique finish places, 4/4 mid-race resumes.
 
 ## 🔴 Aspirational (do not claim in commit messages)
 - Server-side matchmaking is still aspirational; rooms are in-memory.
 - Anti-cheat is **partial, not finished**. Movement plausibility is enforced
   (above), but identity, rate limiting and score-submission trust are not.
-  Measured for the record: botsim logged **16,150 relayed cheats** against the
-  unvalidated Node reference server, which is exactly the class of hole the
-  Rust validator closes and the CI gate now guards.
+  Measured in CI for the record: the same 40 bots produce **16,082 relayed
+  cheats** against the unvalidated Node reference server and **0** against the
+  Rust one. Canonicalisation also cut per-client bandwidth 34.5%
+  (79.56 → 52.11 KB/s) at identical cadence.
 
 ## Next (in order)
 1. Retire `scripts/mp-smoke.mjs` once this PR has been green a while — botsim
