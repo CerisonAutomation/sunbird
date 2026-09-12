@@ -448,12 +448,20 @@ export class Sky {
     this.moon.visible = night > 0.15;
     this.moonGlow.material.opacity = night * 0.55;
     this.starMat.uniforms.time!.value = time;
-    this.starMat.uniforms.uOpacity!.value = Math.max(saturate((0.35 - t) / 0.35), this.altT * 0.9);
+    const starOpacity = Math.max(saturate((0.35 - t) / 0.35), this.altT * 0.9);
+    this.starMat.uniforms.uOpacity!.value = starOpacity;
+    this.stars.visible = starOpacity > 0.005;
     this.stars.position.set(0, 0, 0);
 
     // Space scenery fades in with altitude (the stratosphere opens out) and is
     // also present at night, so a midnight coast shows the full deep sky.
     const space = Math.max(saturate((0.25 - t) / 0.25), smoothstep(0.35, 0.9, this.altT));
+    // When the space layer is fully transparent (daytime below the stratosphere)
+    // skip it entirely rather than paying fill-rate + bloom cost on huge
+    // additive sprites that contribute nothing. This is the single biggest
+    // in-game frame-time win on weaker GPUs.
+    const spaceOn = space > 0.005;
+    this.milkyWay.visible = spaceOn;
     this.milkyWay.material.opacity = space * 0.32;
     for (const n of this.nebulas) {
       const nx = n.userData.baseX as number;
@@ -461,14 +469,19 @@ export class Sky {
       // Very slow drift so the nebulae feel alive, not painted on.
       n.position.x = nx + Math.sin(time * 0.02 + ny) * 14;
       n.position.y = ny + Math.cos(time * 0.015 + nx) * 10;
+      n.visible = spaceOn;
       (n.material as THREE.SpriteMaterial).opacity = space * 0.09;
     }
     for (const p of this.planets) {
+      p.mesh.visible = spaceOn;
+      if (p.ring) p.ring.visible = spaceOn;
+      p.glow.visible = spaceOn;
       (p.mesh.material as THREE.MeshBasicMaterial).opacity = space;
       if (p.ring) (p.ring.material as THREE.MeshBasicMaterial).opacity = space * 0.75;
       p.glow.material.opacity = space * 0.5;
     }
     // A satellite slowly crosses the deep sky.
+    this.satellite.visible = spaceOn;
     this.satellite.material.opacity = space * 0.9;
     this.satellite.position.set(
       Math.sin(time * 0.05 + this.satellitePhase) * 320,
