@@ -17,6 +17,36 @@ function sign(deviceId: string, distance: number, score: number): string {
     .digest("hex");
 }
 
+/**
+ * A score belongs on the *player's* local day, not the server's UTC day — the
+ * client sends its `dateSeed()` (local midnight) and the "daily" board must
+ * reset on that same midnight, or a player near the UTC boundary sees their
+ * run land on the wrong day. Accept the client day only when it's a real
+ * calendar date within ±2 days of the server's UTC day, so a tampered payload
+ * can't plant a score on an arbitrary historical board.
+ */
+function resolveDay(clientDate: unknown): string {
+  const today = todayStr();
+  const raw = sanitize(clientDate, 10);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  if (!m) return today;
+  const t = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  if (Number.isNaN(t)) return today;
+  const d = new Date(t);
+  if (d.getUTCFullYear() !== Number(m[1]) || d.getUTCMonth() !== Number(m[2]) - 1 || d.getUTCDate() !== Number(m[3])) {
+    return today; // rolled over — an impossible date like 2026-02-31
+  }
+  const nowT = parseDayMs(today);
+  const delta = nowT === null ? 0 : Math.abs(t - nowT);
+  return delta <= 2 * 86_400_000 ? raw : today;
+}
+
+function parseDayMs(iso: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return null;
+  return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === "OPTIONS") return handleOptions();
   if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
@@ -38,7 +68,7 @@ export default async function handler(request: Request): Promise<Response> {
     perfects: Math.round(boundedNum(p.perfects, 5_000)),
     coins: Math.round(boundedNum(p.coins, 100_000)),
     score: Math.round(boundedNum(p.score, 5_000_000)),
-    date: todayStr(),
+    date: resolveDay(p.date),
   };
 
   if (!row.deviceId) return json({ error: "missing deviceId" }, 400);
