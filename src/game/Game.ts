@@ -1641,6 +1641,18 @@ export class Game {
   private startRun(opts?: { duel?: boolean; challenge?: "" | "daily" | `gauntlet${number}`; event?: boolean; storm?: boolean }): void {
     this.exitVersus();
     this.mode = modeById(this.modeId);
+    // World variety: in the default "today" mode a plain casual flight gets
+    // fresh random hills every run so no two free-flights look alike. An
+    // explicit Yesterday/Random seed pick is honoured, and date-seeded
+    // daily/gauntlet runs plus shared-field races (duels, events, stormfront,
+    // mass races) keep their fixed seed so the field stays fair/comparable.
+    const casualRun =
+      this.seedMode === "today" && !opts?.duel && !opts?.challenge && !opts?.event && !opts?.storm && this.modeId !== "massrace";
+    if (casualRun) {
+      this.rebuildWorld(`fly-${Math.random().toString(36).slice(2, 10)}`);
+    } else if (opts?.challenge && this.seed !== this.today) {
+      this.rebuildWorld(this.today);
+    }
     // Duels and challenges only apply when their action explicitly asks for
     // them; every other launch path resets to a plain run.
     this.duelActive = Boolean(opts?.duel);
@@ -1858,7 +1870,10 @@ export class Game {
     this.flow.noteRun(stats.distance, this.perfects, this.launch.goods + this.launch.greats + this.launch.perfects, this.save);
     this.terrain.setDifficulty(this.flow.difficulty());
 
-    const beatGhost = this.ghostRecorder.commit(this.seed, stats.distance);
+    // One-off "fresh hills" runs have no stable seed to build a personal best
+    // on, so skip ghost recording for them (the ghost only ever replays a
+    // run on identical terrain).
+    const beatGhost = this.seed.startsWith("fly-") ? false : this.ghostRecorder.commit(this.seed, stats.distance);
     if (beatGhost) {
       this.hud.toast("New personal ghost recorded", "gold");
       this.telemetry.track("ghost_new", { distance: Math.round(stats.distance) });
@@ -3630,6 +3645,7 @@ export class Game {
   }
 
   private seedLabel(): string {
+    if (this.seed.startsWith("fly-")) return `Fresh hills · ${this.seed.slice(4).toUpperCase()}`;
     if (this.seedMode === "yesterday") return `Yesterday's hills · ${formatDatePretty(this.seed)}`;
     if (this.seedMode === "random") return `Wild hills · ${this.seed.replace("wild-", "").toUpperCase()}`;
     return `Hills of ${formatDatePretty(this.seed)}`;
