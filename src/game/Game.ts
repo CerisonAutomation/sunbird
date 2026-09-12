@@ -412,7 +412,9 @@ export class Game {
     // A tasteful "now playing" cue when the score moves to a new track — only
     // when the game is at rest, so it never interrupts a run in flight.
     this.audio.setOnTrackChange((name) => {
-      if (this.state === "menu") this.hud.toast(`♪ ${name}`, "info");
+      // A quiet "now playing" cue at rest and in flight — never while paused
+      // or during an ad, when the game (and audio) is muted or on hold.
+      if (this.state === "menu" || this.state === "playing") this.hud.toast(`♪ ${name}`, "info");
     });
 
     this.terrain = new TerrainSystem(this.seed);

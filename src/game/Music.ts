@@ -175,25 +175,25 @@ const WHISTLE = [
 // Strum pattern per eighth: 1 = down, 2 = up, 0 = none (island strum D _ D U _ U D U)
 const STRUM = [1, 0, 1, 2, 0, 2, 1, 2];
 
-export type Track = { name: string; prog: string[]; mel: number[] };
+export type Track = { name: string; prog: string[]; mel: number[]; mood: BiomeMusicStyle };
 
 /**
  * Ten original island-folk compositions. Each is a full 8-bar song — its own
- * chord progression and lead melody — so a long session never loops the same
- * phrase twice. The engine rotates through them (or loops a pinned one), and
- * biome/mode orchestration layers on top without changing the melody.
+ * chord progression, lead melody, and a `mood` matching the biome orchestration
+ * it was written for, so the shuffle can favor tracks that suit the current
+ * island and time of day while still cycling all ten.
  */
 export const TRACKS: Track[] = [
-  { name: "Island Sunrise", prog: PROG_A, mel: MEL_A },
-  { name: "Lazy Current", prog: PROG_B, mel: MEL_B },
-  { name: "Hilltop Hop", prog: PROG_C, mel: MEL_C },
-  { name: "Sunset Glide", prog: PROG_D, mel: MEL_D },
-  { name: "Coral Breeze", prog: PROG_E, mel: MEL_E },
-  { name: "Moonlight Flutter", prog: PROG_F, mel: MEL_F },
-  { name: "Glass Ocean", prog: PROG_G, mel: MEL_G },
-  { name: "Trade Winds", prog: PROG_H, mel: MEL_H },
-  { name: "Golden Hour", prog: PROG_I, mel: MEL_I },
-  { name: "Starlight", prog: PROG_J, mel: MEL_J },
+  { name: "Island Sunrise", prog: PROG_A, mel: MEL_A, mood: "bright" },
+  { name: "Lazy Current", prog: PROG_B, mel: MEL_B, mood: "airy" },
+  { name: "Hilltop Hop", prog: PROG_C, mel: MEL_C, mood: "bright" },
+  { name: "Sunset Glide", prog: PROG_D, mel: MEL_D, mood: "warm" },
+  { name: "Coral Breeze", prog: PROG_E, mel: MEL_E, mood: "airy" },
+  { name: "Moonlight Flutter", prog: PROG_F, mel: MEL_F, mood: "night" },
+  { name: "Glass Ocean", prog: PROG_G, mel: MEL_G, mood: "crystal" },
+  { name: "Trade Winds", prog: PROG_H, mel: MEL_H, mood: "wide" },
+  { name: "Golden Hour", prog: PROG_I, mel: MEL_I, mood: "warm" },
+  { name: "Starlight", prog: PROG_J, mel: MEL_J, mood: "night" },
 ];
 
 /** Track titles for the settings picker — keep in lockstep with TRACKS. */
@@ -351,14 +351,27 @@ export class Music {
 
   private buildOrder(): void {
     if (this.trackSel === "shuffle") {
-      this.order = Array.from({ length: TRACKS.length }, (_, i) => i);
-      // Fisher-Yates; avoid opening on the track we just finished.
-      for (let i = this.order.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        const tmp = this.order[i]!;
-        this.order[i] = this.order[j]!;
-        this.order[j] = tmp;
+      // Weighted draw without replacement: tracks whose mood matches the
+      // current biome come up sooner, nightfall favors night tracks and
+      // suppresses bright ones — but every track still plays each pass.
+      const pool = Array.from({ length: TRACKS.length }, (_, i) => i);
+      this.order = [];
+      while (pool.length) {
+        const weights = pool.map((i) => this.trackWeight(i));
+        const total = weights.reduce((a, b) => a + b, 0);
+        let r = Math.random() * total;
+        let pick = 0;
+        for (let i = 0; i < pool.length; i++) {
+          r -= weights[i]!;
+          if (r <= 0) {
+            pick = i;
+            break;
+          }
+        }
+        this.order.push(pool[pick]!);
+        pool.splice(pick, 1);
       }
+      // Avoid opening on the track we just finished.
       if (this.order.length > 1 && this.order[0] === this.section) {
         const tmp = this.order[0]!;
         this.order[0] = this.order[1]!;
@@ -367,6 +380,17 @@ export class Music {
     } else {
       this.order = [this.trackSel];
     }
+  }
+
+  /** Sampling weight for a track given the current biome and time of day. */
+  private trackWeight(index: number): number {
+    const mood = TRACKS[index]!.mood;
+    if (mood === this.biome) return 3; // authored for this island
+    if (this.night > 0.6) {
+      if (mood === "night") return 2.5; // nightfall pulls toward the moon tracks
+      if (mood === "bright" || mood === "airy") return 0.35; // and away from sun
+    }
+    return 1;
   }
 
   duck(amount = 0.45, release = 0.5): void {
@@ -417,7 +441,7 @@ export class Music {
     this.orderPos = 0;
     this.section = this.order[0] ?? 0;
     this.lullabyStep = 0;
-    this.onTrackChange?.(TRACKS[this.section]!.name);
+    if (this.mode !== "sleep") this.onTrackChange?.(TRACKS[this.section]!.name);
     this.timer = window.setInterval(() => this.tick(), TICK_MS);
   }
 
@@ -448,7 +472,9 @@ export class Music {
         // repeat the same sequence.
         if (this.orderPos === 0 && this.trackSel === "shuffle") this.buildOrder();
         this.section = this.order[this.orderPos]!;
-        this.onTrackChange?.(TRACKS[this.section]!.name);
+        // Sleep mode plays the lullaby, not the track — don't announce a
+        // "now playing" title for music the player can't hear.
+        if (this.mode !== "sleep") this.onTrackChange?.(TRACKS[this.section]!.name);
       }
     }
   }
