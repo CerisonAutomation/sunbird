@@ -81,10 +81,12 @@ const MIN_DISTANCE_M = 320;
 export class SurpriseEngine {
   private cooldown = 0;
   private fired = 0;
+  private lastKind: SurpriseKind | null = null;
 
   reset(): void {
     this.cooldown = 18; // small warm-up before the first one is possible
     this.fired = 0;
+    this.lastKind = null;
   }
 
   /**
@@ -99,7 +101,12 @@ export class SurpriseEngine {
     if (rng() >= p) return null;
     this.cooldown = COOLDOWN_S * (1 + this.fired * 0.5); // each one rarer than the last
     this.fired += 1;
-    return pickSurprise(rng);
+    // Never serve the exact same surprise twice in a row — variety is the point.
+    let surprise = pickSurprise(rng);
+    let guard = 0;
+    while (surprise.kind === this.lastKind && guard++ < 6) surprise = pickSurprise(rng);
+    this.lastKind = surprise.kind;
+    return surprise;
   }
 }
 

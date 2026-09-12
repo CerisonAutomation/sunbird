@@ -788,7 +788,24 @@ export class HUD {
     }
   }
 
+  /** Last time each exact toast message was shown (ms). Used to de-dupe. */
+  private readonly toastSeenAt = new Map<string, number>();
+
   toast(text: string, kind = "info"): void {
+    const now = performance.now();
+    // De-dupe: rapid-fire events (wind clouds, gems, pickups) must not print
+    // the same line down the screen over and over. If this exact message is
+    // still on screen, skip the duplicate instead of stacking a wall of text.
+    const seen = this.toastSeenAt.get(text);
+    if (seen !== undefined && now - seen < 2600) return;
+    this.toastSeenAt.set(text, now);
+
+    // Cap the visible stack so a burst can never pile more than a couple of
+    // pills down the column — the oldest is retired to make room.
+    while (this.toastLayer.childElementCount >= 3) {
+      this.toastLayer.firstElementChild?.remove();
+    }
+
     const el = document.createElement("div");
     el.className = `toast ${kind}`;
     el.textContent = text;
