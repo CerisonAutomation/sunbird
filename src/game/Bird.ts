@@ -404,12 +404,17 @@ export class Bird {
     this.rotation = lerpAngle(this.rotation, targetAngle, 1 - Math.pow(this.grounded ? 0.0004 : 0.02, dt));
   }
 
-  syncVisual(dt: number, diving: boolean, fever: boolean, time: number, terrain: TerrainSystem): void {
+  syncVisual(dt: number, diving: boolean, fever: boolean, time: number, terrain: TerrainSystem, ox?: number, oy?: number): void {
     const sp = this.speed();
+    // Render interpolation: the mesh draws at a smoothed position between two
+    // fixed physics steps (ox/oy), so a >60 Hz display never sees the bird
+    // step. The sim state (this.x/y) stays untouched.
+    const px = ox ?? this.x;
+    const py = oy ?? this.y;
     // 3D dynamic banking: subtle roll and pitch that gives true depth
     const bankX = Math.sin(time * 3.2) * 0.04 + clamp(this.vy * 0.012, -0.22, 0.22);
     const bankY = clamp(this.vx * 0.002, 0, 0.16) + (diving ? 0.06 : 0);
-    this.root.position.set(this.x, this.y, 0);
+    this.root.position.set(px, py, 0);
     this.root.rotation.z = this.rotation * 0.92;
     this.root.rotation.x = bankX;
     this.root.rotation.y = bankY;
@@ -467,9 +472,9 @@ export class Bird {
     this.wingMat.emissive.set(fever ? 0x441800 : 0x000000);
     this.bellyMat.emissive.set(fever ? 0x332200 : 0x000000);
 
-    const h = terrain.heightAt(this.x);
-    const alt = Math.max(0, this.y - h);
-    this.shadow.position.set(this.x, h + 0.08, 0);
+    const h = terrain.heightAt(px);
+    const alt = Math.max(0, py - h);
+    this.shadow.position.set(px, h + 0.08, 0);
     const s = clamp(1.3 - alt * 0.045, 0.25, 1.3);
     this.shadow.scale.setScalar(s);
     (this.shadow.material as THREE.MeshBasicMaterial).opacity = 0.28 * s * (this.inWater ? 0.15 : 1);

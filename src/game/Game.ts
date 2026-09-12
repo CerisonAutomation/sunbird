@@ -150,6 +150,10 @@ export class Game {
 
   private raf = 0;
   private acc = 0;
+  /** Bird position at the start of this frame's physics steps — the "from"
+   *  end of render interpolation (lerped toward this.bird.x/y each frame). */
+  private prevBirdX = 50;
+  private prevBirdY = 30;
   private last = 0;
   private elapsed = 0;
   private runTime = 0;
@@ -632,6 +636,10 @@ export class Game {
     }
     const simDt = raw * this.timeScale;
 
+    // Snapshot before any physics advances so the render can interpolate.
+    this.prevBirdX = this.bird.x;
+    this.prevBirdY = this.bird.y;
+
     switch (this.state) {
       case "menu":
         this.menuTick(raw);
@@ -1085,13 +1093,14 @@ export class Game {
     this.scoreAccum += Math.max(0, this.bird.vx) * dt * (this.feverOn ? 2 : 1);
     if (this.bird.altitude > this.maxAltitude) {
       this.maxAltitude = this.bird.altitude;
-      if (this.maxAltitude > this.save.state.bestAltitude && this.save.state.bestAltitude > 40) {
-        this.save.noteRecords(this.maxAltitude, this.launch.best);
-        if (this.recordBanner !== "altitude") {
-          this.recordBanner = "altitude";
-          this.hud.toast("NEW ALTITUDE RECORD", "gold");
-          this.flash("perfect");
-        }
+      // Celebrate a mid-run record crossing exactly once, but never persist
+      // here — during a sustained climb this runs every physics step, and a
+      // synchronous localStorage write per step stalls the frame. finishRun()
+      // banks the real record with a single persist.
+      if (this.maxAltitude > this.save.state.bestAltitude && this.save.state.bestAltitude > 40 && this.recordBanner !== "altitude") {
+        this.recordBanner = "altitude";
+        this.hud.toast("NEW ALTITUDE RECORD", "gold");
+        this.flash("perfect");
       }
     }
     if (this.bird.speed() > this.maxSpeed) this.maxSpeed = this.bird.speed();
@@ -1664,7 +1673,13 @@ export class Game {
     }
 
     const glow = this.feverOn || this.powers.has("goldenwings") || (this.skin.magnetAlways && this.bird.speed() > 30);
-    this.bird.syncVisual(visDt, diving, glow, this.elapsed, this.terrain);
+    // Render interpolation: draw the bird between the previous and current
+    // physics step so motion stays smooth above 60 Hz. Disabled outside live
+    // single-player flight (menu/versus/sleep step the bird directly or not).
+    const interp = this.state === "playing" && !this.versus ? clamp(this.acc / PHYS_DT, 0, 1) : 1;
+    const visX = lerp(this.prevBirdX, this.bird.x, interp);
+    const visY = lerp(this.prevBirdY, this.bird.y, interp);
+    this.bird.syncVisual(visDt, diving, glow, this.elapsed, this.terrain, visX, visY);
     this.massRace.syncVisual(visDt, this.bird.x);
     this.finishRemaining = this.finishGate.update(visDt, this.bird.x);
     this.updateTrailRibbon(visDt);
