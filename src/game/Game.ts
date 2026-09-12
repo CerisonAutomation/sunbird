@@ -519,6 +519,9 @@ export class Game {
       this.bump();
     });
     if (seasonEnd) this.hud.toast(`⚔ Ranked season over · ${seasonEnd.division} reward +${seasonEnd.coins} coins`, "gold");
+    // Warm the embedded main-menu leaderboard on boot so it isn't empty on
+    // the first frame (serves the cache first, so this never blocks paint).
+    void this.refreshBoard();
     this.bump();
     this.pushHud();
   }
@@ -3635,6 +3638,9 @@ export class Game {
     this.screen = s;
     this.menuHold = 0;
     this.needRelease = true;
+    // Every return to the home screen refreshes the embedded leaderboard so a
+    // just-finished run shows up immediately (cache-first, non-blocking).
+    if (s === "main") void this.refreshBoard();
     this.bump();
   }
 

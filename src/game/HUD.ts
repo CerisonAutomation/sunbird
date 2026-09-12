@@ -1078,6 +1078,35 @@ function renderBoard(s: HudSnapshot): string {
   `;
 }
 
+/** Compact top-wings leaderboard embedded on the main menu. */
+function renderMiniBoard(s: HudSnapshot): string {
+  const page = s.board;
+  const fmt = (v: number): string =>
+    s.boardMetric === "distance" || s.boardMetric === "altitude" ? `${Math.round(v)} m` : String(Math.round(v));
+  const medals = ["🥇", "🥈", "🥉"];
+  const rows =
+    page && page.entries.length
+      ? page.entries
+          .slice(0, 5)
+          .map(
+            (e, i) => `<div class="board-row ${e.you ? "you" : ""}">
+              <span class="bp">${i < 3 ? medals[i] : i + 1}</span>
+              <span class="bn">${escapeHtml(e.name)}</span>
+              <span class="bv">${fmt(e.value)}</span>
+            </div>`,
+          )
+          .join("")
+      : `<div class="board-row empty">${s.boardLoading ? "Loading leaderboard…" : "No flights yet — be first!"}</div>`;
+  return `
+    <section class="mini-board" aria-label="Leaderboard">
+      <div class="mini-board-head">
+        <h2>🏆 Leaderboard</h2>
+        <button class="mini-btn" data-ui data-action="open-board">Full board ›</button>
+      </div>
+      <div class="board-list mini">${rows}</div>
+    </section>`;
+}
+
 function renderLive(s: HudSnapshot): string {
   const status = s.multiplayerLive
     ? s.netState === "racing" || s.netState === "lobby"
@@ -1636,6 +1665,8 @@ function renderMain(s: HudSnapshot): string {
 
     <div class="how"><div><b>HOLD</b> to dive</div><div class="dot"></div><div><b>RELEASE</b> to glide</div></div>
 
+    ${renderMiniBoard(s)}
+
     <nav class="nav-grid compact">
       <button class="nav-btn" data-ui data-action="mode-select"><i>🎯</i><span>Modes</span></button>
       <button class="nav-btn" data-ui data-action="open-challenges"><i>☀</i><span>Daily</span></button>
@@ -1652,15 +1683,6 @@ function renderMain(s: HudSnapshot): string {
       <button class="nav-btn" data-ui data-action="open-scores"><i>📈</i><span>Scores</span></button>
       <button class="nav-btn" data-ui data-action="open-account"><i>👤</i><span>Account</span></button>
       <button class="nav-btn" data-ui data-action="open-settings" aria-label="Settings"><i>⚙</i><span>Settings</span></button>
-    </nav>
-
-    <!-- Bottom Tab Navigation (Popular Game Pattern) -->
-    <nav class="bottom-tabs" data-ref="bottomTabs">
-      <button class="tab-item" data-ui data-action="open-rank"><span class="tab-icon"><svg viewBox="0 0 24 24" class="ti"><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="5" x2="17" y2="17"/><line x1="19" y1="5" x2="7" y2="17"/><line x1="15.5" y1="18.5" x2="18.5" y2="15.5"/><line x1="5.5" y1="15.5" x2="8.5" y2="18.5"/></g></svg></span><span class="tab-label">Rank</span></button>
-      <button class="tab-item" data-ui data-action="open-shop"><span class="tab-icon"><svg viewBox="0 0 24 24" class="ti"><path d="M6 8h12l-1.2 12H7.2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 8V6a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="2"/></svg></span><span class="tab-label">Shop</span></button>
-      <button class="tab-fly" data-ui data-action="pvp-practice" aria-label="Fly now"><span class="fly-disc"><svg viewBox="0 0 24 24" class="fi"><circle cx="12" cy="11" r="4.2" fill="currentColor"/><g stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="12" y1="2.5" x2="12" y2="5"/><line x1="12" y1="17" x2="12" y2="19.5"/><line x1="3.5" y1="11" x2="6" y2="11"/><line x1="18" y1="11" x2="20.5" y2="11"/><line x1="5.9" y1="4.9" x2="7.7" y2="6.7"/><line x1="16.3" y1="15.3" x2="18.1" y2="17.1"/><line x1="18.1" y1="4.9" x2="16.3" y2="6.7"/><line x1="7.7" y1="15.3" x2="5.9" y2="17.1"/></g></svg></span><span class="tab-label fly-label">Fly</span></button>
-      <button class="tab-item" data-ui data-action="open-pass"><span class="tab-icon"><svg viewBox="0 0 24 24" class="ti"><path d="M4 9a2 2 0 0 0 0 6v3h16v-3a2 2 0 0 1 0-6V6H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><line x1="14" y1="6" x2="14" y2="18" stroke="currentColor" stroke-width="2" stroke-dasharray="2 2.4"/></svg></span><span class="tab-label">Pass</span></button>
-      <button class="tab-item" data-ui data-action="open-settings"><span class="tab-icon"><svg viewBox="0 0 24 24" class="ti"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span><span class="tab-label">More</span></button>
     </nav>
 
     ${
