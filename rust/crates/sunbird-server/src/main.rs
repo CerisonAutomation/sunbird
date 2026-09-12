@@ -145,15 +145,21 @@ fn init_tracing() {
 
 fn build_app(shared: SharedState, shutdown_rx: watch::Receiver<bool>) -> Router {
     let cors = cors_layer(&shared.config);
-    // The WebSocket route carries its own state (the room registry) so the
-    // socket task never needs the whole Shared config.
+    let ws_socket_state = ws::SocketState {
+        rooms: shared.rooms.clone(),
+        allowed_origins: shared.config.public_origins.clone(),
+    };
+    let legacy_socket_state = legacy::LegacySocketState {
+        rooms: shared.legacy_rooms.clone(),
+        allowed_origins: shared.config.public_origins.clone(),
+    };
     let ws_router = Router::new()
         .route("/v1/ws", get(ws::ws_handler))
-        .with_state(shared.rooms.clone());
+        .with_state(ws_socket_state);
     // The legacy simple-protocol socket the browser ships with today.
     let legacy_router = Router::new()
         .route("/ws", get(legacy::legacy_ws_handler))
-        .with_state(shared.legacy_rooms.clone());
+        .with_state(legacy_socket_state);
     Router::new()
         .merge(ws_router)
         .merge(legacy_router)

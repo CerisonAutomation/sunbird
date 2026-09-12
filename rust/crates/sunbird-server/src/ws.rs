@@ -25,7 +25,8 @@ use axum::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         State,
     },
-    response::Response,
+    http::HeaderMap,
+    response::{IntoResponse, Response},
 };
 use futures_util::{sink::SinkExt, stream::StreamExt};
 use std::{sync::Arc, time::Duration};
@@ -43,8 +44,40 @@ const SWEEP_EVERY: Duration = Duration::from_secs(15);
 /// Per-socket outbound queue; when full the socket is considered dead.
 const OUT_QUEUE: usize = 64;
 
-pub async fn ws_handler(ws: WebSocketUpgrade, State(rooms): State<Arc<RoomManager>>) -> Response {
-    ws.on_upgrade(move |socket| serve_socket(socket, rooms))
+/// WebSocket upgrade state shared between the v1 and legacy socket handlers.
+/// Carries the room registry and the list of allowed origins for WS origin
+/// enforcement (mirrors the HTTP CORS layer but applies to the WS upgrade too).
+#[derive(Clone)]
+pub struct SocketState {
+    pub rooms: Arc<RoomManager>,
+    pub allowed_origins: Vec<String>,
+}
+
+/// Validate the request `Origin` header against the configured allowed list.
+/// In development (all origins `"*"`) we allow everything; in staging/production
+/// the list must be explicit and every entry is an exact match.
+pub fn origin_allowed(headers: &HeaderMap, allowed_origins: &[String]) -> bool {
+    if allowed_origins.iter().any(|o| o == "*") {
+        return true;
+    }
+    let provided = headers
+        .get("origin")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    allowed_origins.iter().any(|o| o == provided)
+}
+
+pub async fn ws_handler(
+    ws: WebSocketUpgrade,
+    State(state): State<SocketState>,
+    headers: HeaderMap,
+) -> Response {
+    if !origin_allowed(&headers, &state.allowed_origins) {
+        return (axum::http::StatusCode::FORBIDDEN, "origin not allowed").into_response();
+    }
+    ws.max_message_size(MAX_JSON_PAYLOAD_BYTES)
+        .max_frame_size(MAX_JSON_PAYLOAD_BYTES)
+        .on_upgrade(move |socket| serve_socket(socket, state.rooms))
 }
 
 /// Periodic reaper: run once from main() at startup.
