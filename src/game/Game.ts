@@ -1682,13 +1682,14 @@ export class Game {
 
     const glow = this.feverOn || this.powers.has("goldenwings") || (this.skin.magnetAlways && this.bird.speed() > 30);
     // Render interpolation: draw the bird between the previous and current
-    // physics step so motion stays smooth above 60 Hz. Disabled outside live
-    // single-player flight (menu/versus/sleep step the bird directly or not).
-    const interp = this.state === "playing" && !this.versus ? clamp(this.acc / PHYS_DT, 0, 1) : 1;
+    // physics step so motion stays smooth above 60 Hz. The menu, sleep and
+    // game-over states step the bird directly (or not at all), so they draw
+    // at interp = 1; versus has its own interpolated path in renderVersus().
+    const interp = this.state === "playing" ? clamp(this.acc / PHYS_DT, 0, 1) : 1;
     const visX = lerp(this.prevBirdX, this.bird.x, interp);
     const visY = lerp(this.prevBirdY, this.bird.y, interp);
     this.bird.syncVisual(visDt, diving, glow, this.elapsed, this.terrain, visX, visY);
-    this.massRace.syncVisual(visDt, this.bird.x);
+    this.massRace.syncVisual(visDt, this.bird.x, interp);
     this.finishRemaining = this.finishGate.update(visDt, this.bird.x);
     this.updateTrailRibbon(visDt);
     this.particles.update(visDt);
@@ -1744,8 +1745,9 @@ export class Game {
     const p1 = this.p1!;
     const p2 = this.p2!;
     const playing = this.state === "playing";
-    p1.syncVisual(visDt, playing && this.input.diving, this.elapsed, this.terrain);
-    p2.syncVisual(visDt, playing && this.input.diving2, this.elapsed, this.terrain);
+    const interp = playing ? clamp(this.acc / PHYS_DT, 0, 1) : 1;
+    p1.syncVisual(visDt, playing && this.input.diving, this.elapsed, this.terrain, interp);
+    p2.syncVisual(visDt, playing && this.input.diving2, this.elapsed, this.terrain, interp);
     this.particles.update(visDt);
     p1.updateCamera(rawDt, playing, this.terrain);
     p2.updateCamera(rawDt, playing, this.terrain);

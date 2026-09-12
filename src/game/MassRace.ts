@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { Bird } from "./Bird";
 import { BIRD_RADIUS } from "./constants";
 import { LaunchSystem } from "./LaunchSystem";
-import { clamp, SeededRandom } from "./math";
+import { clamp, lerp, SeededRandom } from "./math";
 import type { TerrainSystem } from "./TerrainSystem";
 
 /**
@@ -36,6 +36,10 @@ export type Rival = {
   kind: RivalKind;
   bird: Bird;
   launch: LaunchSystem;
+  /** Bird position at the start of the last physics step (or the last remote
+   *  snapshot) — the "from" end of render interpolation. */
+  prevX: number;
+  prevY: number;
   /** how far ahead of a crest this pilot releases — their whole personality */
   lead: number;
   /** slow wobble in their crest judgement (amplitude, rate, phase) */
@@ -173,6 +177,8 @@ export class MassRace {
         kind: "local",
         bird,
         launch: new LaunchSystem(),
+        prevX: bird.x,
+        prevY: bird.y,
         lead,
         // Nobody reads a crest perfectly every time. A slow per-pilot wobble
         // keeps the field genuinely separated instead of collapsing onto a
@@ -275,6 +281,10 @@ export class MassRace {
     this.clock += dt;
 
     for (const r of this.rivals) {
+      // Snapshot before any motion this step (or before a remote snapshot
+      // overwrites the position below), so the render can interpolate.
+      r.prevX = r.bird.x;
+      r.prevY = r.bird.y;
       if (r.kind === "remote" || r.finished) continue;
 
       // Policy: hold through the descent and the climb, release just before the
@@ -439,7 +449,7 @@ export class MassRace {
     return { rows: merged, place, total: rows.length };
   }
 
-  syncVisual(dt: number, cameraX: number): void {
+  syncVisual(dt: number, cameraX: number, interp = 1): void {
     if (!this.group.visible) return;
     this.flapT += dt;
 
@@ -450,7 +460,9 @@ export class MassRace {
       const flap = Math.sin(this.flapT * 14 + r.hue * 9) * 0.4;
       tmpColor.setHSL(r.hue, 0.62, r.kind === "remote" ? 0.68 : 0.55);
 
-      tmpObj.position.set(r.bird.x, r.bird.y, -3.5 - (r.hue - 0.5) * 5);
+      const x = lerp(r.prevX, r.bird.x, interp);
+      const y = lerp(r.prevY, r.bird.y, interp);
+      tmpObj.position.set(x, y, -3.5 - (r.hue - 0.5) * 5);
       tmpObj.rotation.set(0, 0, r.bird.rotation * 0.9);
       tmpObj.scale.set(1.05, 0.9, 0.9);
       tmpObj.updateMatrix();
