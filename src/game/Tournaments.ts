@@ -100,16 +100,16 @@ const TIER_ORDER: TrophyTier[] = ["bronze", "silver", "gold", "diamond"];
 
 const TIER_PRIZES: Record<TrophyTier, Prize[]> = {
   bronze: [
-    { kind: "coins", id: "coins", amount: 120, label: "120 coins", icon: "💰" },
+    { kind: "coins", id: "coins_bronze", amount: 120, label: "120 coins", icon: "💰" },
     { kind: "boost", id: "sunflask", amount: 1, label: "Sun Flask", icon: "☀" },
   ],
   silver: [
-    { kind: "coins", id: "coins", amount: 320, label: "320 coins", icon: "💰" },
+    { kind: "coins", id: "coins_silver", amount: 320, label: "320 coins", icon: "💰" },
     { kind: "boost", id: "headstart", amount: 1, label: "Head Start", icon: "🚀" },
   ],
   gold: [
     { kind: "trail", id: "trail_comet", amount: 1, label: "Comet Trail", icon: "☄" },
-    { kind: "coins", id: "coins", amount: 700, label: "700 coins", icon: "💰" },
+    { kind: "coins", id: "coins_gold", amount: 700, label: "700 coins", icon: "💰" },
   ],
   diamond: [
     { kind: "trail", id: "trail_prism", amount: 1, label: "Prism Trail", icon: "🌈" },
