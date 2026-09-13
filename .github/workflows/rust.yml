@@ -23,22 +23,18 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: rust
-      - name: Format
-        run: cargo fmt --all
-      - name: Commit formatting
-        # Apply rustfmt canonically and push the result back so the check
-        # below (and every future run) is against rustfmt's exact output.
-        # The follow-up run triggered by this push sees no diff and is a
-        # no-op, so this converges instead of looping.
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if [ -n "$(git status --porcelain)" ]; then
-            git add -A
-            git commit -m "chore: apply cargo fmt"
-            git push
-          fi
       - name: Format (check)
+        # rustfmt is a gate, not an autofix. This step used to run `cargo fmt`
+        # and push the result back as github-actions[bot], which caused two
+        # failures observed on this repo:
+        #   1. two rust-backend runs racing on the same push — the loser fails
+        #      here with a non-fast-forward before Test ever runs;
+        #   2. the bot's follow-up commit triggers runs that sit in
+        #      `action_required`, turning a green PR red until someone with
+        #      approval rights clicks through (a normal PR token gets 403 on
+        #      POST /actions/runs/{id}/approve).
+        # Failing the build instead keeps branch history human-authored and
+        # every run approvable by whoever pushed it.
         run: cargo fmt --all --check
       - name: Clippy
         id: clippy
