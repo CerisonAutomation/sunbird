@@ -1,0 +1,46 @@
+{
+  "name": "sunbird",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:poki": "bash scripts/build-portal.sh poki",
+    "build:crazy": "bash scripts/build-portal.sh crazy",
+    "build:standalone": "bash scripts/build-portal.sh standalone",
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui"
+  },
+  "dependencies": {
+    "@stripe/stripe-js": "^9.15.0",
+    "clsx": "2.1.1",
+    "firebase": "^12.18.0",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "tailwind-merge": "3.4.0",
+    "three": "^0.186.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.1.17",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
+    "@types/node": "22.19.17",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
+    "@types/three": "^0.186.0",
+    "@vitejs/plugin-react": "5.1.1",
+    "jsdom": "^30.0.1",
+    "tailwindcss": "4.1.17",
+    "terser": "^5.51.2",
+    "typescript": "5.9.3",
+    "vite": "7.3.2",
+    "vite-plugin-singlefile": "2.3.0",
+    "vitest": "^5.0.0"
+  }
+}

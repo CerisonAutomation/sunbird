@@ -1,0 +1,44 @@
+# Dependencies (Vercel will install)
+node_modules/
+
+# Server (not needed for frontend)
+server/
+
+# Build artifacts (Vercel will build)
+dist/
+dist-*/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Documentation
+*.md
+LICENSE
+CHANGELOG.md
+
+# Config files
+.git/
+.gitignore
+.vercelignore
+.vercel/
+tsconfig.json
+tsconfig.node.json
+
+# Scripts
+scripts/
+
+# Archive folders
+archive/
+*.zip
+
+# Dev tools
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db

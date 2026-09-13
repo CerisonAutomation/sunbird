@@ -1,0 +1,37 @@
+{
+  "rules": {
+    "leaderboard": {
+      ".read": true,
+      ".write": true,
+      "$mode": {
+        "$entry": {
+          ".validate": "newData.hasChildren(['name', 'score', 'device', 'ts'])",
+          "name": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 16"
+          },
+          "score": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 999999999"
+          },
+          "distance": {
+            ".validate": "newData.isNumber() && newData.val() >= 0"
+          },
+          "coins": {
+            ".validate": "newData.isNumber() && newData.val() >= 0"
+          },
+          "perfects": {
+            ".validate": "newData.isNumber() && newData.val() >= 0"
+          },
+          "device": {
+            ".validate": "newData.isString() && newData.val().length <= 12"
+          },
+          "hash": {
+            ".validate": "newData.isString()"
+          },
+          "ts": {
+            ".validate": "newData.isNumber()"
+          }
+        }
+      }
+    }
+  }
+}
