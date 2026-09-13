@@ -9,6 +9,7 @@ import type { RosterBird, Standing } from "./MassRace";
 import { VIP_DAILY_GIFT } from "./constants";
 import { COLLECTIONS, type BoostView, type ShopTrailView, type SkinView } from "./Economy";
 import { MenuSky } from "./MenuSky";
+import { GREY_PALETTE, rivalPalette, sunSVG, sunbirdSVG } from "./Sunbird";
 import { formatDistance } from "./math";
 import type { MissionView, QuestReward, QuestView } from "./Missions";
 import type { CampaignChapterView } from "./Campaign";
@@ -1166,12 +1167,77 @@ function renderLive(s: HudSnapshot): string {
     : `<span class="board-badge local">Solo field · practice</span>`;
 
   const featured = s.lobbyRivals.slice(0, 3);
+  // Everyone in the field, as real birds — live pilots in colour, seeded
+  // rivals in grey, plus the empty seats still waiting on a player.
+  const flock = s.lobbyRivals.slice(0, 8).map((r) => ({ name: r.name, live: r.tag.includes("live") }));
+  const fieldSize = s.roomSize + 1;
+  const seated = Math.min(fieldSize, flock.length + 1);
+  const openSeats = fieldSize - seated;
+  const seatPct = Math.round((seated / fieldSize) * 100);
   return `
     ${head("Race Lobby", "back", status)}
+
+    <!-- The main menu's own sun and bird. The lobby used to be a wall of
+         controls with nothing of the game's identity in it; now the first
+         thing you see is the sunrise you actually fly into. -->
+    <div class="lobby-sky" aria-hidden="true">
+      ${sunSVG({ size: 96, className: "lobby-sun" })}
+      <div class="lobby-flock">
+        ${[0, 1, 2, 3]
+          .map((i) => sunbirdSVG({ palette: rivalPalette(i), width: 40 - i * 7, flap: 0.25 + i * 0.19, className: `lobby-bird b${i}` }))
+          .join("")}
+      </div>
+    </div>
+
+    <div class="lobby-seats">
+      <div class="lobby-seats-head">
+        <b>${seated}</b> of ${fieldSize} birds seated
+        ${openSeats > 0 ? `<em>${openSeats} seat${openSeats === 1 ? "" : "s"} open</em>` : `<em>field full</em>`}
+      </div>
+      <div class="seat-bar"><i style="width:${seatPct}%"></i></div>
+    </div>
+
+    ${
+      s.roomCode
+        ? `<div class="room-now">
+             <span class="room-now-label">Your room</span>
+             <span class="room-now-code">${escapeHtml(s.roomCode)}</span>
+             <button class="mini-btn gold" data-ui data-action="copy-invite">Copy link</button>
+           </div>`
+        : ""
+    }
+
     <div class="vs-stage" aria-label="You versus the featured rivals">
-      <div class="vs-you"><span class="vs-swatch" style="--body:#ff7a45;--wing:#ff9a62;--belly:#ffe6c4"><i class="w"></i><i class="b"></i><i class="e"></i></span><b>YOU</b><span class="vs-sub">${s.rival.divisionIcon} ${s.rival.division} · ${s.rival.rating}</span></div>
+      <div class="vs-you">
+        <span class="bird-badge you">${sunbirdSVG({ width: 86, flap: 0.62, title: "Your sunbird" })}</span>
+        <b>YOU</b>
+        <span class="vs-sub">${s.rival.divisionIcon} ${s.rival.division} · ${s.rival.rating}</span>
+      </div>
       <div class="vs-mark">VS</div>
-      <div class="vs-foes">${featured.map((r) => `<div class="vs-foe ${r.tag.includes("live") ? "live" : ""}"><span class="vs-swatch" style="${r.tag.includes("live") ? "--body:#5eb7ea;--wing:#83cbf2;--belly:#eaf6ff" : "--body:#8a9bb0;--wing:#a8b8c8;--belly:#e8eef4"}"><i class="w"></i><i class="b"></i><i class="e"></i></span><b>${escapeHtml(r.name)}</b><span class="vs-sub">${escapeHtml(r.tag)}</span></div>`).join("")}</div>
+      <div class="vs-foes">${featured
+        .map(
+          (r, i) => `<div class="vs-foe ${r.tag.includes("live") ? "live" : ""}">
+            <span class="bird-badge">${sunbirdSVG({ palette: rivalPalette(i), width: 62, flap: 0.3 + i * 0.16, title: r.name })}</span>
+            <b>${escapeHtml(r.name)}</b><span class="vs-sub">${escapeHtml(r.tag)}</span>
+          </div>`,
+        )
+        .join("")}</div>
+    </div>
+
+    <div class="flock-grid" aria-label="Rivals in this field">
+      ${flock
+        .map(
+          (r, i) => `<div class="flock-bird ${r.live ? "live" : ""}">
+            ${sunbirdSVG({ palette: r.live ? rivalPalette(i) : GREY_PALETTE, width: 46, flap: 0.2 + i * 0.11, title: r.name })}
+            <span class="flock-name">${escapeHtml(r.name)}</span>
+          </div>`,
+        )
+        .join("")}
+      ${
+        openSeats > 0
+          ? `<div class="flock-bird open"><span class="flock-seat">${openSeats}</span><span class="flock-name">open seat${openSeats === 1 ? "" : "s"}</span></div>`
+          : ""
+      }
     </div>
 
     <div class="lobby-rules">
@@ -1463,9 +1529,9 @@ function renderRank(s: HudSnapshot): string {
     <div class="section-title">Duels <small>ranked 1v1 · ±16 rating</small></div>
     <div class="duel-card">
       <div class="vs-stage slim">
-        <div class="vs-you"><span class="vs-swatch" style="--body:#ff7a45;--wing:#ff9a62;--belly:#ffe6c4"><i class="w"></i><i class="b"></i><i class="e"></i></span><b>YOU</b><span class="vs-sub">${r.rating}</span></div>
+        <div class="vs-you"><span class="bird-badge you">${sunbirdSVG({ width: 62, flap: 0.55, title: "Your sunbird" })}</span><b>YOU</b><span class="vs-sub">${r.rating}</span></div>
         <div class="vs-mark">VS</div>
-        <div class="vs-foes"><div class="vs-foe"><span class="vs-swatch" style="--body:#8a9bb0;--wing:#a8b8c8;--belly:#e8eef4"><i class="w"></i><i class="b"></i><i class="e"></i></span><b>${escapeHtml(s.duelFoe.name)}</b><span class="vs-sub">${escapeHtml(s.duelFoe.tag)} · ~${s.duelFoe.rating}</span></div></div>
+        <div class="vs-foes"><div class="vs-foe"><span class="bird-badge">${sunbirdSVG({ palette: rivalPalette(0), width: 54, flap: 0.35, title: s.duelFoe.name })}</span><b>${escapeHtml(s.duelFoe.name)}</b><span class="vs-sub">${escapeHtml(s.duelFoe.tag)} · ~${s.duelFoe.rating}</span></div></div>
       </div>
       <div class="rank-stats">
         <div><span>Duel W–L</span><b>${s.duel.wins}–${s.duel.losses}</b></div>
@@ -1620,23 +1686,11 @@ function renderMain(s: HudSnapshot): string {
       : `<button class="lock-chip" data-ui data-action="open-paywall">✦ Pick your hills with Gold</button>`;
   return `
     <header class="hero">
-      <div class="hero-sun" aria-hidden="true"></div>
-      <svg class="hero-bird" viewBox="0 0 64 64" role="img" aria-hidden="true">
-        <!-- A clean sunbird mark (no baked-in wordmark, no full app-icon scene)
-             so the title "SUNBIRD" below reads exactly once and the bird never
-             doubles the menu's painted sky. -->
-        <path d="M8 42 L2 34 L5 44 L3 50 L12 45 Z" fill="#e06a35"/>
-        <path d="M8 44 L3 50 L6 54 L13 48 Z" fill="#be4824"/>
-        <ellipse cx="30" cy="36" rx="17" ry="11" fill="#ff7a45"/>
-        <ellipse cx="33" cy="40" rx="11" ry="6" fill="#ffe6c4"/>
-        <path d="M24 26 Q14 12 6 16 Q14 22 24 30 Z" fill="#c85228"/>
-        <path d="M26 30 Q14 14 4 20 Q15 24 27 34 Z" fill="#ff9a62"/>
-        <path d="M46 34 L58 37 L46 40 Z" fill="#ffb020"/>
-        <circle cx="41" cy="32" r="3.4" fill="#fff"/>
-        <circle cx="42.4" cy="31.4" r="1.7" fill="#2a1c28"/>
-        <circle cx="43" cy="30.8" r="0.7" fill="#fff"/>
-        <path d="M36 27 Q42 27.5 44 30 Q40 29.6 37 29.4 Z" fill="#d84a2e"/>
-      </svg>
+      <!-- Sun and bird both come from Sunbird.ts, so the title screen, the
+           lobby and the flock in the menu sky are literally one sun and one
+           bird. This SVG *is* the reference the whole game is drawn from. -->
+      <div class="hero-sun-wrap">${sunSVG({ size: 64, className: "hero-sun" })}</div>
+      ${sunbirdSVG({ className: "hero-bird", width: 56, title: "Sunbird" })}
       <div class="hero-title">
         <span class="hero-kicker">chase the daylight</span>
         <h1>SUNBIRD</h1>

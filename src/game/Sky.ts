@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { saturate, smoothstep } from "./math";
+import { drawSunDisc } from "./Sunbird";
 import type { TerrainPalette } from "./TerrainSystem";
 
 type SkyStop = {
@@ -111,7 +112,8 @@ export class Sky {
   readonly hemi: THREE.HemisphereLight;
   readonly sunLight: THREE.DirectionalLight;
   private readonly skyMat: THREE.ShaderMaterial;
-  private readonly sun: THREE.Mesh;
+  private readonly sun: THREE.Sprite;
+  private readonly sunTex: THREE.CanvasTexture;
   private readonly sunGlow: THREE.Sprite;
   private readonly moon: THREE.Mesh;
   private readonly moonGlow: THREE.Sprite;
@@ -192,10 +194,24 @@ export class Sky {
     const skyMesh = new THREE.Mesh(new THREE.SphereGeometry(420, 24, 16), this.skyMat);
     this.group.add(skyMesh);
 
-    const sunGeo = new THREE.SphereGeometry(10, 16, 12);
-    this.sun = new THREE.Mesh(
-      sunGeo,
-      new THREE.MeshBasicMaterial({ color: 0xfff2b0, fog: false, toneMapped: false }),
+    // The in-flight sun is the *same* disc as the title screen's: painted by
+    // Sunbird.drawSunDisc from SUN_STOPS, so the sun you start under and the
+    // sun you fly toward are one object rather than a flat yellow ball.
+    const sunCanvas = document.createElement("canvas");
+    sunCanvas.width = 256;
+    sunCanvas.height = 256;
+    drawSunDisc(sunCanvas.getContext("2d")!, 128, 128, 128);
+    this.sunTex = new THREE.CanvasTexture(sunCanvas);
+    this.sunTex.colorSpace = THREE.SRGBColorSpace;
+    this.sun = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: this.sunTex,
+        color: 0xfff2b0,
+        fog: false,
+        toneMapped: false,
+        transparent: true,
+        depthWrite: false,
+      }),
     );
     this.group.add(this.sun);
 
@@ -441,8 +457,8 @@ export class Sky {
     const elev = 22 + t * 78;
     this.sun.position.set(36 + (1 - t) * 28, elev, -110);
     this.sunGlow.position.copy(this.sun.position);
-    (this.sun.material as THREE.MeshBasicMaterial).color.copy(this.mixHex(a.sun, b.sun, u));
-    this.sun.scale.setScalar(0.85 + t * 0.4);
+    (this.sun.material as THREE.SpriteMaterial).color.copy(this.mixHex(a.sun, b.sun, u));
+    this.sun.scale.setScalar((0.85 + t * 0.4) * 26);
 
     this.moon.position.set(-8, 20 + (1 - t) * 68, -120);
     this.moonGlow.position.copy(this.moon.position);
@@ -491,9 +507,11 @@ export class Sky {
       -240,
     );
 
-    // Background haze kept light: thin altitude-readable banks, never overcast.
-    // (Density response cut ~40% — gameplay clouds in Collectibles are untouched.)
-    const hazeAlpha = (0.04 + this.hazeDensity * 0.055) * (1 - this.altT * 0.75) * (0.5 + t * 0.5);
+    // Background haze kept deliberately thin: altitude-readable banks, never
+    // overcast. Density response is cut a second time (~50% again) because the
+    // banks read as a grey wash over the hills rather than weather. Gameplay
+    // clouds in Collectibles are untouched — these are atmosphere only.
+    const hazeAlpha = (0.02 + this.hazeDensity * 0.026) * (1 - this.altT * 0.75) * (0.5 + t * 0.5);
     for (const sprite of this.haze) {
       const mat = sprite.material as THREE.SpriteMaterial;
       const phase = sprite.userData.phase as number;
@@ -501,7 +519,7 @@ export class Sky {
       sprite.position.x = (sprite.userData.baseX as number) - camX * (1 - parallax);
       sprite.position.y = (sprite.userData.baseY as number) + Math.sin(time * (0.09 + parallax * 0.08) + phase) * 1.2;
       mat.color.setHex(this.hazeTint);
-      mat.opacity = hazeAlpha * (0.72 + (phase % 1) * 0.25) * (this.hazeGlow ? 1.25 : 1);
+      mat.opacity = hazeAlpha * (0.72 + (phase % 1) * 0.25) * (this.hazeGlow ? 1.12 : 1);
     }
 
     this.group.position.set(camX, 0, 0);
@@ -530,6 +548,7 @@ export class Sky {
         else mat.dispose();
       }
     });
+    this.sunTex.dispose();
     this.hazeTex.dispose();
     this.milkyWayTex.dispose();
     this.nebulaTex.dispose();

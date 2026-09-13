@@ -23,7 +23,7 @@ Sunbird is a complete HTML5 arcade game: 8 flight modes, 40-pilot races, daily/w
 | Physics | Fixed-step deterministic client sim (`Bird.step()`, bit-exact tested) |
 | Audio | Zero-asset procedural WebAudio synth (SFX + adaptive score, portal-safe) |
 | Payments | Stripe Payment Links (no backend); portal builds strip all payment surfaces |
-| Multiplayer | Self-hosted Rust room server ([rust/](./rust/)) — lobby, seats, synchronized starts |
+| Multiplayer | Self-hosted Rust room server ([rust/](./rust/)) — lobby, seats, synchronized starts, server-authoritative finish order and a movement envelope that rejects impossible client positions |
 | Leaderboard | Vercel Functions ([api/](./api/)) + Vercel KV, on-device fallback ([LEADERBOARD_API.md](./LEADERBOARD_API.md)) |
 | Ghosts | Async PvP via ghost publish/chase ([src/game/GhostNet.ts](./src/game/GhostNet.ts)) |
 | PWA | Service worker (build-stamped cache) + manifest (web builds only) |
@@ -67,6 +67,8 @@ Copy `.env.example` → `.env.local`. All variables are optional — the game ru
 | `npm run verify` | typecheck + test + build |
 | `npm run lint` | ESLint over src, scripts (`--max-warnings 0`) |
 | `npm run test:mp` | Two-client multiplayer smoke test — needs `npm run dev` **and** the room server running |
+| `npm run botsim` | Headless load test: N real WebSocket pilots on the wire protocol |
+| `npm run botsim:40` | 40-pilot load + anti-cheat + resume run (the CI gate) |
 | `npm run physcheck` | Physics determinism harness |
 | `npm run gen-icons` | Regenerate PWA icons |
 
@@ -75,6 +77,7 @@ Copy `.env.example` → `.env.local`. All variables are optional — the game ru
 - **Unit** — `npm test`: pure-function coverage across PvP rating, challenges, mastery, economy, ghost codecs, protocol parsing, and bit-exact `Bird.step()` determinism on seeded terrain.
 - **Stability** — the suite is loop-safe: 100 consecutive runs green with zero flakes (each run is independent; no shared state, no wall-clock dependence — season/week tests are timezone-independent).
 - **Multiplayer smoke** — `npm run test:mp` joins two real WebSocket clients to the same room through the dev proxy and asserts roster visibility plus live state frames (`peers-visible=true`, 5+ frames in 4 s).
+- **Load** — `npm run botsim:40`: 40 real WebSocket pilots on the shipped protocol. Gated in `.github/workflows/botsim.yml`; the Rust job requires cheat containment (`--require-anticheat`), so a regression that lets a teleport through fails the build.
 - **Rust** — `cargo fmt --check`, `cargo clippy`, `cargo test` in [rust/](./rust/).
 
 ## Builds & portals

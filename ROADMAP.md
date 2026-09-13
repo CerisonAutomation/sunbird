@@ -34,9 +34,50 @@ until proven otherwise. This file exists so the commit log can't overclaim.
 - Without a configured URL the game still falls back to local squadron
   pilots with human-sounding names — the lobby badge says which one you got.
 
+## 🟡 Written and tested in CI, not yet exercised in production
+- `protocol/contract.json` — the single machine-checked source of truth for the
+  wire protocol. Asserted by **both** implementations:
+  `src/game/__tests__/protocol-contract.test.ts` and
+  `rust/crates/sunbird-protocol/tests/contract.rs`. This exists because the
+  "Rust is the source of truth, TS mirrors it" comment had already gone false:
+  `ServerMessage::Snapshot` shipped in Rust with no TypeScript counterpart, so
+  the browser would have thrown on the first authoritative snapshot. The
+  mirror is now fixed *and* pinned.
+- `rust/crates/sunbird-server/src/validate.rs` — server-authoritative movement
+  envelope. Client `state` frames are now checked for finiteness, world bounds,
+  distance regression and a **time-aware** speed cap derived from the client's
+  own physics ceiling (234 u/s = 128 fever × 1.5 wingboost + 42 boost), then
+  canonicalised to wire precision. Rejections are dropped and counted as
+  `sunbird_legacy_state_rejected_total{reason=…}`; the seat is never dropped.
+- `rust/crates/sunbird-protocol/src/lib.rs` — `Limits` was the only type in the
+  protocol missing `rename_all = "camelCase"`, so `GET /v1/hello` emitted
+  `max_json_payload_bytes` and the browser client's parser threw. Fixed and
+  pinned by `hello_limits_are_camel_case_on_the_wire`. Found by the contract
+  suite, which is the only reason it was found.
+- `scripts/botsim.mjs` — 40 headless pilots on the real wire protocol, seeded
+  and reproducible. Gated in `.github/workflows/botsim.yml`: the Node reference
+  job reports cheat containment, the Rust job **gates** on it
+  (`--require-anticheat`). Measured locally against the reference server:
+  40/40 connected in 42 ms, roster 40/40, broadcast cadence p95 66.8 ms, 13
+  unique finish places, 4/4 mid-race resumes.
+
 ## 🔴 Aspirational (do not claim in commit messages)
-- Anti-cheat and server-side matchmaking are still aspirational; rooms today
-  are in-memory and trust the client's position stream.
+- Server-side matchmaking is still aspirational; rooms are in-memory.
+- Anti-cheat is **partial, not finished**. Movement plausibility is enforced
+  (above), but identity, rate limiting and score-submission trust are not.
+  Measured in CI for the record: the same 40 bots produce **16,082 relayed
+  cheats** against the unvalidated Node reference server and **0** against the
+  Rust one. Canonicalisation also cut per-client bandwidth 34.5%
+  (79.56 → 52.11 KB/s) at identical cadence.
+
+## Next (in order)
+1. Retire `scripts/mp-smoke.mjs` once this PR has been green a while — botsim
+   supersedes it (40 clients vs 2, and it is actually wired into CI)
+2. Wire the client to consume the `snapshot` message it can now parse — the
+   parser is no longer the blocker for authoritative rooms
+
+See `ARCHITECTURE_REVIEW.md` for the full comparison against the proposed
+Bevy/Replicon rewrite, including what was rejected and why.
 
 ## ✅ Formerly "Next" — shipped in-repo (merged from both lines)
 1. ~~Deploy `sunbird-server`~~ / ~~deploy `backend/`~~ — both server stacks are

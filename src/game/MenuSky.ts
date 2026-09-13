@@ -16,6 +16,8 @@
  *    source of visible flashing (blank canvas until the next 30 Hz tick).
  */
 
+import { FLAP_NEUTRAL, drawSunbird } from "./Sunbird.js";
+
 type Flocker = {
   x: number;
   y: number;
@@ -222,80 +224,6 @@ export class MenuSky {
     }
   }
 
-  /* ------------------------------------------------------------- hero bird */
-
-  /**
-   * One sunbird shape used for both the big hero and every member of the
-   * distant flock, so the small birds flying around read as the same bird —
-   * orange body, cream belly, gold beak — just scaled and dimmed by depth.
-   * Draws centered on the origin, facing +x. `dim` fades 1 (near, full colour)
-   * toward a deeper silhouette for the far birds.
-   */
-  private drawSunbird(ctx: CanvasRenderingContext2D, size: number, flap: number, dim: number): void {
-    const f = Math.max(0.35, Math.min(1, dim));
-    const tint = (hex: string, m = 1): string => {
-      const n = parseInt(hex.slice(1), 16);
-      const r = Math.round(((n >> 16) & 255) * f * m);
-      const g = Math.round(((n >> 8) & 255) * f * m);
-      const b = Math.round((n & 255) * f * m);
-      return `rgb(${r},${g},${b})`;
-    };
-
-    // Far wing (behind the body, slightly darker).
-    ctx.fillStyle = tint("#e06a35", 0.92);
-    ctx.beginPath();
-    ctx.ellipse(-size * 0.05, -size * 0.16 - flap * size * 0.34, size * 0.5, size * 0.2, -0.5 - flap * 0.35, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Body.
-    ctx.fillStyle = tint("#ff7a45");
-    ctx.beginPath();
-    ctx.ellipse(0, 0, size * 0.62, size * 0.4, 0.06, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Belly.
-    ctx.fillStyle = tint("#ffe6c4");
-    ctx.beginPath();
-    ctx.ellipse(size * 0.1, size * 0.14, size * 0.36, size * 0.2, 0.1, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Tail feathers.
-    ctx.fillStyle = tint("#e06a35");
-    ctx.beginPath();
-    ctx.moveTo(-size * 0.5, 0);
-    ctx.lineTo(-size * 0.95, -size * 0.18);
-    ctx.lineTo(-size * 0.85, size * 0.12);
-    ctx.closePath();
-    ctx.fill();
-
-    // Near wing (banks with the flap).
-    ctx.fillStyle = tint("#ff9a62");
-    ctx.beginPath();
-    ctx.ellipse(size * 0.02, -size * 0.05 - flap * size * 0.42, size * 0.56, size * 0.24, -0.35 - flap * 0.5, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Beak.
-    ctx.fillStyle = tint("#ffb020");
-    ctx.beginPath();
-    ctx.moveTo(size * 0.58, -size * 0.06);
-    ctx.lineTo(size * 0.86, size * 0.02);
-    ctx.lineTo(size * 0.56, size * 0.12);
-    ctx.closePath();
-    ctx.fill();
-
-    // Eye only when large enough to read; tiny distant birds stay clean.
-    if (size >= 14) {
-      ctx.fillStyle = tint("#2a1c28");
-      ctx.beginPath();
-      ctx.arc(size * 0.36, -size * 0.1, size * 0.07, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = tint("#ffffff");
-      ctx.beginPath();
-      ctx.arc(size * 0.385, -size * 0.125, size * 0.025, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
   /* ---------------------------------------------------------- distant flock */
 
   private step(bird: Flocker, dt: number): void {
@@ -332,8 +260,14 @@ export class MenuSky {
   private drawFlocker(ctx: CanvasRenderingContext2D, bird: Flocker, w: number, h: number): void {
     const x = bird.x * w;
     const y = bird.y * h + Math.sin(this.time * 0.9 + bird.flap * 0.15) * (h * 0.004);
-    const size = Math.max(6, 9 * bird.scale);
-    const flap = Math.sin(bird.flap) * 0.7;
+    // The shared bird is `size` px WIDE (64 units end to end), where the old
+    // menu-local one spanned ~1.81 * size. Scaled up to match, so the flock
+    // reads exactly as big on screen as it did before the extraction.
+    const size = Math.max(11, 16 * bird.scale);
+    // Centred on FLAP_NEUTRAL, not on zero: that is the pose the title-screen
+    // bird is drawn in, so a ±0.5 beat sweeps the wings symmetrically through
+    // it instead of hanging below it for most of the cycle.
+    const flap = FLAP_NEUTRAL + Math.sin(bird.flap) * 0.5;
 
     // Every flock member is the same sunbird: near ones show full plumage,
     // far ones fade toward a deep-orange silhouette so they still read as
@@ -341,7 +275,8 @@ export class MenuSky {
     const dim = 0.5 + bird.depth * 0.5;
     ctx.save();
     ctx.translate(x, y);
-    this.drawSunbird(ctx, size, flap, dim);
+    // The one canonical bird — same shape as the lobby and roster birds.
+    drawSunbird(ctx, size, flap, dim);
     ctx.restore();
   }
 }
