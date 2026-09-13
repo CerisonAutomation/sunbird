@@ -245,19 +245,19 @@ export class TerrainSystem {
   distanceToCrest(x: number, maxAhead = 150): number {
     this.ensureCrests(x + maxAhead + CREST_STEP * 4);
     const crests = this.crests;
-    if (crests.length === 0) return maxAhead + 1;
+    if (crests.length === 0) return maxAhead;
 
     // Binary search for the first crest strictly ahead of x.
     let lo = 0;
     let hi = crests.length - 1;
-    if (crests[hi]! <= x) return maxAhead + 1;
+    if (crests[hi]! <= x) return maxAhead;
     while (lo < hi) {
       const mid = (lo + hi) >> 1;
       if (crests[mid]! <= x) lo = mid + 1;
       else hi = mid;
     }
     const d = crests[lo]! - x;
-    return d > maxAhead ? maxAhead + 1 : d;
+    return d > maxAhead ? maxAhead : d;
   }
 
   /**

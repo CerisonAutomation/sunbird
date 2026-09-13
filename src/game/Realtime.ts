@@ -290,9 +290,10 @@ export class RealtimeClient implements NetTransport {
   private dispatch(msg: ServerMsg): void {
     switch (msg.type) {
       case "welcome":
+        if (typeof msg.id !== "string") break;
         this.selfId = msg.id;
         this.roomCode = msg.room;
-        this.seed = msg.seed;
+        this.seed = msg.seed || this.seed;
         this.capacity = msg.capacity || 40;
         this.state = "lobby";
         break;
@@ -359,10 +360,11 @@ export class RealtimeClient implements NetTransport {
         const t = this.track(msg.id);
         t.finished = true;
         t.finishTime = msg.time;
-        this.pendingEvents.push({ type: "finish", name: t.name, place: msg.place });
+        this.pendingEvents.push({ type: "finish", name: t.name, place: msg.place ?? 0 });
         break;
       }
       case "start":
+        if (!Number.isFinite(msg.at)) break;
         this.myPlace = 0;
         this.startsAt = msg.at;
         this.seed = msg.seed || this.seed;
@@ -370,7 +372,7 @@ export class RealtimeClient implements NetTransport {
         this.pendingEvents.push({ type: "start" });
         break;
       case "error":
-        this.fail(msg.message || "Server refused the connection");
+        this.fail(typeof msg.message === "string" && msg.message.length > 0 ? msg.message : "Server refused the connection");
         break;
       default:
         break;
