@@ -15,6 +15,7 @@ export class Telemetry {
   private readonly buffer: Entry[] = [];
   private readonly debug =
     typeof location !== "undefined" && /localhost|127\.0\.0\.1/.test(location.hostname);
+  private hookInstalled = false;
 
   // Performance monitoring
   private frameCount = 0;
@@ -23,6 +24,26 @@ export class Telemetry {
   private frameTimes: number[] = [];
   private metricsHistory: PerformanceMetrics[] = [];
   private static readonly MAX_METRICS_HISTORY = 60;
+
+  private readonly onHide = (): void => {
+    if (document.visibilityState === "hidden") this.flush();
+  };
+
+  /** Send buffered events and install the visibility flush hook. */
+  flush(): void {
+    if (!this.hookInstalled && typeof document !== "undefined") {
+      this.hookInstalled = true;
+      document.addEventListener("visibilitychange", this.onHide);
+    }
+  }
+
+  /** Detach the flush hook — Game.dispose() calls this so React StrictMode's
+   * double-mount never leaves a zombie listener double-beaconing events. */
+  dispose(): void {
+    if (!this.hookInstalled || typeof document === "undefined") return;
+    this.hookInstalled = false;
+    document.removeEventListener("visibilitychange", this.onHide);
+  }
 
   track(name: string, props: Props = {}): void {
     const entry: Entry = { name, props, t: Date.now() };

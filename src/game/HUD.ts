@@ -6,6 +6,7 @@ import type { ModeDef } from "./Modes";
 import type { RacerStats } from "./Racer";
 import { VIP_DAILY_GIFT } from "./constants";
 import type { BoostView, SkinView } from "./Economy";
+import { GREY_PALETTE, rivalPalette, skinPalette, sunSVG, sunbirdSVG } from "./Sunbird";
 import { formatDistance } from "./math";
 import type { MissionView, QuestReward, QuestView } from "./Missions";
 import type { HighScore, Settings } from "./SaveData";
@@ -78,6 +79,10 @@ export type HudSnapshot = {
   adTotal: number;
   adReason: "continue" | "interstitial";
   seedLabel: string;
+  /** Career wings: lifetime-distance rank shown on the title screen. */
+  wings: { icon: string; name: string; progress: number; nextName: string; nextNeeded: number; lifetime: number };
+  /** Flight recap: downsampled [metresFromStart, altitude] profile. */
+  flightPath: [number, number][];
   seedMode: SeedMode;
   wallet: number;
   streakDays: number;
@@ -254,6 +259,7 @@ export class HUD {
   private overEl!: HTMLElement;
   private overCard!: HTMLElement;
   private toastLayer!: HTMLElement;
+  private readonly liveToasts = new Map<string, { el: HTMLElement; count: number; timer: number }>();
   private flashEl!: HTMLElement;
   private comboEl!: HTMLElement;
   private biomeChip!: HTMLElement;
@@ -449,8 +455,15 @@ export class HUD {
       this.feverFill.style.width = `${Math.max(0, Math.min(1, s.fever)) * 100}%`;
 
       const chips: string[] = [];
-      if (s.boostTimer > 0) chips.push(`<span class="pchip boost">🚀 boost</span>`);
-      if (s.magnetTimer > 0) chips.push(`<span class="pchip magnet">🧲 ${Math.ceil(s.magnetTimer)}s</span>`);
+      // Timed power-ups live ONLY in the power strip (countdown bars) — chips
+      // here double-printed the same power-up (the old bug: pickup magnet fed
+      // both magnetTimer AND PowerUps, so "🧲" showed twice). Chips remain as
+      // a fallback for armed-boost timers the strip doesn't know about, plus
+      // shield stock and weather calls to action.
+      if (s.boostTimer > 0 && !s.powers.some((p) => p.kind === "rocket"))
+        chips.push(`<span class="pchip boost">🚀 boost</span>`);
+      if (s.magnetTimer > 0 && !s.powers.some((p) => p.kind === "magnet"))
+        chips.push(`<span class="pchip magnet">🧲 ${Math.ceil(s.magnetTimer)}s</span>`);
       if (s.shield > 0) chips.push(`<span class="pchip shield">🛡 ×${s.shield}</span>`);
       if (s.gust > 0.3) chips.push(`<span class="pchip gust">🌬 headwind — dive!</span>`);
       if (s.inThermal) chips.push(`<span class="pchip thermal">♨ thermal — release!</span>`);
@@ -487,13 +500,13 @@ export class HUD {
         this.launchBanner.className = `launch-banner ${s.launchRating} ${s.launchBannerT > 0 ? "show" : ""}`;
       }
 
-      const pkey = s.powers.map((p) => `${p.kind}${Math.ceil(p.time)}`).join(",");
+      const pkey = s.powers.map((p) => `${p.kind}${p.level}${Math.ceil(p.time)}`).join(",");
       if (pkey !== this.lastPowers) {
         this.lastPowers = pkey;
         this.powerStrip.innerHTML = s.powers
           .map(
             (p) =>
-              `<span class="pu" title="${p.label} — ${Math.ceil(p.time)}s left"><i>${p.icon}</i><u>${p.label} · ${Math.ceil(p.time)}s</u><b style="width:${Math.max(0, Math.min(1, p.time / p.total)) * 100}%"></b></span>`,
+              `<span class="pu${p.time < 1.8 ? " expiring" : ""}${p.level === 2 ? " lv2" : ""}" title="${escapeHtml(p.label)}${p.level === 2 ? " II (overcharged)" : ""}"><i>${escapeHtml(p.icon)}</i>${p.level === 2 ? `<em class="pu-lv">II</em>` : ""}<b style="width:${Math.max(0, Math.min(1, p.time / p.total)) * 100}%"></b><u>${Math.ceil(p.time)}</u></span>`,
           )
           .join("");
       }
@@ -571,16 +584,48 @@ export class HUD {
   }
 
   toast(text: string, kind = "info"): void {
+    // Dedup: firing the same line while it is still on screen bumps a ×n
+    // counter instead of stacking identical pills (ash storms, repeat
+    // pickups). Never show the same words twice at once.
+    const live = this.liveToasts.get(text);
+    if (live && live.el.isConnected) {
+      live.count += 1;
+      live.el.textContent = `${text} ×${live.count}`;
+      live.el.classList.remove("bump");
+      void live.el.offsetWidth;
+      live.el.classList.add("bump");
+      window.clearTimeout(live.timer);
+      live.timer = this.scheduleToastOut(live.el, text);
+      return;
+    }
+    // Cap the stack — beyond 4 pills the oldest leaves immediately.
+    while (this.toastLayer.children.length >= 4) {
+      const oldest = this.toastLayer.firstElementChild;
+      if (!oldest) break;
+      for (const [k, v] of this.liveToasts) if (v.el === oldest) this.liveToasts.delete(k);
+      oldest.remove();
+    }
     const el = document.createElement("div");
     el.className = `toast ${kind}`;
     el.textContent = text;
     this.toastLayer.appendChild(el);
     requestAnimationFrame(() => el.classList.add("in"));
-    window.setTimeout(() => {
+    const timer = this.scheduleToastOut(el, text);
+    this.liveToasts.set(text, { el, count: 1, timer });
+  }
+
+  /** Long lines earn longer reads: 1.2 s base + 28 ms/char, capped at 4 s. */
+  private scheduleToastOut(el: HTMLElement, key: string): number {
+    const hold = Math.min(4000, 1200 + Math.max(0, el.textContent!.length - 16) * 28);
+    return window.setTimeout(() => {
       el.classList.remove("in");
       el.classList.add("out");
-      window.setTimeout(() => el.remove(), 420);
-    }, 1200);
+      window.setTimeout(() => {
+        el.remove();
+        const live = this.liveToasts.get(key);
+        if (live && live.el === el) this.liveToasts.delete(key);
+      }, 420);
+    }, hold);
   }
 
   flash(kind: "perfect" | "fever" | "island" | "sleep"): void {
@@ -862,10 +907,6 @@ function escapeHtml(s: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
-}
-
-function hex(n: number): string {
-  return `#${n.toString(16).padStart(6, "0")}`;
 }
 
 function head(title: string, backAction = "back", right = ""): string {
@@ -1239,8 +1280,14 @@ function renderMain(s: HudSnapshot): string {
     <!-- ── SEED & WORLD ── -->
     <div class="home-world">
       <span class="home-seed-label">${s.seedLabel}</span>
+      <span class="pill wings-pill" title="${formatDistance(s.wings.lifetime)} lifetime">${s.wings.icon} ${s.wings.name}</span>
       ${seedPicker}
     </div>
+    ${
+      s.wings.nextNeeded > 0
+        ? `<div class="wings-track" aria-label="Career progress"><i style="width:${Math.round(s.wings.progress * 100)}%"></i><span>${formatDistance(s.wings.nextNeeded)} to ${s.wings.nextName}</span></div>`
+        : ""
+    }
 
     <!-- ── ALERTS ── -->
     ${s.streakBroken && s.streakSaveAvailable ? `<div class="home-alert warn"><span>⚠ Streak broken!</span><button class="mini-btn" data-ui data-action="ad-streak-save">🎬 Save it</button></div>` : ""}
@@ -1321,7 +1368,14 @@ function renderMain(s: HudSnapshot): string {
 
 function renderSkinCard(v: SkinView): string {
   const d = v.def;
-  const swatch = `<div class="bird-swatch" style="--body:${hex(d.body)};--wing:${hex(d.wing)};--belly:${hex(d.belly)}"><i class="w"></i><i class="b"></i><i class="e"></i></div>`;
+  // The real bird, in this skin's colours — not the old three-div CSS blob.
+  const swatch = sunbirdSVG({
+    palette: skinPalette(d),
+    width: 64,
+    flap: 0.45,
+    className: "bird-swatch",
+    title: d.name,
+  });
   let action: string;
   if (v.equipped) action = `<span class="tag on">Equipped</span>`;
   else if (v.owned) action = `<button class="mini-btn" data-ui data-action="equip-skin" data-id="${d.id}">Equip</button>`;
@@ -1414,7 +1468,7 @@ function renderCheckout(s: HudSnapshot): string {
     return `
       ${head("Stripe Checkout", "checkout-cancel")}
       <div class="sheet stripe">
-        <div class="sheet-row"><span>${item.name}</span><b>${item.price}</b></div>
+        <div class="sheet-row"><span>${escapeHtml(item.name)}</span><b>${escapeHtml(String(item.price))}</b></div>
         <p class="tagline">You'll continue to Stripe's secure checkout in a new tab.</p>
         <button class="primary-btn gold" data-ui data-action="stripe-open">Continue to Stripe ↗</button>
         ${
@@ -1429,7 +1483,7 @@ function renderCheckout(s: HudSnapshot): string {
   return `
     ${head("Demo Checkout", "checkout-cancel")}
     <div class="sheet">
-      <div class="sheet-row"><span>${item.name}</span><b>${item.price}</b></div>
+      <div class="sheet-row"><span>${escapeHtml(item.name)}</span><b>${escapeHtml(String(item.price))}</b></div>
       <label>Card number<input data-ui value="4242 4242 4242 4242" readonly /></label>
       <div class="two"><label>Expiry<input data-ui value="12 / 29" readonly /></label><label>CVC<input data-ui value="123" readonly /></label></div>
       <label>Name on card<input data-ui value="Sunbird Tester" readonly /></label>
@@ -1461,7 +1515,7 @@ function renderSettings(s: HudSnapshot): string {
     <div class="setting-row"><span>Flights flown</span><b>${s.runsPlayed}</b></div>
     ${s.canInstall ? `<button class="soft-btn wide" data-ui data-action="install-app">⬇ Install Sunbird</button>` : ""}
     <button class="ghost-btn danger" data-ui data-action="reset-progress">${s.resetArmed ? "Tap again to erase everything" : "Reset progress"}</button>
-    <p class="fineprint">Sunbird 2.5 Pro · ${s.seedLabel}</p>
+    <p class="fineprint">Sunbird 1.0 · ${s.seedLabel}</p>
   `;
 }
 
@@ -1787,6 +1841,71 @@ function renderWeeklyLeaderboard(s: HudSnapshot): string {
   `;
 }
 
+/** The run's silhouette: an SVG sparkline of the altitude profile. */
+export function renderFlightRecap(path: [number, number][]): string {
+  if (path.length < 3) return "";
+  const w = 320;
+  const hgt = 64;
+  let maxX = 1;
+  let maxY = 12;
+  for (const [x, y] of path) {
+    if (x > maxX) maxX = x;
+    if (y > maxY) maxY = y;
+  }
+  const px = (x: number): number => (x / maxX) * (w - 4) + 2;
+  const py = (y: number): number => hgt - 4 - (Math.max(0, y) / maxY) * (hgt - 10);
+  const line = path.map(([x, y], i) => `${i === 0 ? "M" : "L"}${px(x).toFixed(1)} ${py(y).toFixed(1)}`).join(" ");
+  const area = `${line} L${px(path[path.length - 1]![0]).toFixed(1)} ${hgt - 2} L${px(path[0]![0]).toFixed(1)} ${hgt - 2} Z`;
+  let peak = path[0]!;
+  for (const p of path) if (p[1] > peak[1]) peak = p;
+  return `
+    <div class="flight-recap" aria-label="Flight altitude profile">
+      <svg viewBox="0 0 ${w} ${hgt}" preserveAspectRatio="none">
+        <defs><linearGradient id="fr-g" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#ffb020" stop-opacity="0.55"/>
+          <stop offset="1" stop-color="#ffb020" stop-opacity="0.05"/>
+        </linearGradient></defs>
+        <path d="${area}" fill="url(#fr-g)"/>
+        <path d="${line}" fill="none" stroke="#e08a10" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="${px(peak[0]).toFixed(1)}" cy="${py(peak[1]).toFixed(1)}" r="3" fill="#ff6b4a"/>
+      </svg>
+      <span class="fr-peak">▲ ${Math.round(peak[1])} m peak</span>
+    </div>`;
+}
+
+/** The run's silhouette: an SVG sparkline of the altitude profile. */
+export function renderFlightRecap(path: [number, number][]): string {
+  if (path.length < 3) return "";
+  const w = 320;
+  const hgt = 64;
+  let maxX = 1;
+  let maxY = 12;
+  for (const [x, y] of path) {
+    if (x > maxX) maxX = x;
+    if (y > maxY) maxY = y;
+  }
+  const px = (x: number): number => (x / maxX) * (w - 4) + 2;
+  const py = (y: number): number => hgt - 4 - (Math.max(0, y) / maxY) * (hgt - 10);
+  const line = path.map(([x, y], i) => `${i === 0 ? "M" : "L"}${px(x).toFixed(1)} ${py(y).toFixed(1)}`).join(" ");
+  const area = `${line} L${px(path[path.length - 1]![0]).toFixed(1)} ${hgt - 2} L${px(path[0]![0]).toFixed(1)} ${hgt - 2} Z`;
+  // Peak marker — the flight's zenith deserves a dot.
+  let peak = path[0]!;
+  for (const p of path) if (p[1] > peak[1]) peak = p;
+  return `
+    <div class="flight-recap" aria-label="Flight altitude profile">
+      <svg viewBox="0 0 ${w} ${hgt}" preserveAspectRatio="none">
+        <defs><linearGradient id="fr-g" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#ffb020" stop-opacity="0.55"/>
+          <stop offset="1" stop-color="#ffb020" stop-opacity="0.05"/>
+        </linearGradient></defs>
+        <path d="${area}" fill="url(#fr-g)"/>
+        <path d="${line}" fill="none" stroke="#e08a10" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="${px(peak[0]).toFixed(1)}" cy="${py(peak[1]).toFixed(1)}" r="3" fill="#ff6b4a"/>
+      </svg>
+      <span class="fr-peak">▲ ${Math.round(peak[1])} m peak</span>
+    </div>`;
+}
+
 function renderGameOver(s: HudSnapshot): string {
   if (s.versus && s.p1Stats && s.p2Stats) return renderVersusResult(s);
   const questTotal = s.claimedQuests.reduce((a, q) => a + q.reward, 0);
@@ -1795,6 +1914,7 @@ function renderGameOver(s: HudSnapshot): string {
     <div class="zzz">z z z</div>
     <h2>Sunbird sleeps</h2>
     <p class="tagline">The daylight ran out.</p>
+    ${renderFlightRecap(s.flightPath)}
     ${s.challengeActive ? `<div class="reward-strip gold">Challenge from ${escapeHtml(s.challengeFrom)}: Beat ${s.challengeScore.toLocaleString()} pts</div>` : ""}
     ${isNewBest ? '<div class="new-best-banner">✨ NEW PERSONAL BEST ✨</div>' : ""}
     <div class="over-stats">

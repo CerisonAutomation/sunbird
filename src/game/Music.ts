@@ -73,6 +73,35 @@ const BASS_ROOT: Record<string, number> = {
   A: 45, D: 50, Bm: 47, E: 52, Gm: 43,
 };
 
+/**
+ * Vary one melody slot for the phrase currently playing.
+ *
+ * A track is 64 fixed slots, so without this every pass of a tune is
+ * note-for-note identical — recognisable for eight bars, dead after that.
+ * Every choice derives from `cycle` and never from randomness, so a pass is
+ * varied but still coherent instead of noisy, and the tune stays recognisable.
+ *
+ * `note` uses the track encoding: >0 is a MIDI pitch, 0 is a rest, -1 a
+ * sustain. Rests and sustains are returned unchanged.
+ */
+export function varyMelody(note: number, cycle: number, bar: number, step: number): number {
+  if (note <= 0) return note;
+  const variation = ((cycle % 3) + 3) % 3;
+  // Pass 1: answer the second and fourth phrases an octave up.
+  if (variation === 1 && bar % 2 === 1 && step === 2) return note + 12;
+  // Pass 2: drop the tail of the second and fourth phrases.
+  if (variation === 2 && (bar === 3 || bar === 7) && step >= 4) return note - 12;
+  return note;
+}
+
+/**
+ * Whether this slot should get a turnaround fill. Only ever in a true rest
+ * (0), never over a sustain (-1), so a fill cannot fight a held note.
+ */
+export function wantsTurnaround(note: number, cycle: number, bar: number, step: number): boolean {
+  return note === 0 && bar === 7 && cycle % 2 === 1 && step % 2 === 0;
+}
+
 /* ── The 10 tracks ───────────────────────────────────────────────── */
 
 const TRACKS: TrackDef[] = [
@@ -426,6 +455,12 @@ export class Music {
   private step = 0;
   private bar = 0;
   private section = 0;
+  /**
+   * How many 8-bar phrases have played since the score started. Used to vary
+   * each pass of a tune — see `scheduleStep`. Without it every performance of
+   * a track is byte-identical, which is what made the score read as a loop.
+   */
+  private cycle = 0;
   private night = 0;
   private baseLevel = 0;
   private lullabyStep = 0;
@@ -784,6 +819,7 @@ export class Music {
       this.dynMult = quiet ? 0.55 + Math.random() * 0.2 : 0.82 + Math.random() * 0.18;
       if (this.bar >= 8) {
         this.bar = 0;
+        this.cycle += 1;
         this.section = (this.section + 1) % this.trackDef.progs.length;
       }
     }
@@ -819,9 +855,10 @@ export class Music {
     /* Melody (glockenspiel + warm sine doubler on strong beats) */
     const mel = track.melodies[this.section % track.melodies.length]!;
     const note = mel[idx] ?? 0;
-    if (note > 0) {
+    const n = varyMelody(note, this.cycle, this.bar, this.step);
+    if (n > 0) {
       const vel = (this.step === 0 ? 0.62 : this.step === 4 ? 0.52 : 0.40) * this.dynMult;
-      this.glock(t, mtof(note), vel);
+      this.glock(t, mtof(n), vel);
       // Warm sine doubler on beat-1 and beat-5 — gives melody a human "voice"
       if (this.step === 0 || this.step === 4) {
         this.leadSine(t, mtof(note), beat * 0.85, vel * 0.32);

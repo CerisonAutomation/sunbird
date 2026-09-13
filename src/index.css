@@ -464,7 +464,7 @@ h2 {
   display: grid;
   place-items: center;
   font-size: 12px;
-  color: #3a8a4a;
+  color: #2c6938;
 }
 
 .mission.done .check {
@@ -581,7 +581,7 @@ h2 {
 }
 
 .toast.fever {
-  background: #ff6b4a;
+  background: #c45239;
   color: #fff;
 }
 
@@ -591,6 +591,11 @@ h2 {
 
 .toast.cloud {
   background: #fff;
+}
+
+.toast.warn {
+  background: #c4522f;
+  color: #fff;
 }
 
 .flash {
@@ -729,4 +734,46 @@ h2 {
 .loading-tip {
   font-size: 14px;
   opacity: 0.5;
+}
+
+/* Hero sun — SVG disc rendered from Sunbird.ts, replaces the old CSS-only disc */
+.home-sun-wrap {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 8px;
+  /* One variable drives the whole composition. Fluid rather than a fixed px:
+     a hardcoded large value crowds a 375px phone and looks lost on a wide
+     desktop, so this always fills its space without overflowing it. Declared
+     here, not on the wrap, so the padding below can size from it too. */
+  --hero-sun: clamp(116px, 34vw, 168px);
+  /* Room for the wingtips that break above the sun's rim. */
+  padding-top: calc(var(--hero-sun) * 0.22);
+}
+
+/* The sun. Geometry and gradient live in Sunbird.ts (SUN_STOPS) and are
+   rendered as inline SVG, so the title screen, the lobby and the in-game sun
+   sprite are one definition instead of three drifting copies. */
+.hero-sun-wrap {
+  position: relative;
+  width: var(--hero-sun);
+  height: var(--hero-sun);
+  margin: 0 auto;
+  filter:
+    drop-shadow(0 6px 12px rgba(210, 100, 30, 0.45))
+    drop-shadow(0 20px 44px rgba(255, 150, 60, 0.4));
+}
+.hero-sun { display: block; width: 100%; height: 100%; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero-sun {
+    /* Was an animated box-shadow; the corona is inside the SVG now, so the
+       breath is a transform — cheaper, and it scales the rings with it. */
+    animation: sun-breathe 4.2s ease-in-out infinite;
+    transform-origin: 50% 50%;
+  }
+}
+
+@keyframes sun-breathe {
+  50% { transform: scale(1.055); }
 }

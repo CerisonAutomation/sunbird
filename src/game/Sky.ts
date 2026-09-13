@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { saturate } from "./math";
+import { drawSunDisc } from "./Sunbird";
+import { drawSunDisc } from "./Sunbird";
 import type { TerrainPalette } from "./TerrainSystem";
 
 type SkyStop = {
@@ -17,7 +19,14 @@ type SkyStop = {
   hemiGround: number;
 };
 
-const STOPS: { t: number; s: SkyStop }[] = [
+/**
+ * Time-of-day colour ramp, indexed by `dayT` (daylight remaining, 1 -> 0).
+ * This table — not the sky material's initial uniform values — is what the
+ * rendered sky is made of: `update()` writes topColor/horizonColor/bottomColor
+ * from `sampleStops(dayT)` every frame. Exported so the palette's brightness
+ * can be asserted rather than eyeballed.
+ */
+export const STOPS: { t: number; s: SkyStop }[] = [
   {
     t: 0,
     s: {
@@ -38,18 +47,18 @@ const STOPS: { t: number; s: SkyStop }[] = [
   {
     t: 0.18,
     s: {
-      top: 0x3a2460,
-      horizon: 0xc45a48,
-      bottom: 0x6a2848,
-      fog: 0x8a4060,
+      top: 0x603b9e,
+      horizon: 0xeb6c56,
+      bottom: 0x9a3a68,
+      fog: 0xc85d8b,
       sun: 0xffb070,
-      farA: 0x6a3a58,
-      farB: 0x4a2a58,
-      farC: 0x2a2048,
-      water: 0x2a4870,
-      waterDeep: 0x142240,
+      farA: 0x9a5480,
+      farB: 0x6f3f84,
+      farC: 0x433373,
+      water: 0x3b659d,
+      waterDeep: 0x1c305a,
       hemiSky: 0xe87850,
-      hemiGround: 0x4a2838,
+      hemiGround: 0x68384e,
     },
   },
   {
@@ -72,35 +81,41 @@ const STOPS: { t: number; s: SkyStop }[] = [
   {
     t: 0.7,
     s: {
-      top: 0x4aa4ea,
-      horizon: 0xa8e4ff,
-      bottom: 0x7ec8e8,
-      fog: 0x8ed0ee,
-      sun: 0xfff6c8,
-      farA: 0x6bb87a,
-      farB: 0x4d8aaa,
-      farC: 0x4a68a0,
-      water: 0x3a98c8,
-      waterDeep: 0x1a5888,
-      hemiSky: 0xb0e0ff,
-      hemiGround: 0x5a8a50,
+      // Clear-sky pass: a deeper, more saturated blue overhead reads as *less*
+      // cloud, not less light, and a brighter horizon + fog colour is what
+      // actually removes the murky cast. Distance layers lifted to match, so
+      // the horizon doesn't turn to grey sludge where the fog starts.
+      top: 0x3f9ae8,
+      horizon: 0xd8f2ff,
+      bottom: 0x9fdcf5,
+      fog: 0xcfeeff,
+      sun: 0xfff8d0,
+      farA: 0x86cf90,
+      farB: 0x6aa8c4,
+      farC: 0x6888ba,
+      water: 0x52b0dc,
+      waterDeep: 0x2270a4,
+      hemiSky: 0xc8ecff,
+      hemiGround: 0x6c9c5c,
     },
   },
   {
     t: 1,
     s: {
-      top: 0x7ec8f5,
-      horizon: 0xffe0b8,
-      bottom: 0xf0c8a0,
-      fog: 0xe8d8c4,
-      sun: 0xfff2b8,
-      farA: 0x8ed89a,
-      farB: 0x78b0c8,
-      farC: 0x7a90c0,
-      water: 0x48b0d8,
-      waterDeep: 0x2a7098,
-      hemiSky: 0xffe0c8,
-      hemiGround: 0x80b060,
+      // Every run starts here (dayT = 1), so this stop is the first
+      // impression. Lifted across the board: warmer, brighter, less dusty.
+      top: 0x6fc4f8,
+      horizon: 0xffecc8,
+      bottom: 0xf8dcb8,
+      fog: 0xf6e8d4,
+      sun: 0xfff6c4,
+      farA: 0xa4e8ac,
+      farB: 0x90c8dc,
+      farC: 0x92a8d4,
+      water: 0x5cc4e8,
+      waterDeep: 0x3288b0,
+      hemiSky: 0xffeada,
+      hemiGround: 0x92c46e,
     },
   },
 ];
@@ -111,7 +126,8 @@ export class Sky {
   readonly hemi: THREE.HemisphereLight;
   readonly sunLight: THREE.DirectionalLight;
   private readonly skyMat: THREE.ShaderMaterial;
-  private readonly sun: THREE.Mesh;
+  private readonly sun: THREE.Sprite;
+  private readonly sunTex: THREE.CanvasTexture;
   private readonly sunGlow: THREE.Sprite;
   private readonly sunHalo: THREE.Sprite;
   private readonly moon: THREE.Mesh;
@@ -139,11 +155,18 @@ export class Sky {
       fog: false,
       toneMapped: false,
       uniforms: {
-        topColor: { value: new THREE.Color(0x4aa0e8) },
-        horizonColor: { value: new THREE.Color(0xa8e4ff) },
-        bottomColor: { value: new THREE.Color(0x7ec8e8) },
+        // Seeds only. STOPS (above) is authoritative: update() writes these
+        // three every frame from sampleStops(dayT), so editing them here does
+        // nothing to the rendered sky. Kept equal to the t=0.7 day stop.
+        topColor: { value: new THREE.Color(0x3f9ae8) },
+        horizonColor: { value: new THREE.Color(0xd8f2ff) },
+        bottomColor: { value: new THREE.Color(0x9fdcf5) },
         time: { value: 0 },
         aurora: { value: 0 },
+        // Direction to the sun, and how hard it blooms. Kept as uniforms so the
+        // dome can light itself from the same sun the scene is lit by.
+        sunDir: { value: new THREE.Vector3(48, 72, 36).normalize() },
+        sunGlow: { value: 1 },
       },
       vertexShader: `
         varying vec3 vWorld;
@@ -159,6 +182,8 @@ export class Sky {
         uniform vec3 bottomColor;
         uniform float time;
         uniform float aurora;
+        uniform vec3 sunDir;
+        uniform float sunGlow;
         varying vec3 vWorld;
 
         // Blue-noise dithering — smooths gradient banding at no cost
@@ -226,8 +251,28 @@ export class Sky {
             col += auroraCol * curtain * aurora * 0.92;
           }
 
+          // Sun bloom in the dome itself. Tight core, broad warm halo, faint
+          // crepuscular rays so the light has a direction.
+          float sd = max(dot(dir, sunDir), 0.0);
+          col += vec3(1.00, 0.88, 0.66) * pow(sd, 260.0) * 1.45 * sunGlow;
+          col += vec3(1.00, 0.80, 0.52) * pow(sd, 11.0) * 0.30 * sunGlow;
+          float ang = atan(dir.z, dir.x);
+          float rays = 0.5 + 0.5 * sin(ang * 13.0 + time * 0.11);
+          col += vec3(1.00, 0.90, 0.70) * pow(sd, 34.0) * rays * 0.15 * sunGlow;
+
           // Dithering to prevent color banding in smooth gradients
           col += dither4x4(gl_FragCoord.xy);
+
+          // Sun bloom in the dome itself. A flat three-stop gradient is most of
+          // why a bright day still reads as overcast: there is no bright point
+          // for the eye to anchor on. Tight core, broad warm halo, and faint
+          // crepuscular rays so the light has a direction.
+          float sd = max(dot(dir, sunDir), 0.0);
+          col += vec3(1.00, 0.88, 0.66) * pow(sd, 260.0) * 1.45 * sunGlow;
+          col += vec3(1.00, 0.80, 0.52) * pow(sd, 11.0) * 0.30 * sunGlow;
+          float ang = atan(dir.z, dir.x);
+          float rays = 0.5 + 0.5 * sin(ang * 13.0 + time * 0.11);
+          col += vec3(1.00, 0.90, 0.70) * pow(sd, 34.0) * rays * 0.15 * sunGlow;
 
           gl_FragColor = vec4(col, 1.0);
         }
@@ -236,10 +281,24 @@ export class Sky {
     const skyMesh = new THREE.Mesh(new THREE.SphereGeometry(420, 24, 16), this.skyMat);
     this.group.add(skyMesh);
 
-    const sunGeo = new THREE.SphereGeometry(8, 16, 12);
-    this.sun = new THREE.Mesh(
-      sunGeo,
-      new THREE.MeshBasicMaterial({ color: 0xf0d890, fog: false }),
+    // The in-flight sun is the same disc as the title screen's: painted by
+    // drawSunDisc from SUN_STOPS, so the sun you start under and the sun you
+    // fly toward are one object rather than a flat yellow ball.
+    const sunCanvas = document.createElement("canvas");
+    sunCanvas.width = 256;
+    sunCanvas.height = 256;
+    drawSunDisc(sunCanvas.getContext("2d")!, 128, 128, 128);
+    this.sunTex = new THREE.CanvasTexture(sunCanvas);
+    this.sunTex.colorSpace = THREE.SRGBColorSpace;
+    this.sun = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: this.sunTex,
+        color: 0xfff2b0,
+        fog: false,
+        toneMapped: false,
+        transparent: true,
+        depthWrite: false,
+      }),
     );
     this.group.add(this.sun);
 
@@ -334,8 +393,11 @@ export class Sky {
     this.sunLight = new THREE.DirectionalLight(0xfff4d0, 1.0);
     this.sunLight.position.set(40, 60, 30);
     this.sunLight.castShadow = true;
-    this.sunLight.shadow.mapSize.width = 1024;
-    this.sunLight.shadow.mapSize.height = 1024;
+    // 2048 rather than 1024. Shadow-map resolution is the other half of why
+    // shadows read as cheap: at 1024 the whole terrain shares a coarse grid, so
+    // edges stair-step. One directional light, so this is a single 16 MB buffer.
+    this.sunLight.shadow.mapSize.width = 2048;
+    this.sunLight.shadow.mapSize.height = 2048;
     this.sunLight.shadow.camera.near = 10;
     this.sunLight.shadow.camera.far = 280;
     this.sunLight.shadow.camera.left = -80;
@@ -397,8 +459,9 @@ export class Sky {
     this.hemi.color.copy(this.mixHex(a.hemiSky, b.hemiSky, u));
     this.hemi.groundColor.copy(this.mixHex(a.hemiGround, b.hemiGround, u));
     this.sunLight.color.copy(this.mixHex(a.sun, b.sun, u));
-    this.sunLight.intensity = 0.35 + t * 0.7;
-    this.hemi.intensity = 0.7 + t * 0.4;
+    // Day grade lifted ~15% for a premium well-lit look.
+    this.sunLight.intensity = 0.8 + t * 0.95;
+    this.hemi.intensity = 1.1 + t * 0.45;
 
     const elev = 22 + t * 78;
     this.sun.position.set(36 + (1 - t) * 28, elev, -110);
@@ -408,8 +471,8 @@ export class Sky {
     const haloPulse = 1 + Math.sin(time * 0.8) * 0.12;
     this.sunHalo.scale.setScalar(56 * this.sun.scale.x * haloPulse);
     (this.sunHalo.material as THREE.SpriteMaterial).opacity = 0.15 + Math.sin(time * 1.2) * 0.04;
-    (this.sun.material as THREE.MeshBasicMaterial).color.copy(this.mixHex(a.sun, b.sun, u));
-    this.sun.scale.setScalar(0.85 + t * 0.4);
+    (this.sun.material as THREE.SpriteMaterial).color.copy(this.mixHex(a.sun, b.sun, u));
+    this.sun.scale.setScalar((0.85 + t * 0.4) * 26);
 
     this.moon.position.set(-8, 20 + (1 - t) * 68, -120);
     this.moonGlow.position.copy(this.moon.position);
@@ -423,6 +486,10 @@ export class Sky {
     this.sunLight.position.set(camX + 48, 72, 36);
     this.sunLight.target.position.set(camX + 8, 10, 0);
     this.sunLight.target.updateMatrixWorld();
+    // Point the dome's bloom at the same sun the scene is lit by, and fade it
+    // with the daylight clock so dusk dims instead of glowing like noon.
+    (this.skyMat.uniforms.sunDir!.value as THREE.Vector3).set(48, 72, 36).normalize();
+    this.skyMat.uniforms.sunGlow!.value = 0.35 + t * 0.65;
 
     this.water.position.set(0, 0.25, 6);
     this.waterMat.uniforms.time!.value = time;
@@ -447,6 +514,7 @@ export class Sky {
         else mat.dispose();
       }
     });
+    this.sunTex.dispose();
   }
 
   private mixHex(ha: number, hb: number, t: number): THREE.Color {

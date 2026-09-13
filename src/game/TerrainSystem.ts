@@ -21,10 +21,46 @@ const HEIGHT_CACHE_MASK = HEIGHT_CACHE_SIZE - 1;
 /** One smooth cosine arch of terrain with an authored intent. */
 type Segment = { start: number; len: number; height: number; base: number; baseNext: number };
 
+/** Chunk mesh dimensions, derived once from the streaming constants. */
+const CHUNK_SEGMENTS = Math.ceil(CHUNK_SIZE / CHUNK_RES);
+const CHUNK_STRIDE = 4;
+const CHUNK_VERTS = (CHUNK_SEGMENTS + 1) * CHUNK_STRIDE;
+/** 6 triangles per segment x 3 index entries. */
+const CHUNK_INDEX_COUNT = CHUNK_SEGMENTS * 18;
+/**
+ * Pool ceiling. The visible window is VISIBLE_CHUNKS_BACK + _FWD + 1 chunks,
+ * so this only needs enough slack to cover a burst of spawns before the
+ * matching evictions land.
+ */
+const GEO_POOL_MAX = 24;
+
+/** Far parallax layers. Buffers built once, heights rewritten in place. */
+const FAR_SAMPLES = 120;
+const FAR_VERTS = (FAR_SAMPLES + 1) * 2;
+const FAR_INDEX_COUNT = FAR_SAMPLES * 6;
+
+/**
+ * Reusable attribute buffers for one terrain chunk.
+ */
+type ChunkBuffers = {
+  geo: THREE.BufferGeometry;
+  positions: Float32Array;
+  normals: Float32Array;
+  colors: Float32Array;
+  index: Uint16Array;
+};
+
+type Placement = { x: number; y: number; z: number; s: number; rot: number };
+type PropGroup = { props: Placement[]; parts: { inst: THREE.InstancedMesh; part: DecoPart }[]; faded: Set<number> };
+
 type Chunk = {
   id: number;
   group: THREE.Group;
   disposables: { dispose(): void }[];
+  /** Pooled attribute buffers — returned to the pool on eviction, not freed. */
+  buffers: ChunkBuffers;
+  /** Foreground-capable prop groups for updateOcclusion. */
+  propGroups?: PropGroup[];
 };
 
 export type TerrainPalette = {
@@ -46,6 +82,8 @@ export class TerrainSystem {
   private readonly mat: THREE.MeshLambertMaterial;
   private readonly farMats: THREE.MeshBasicMaterial[] = [];
   private readonly farMeshes: THREE.Mesh[] = [];
+  /** Preallocated far-layer vertex buffers, rewritten by rebuildFar. */
+  private readonly farPos: Float32Array[] = [];
   private readonly decoParts = new Map<DecoKind, DecoPart[]>();
   private farCenter = -9999;
   private farIsland = -1;
@@ -54,6 +92,15 @@ export class TerrainSystem {
   private readonly hVal = new Float64Array(HEIGHT_CACHE_SIZE);
   /** Flow calibration: <1 gentler arches, >1 tighter and steeper. */
   private difficulty = 1;
+  /** Free chunk buffers, reused instead of re-allocated every spawn. */
+  private readonly geoPool: ChunkBuffers[] = [];
+  // Scratch colours — were six allocations per chunk, now instance fields.
+  private readonly cTop = new THREE.Color();
+  private readonly cRidge = new THREE.Color();
+  private readonly cMid = new THREE.Color();
+  private readonly cDeep = new THREE.Color();
+  private readonly cSand = new THREE.Color();
+  private readonly cSnow = new THREE.Color(0xf4f8ff);
 
   constructor(seedStr: string) {
     this.seedStr = seedStr;
@@ -65,7 +112,19 @@ export class TerrainSystem {
     for (let i = 0; i < 4; i++) {
       const m = new THREE.MeshBasicMaterial({ color: 0x6b9e7a, side: THREE.DoubleSide });
       this.farMats.push(m);
-      const mesh = new THREE.Mesh(new THREE.BufferGeometry(), m);
+      const positions = new Float32Array(FAR_VERTS * 3);
+      const index = new Uint16Array(FAR_INDEX_COUNT);
+      for (let j = 0; j < FAR_SAMPLES; j++) {
+        const a = j * 2;
+        const o = j * 6;
+        index[o] = a; index[o + 1] = a + 1; index[o + 2] = a + 2;
+        index[o + 3] = a + 1; index[o + 4] = a + 3; index[o + 5] = a + 2;
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      geo.setIndex(new THREE.BufferAttribute(index, 1));
+      this.farPos.push(positions);
+      const mesh = new THREE.Mesh(geo, m);
       mesh.position.z = -24 - i * 32;
       mesh.frustumCulled = false;
       // Static background — no per-frame matrix update needed
@@ -198,6 +257,7 @@ export class TerrainSystem {
       if (id < lo || id > hi) {
         this.group.remove(chunk.group);
         for (const d of chunk.disposables) d.dispose();
+        this.releaseBuffers(chunk.buffers);
         this.chunks.delete(id);
       }
     }
@@ -222,8 +282,16 @@ export class TerrainSystem {
     for (const chunk of this.chunks.values()) {
       this.group.remove(chunk.group);
       for (const d of chunk.disposables) d.dispose();
+      chunk.buffers.geo.dispose();
+      chunk.buffers.geo.dispose();
     }
     this.chunks.clear();
+    // Pooled buffers are still live GPU resources — free them on teardown.
+    for (const rec of this.geoPool) rec.geo.dispose();
+    this.geoPool.length = 0;
+    // Pooled buffers are still live GPU resources — free them on teardown.
+    for (const rec of this.geoPool) rec.geo.dispose();
+    this.geoPool.length = 0;
     this.mat.dispose();
     for (const m of this.farMats) m.dispose();
     for (const mesh of this.farMeshes) mesh.geometry.dispose();
@@ -392,41 +460,64 @@ export class TerrainSystem {
   private spawnChunk(id: number): void {
     const group = new THREE.Group();
     const disposables: { dispose(): void }[] = [];
-    const geo = this.buildChunkGeo(id);
-    disposables.push(geo);
-    const mesh = new THREE.Mesh(geo, this.mat);
+    // The terrain geometry is pooled — NOT pushed into disposables.
+    // Eviction returns it to the pool rather than freeing it.
+    const buffers = this.acquireBuffers();
+    this.fillBuffers(buffers, id);
+    const mesh = new THREE.Mesh(buffers.geo, this.mat);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     // Static meshes don't need per-frame matrix recomputation (saves ~1.2ms/frame)
     mesh.matrixAutoUpdate = false;
     mesh.updateMatrix();
     group.add(mesh);
-    this.placeDecor(id, group, disposables);
+    const propGroups = this.placeDecor(id, group, disposables);
     this.group.add(group);
-    this.chunks.set(id, { id, group, disposables });
+    this.chunks.set(id, { id, group, disposables, buffers, propGroups: propGroups.length ? propGroups : undefined });
   }
 
-  private buildChunkGeo(id: number): THREE.BufferGeometry {
+  /** Take a chunk's buffers from the pool, or allocate them the first time. */
+  private acquireBuffers(): ChunkBuffers {
+    const pooled = this.geoPool.pop();
+    if (pooled) return pooled;
+    const positions = new Float32Array(CHUNK_VERTS * 3);
+    const normals = new Float32Array(CHUNK_VERTS * 3);
+    const colors = new Float32Array(CHUNK_VERTS * 3);
+    const index = new Uint16Array(CHUNK_INDEX_COUNT);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
+    geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    geo.setIndex(new THREE.BufferAttribute(index, 1));
+    return { geo, positions, normals, colors, index };
+  }
+
+  /** Return a chunk's buffers to the pool instead of freeing them. */
+  private releaseBuffers(rec: ChunkBuffers): void {
+    if (this.geoPool.length < GEO_POOL_MAX) this.geoPool.push(rec);
+    else rec.geo.dispose();
+  }
+
+  private fillBuffers(rec: ChunkBuffers, id: number): void {
     const x0 = id * CHUNK_SIZE;
-    const n = Math.ceil(CHUNK_SIZE / CHUNK_RES);
+    const n = CHUNK_SEGMENTS;
     const dx = CHUNK_SIZE / n;
     const hz = TERRAIN_HALF_Z;
     const depth = TERRAIN_FACE_DEPTH;
     const overlap = Math.max(0.35, dx * 0.5);
 
-    const stride = 4;
-    const vertCount = (n + 1) * stride;
-    const positions = new Float32Array(vertCount * 3);
-    const normals = new Float32Array(vertCount * 3);
-    const colors = new Float32Array(vertCount * 3);
-    const indices: number[] = [];
+    const stride = CHUNK_STRIDE;
+    const { positions, normals, colors, index, geo } = rec;
 
-    const cTop = new THREE.Color();
-    const cRidge = new THREE.Color();
-    const cMid = new THREE.Color();
-    const cDeep = new THREE.Color();
-    const cSand = new THREE.Color();
-    const snow = new THREE.Color(0xf4f8ff);
+    // Instance scratch colours — these were six allocations per chunk.
+    const cTop = this.cTop;
+    const cRidge = this.cRidge;
+    const cMid = this.cMid;
+    const cDeep = this.cDeep;
+    const cSand = this.cSand;
+    const snow = this.cSnow;
+
+    let ii = 0;
 
     for (let i = 0; i <= n; i++) {
       const x = x0 + i * dx - (i === 0 ? overlap : i === n ? -overlap : 0);
@@ -486,19 +577,22 @@ export class TerrainSystem {
       if (i < n) {
         const a = i * stride;
         const c = (i + 1) * stride;
-        indices.push(a + 0, c + 0, a + 1, a + 1, c + 0, c + 1);
-        indices.push(a + 1, c + 1, a + 2, a + 2, c + 1, c + 2);
-        indices.push(a + 2, c + 2, a + 3, a + 3, c + 2, c + 3);
+        index[ii++] = a + 0; index[ii++] = c + 0; index[ii++] = a + 1;
+        index[ii++] = a + 1; index[ii++] = c + 0; index[ii++] = c + 1;
+        index[ii++] = a + 1; index[ii++] = c + 1; index[ii++] = a + 2;
+        index[ii++] = a + 2; index[ii++] = c + 1; index[ii++] = c + 2;
+        index[ii++] = a + 2; index[ii++] = c + 2; index[ii++] = a + 3;
+        index[ii++] = a + 3; index[ii++] = c + 2; index[ii++] = c + 3;
       }
     }
 
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    geo.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
-    geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-    geo.setIndex(indices);
+    // The attributes were rewritten in place, so the GPU copies have to be
+    // re-flagged and the culling sphere has to follow the new heights.
+    (geo.getAttribute("position") as THREE.BufferAttribute).needsUpdate = true;
+    (geo.getAttribute("normal") as THREE.BufferAttribute).needsUpdate = true;
+    (geo.getAttribute("color") as THREE.BufferAttribute).needsUpdate = true;
+    (geo.getIndex() as THREE.BufferAttribute).needsUpdate = true;
     geo.computeBoundingSphere();
-    return geo;
   }
 
   /* ------------------------------------------------------------ decor */
@@ -583,15 +677,42 @@ export class TerrainSystem {
     }
   }
 
-  private placeDecor(id: number, group: THREE.Group, disposables: { dispose(): void }[]): void {
+  private placeDecor(id: number, group: THREE.Group, disposables: { dispose(): void }[]): PropGroup[] {
     const x0 = id * CHUNK_SIZE;
     const biome = this.biomeAt(x0 + CHUNK_SIZE / 2);
+    const propGroups: PropGroup[] = [];
+
+    const emitGroup = (parts: DecoPart[], placements: Placement[]): void => {
+      if (!placements.length || !parts.length) return;
+      const made: { inst: THREE.InstancedMesh; part: DecoPart }[] = [];
+      for (const part of parts) {
+        const inst = new THREE.InstancedMesh(part.geo, part.mat, placements.length);
+        inst.castShadow = true;
+        inst.receiveShadow = true;
+        placements.forEach((p, i) => {
+          tmpObj.position.set(p.x, p.y + part.y * p.s, p.z);
+          tmpObj.rotation.set(0, p.rot, 0);
+          tmpObj.scale.setScalar(p.s * part.s);
+          tmpObj.updateMatrix();
+          inst.setMatrixAt(i, tmpObj.matrix);
+        });
+        inst.instanceMatrix.needsUpdate = true;
+        inst.frustumCulled = false;
+        group.add(inst);
+        disposables.push({ dispose: () => inst.dispose() });
+        made.push({ inst, part });
+      }
+      // Foreground props (z > 0 camera side) feed updateOcclusion.
+      if (made.length && placements.some((p) => p.z > 3.5)) {
+        propGroups.push({ props: placements, parts: made, faded: new Set<number>() });
+      }
+    };
 
     // --- primary decoration layer ---
     const parts = this.decoParts.get(biome.deco);
     if (parts) {
       const count = Math.round(12 * biome.decoDensity);
-      const placements: { x: number; y: number; z: number; s: number; rot: number }[] = [];
+      const placements: Placement[] = [];
       for (let i = 0; i < count; i++) {
         const r1 = hash01(id * 131 + i * 7, this.seedN + 301);
         const r2 = hash01(id * 131 + i * 7, this.seedN + 302);
@@ -607,31 +728,14 @@ export class TerrainSystem {
         const s = (behind ? 0.9 : 0.6) + r3 * 0.5;
         placements.push({ x, y: this.heightAt(x) - 0.2, z, s, rot: r2 * Math.PI * 2 });
       }
-      if (placements.length) {
-        for (const part of parts) {
-          const inst = new THREE.InstancedMesh(part.geo, part.mat, placements.length);
-          inst.castShadow = true;
-          inst.receiveShadow = true;
-          placements.forEach((p, i) => {
-            tmpObj.position.set(p.x, p.y + part.y * p.s, p.z);
-            tmpObj.rotation.set(0, p.rot, 0);
-            tmpObj.scale.setScalar(p.s * part.s);
-            tmpObj.updateMatrix();
-            inst.setMatrixAt(i, tmpObj.matrix);
-          });
-          inst.instanceMatrix.needsUpdate = true;
-          inst.frustumCulled = false;
-          group.add(inst);
-          disposables.push({ dispose: () => inst.dispose() });
-        }
-      }
+      emitGroup(parts, placements);
     }
 
     // --- secondary decoration layer (smaller, sparser for visual depth) ---
     const secParts = this.decoParts.get(biome.secondaryDeco);
     if (secParts) {
       const secCount = Math.round(5 * biome.decoDensity);
-      const secPlacements: { x: number; y: number; z: number; s: number; rot: number }[] = [];
+      const secPlacements: Placement[] = [];
       for (let i = 0; i < secCount; i++) {
         const r1 = hash01(id * 97 + i * 13, this.seedN + 501);
         const r2 = hash01(id * 97 + i * 13, this.seedN + 502);
@@ -647,44 +751,110 @@ export class TerrainSystem {
         const s = (behind ? 0.55 : 0.35) + r3 * 0.35;
         secPlacements.push({ x, y: this.heightAt(x) - 0.2, z, s, rot: r2 * Math.PI * 2 });
       }
-      if (secPlacements.length) {
-        for (const part of secParts) {
-          const inst = new THREE.InstancedMesh(part.geo, part.mat, secPlacements.length);
-          inst.castShadow = true;
-          inst.receiveShadow = true;
-          secPlacements.forEach((p, i) => {
-            tmpObj.position.set(p.x, p.y + part.y * p.s, p.z);
-            tmpObj.rotation.set(0, p.rot, 0);
-            tmpObj.scale.setScalar(p.s * part.s);
-            tmpObj.updateMatrix();
-            inst.setMatrixAt(i, tmpObj.matrix);
-          });
-          inst.instanceMatrix.needsUpdate = true;
-          inst.frustumCulled = false;
-          group.add(inst);
-          disposables.push({ dispose: () => inst.dispose() });
-        }
+      emitGroup(secParts, secPlacements);
+    }
+
+    return propGroups;
+  }
+
+  /**
+   * Sink-and-shrink any foreground prop about to cross a bird's sight line, so
+   * the player never loses sight of the bird behind a tree.
+   */
+  updateOcclusion(views: { x: number; y: number }[], camX: number, camY: number, camZ: number): void {
+    if (views.length === 0 || camZ <= 4) return;
+    for (const chunk of this.chunks.values()) {
+      const groups = chunk.propGroups;
+      if (!groups) continue;
+      const cx0 = chunk.id * CHUNK_SIZE;
+      if (cx0 > views[0]!.x + CHUNK_SIZE * 1.5 || cx0 + CHUNK_SIZE < views[0]!.x - CHUNK_SIZE * 1.5) {
+        if (chunk.propGroups) this.restoreFaded(chunk.propGroups);
+        continue;
       }
+      for (const g of groups) {
+        g.props.forEach((p, i) => {
+          let occ = 0;
+          if (p.z > 3.5) {
+            const t = 1 - p.z / camZ;
+            if (t > 0) {
+              const top = p.y + 9.5 * p.s;
+              for (const v of views) {
+                const sx = camX + (v.x - camX) * t;
+                const sy = camY + (v.y - camY) * t;
+                const dx = Math.abs(p.x - sx);
+                const r = p.s * 3.4;
+                if (dx < r && sy > p.y - 2 && sy < top + 2) {
+                  occ = Math.max(occ, smoothstep(r, r * 0.35, dx));
+                }
+              }
+            }
+          }
+          const was = g.faded.has(i);
+          if (occ > 0.01) {
+            const f = 1 - occ * 0.94;
+            for (const { inst, part } of g.parts) {
+              tmpObj.position.set(p.x, p.y + part.y * p.s * f - occ * 2.6, p.z);
+              tmpObj.rotation.set(0, p.rot, 0);
+              tmpObj.scale.setScalar(p.s * part.s * f);
+              tmpObj.updateMatrix();
+              inst.setMatrixAt(i, tmpObj.matrix);
+              inst.instanceMatrix.needsUpdate = true;
+            }
+            g.faded.add(i);
+          } else if (was) {
+            this.restoreInstance(g, i);
+            g.faded.delete(i);
+          }
+        });
+      }
+    }
+  }
+
+  /** Restore every faded instance in these groups to its authored matrix. */
+  private restoreFaded(groups: PropGroup[]): void {
+    for (const g of groups) {
+      if (!g.faded.size) continue;
+      for (const i of g.faded) this.restoreInstance(g, i);
+      g.faded.clear();
+    }
+  }
+
+  private restoreInstance(g: PropGroup, i: number): void {
+    const p = g.props[i]!;
+    for (const { inst, part } of g.parts) {
+      tmpObj.position.set(p.x, p.y + part.y * p.s, p.z);
+      tmpObj.rotation.set(0, p.rot, 0);
+      tmpObj.scale.setScalar(p.s * part.s);
+      tmpObj.updateMatrix();
+      inst.setMatrixAt(i, tmpObj.matrix);
+      inst.instanceMatrix.needsUpdate = true;
     }
   }
 
   /* ------------------------------------------------------------ far */
 
+  /**
+   * Slide the four parallax layers along with the camera.
+   *
+   * This used to dispose and rebuild all four geometries on every call — every
+   * 40 units of travel. Measured over a 20 km flight that was 3,640 of the
+   * 4,831 Float32Array allocations (75%) and most of the geometry disposals,
+   * plus a computeVertexNormals() per layer per call. The topology is fixed at
+   * FAR_SAMPLES, so only the heights are rewritten now and the flight is
+   * allocation-free for these layers.
+   */
   private rebuildFar(camX: number): void {
     const start = camX - 350;
     const end = camX + 1800;
-    const samples = 120;
     for (let layer = 0; layer < 4; layer++) {
       const mesh = this.farMeshes[layer];
-      if (!mesh) continue;
-      mesh.geometry.dispose();
+      const positions = this.farPos[layer];
+      if (!mesh || !positions) continue;
       const amp = 0.55 + layer * 0.22;
       const yOff = -2 + layer * 7;
       const phase = layer * 45 + this.seedN * 0.01;
-      const positions: number[] = [];
-      const indices: number[] = [];
-      for (let i = 0; i <= samples; i++) {
-        const t = i / samples;
+      for (let i = 0; i <= FAR_SAMPLES; i++) {
+        const t = i / FAR_SAMPLES;
         const x = lerp(start, end, t);
         const b = this.biomeAt(x);
         const y =
@@ -692,17 +862,19 @@ export class TerrainSystem {
           amp * 16 * b.amp * Math.sin(x * (0.01 - layer * 0.0018) / b.wave + phase) +
           amp * 8 * Math.sin(x * 0.024 + phase * 1.3) +
           5 * fbm(x * 0.016 + layer, this.seedN + layer * 17, 3);
-        positions.push(x, y, 0, x, y - 90, 0);
-        if (i < samples) {
-          const a = i * 2;
-          indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
-        }
+        // Two verts per sample: the ridge line and its skirt 90 units below.
+        const o = i * 6;
+        positions[o] = x;
+        positions[o + 1] = y;
+        positions[o + 2] = 0;
+        positions[o + 3] = x;
+        positions[o + 4] = y - 90;
+        positions[o + 5] = 0;
       }
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-      geo.setIndex(indices);
-      geo.computeVertexNormals();
-      mesh.geometry = geo;
+      // No computeVertexNormals(): farMats are MeshBasicMaterial, which never
+      // reads normals, and frustumCulled is already false so no bounding
+      // sphere is required either. Both were pure cost.
+      (mesh.geometry.getAttribute("position") as THREE.BufferAttribute).needsUpdate = true;
     }
   }
 }

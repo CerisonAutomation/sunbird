@@ -3,7 +3,7 @@ import { GHOST_MAX_SAMPLES, GHOST_SAMPLE_DT } from "./constants";
 
 type Sample = [number, number, number, number]; // t, x, y, rotation
 
-type GhostRecord = { seed: string; distance: number; samples: Sample[] };
+export type GhostRecord = { seed: string; distance: number; samples: Sample[] };
 
 const KEY_PREFIX = "sunbird.ghost.";
 
@@ -22,6 +22,11 @@ export class GhostRecorder {
     this.acc = 0;
     if (this.samples.length >= GHOST_MAX_SAMPLES) return;
     this.samples.push([Math.round(t * 100) / 100, Math.round(x * 10) / 10, Math.round(y * 10) / 10, Math.round(rotation * 100) / 100]);
+  }
+
+  /** Read-only view of this run's samples (for network publishing). */
+  snapshot(): readonly Sample[] {
+    return this.samples;
   }
 
   /** Persists this run as the new best ghost if it beat the previous one. */
@@ -92,12 +97,23 @@ export class GhostPlayer {
   }
 
   load(seed: string): boolean {
-    this.record = GhostRecorder.load(seed);
+    return this.loadRecord(GhostRecorder.load(seed));
+  }
+
+  /** Load a ghost record directly (network rival ghosts skip localStorage). */
+  loadRecord(record: GhostRecord | null): boolean {
+    this.record = record;
     this.cursor = 0;
     this.flapT = 0;
     this.active = Boolean(this.record && this.record.samples.length > 4);
     this.mesh.visible = false;
     return this.active;
+  }
+
+  /** Recolor the silhouette (rival ghosts read amber, yours reads ice-blue). */
+  setTint(body: number, wings: number): void {
+    (this.body.material as THREE.MeshBasicMaterial).color.setHex(body);
+    (this.wingL.material as THREE.MeshBasicMaterial).color.setHex(wings);
   }
 
   bestDistance(): number {

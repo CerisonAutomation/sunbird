@@ -2,6 +2,21 @@ import type { SkinDef } from "./Economy";
 
 export type ShareCard = { blob: Blob | null; dataUrl: string; text: string };
 
+/**
+ * Pure share-text builder — the viral payload without canvas.
+ * Text is the channel that survives: native share sheets, clipboard, and
+ * portal iframes (where image downloads are QA-flagged) all carry it.
+ * Kept pure so the link grammar is test-pinned without a canvas.
+ */
+export function buildShareText(opts: {
+  distance: number;
+  referralCode: string;
+  challengeUrl?: string;
+}): string {
+  const base = `I flew ${Math.floor(opts.distance)}m in Sunbird 🌤️ Use my code ${opts.referralCode} for a bonus!`;
+  return opts.challengeUrl ? `${base} Beat me here: ${opts.challengeUrl}` : base;
+}
+
 /** Draws a shareable "flight card" summarizing a run onto a canvas. */
 export async function buildShareCard(opts: {
   distance: number;
@@ -88,17 +103,18 @@ export async function buildShareCard(opts: {
   ctx.fillStyle = "rgba(255,255,255,0.8)";
   ctx.fillText(`Play free · friend code ${opts.referralCode}`, 64, 368);
 
-  // Draw challenge URL on the card if present
   if (opts.challengeUrl) {
-    ctx.fillStyle = "rgba(255,255,255,0.9)";
-    ctx.font = "600 14px Fredoka, sans-serif";
-    ctx.fillText(`Beat my score! ${opts.challengeUrl}`, 64, 395);
+    ctx.fillStyle = "rgba(255,255,255,0.92)";
+    ctx.fillText("Same hills, same wind — the link in the shared text is the rematch", 64, 344);
   }
 
   const dataUrl = canvas.toDataURL("image/png");
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
-  const challengeText = opts.challengeUrl ? `\nCan you beat my score? ${opts.challengeUrl}` : "";
-  const text = `I flew ${Math.floor(opts.distance)}m in Sunbird 🌤️ Use my code ${opts.referralCode} for a bonus!${challengeText}`;
+  const text = buildShareText({
+    distance: opts.distance,
+    referralCode: opts.referralCode,
+    challengeUrl: opts.challengeUrl,
+  });
   return { blob, dataUrl, text };
 }
 

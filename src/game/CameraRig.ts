@@ -93,13 +93,15 @@ export class CameraRig {
       smoothstep(ALT_CLOUDS, ALT_HIGH, alt) * 34 +
       smoothstep(ALT_HIGH, ALT_HIGH * 2.2, alt) * 46;
 
-    const ahead = 8 + speed * CAMERA_LOOKAHEAD + altPull * 0.12;
+    // A touch more lookahead keeps the bird in the left third of the frame so
+    // the player reads the hills ahead, not the bird's back.
+    const ahead = 9.5 + speed * CAMERA_LOOKAHEAD + altPull * 0.12;
     const targetLookX = bird.x + ahead;
-    // Look upward when bird is at low-to-mid altitude — gives sky in frame.
-    // When very high, bias downward so landscape stays visible.
+    // When very high, bias the look point downward so the landscape stays in frame.
     const downBias = smoothstep(ALT_SKY, ALT_HIGH, alt) * 14;
-    const upBias = smoothstep(0, 30, alt) * 5;  // tilt up as bird rises from ground
-    const targetLookY = bird.y + 7 + upBias - downBias;
+    // Slightly lower look point + higher camera = a gentle top-down tilt: the
+    // bird frames against the ground (readable landings) instead of the sky.
+    const targetLookY = bird.y + 3.2 - downBias;
 
     // Rising fast? Lead the climb. Falling from height? Lead the descent.
     const vLead = clamp(bird.vy * 0.12, -14, 18) * smoothstep(6, 40, alt);
@@ -112,8 +114,10 @@ export class CameraRig {
     this.punchZ *= Math.pow(0.03, dt);
     const zoom = CAMERA_BASE_Z + sNorm * 14 + altPull - this.punchZ;
 
-    const wantY = bird.y + 9 + altPull * 0.18 + vLead;
-    const floorY = groundY + 5;
+    // Camera rides a little higher so the bird frames against the terrain
+    // rather than tree canopies at low altitude.
+    const wantY = bird.y + 8.5 + altPull * 0.16 + vLead;
+    const floorY = groundY + 6.5;
 
     ;[this.camX, this.camVX] = springStep(this.camX, this.camVX, bird.x - 1.5 + this.intro * 6, springDt);
     ;[this.camY, this.camVY] = springStep(this.camY, this.camVY, Math.max(floorY, wantY) + this.intro * 4, springDt);

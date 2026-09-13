@@ -60,3 +60,15 @@ server/dist/
 archive/
 *.zip
 .vercel
+
+# botsim CI reports (uploaded as artifacts, never committed)
+botsim-*.json
+*.png  # screenshot artifacts — do not version
+
+# Session scratch: rasterised previews generated with sharp, not assets
+/bird-options.png
+/hero-composition.png
+/FINAL-menu-hero.png
+/FINAL-lobby.png
+/SHOP-birds.png
+/screen-*.png

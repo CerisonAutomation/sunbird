@@ -13,7 +13,10 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "test:mp": "node scripts/botsim.mjs --players 8 --seconds 6",
+    "botsim": "node scripts/botsim.mjs",
+    "botsim:40": "node scripts/botsim.mjs --players 40 --seconds 15"
   },
   "dependencies": {
     "@stripe/stripe-js": "^9.15.0",
