@@ -4,6 +4,7 @@ import { GameAudio } from "./Audio";
 import { BIOMES, biomeForIsland } from "./Biomes";
 import { TRACK_NAMES } from "./Music";
 import { Bird, type BirdStepOpts } from "./Bird";
+import { decideHold } from "./pilot";
 import { CameraRig } from "./CameraRig";
 import { PICKUP_STYLE, Collectibles, type CloudKind, type PickupKind } from "./Collectibles";
 import { evaluateNearMiss, FlowTuner, SessionGoals, type NearMiss } from "./Engagement";
@@ -201,6 +202,8 @@ export class Game {
   private bonus = 0;
   private scoreAccum = 0;
   private splashCd = 0;
+  /** Edge-trigger for the ocean-entry splash burst (see fixedUpdate). */
+  private wasInWater = false;
   private hintTimer = 0;
   private hint = "";
   private runCoins = 0;
@@ -228,6 +231,16 @@ export class Game {
   private claimedQuests: QuestReward[] = [];
   private menuHold = 0;
   private needRelease = false;
+  /**
+   * Attract mode: the live sim flies behind the menu (see menuTick). Demo
+   * physics runs the real Bird.step with the pilot's hold decisions — no
+   * scoring, audio, saves or telemetry, so the backdrop can never leak
+   * into a run. resetRun(true) is the silent demo reset; startRun() takes
+   * over seamlessly because the first menu HOLD carries straight into it.
+   */
+  private demoAcc = 0;
+  private demoTime = 0;
+  private demoStuck = 0;
   private ghostWasAhead = false;
   private ghostPassed = false;
   private readonly launch = new LaunchSystem();
@@ -754,13 +767,53 @@ export class Game {
   }
 
   private menuTick(dt: number): void {
-    const h = this.terrain.heightAt(this.startX);
-    this.bird.x = this.startX;
-    this.bird.y = h + BIRD_RADIUS;
-    this.bird.vx = 6;
-    this.bird.vy = 0;
-    this.bird.grounded = true;
-    this.bird.rotation = Math.atan(this.terrain.slopeAt(this.startX));
+    // Attract mode: fly the actual game behind the menu. Same fixed-step
+    // contract as a run, but the pilot holds the button and nothing outside
+    // the scene (no score, audio, saves, telemetry) can hear it.
+    const calm = this.save.state.settings.reduceMotion;
+    if (calm) {
+      // Reduced motion: static perched bird, like the old painted backdrop.
+      const h = this.terrain.heightAt(this.startX);
+      this.bird.x = this.startX;
+      this.bird.y = h + BIRD_RADIUS;
+      this.bird.vx = 6;
+      this.bird.vy = 0;
+      this.bird.grounded = true;
+      this.bird.rotation = Math.atan(this.terrain.slopeAt(this.startX));
+      if (this.screen === "main") this.holdToStart(dt, 0.18);
+      return;
+    }
+    this.demoTime += dt;
+    this.demoAcc = Math.min(this.demoAcc + dt, 0.25);
+    let n = 0;
+    while (this.demoAcc >= PHYS_DT && n < 12) {
+      const hold = decideHold(this.bird, this.terrain);
+      this.bird.step(PHYS_DT, { diving: hold, fever: false, speedMult: 1, boost: false }, this.terrain);
+      if (this.bird.justLanded && !calm && this.bird.impact > 5) {
+        this.particles.emitDust(
+          this.bird.x,
+          this.terrain.heightAt(this.bird.x) + 0.3,
+          this.bird.speed(),
+          this.terrain.slopeAt(this.bird.x),
+        );
+      }
+      this.demoAcc -= PHYS_DT;
+      n++;
+    }
+    if (!calm && this.bird.speed() > 48) this.emitTrail(dt);
+    // Watchdog: beached, stalled or flown off-screen → silent loop restart
+    // on the same island (resetRun pops nothing, banks nothing). Open water
+    // counts double: a drowning bird is never good backdrop, cut in ~1.5 s.
+    // (Needed because a swimming bird keeps speed ~9 and would otherwise
+    // bob past the stall trip and never trigger it.)
+    if (this.bird.speed() < 9 || this.bird.inWater) this.demoStuck += dt * (this.bird.inWater ? 2 : 1);
+    else this.demoStuck = 0;
+    if (this.demoTime > 90 || this.demoStuck > 3 || this.bird.x - this.startX > 4000) {
+      this.resetRun(true);
+      this.demoAcc = 0;
+      this.demoTime = 0;
+      this.demoStuck = 0;
+    }
     if (this.screen === "main") this.holdToStart(dt, 0.18);
   }
 
@@ -1019,7 +1072,20 @@ export class Game {
     }
 
     this.splashCd -= dt;
-    if (this.bird.inWater && this.splashCd <= 0) {
+    // Ocean entry gets the full thunk treatment — spray ring, freeze, kick —
+    // then the swim itself is just the periodic bob below.
+    const wet = this.bird.inWater;
+    if (wet && !this.wasInWater) {
+      this.particles.emitSplash(this.bird.x, WATER_Y);
+      this.particles.burstRing(this.bird.x, WATER_Y + 1, 0xafe8ff);
+      this.audio.splash();
+      if (!this.save.state.settings.reduceMotion) {
+        this.hitStopTimer = Math.max(this.hitStopTimer, 0.06);
+        this.shake(0.7);
+      }
+    }
+    this.wasInWater = wet;
+    if (wet && this.splashCd <= 0) {
       this.splashCd = 0.55;
       this.particles.emitSplash(this.bird.x, WATER_Y);
       this.audio.splash();
@@ -1366,9 +1432,11 @@ export class Game {
       this.flash("perfect");
       this.glow(0.85);
       this.shake(0.35 + Math.min(0.4, combo * 0.06));
-      // Hit stop: 2-frame freeze for cinematic impact.
+      // Hit stop: 2-frame freeze for cinematic impact, 40 ms on the
+      // fever-clinching perfect (prototype parity: thuds 80 ms, fever 40 ms).
       if (!this.save.state.settings.reduceMotion) {
-        this.hitStopTimer = 2 / 60;
+        const clinchesFever = this.perfectChain >= FEVER_NEED && !this.feverOn;
+        this.hitStopTimer = clinchesFever ? 0.04 : 2 / 60;
       }
       this.haptic([50, 30, 50]);
       // A breath of slow-motion so the launch lands emotionally.
@@ -1424,6 +1492,11 @@ export class Game {
     } else if (q < 0.8) {
       this.launch.breakCombo();
       this.perfectChain = 0;
+      // The thunk: an 80 ms freeze on a hard thud, matching the prototype's
+      // hit-stop. Same path as the perfect-launch freeze above.
+      if (!this.save.state.settings.reduceMotion) {
+        this.hitStopTimer = Math.max(this.hitStopTimer, 0.08);
+      }
       if (this.bird.impact > 6) {
         this.audio.land(this.bird.impact);
         this.shake(Math.min(0.5, this.bird.impact * 0.035));
@@ -1762,7 +1835,10 @@ export class Game {
     this.finishRemaining = this.finishGate.update(visDt, this.bird.x);
     this.updateTrailRibbon(visDt);
     this.particles.update(visDt);
-    this.camera.update(rawDt, this.bird, playing, this.terrain.heightAt(this.bird.x));
+    // Attract framing in the menu only: the demo bird leads into the open
+    // margin beside the card. Every other state keeps gameplay framing.
+    const attract = this.state === "menu" && !this.versus;
+    this.camera.update(rawDt, this.bird, playing, this.terrain.heightAt(this.bird.x), attract, this.feverOn);
     // Sink foreground props that would cross the bird's sight line (per-view
     // in split-screen so neither player loses their bird behind a tree).
     this.terrain.updateOcclusion(
@@ -2404,6 +2480,7 @@ export class Game {
     this.bonus = 0;
     this.scoreAccum = 0;
     this.splashCd = 0;
+    this.wasInWater = false;
     this.hintTimer = 0;
     this.hint = idle ? "" : "HOLD to dive";
     this.runCoins = 0;
@@ -3114,7 +3191,26 @@ export class Game {
     this.duelResult = "";
     this.challengeRun = "";
     this.challengeMods = NO_MODS;
+    // The demo flies the menu island, not whatever random hills the last run
+    // used — otherwise the backdrop (and the "Hills of …" label) is a dice
+    // roll per run: it flies once, then stalls on a brutal island. Wild
+    // keeps its current hills; dated modes return to their date. Guarded:
+    // a failed rebuild must never trap the player — worst case the menu
+    // shows the current hills.
+    if (this.seedMode !== "random") {
+      const menuSeed = this.seedMode === "today" ? this.today : dateSeed(new Date(Date.now() - 86400000));
+      if (this.seed !== menuSeed) {
+        try {
+          this.rebuildWorld(menuSeed);
+        } catch (err) {
+          console.error("Sunbird menu world rebuild failed, keeping hills:", err);
+        }
+      }
+    }
     this.resetRun(true);
+    this.demoAcc = 0;
+    this.demoTime = 0;
+    this.demoStuck = 0;
     this.setState("menu");
     this.setScreen("main");
     this.camera.setIntro(1);

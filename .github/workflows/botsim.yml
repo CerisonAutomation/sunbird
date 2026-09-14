@@ -31,11 +31,14 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
 
       - name: Start the reference room server
         run: |
@@ -107,11 +110,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
-          cache-dependency-path: package-lock.json
+          cache: pnpm
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -121,7 +127,7 @@ jobs:
       - name: Build the authoritative server
         run: cargo build --release -p sunbird-server
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
         working-directory: .
 
       - name: Start the authoritative server

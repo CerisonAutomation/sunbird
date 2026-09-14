@@ -544,8 +544,9 @@ export class HUD {
     this.playHud.classList.toggle("versus", s.versus);
     const menuVisible = s.state === "menu" || (s.state === "gameover" && s.screen !== "main");
     this.menuEl.classList.toggle("hidden", !menuVisible);
-    if (menuVisible) this.menuSky.resize(this.menuEl.clientWidth, this.menuEl.clientHeight);
-    this.menuSky.setActive(menuVisible);
+    // Painted-sky backdrop retired: the live attract flight behind the card
+    // is the menu background now. Never activate the 2D loop.
+    this.menuSky.setActive(false);
     // The static perched hero-bird SVG on the sun is the menu's bird. The
     // canvas "hero bird" overlay used to draw a second swooping bird on top of
     // it — two birds on one title screen. Keep it hidden so the mark reads once.
@@ -941,14 +942,13 @@ export class HUD {
     this.feverFill = grab("feverFill");
     this.hintEl = grab("hint");
     this.menuEl = grab("menu");
-    // Living painted sky with the depth flock — sits behind the paper card.
-    this.menuEl.insertBefore(this.menuSky.host, this.menuEl.firstChild);
-    // Hero-bird overlay: appended last so the sunbird swoops over the card.
+    // The menu backdrop is the live 3D attract flight (Game.menuTick), not
+    // the old painted 2D sky — so menuSky's backdrop canvas stays out of the
+    // DOM and its loop never starts. The hero overlay stays mounted (hidden)
+    // so MenuSky.dispose() keeps working unchanged.
+    // Hero-bird overlay stays mounted but permanently hidden (see update):
+    // the title bird reads once, and the sky behind the card is live 3D.
     this.menuEl.appendChild(this.menuSky.heroHost);
-    if (typeof ResizeObserver !== "undefined") {
-      this.resizeObs = new ResizeObserver(() => this.menuSky.resize(this.menuEl.clientWidth, this.menuEl.clientHeight));
-      this.resizeObs.observe(this.menuEl);
-    }
     this.menuCard = grab("menuCard");
     this.pauseEl = grab("pause");
     this.pauseBtnEl = grab("pauseBtn");

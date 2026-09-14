@@ -13,27 +13,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: npm run lint
+        run: pnpm lint
 
       - name: Typecheck
-        run: npm run typecheck
+        run: pnpm typecheck
 
       - name: Test
-        run: npm test
+        run: pnpm test
 
       - name: Build (Vercel / direct / PWA)
         env:
           VITE_PORTAL_TARGET: none
-        run: npm run build:vercel
+        run: pnpm build:vercel
 
       - name: Upload dist artifact (Vercel)
         uses: actions/upload-artifact@v4
@@ -47,30 +51,36 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
+          cache: pnpm
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
       - name: Autoperfect production mode
-        run: npm run verify:prod
+        run: pnpm verify:prod
 
   build-itch:
     name: Build (itch.io single-file)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - name: Build (itch.io singlefile)
         env:
           VITE_PORTAL_TARGET: none
           VITE_SINGLEFILE: "true"
-        run: npm run build:itch
+        run: pnpm build:itch
       - uses: actions/upload-artifact@v4
         with:
           name: sunbird-dist-itch
@@ -82,13 +92,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - name: Build all portal zips
-        run: npm run build:portals
+        run: pnpm build:portals
       - uses: actions/upload-artifact@v4
         with:
           name: sunbird-portal-zips
