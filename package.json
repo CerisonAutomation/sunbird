@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "packageManager": "pnpm@12.4.1",
+  "packageManager": "pnpm@9.15.0",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -13,6 +13,7 @@
     "test:coverage": "vitest run --coverage",
     "verify": "pnpm typecheck && pnpm test && pnpm build",
     "verify:prod": "node scripts/verify-prod.mjs",
+    "verify:portals": "node scripts/verify-portal.mjs",
     "test:mp": "node scripts/mp-smoke.mjs",
     "botsim": "node scripts/botsim.mjs",
     "botsim:40": "node scripts/botsim.mjs --players 40 --seconds 15",
