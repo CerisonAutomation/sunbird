@@ -14,9 +14,9 @@ describe("island music uniqueness", () => {
   it("biomeForIsland returns the correct hand-authored mode for islands 0–8", () => {
     const expected: BiomeMusicStyle[] = [
       "bright",   // 0 Green Hills
-      "warm",     // 1 Sunset Ridge
-      "airy",     // 2 Tropical Atoll
-      "reef",     // 3 Coral Reach
+      "airy",     // 1 Tropical Atoll
+      "reef",     // 2 Coral Reach
+      "warm",     // 3 Sunset Ridge
       "wide",     // 4 Dune Sea
       "night",    // 5 Midnight Coast
       "crystal",  // 6 Aurora Peaks

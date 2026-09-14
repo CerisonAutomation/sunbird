@@ -160,6 +160,42 @@ const MEL_J = [
   77, -1, 76, -1, 72, -1, 0, 0,
 ];
 
+// Track 11 — Tide Runner: rippling ascents and cascading steps, playful surf-light.
+const MEL_K = [
+  72,  0, 74, 76, 79,  0, 76, 79,
+  81,  0, 79, 76, 74,  0, 72,  0,
+  69, 72, 74, 72, 77,  0, 74, 72,
+  71,  0, 74,  0, 76, 79, 76,  0,
+  79,  0, 81,  0, 84,  0, 81, 79,
+  76, 74, 72,  0, 69, 72, 74,  0,
+  77,  0, 74, 76, 79, 76, 74,  0,
+  72, -1,  0,  0, 74, -1,  0,  0,
+];
+
+// Track 12 — Magma Drift: sparse descending phrases, brooding volcanic weight.
+const MEL_L = [
+  69, -1,  0,  0, 65,  0, 64,  0,
+  62, -1,  0,  0, 64,  0, 65,  0,
+  65,  0, 69,  0, 72,  0, 69,  0,
+  67, -1,  0,  0, 65, -1,  0,  0,
+  69,  0, 67, 65, 64,  0, 62,  0,
+  60, -1,  0,  0, 62, 64, 65,  0,
+  65,  0,  0, 69, 72, -1,  0,  0,
+  67, -1, -1, -1,  0,  0,  0,  0,
+];
+
+// Track 13 — Mesa Wind: wide leaping phrases with canyon space between.
+const MEL_M = [
+  65,  0,  0,  0, 72,  0, 77,  0,
+  76,  0,  0, 72, 69,  0,  0,  0,
+  69, 72, 74,  0, 72,  0, 69,  0,
+  67,  0, 71,  0, 74, -1,  0,  0,
+  65,  0,  0,  0, 77,  0, 81,  0,
+  79,  0, 76, 72, 69,  0, 72,  0,
+  74,  0, 72, 71, 69,  0, 65,  0,
+  67, -1, -1,  0,  0,  0,  0,  0,
+];
+
 // Whistle counter-melody used in fever (per eighth, section-agnostic)
 const WHISTLE = [
   0, 0, 84, 0, 83, 0, 81, 0,
@@ -178,22 +214,25 @@ const STRUM = [1, 0, 1, 2, 0, 2, 1, 2];
 export type Track = { name: string; prog: string[]; mel: number[]; mood: BiomeMusicStyle };
 
 /**
- * Ten original island-folk compositions. Each is a full 8-bar song — its own
- * chord progression, lead melody, and a `mood` matching the biome orchestration
- * it was written for, so the shuffle can favor tracks that suit the current
- * island and time of day while still cycling all ten.
+ * Thirteen original island-folk compositions. Each is a full 8-bar song — its
+ * own chord progression, lead melody, and a `mood` matching the biome
+ * orchestration it was written for, so the shuffle can favor tracks that suit
+ * the current island and time of day while still cycling all thirteen.
  */
 export const TRACKS: Track[] = [
-  { name: "Island Sunrise", prog: PROG_A, mel: MEL_A, mood: "bright" },
-  { name: "Lazy Current", prog: PROG_B, mel: MEL_B, mood: "airy" },
-  { name: "Hilltop Hop", prog: PROG_C, mel: MEL_C, mood: "bright" },
-  { name: "Sunset Glide", prog: PROG_D, mel: MEL_D, mood: "warm" },
-  { name: "Coral Breeze", prog: PROG_E, mel: MEL_E, mood: "airy" },
-  { name: "Moonlight Flutter", prog: PROG_F, mel: MEL_F, mood: "night" },
-  { name: "Glass Ocean", prog: PROG_G, mel: MEL_G, mood: "crystal" },
-  { name: "Trade Winds", prog: PROG_H, mel: MEL_H, mood: "wide" },
-  { name: "Golden Hour", prog: PROG_I, mel: MEL_I, mood: "warm" },
-  { name: "Starlight", prog: PROG_J, mel: MEL_J, mood: "night" },
+  { name: "Island Sunrise",    prog: PROG_A, mel: MEL_A, mood: "bright"  },
+  { name: "Lazy Current",      prog: PROG_B, mel: MEL_B, mood: "airy"    },
+  { name: "Hilltop Hop",       prog: PROG_C, mel: MEL_C, mood: "bright"  },
+  { name: "Sunset Glide",      prog: PROG_D, mel: MEL_D, mood: "warm"    },
+  { name: "Coral Breeze",      prog: PROG_E, mel: MEL_E, mood: "airy"    },
+  { name: "Moonlight Flutter", prog: PROG_F, mel: MEL_F, mood: "night"   },
+  { name: "Glass Ocean",       prog: PROG_G, mel: MEL_G, mood: "crystal" },
+  { name: "Trade Winds",       prog: PROG_H, mel: MEL_H, mood: "wide"    },
+  { name: "Golden Hour",       prog: PROG_I, mel: MEL_I, mood: "warm"    },
+  { name: "Starlight",         prog: PROG_J, mel: MEL_J, mood: "night"   },
+  { name: "Tide Runner",       prog: PROG_E, mel: MEL_K, mood: "reef"    },
+  { name: "Magma Drift",       prog: PROG_F, mel: MEL_L, mood: "ember"   },
+  { name: "Mesa Wind",         prog: PROG_I, mel: MEL_M, mood: "canyon"  },
 ];
 
 /** Track titles for the settings picker — keep in lockstep with TRACKS. */

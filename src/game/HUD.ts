@@ -1706,14 +1706,18 @@ function renderMain(s: HudSnapshot): string {
     ${s.rivalBanner ? renderRivalBanner(s.rivalBanner) : ""}
     ${seedPicker}
 
-    <!-- PLAY: one primary action, then grouped secondary paths. All data-action
-         ids are unchanged — Game.handleAction is the contract. -->
+    <!-- PLAY: primary + Endless side by side, then grouped secondary paths. -->
     <div class="section-title">Play <small>hold to dive · release to soar</small></div>
     <div class="mode-cards hero-play" role="group" aria-label="Primary play">
       <button class="mode-card-main primary" data-ui data-action="pvp-practice" aria-label="Play free flight now">
         <span class="mode-icon-lg"><svg class="mi" viewBox="0 0 48 48"><defs><linearGradient id="gSun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd76a"/><stop offset="1" stop-color="#ff9a3a"/></linearGradient></defs><circle cx="24" cy="22" r="9" fill="url(#gSun)"/><g stroke="url(#gSun)" stroke-width="3" stroke-linecap="round"><line x1="24" y1="5" x2="24" y2="10"/><line x1="24" y1="34" x2="24" y2="39"/><line x1="7" y1="22" x2="12" y2="22"/><line x1="36" y1="22" x2="41" y2="22"/><line x1="11.5" y1="9.5" x2="15" y2="13"/><line x1="33" y1="31" x2="36.5" y2="34.5"/><line x1="36.5" y1="9.5" x2="33" y2="13"/><line x1="15" y1="31" x2="11.5" y2="34.5"/></g><path d="M14 42 Q20 36 24 40 Q28 36 34 42" fill="none" stroke="#e8862a" stroke-width="2.6" stroke-linecap="round"/></svg></span>
-        <span class="mode-name">▶ FLY NOW — 1 PLAYER</span>
+        <span class="mode-name">▶ FLY NOW</span>
         <span class="mode-desc">Free flight — hold to dive, release to soar</span>
+      </button>
+      <button class="mode-card-main endless" data-ui data-action="start-endless" aria-label="Play Endless mode — no clock, hills get faster">
+        <span class="mode-icon-lg endless-inf">∞</span>
+        <span class="mode-name">ENDLESS</span>
+        <span class="mode-desc">No clock · hills accelerate forever</span>
       </button>
     </div>
 
@@ -1927,12 +1931,11 @@ function renderTrailCard(v: ShopTrailView, wallet: number): string {
 
 function renderShop(s: HudSnapshot): string {
   const owned = s.skins.filter((v) => v.owned).length;
-  const armed = s.boosts.filter((v) => v.armed).length;
+  const armedBoosts = s.boosts.filter((b) => b.armed);
   const equippedSkin = s.skins.find((v) => v.equipped);
   const heroSvg = equippedSkin
     ? sunbirdSVG({ palette: skinPalette(equippedSkin.def), width: 88, flap: 0.45, title: equippedSkin.def.name })
     : sunbirdSVG({ width: 88, flap: 0.45, title: "Sunbird" });
-  const armedBoosts = s.boosts.filter((b) => b.armed);
   return `
     ${head("Shop", "back", `<span class="pill coin">● ${s.wallet}</span>`)}
     <div class="shop-hero">
@@ -1945,7 +1948,7 @@ function renderShop(s: HudSnapshot): string {
     </div>
     <div class="section-title shop-section-birds">Birds <small>${owned}/${s.skins.length} owned</small></div>
     ${renderSkinCollections(s)}
-    <div class="section-title shop-section-boosts">Boosts <small>${armed} armed for your next flight</small></div>
+    <div class="section-title shop-section-boosts">Boosts <small>${armedBoosts.length} armed for your next flight</small></div>
     <div class="boost-list">${s.boosts.map((b) => renderBoostRow(b, s.wallet)).join("")}</div>
     <div class="section-title">Nest <small>permanent score multiplier</small></div>
     <div class="boost-list"><div class="boost-row nest-row">

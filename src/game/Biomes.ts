@@ -1,4 +1,5 @@
 import { GAP_START } from "./constants";
+import type { BiomeMusicStyle } from "./Music";
 
 export type DecoKind = "tree" | "palm" | "pine" | "spire" | "crystal" | "cactus";
 /** Rare monument props placed ~1 chunk in 8 (see TerrainSystem.placeDecor). */
@@ -39,7 +40,7 @@ export type BiomeDef = {
   /** night worlds glow their collectibles */
   glow: boolean;
   /** musical colour for this world */
-  musicMode: "bright" | "warm" | "airy" | "wide" | "night" | "crystal" | "reef" | "ember" | "canyon";
+  musicMode: BiomeMusicStyle;
 };
 
 /**
@@ -75,35 +76,6 @@ export const BIOMES: BiomeDef[] = [
     fogTint: 0xeef8ff,
     glow: false,
     musicMode: "bright",
-  },
-  {
-    id: "sunset",
-    name: "Sunset Ridge",
-    tagline: "Long violet valleys and warm, fast air",
-    emoji: "🌇",
-    amp: 1.12,
-    wave: 1.22,
-    top: 0xd98ac0,
-    ridge: 0x9a5a9e,
-    mid: 0x5f3a7a,
-    deep: 0x33224e,
-    sand: 0xe8a877,
-    farA: 0xc46a8a,
-    farB: 0x8a4a80,
-    farC: 0x4a3060,
-    skyTop: 0xf0784a,
-    skyHorizon: 0xffc79a,
-    skyMix: 0.55,
-    cloudTint: 0xffc8a0,
-    cloudDensity: 0.32,
-    snowLine: 0,
-    deco: "pine",
-    decoDensity: 0.8,
-    hazard: "none",
-    thermals: 3,
-    fogTint: 0xffb890,
-    glow: false,
-    musicMode: "warm",
   },
   {
     id: "tropical",
@@ -162,6 +134,35 @@ export const BIOMES: BiomeDef[] = [
     fogTint: 0xcfeef0,
     glow: false,
     musicMode: "reef",
+  },
+  {
+    id: "sunset",
+    name: "Sunset Ridge",
+    tagline: "Long violet valleys and warm, fast air",
+    emoji: "🌇",
+    amp: 1.12,
+    wave: 1.22,
+    top: 0xd98ac0,
+    ridge: 0x9a5a9e,
+    mid: 0x5f3a7a,
+    deep: 0x33224e,
+    sand: 0xe8a877,
+    farA: 0xc46a8a,
+    farB: 0x8a4a80,
+    farC: 0x4a3060,
+    skyTop: 0xf0784a,
+    skyHorizon: 0xffc79a,
+    skyMix: 0.55,
+    cloudTint: 0xffc8a0,
+    cloudDensity: 0.32,
+    snowLine: 0,
+    deco: "pine",
+    decoDensity: 0.8,
+    hazard: "none",
+    thermals: 3,
+    fogTint: 0xffb890,
+    glow: false,
+    musicMode: "warm",
   },
   {
     id: "desert",

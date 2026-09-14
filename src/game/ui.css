@@ -377,47 +377,6 @@ button {
   overflow-wrap: anywhere;
 }
 
-.bird-swatch {
-  position: relative;
-  width: 56px;
-  height: 44px;
-}
-
-.bird-swatch .b {
-  position: absolute;
-  left: 8px;
-  top: 6px;
-  width: 40px;
-  height: 32px;
-  border-radius: 50% 50% 45% 45%;
-  background: var(--body);
-  box-shadow: inset -6px -6px 0 var(--belly);
-}
-
-.bird-swatch .w {
-  position: absolute;
-  left: 2px;
-  top: 18px;
-  width: 26px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--wing);
-  transform: rotate(-20deg);
-  z-index: 1;
-}
-
-.bird-swatch .e {
-  position: absolute;
-  left: 36px;
-  top: 13px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: inset -2px 0 0 #2a1c28;
-  z-index: 2;
-}
-
 /* ---------- shop hero (equipped bird summary at top of shop) ---------- */
 .shop-hero {
   display: flex;
@@ -3536,7 +3495,7 @@ button:focus-visible, .toggle:focus-visible {
   transition: transform 0.14s ease, box-shadow 0.14s ease;
 }
 .skin-card:hover { transform: translateY(-2px); box-shadow: var(--elev-2); }
-.skin-card .bird-swatch { filter: drop-shadow(0 4px 6px rgba(58, 34, 24, 0.18)); }
+.skin-card .skin-bird { filter: drop-shadow(0 4px 6px rgba(58, 34, 24, 0.18)); }
 .skin-card.r-rare { box-shadow: var(--elev-1), 0 0 0 1.5px rgba(90, 150, 230, 0.35), 0 0 16px -4px rgba(90, 150, 230, 0.35); }
 .skin-card.r-epic { box-shadow: var(--elev-1), 0 0 0 1.5px rgba(170, 110, 230, 0.4), 0 0 18px -4px rgba(170, 110, 230, 0.4); }
 .skin-card.r-legendary {
@@ -3988,7 +3947,20 @@ button:focus-visible, .toggle:focus-visible {
    Expert pass: the old main screen gave 4 equal cards + 5 race buttons +
    15 nav buttons equal weight (Hick's law violation, no primary CTA).
    All data-action ids are unchanged — this is visual hierarchy only. */
-.mode-cards.hero-play { grid-template-columns: minmax(0, 1fr); margin: 8px 0 4px; }
+.mode-cards.hero-play { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); margin: 8px 0 4px; }
+.mode-card-main.endless {
+  border-color: rgba(90, 60, 160, 0.3);
+  background: linear-gradient(180deg, rgba(240, 234, 255, 0.9), rgba(220, 210, 255, 0.7));
+}
+.mode-card-main.endless:hover { border-color: rgba(110, 70, 200, 0.5); }
+.endless-inf {
+  font-size: 44px;
+  line-height: 1;
+  background: linear-gradient(135deg, #7b4fc8, #3a78c8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
 .mode-card-main.primary {
   flex-direction: row;
   gap: 12px;

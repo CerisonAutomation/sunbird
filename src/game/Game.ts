@@ -852,7 +852,7 @@ export class Game {
       {
         diving,
         fever: this.feverOn,
-        speedMult: skin.speedMult * this.challengeMods.speedMult,
+        speedMult: skin.speedMult * this.challengeMods.speedMult * this.escalateMult(),
         boost: this.boostTimer > 0 || this.powers.boostOn(),
         liftMult: this.powers.liftMult() * this.masteryPerk.liftMult,
         // Slipstream: tucking behind a rival genuinely reduces your drag.
@@ -2916,6 +2916,12 @@ export class Game {
         this.mode = modeById("daytrip");
         this.startRun();
         break;
+      case "start-endless":
+        this.exitVersus();
+        this.modeId = "endless";
+        this.mode = modeById("endless");
+        this.startRun();
+        break;
       case "open-rank":
         this.setScreen("rank");
         break;
@@ -3588,6 +3594,13 @@ export class Game {
 
   private get skin(): SkinDef {
     return skinById(this.save.state.activeSkin);
+  }
+
+  /** Speed boost for modes with `escalate: true`. Grows with island index and
+   *  time so Endless mode feels genuinely harder as you go deeper. */
+  private escalateMult(): number {
+    if (!this.mode.escalate) return 1;
+    return 1 + Math.min(1.2, this.island * 0.04 + this.elapsed / 900);
   }
 
   private daylightMax(): number {
