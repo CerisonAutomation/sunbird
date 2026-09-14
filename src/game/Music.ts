@@ -10,7 +10,7 @@
  *   sleep → music-box lullaby
  */
 export type MusicMode = "off" | "menu" | "play" | "fever" | "sleep" | "storm";
-export type BiomeMusicStyle = "bright" | "warm" | "airy" | "wide" | "night" | "crystal";
+export type BiomeMusicStyle = "bright" | "warm" | "airy" | "wide" | "night" | "crystal" | "reef" | "ember" | "canyon";
 
 type Voicing = number[];
 
@@ -202,12 +202,18 @@ export const TRACK_NAMES: string[] = TRACKS.map((t) => t.name);
 // Per-biome orchestration keeps each island sonically distinct while all
 // variants share the same original melodic identity.
 const BIOME_MIX: Record<BiomeMusicStyle, { bpm: number; fever: number; cutoff: number; uke: number; glock: number; bass: number; perc: number; whistle: number; transpose: number }> = {
-  bright: { bpm: 112, fever: 126, cutoff: 9000, uke: 1, glock: 1, bass: 1, perc: 1, whistle: 1, transpose: 0 },
-  warm: { bpm: 106, fever: 122, cutoff: 6200, uke: 1.18, glock: 0.82, bass: 1.12, perc: 0.9, whistle: 0.9, transpose: -2 },
-  airy: { bpm: 116, fever: 130, cutoff: 9800, uke: 0.88, glock: 1.18, bass: 0.9, perc: 1.15, whistle: 1.08, transpose: 2 },
-  wide: { bpm: 110, fever: 124, cutoff: 7500, uke: 0.85, glock: 0.9, bass: 1.22, perc: 0.95, whistle: 1.1, transpose: -3 },
-  night: { bpm: 104, fever: 120, cutoff: 4600, uke: 0.68, glock: 1.3, bass: 0.82, perc: 0.65, whistle: 0.85, transpose: -5 },
-  crystal: { bpm: 114, fever: 128, cutoff: 10500, uke: 0.78, glock: 1.36, bass: 0.92, perc: 1.04, whistle: 1.25, transpose: 4 },
+  bright:  { bpm: 112, fever: 126, cutoff: 9000,  uke: 1,    glock: 1,    bass: 1,    perc: 1,    whistle: 1,    transpose: 0  },
+  warm:    { bpm: 106, fever: 122, cutoff: 6200,  uke: 1.18, glock: 0.82, bass: 1.12, perc: 0.9,  whistle: 0.9,  transpose: -2 },
+  airy:    { bpm: 116, fever: 130, cutoff: 9800,  uke: 0.88, glock: 1.18, bass: 0.9,  perc: 1.15, whistle: 1.08, transpose: 2  },
+  wide:    { bpm: 110, fever: 124, cutoff: 7500,  uke: 0.85, glock: 0.9,  bass: 1.22, perc: 0.95, whistle: 1.1,  transpose: -3 },
+  night:   { bpm: 104, fever: 120, cutoff: 4600,  uke: 0.68, glock: 1.3,  bass: 0.82, perc: 0.65, whistle: 0.85, transpose: -5 },
+  crystal: { bpm: 114, fever: 128, cutoff: 10500, uke: 0.78, glock: 1.36, bass: 0.92, perc: 1.04, whistle: 1.25, transpose: 4  },
+  // Coral Reach: flowing, liquid — faster glock, reduced perc, open high end
+  reef:    { bpm: 118, fever: 132, cutoff: 11200, uke: 0.82, glock: 1.28, bass: 0.86, perc: 0.88, whistle: 1.15, transpose: 3  },
+  // Cinder Forge: tense, volcanic — heavy bass, muted highs, dark register
+  ember:   { bpm: 100, fever: 116, cutoff: 3800,  uke: 0.72, glock: 0.76, bass: 1.38, perc: 1.12, whistle: 0.62, transpose: -7 },
+  // Skyreach Canyon: dry, cavernous — sparse whistle, deep bass, wide dynamics
+  canyon:  { bpm: 108, fever: 122, cutoff: 7000,  uke: 0.8,  glock: 0.84, bass: 1.28, perc: 0.78, whistle: 1.18, transpose: -4 },
 };
 
 function mtof(m: number): number {

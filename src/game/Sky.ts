@@ -511,7 +511,9 @@ export class Sky {
     // overcast. Density response is cut a second time (~50% again) because the
     // banks read as a grey wash over the hills rather than weather. Gameplay
     // clouds in Collectibles are untouched — these are atmosphere only.
-    const hazeAlpha = (0.02 + this.hazeDensity * 0.026) * (1 - this.altT * 0.75) * (0.5 + t * 0.5);
+    // Haze is crystal-clear by default — just a whisper at full density. 0.012
+    // multiplier (was 0.026) keeps the sky readable as sunlit and open.
+    const hazeAlpha = (0.008 + this.hazeDensity * 0.012) * (1 - this.altT * 0.8) * (0.5 + t * 0.5);
     for (const sprite of this.haze) {
       const mat = sprite.material as THREE.SpriteMaterial;
       const phase = sprite.userData.phase as number;

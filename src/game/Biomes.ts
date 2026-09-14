@@ -39,7 +39,7 @@ export type BiomeDef = {
   /** night worlds glow their collectibles */
   glow: boolean;
   /** musical colour for this world */
-  musicMode: "bright" | "warm" | "airy" | "wide" | "night" | "crystal";
+  musicMode: "bright" | "warm" | "airy" | "wide" | "night" | "crystal" | "reef" | "ember" | "canyon";
 };
 
 /**
@@ -62,17 +62,17 @@ export const BIOMES: BiomeDef[] = [
     farA: 0x6bb87a,
     farB: 0x4d8aaa,
     farC: 0x4a68a0,
-    skyTop: 0x4aa8f0,
-    skyHorizon: 0xbfe8ff,
-    skyMix: 0.25,
+    skyTop: 0x2a9af0,
+    skyHorizon: 0xd8f4ff,
+    skyMix: 0.18,
     cloudTint: 0xffffff,
-    cloudDensity: 0.65,
+    cloudDensity: 0.28,
     snowLine: 0,
     deco: "tree",
     decoDensity: 1,
     hazard: "none",
     thermals: 2,
-    fogTint: 0xffffff,
+    fogTint: 0xeef8ff,
     glow: false,
     musicMode: "bright",
   },
@@ -95,7 +95,7 @@ export const BIOMES: BiomeDef[] = [
     skyHorizon: 0xffc79a,
     skyMix: 0.55,
     cloudTint: 0xffc8a0,
-    cloudDensity: 0.59,
+    cloudDensity: 0.32,
     snowLine: 0,
     deco: "pine",
     decoDensity: 0.8,
@@ -124,7 +124,7 @@ export const BIOMES: BiomeDef[] = [
     skyHorizon: 0xd8fbff,
     skyMix: 0.4,
     cloudTint: 0xe8ffff,
-    cloudDensity: 0.75,
+    cloudDensity: 0.38,
     snowLine: 0,
     deco: "palm",
     decoDensity: 1.1,
@@ -153,7 +153,7 @@ export const BIOMES: BiomeDef[] = [
     skyHorizon: 0xffd8e8,
     skyMix: 0.4,
     cloudTint: 0xfff0f6,
-    cloudDensity: 0.59,
+    cloudDensity: 0.30,
     snowLine: 0,
     deco: "palm",
     decoDensity: 1.1,
@@ -161,7 +161,7 @@ export const BIOMES: BiomeDef[] = [
     thermals: 5,
     fogTint: 0xcfeef0,
     glow: false,
-    musicMode: "airy",
+    musicMode: "reef",
   },
   {
     id: "desert",
@@ -211,7 +211,7 @@ export const BIOMES: BiomeDef[] = [
     skyHorizon: 0x2a2f60,
     skyMix: 0.75,
     cloudTint: 0x8090c8,
-    cloudDensity: 0.49,
+    cloudDensity: 0.28,
     snowLine: 0,
     deco: "pine",
     decoDensity: 0.9,
@@ -240,7 +240,7 @@ export const BIOMES: BiomeDef[] = [
     skyHorizon: 0x62e8c8,
     skyMix: 0.6,
     cloudTint: 0xd8fff4,
-    cloudDensity: 0.55,
+    cloudDensity: 0.30,
     snowLine: 26,
     deco: "crystal",
     decoDensity: 0.95,
@@ -269,7 +269,7 @@ export const BIOMES: BiomeDef[] = [
     skyHorizon: 0xff7a3a,
     skyMix: 0.7,
     cloudTint: 0x9a6858,
-    cloudDensity: 0.46,
+    cloudDensity: 0.24,
     snowLine: 0,
     deco: "spire",
     decoDensity: 0.8,
@@ -277,7 +277,7 @@ export const BIOMES: BiomeDef[] = [
     thermals: 6,
     fogTint: 0x54303a,
     glow: true,
-    musicMode: "night",
+    musicMode: "ember",
   },
   {
     id: "canyon",
@@ -306,7 +306,7 @@ export const BIOMES: BiomeDef[] = [
     thermals: 5,
     fogTint: 0xe8c8a8,
     glow: false,
-    musicMode: "wide",
+    musicMode: "canyon",
   },
 ];
 

@@ -9,7 +9,7 @@ import type { RosterBird, Standing } from "./MassRace";
 import { VIP_DAILY_GIFT } from "./constants";
 import { COLLECTIONS, type BoostView, type ShopTrailView, type SkinView } from "./Economy";
 import { MenuSky } from "./MenuSky";
-import { GREY_PALETTE, rivalPalette, sunSVG, sunbirdSVG } from "./Sunbird";
+import { GREY_PALETTE, rivalPalette, skinPalette, sunSVG, sunbirdSVG } from "./Sunbird";
 import { formatDistance } from "./math";
 import type { MissionView, QuestReward, QuestView } from "./Missions";
 import type { CampaignChapterView } from "./Campaign";
@@ -987,10 +987,6 @@ export class HUD {
 
 /* ---------- templates ---------- */
 
-function hex(n: number): string {
-  return `#${n.toString(16).padStart(6, "0")}`;
-}
-
 function head(title: string, backAction = "back", right = ""): string {
   return `<div class="screen-head"><button class="back-btn" data-ui data-action="${backAction}" aria-label="Back">‹</button><h2>${title}</h2><span>${right}</span></div>`;
 }
@@ -1876,7 +1872,8 @@ function renderSkinCollections(s: HudSnapshot): string {
 function renderSkinCard(v: SkinView, portal = false): string {
   const d = v.def;
   const rarity = skinRarity(d);
-  const swatch = `<div class="bird-swatch" style="--body:${hex(d.body)};--wing:${hex(d.wing)};--belly:${hex(d.belly)}"><i class="w"></i><i class="b"></i><i class="e"></i></div>`;
+  const pal = skinPalette(d);
+  const birdSvg = sunbirdSVG({ palette: pal, width: 64, flap: 0.38, title: d.name });
   let action: string;
   if (v.equipped) action = `<span class="tag on">✓ In use</span>`;
   else if (v.owned) action = `<button class="mini-btn" data-ui data-action="equip-skin" data-id="${d.id}">Equip</button>`;
@@ -1888,7 +1885,8 @@ function renderSkinCard(v: SkinView, portal = false): string {
   else
     action = `<button class="mini-btn ${v.affordable ? "" : "off"}" data-ui data-action="buy-skin" data-id="${d.id}">● ${d.price}</button>`;
   return `<div class="skin-card r-${rarity.key} ${v.equipped ? "equipped" : ""} ${v.owned ? "owned" : ""}">
-    <span class="rarity">${rarity.label}</span>${swatch}
+    <span class="rarity">${rarity.label}</span>
+    <div class="skin-bird">${birdSvg}</div>
     <div class="sk-name">${d.name}</div><div class="sk-perk">${d.perk}</div>${skinStatBars(d)}${action}</div>`;
 }
 
@@ -1930,12 +1928,24 @@ function renderTrailCard(v: ShopTrailView, wallet: number): string {
 function renderShop(s: HudSnapshot): string {
   const owned = s.skins.filter((v) => v.owned).length;
   const armed = s.boosts.filter((v) => v.armed).length;
+  const equippedSkin = s.skins.find((v) => v.equipped);
+  const heroSvg = equippedSkin
+    ? sunbirdSVG({ palette: skinPalette(equippedSkin.def), width: 88, flap: 0.45, title: equippedSkin.def.name })
+    : sunbirdSVG({ width: 88, flap: 0.45, title: "Sunbird" });
+  const armedBoosts = s.boosts.filter((b) => b.armed);
   return `
     ${head("Shop", "back", `<span class="pill coin">● ${s.wallet}</span>`)}
-    <p class="tagline">Birds change how you fly. Boosts arm for exactly one flight — spend them where they count.</p>
-    <div class="section-title">Birds <small>${owned}/${s.skins.length} owned</small></div>
+    <div class="shop-hero">
+      <div class="shop-hero-bird">${heroSvg}</div>
+      <div class="shop-hero-info">
+        <div class="shop-hero-name">${equippedSkin ? equippedSkin.def.name : "Sunbird"}</div>
+        <div class="shop-hero-perk">${equippedSkin ? equippedSkin.def.perk : "The original. Fast, honest, unstoppable."}</div>
+        ${armedBoosts.length ? `<div class="shop-hero-boosts">${armedBoosts.map((b) => `<span class="boost-pip">${b.def.icon}</span>`).join("")} armed</div>` : `<div class="shop-hero-boosts muted">No boosts armed</div>`}
+      </div>
+    </div>
+    <div class="section-title shop-section-birds">Birds <small>${owned}/${s.skins.length} owned</small></div>
     ${renderSkinCollections(s)}
-    <div class="section-title">Boosts <small>${armed} armed for your next flight</small></div>
+    <div class="section-title shop-section-boosts">Boosts <small>${armed} armed for your next flight</small></div>
     <div class="boost-list">${s.boosts.map((b) => renderBoostRow(b, s.wallet)).join("")}</div>
     <div class="section-title">Nest <small>permanent score multiplier</small></div>
     <div class="boost-list"><div class="boost-row nest-row">

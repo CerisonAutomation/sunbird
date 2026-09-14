@@ -445,7 +445,7 @@ export class Game {
     this.scene = new THREE.Scene();
     // Fog pushed well past the action: at near=62 the hills the bird is about
     // to fly through were already washed out, which read as permanent mist.
-    this.scene.fog = new THREE.Fog(0x8ed0ee, 118, 640);
+    this.scene.fog = new THREE.Fog(0x8ed0ee, 160, 900);
 
     this.hud = new HUD(host);
     this.input = new Input(host, () => {
@@ -1883,10 +1883,10 @@ export class Game {
     const pal = this.sky.update(dayT, x, this.elapsed);
     this.terrain.setPalette(pal, x);
     if (this.scene.fog instanceof THREE.Fog) {
-      this.scene.fog.color.copy(this.sky.fogColor).lerp(this.tmpColor.setHex(biome.fogTint), 0.25);
+      this.scene.fog.color.copy(this.sky.fogColor).lerp(this.tmpColor.setHex(biome.fogTint), 0.12);
       // Thin the haze as we climb so the whole world opens up beneath the bird.
-      this.scene.fog.near = 118 + altT * 340;
-      this.scene.fog.far = 640 + altT * 1000;
+      this.scene.fog.near = 160 + altT * 400;
+      this.scene.fog.far = 900 + altT * 1400;
       this.renderer.setClearColor(this.scene.fog.color, 1);
     }
     this.altZone =

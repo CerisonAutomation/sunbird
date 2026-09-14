@@ -176,6 +176,34 @@ function wingAngle(part: Part, flap: number): number {
   return (flap - FLAP_NEUTRAL) * part.flapK;
 }
 
+/**
+ * Build a full SunbirdPalette from the four skin colours stored in SkinDef.
+ * The missing slots (wings, tail, brow, eye) are derived deterministically so
+ * the shop bird matches the in-game bird exactly.
+ */
+export function skinPalette(skin: { body: number; wing: number; belly: number; beak: number }): SunbirdPalette {
+  const toHex = (n: number) => `#${(n >>> 0).toString(16).padStart(6, "0")}`;
+  const darken = (n: number, f: number) => {
+    const r = Math.round(((n >> 16) & 255) * f);
+    const g = Math.round(((n >> 8) & 255) * f);
+    const b = Math.round((n & 255) * f);
+    return ((r << 16) | (g << 8) | b) >>> 0;
+  };
+  const body = skin.body;
+  return {
+    body: toHex(body),
+    belly: toHex(skin.belly),
+    wingNear: toHex(skin.wing),
+    wingFar: toHex(darken(body, 0.72)),
+    tail: toHex(darken(body, 0.88)),
+    tailTip: toHex(darken(body, 0.7)),
+    brow: toHex(darken(body, 0.8)),
+    beak: toHex(skin.beak),
+    eye: "#2a1c28",
+    eyeWhite: "#ffffff",
+  };
+}
+
 /** Depth fade for distant birds — floors at 0.35 so they never vanish. */
 export function dimColor(hex: string, dim: number): string {
   if (hex === "#ffffff") return "#ffffff";
