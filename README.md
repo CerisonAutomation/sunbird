@@ -112,7 +112,7 @@ public/         PWA manifest, service worker, icons, self-hosted fonts
 - [SOCIAL_API.md](./SOCIAL_API.md) — social layer API
 - [DEPLOY.md](./DEPLOY.md) — hosting, env, Stripe webhook setup
 - [RUST_MIGRATION_PLAN.md](./RUST_MIGRATION_PLAN.md) — phased backend plan + rollback
-- [GAME_AUDIT_2026-09.md](./GAME_AUDIT_2026-09.md) — competitive audit + implementation log
+- [docs/archive/](./docs/archive/) — superseded prompts + dated audit snapshots (history, not guidance)
 
 ## Deployment
 

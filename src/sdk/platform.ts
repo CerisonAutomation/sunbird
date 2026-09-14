@@ -3,6 +3,8 @@ export type PlatformName = "poki" | "crazy" | "generic" | "none";
 export type PlatformEvents = {
   onAdOpened?: () => void;
   onAdClosed?: () => void;
+  /** Portal-level mute (CrazyGames `muteAudio`) — must beat the in-game toggle. */
+  onPortalMute?: (muted: boolean) => void;
 };
 
 export interface PlatformAdapter {
@@ -10,6 +12,10 @@ export interface PlatformAdapter {
   gameplayStart(): void;
   gameplayStop(): void;
   loadingFinished(): void;
+  /** Portal celebration (CrazyGames `happytime`) — best-effort, never throws. */
+  happytime(): void;
+  /** Re-apply portal settings (mute) to the current events — safe to repeat. */
+  syncSettings(): void;
   commercialBreak(): Promise<void>;
   rewardedBreak(): Promise<boolean>;
   mountBanner(container: HTMLElement): void;
@@ -32,7 +38,16 @@ type CrazyAdCallbacks = {
 
 type CrazySdk = {
   init?: () => Promise<void> | void;
-  game?: { loadingStart?: () => void; loadingStop?: () => void; gameplayStart?: () => void; gameplayStop?: () => void };
+  game?: {
+    loadingStart?: () => void;
+    loadingStop?: () => void;
+    gameplayStart?: () => void;
+    gameplayStop?: () => void;
+    happytime?: () => Promise<void> | void;
+    settings?: { muteAudio?: boolean; disableChat?: boolean };
+    addSettingsChangeListener?: (listener: (settings: { muteAudio?: boolean }) => void) => void;
+    removeSettingsChangeListener?: (listener: (settings: { muteAudio?: boolean }) => void) => void;
+  };
   ad?: { requestAd?: (kind: "midgame" | "rewarded", callbacks: CrazyAdCallbacks) => void };
   banner?: { requestBanner?: (opts: { id: string; width: number; height: number }) => Promise<HTMLElement> };
 };
@@ -46,6 +61,9 @@ declare global {
 
 const TARGET = (import.meta.env.VITE_PORTAL_TARGET ?? "none").toLowerCase();
 const CRAZY_BANNER_ID = import.meta.env.VITE_CRAZY_BANNER_ID ?? "";
+// Both URLs ship as inert string literals in every bundle; only the build
+// target's URL ever reaches the DOM (scriptFor() returns null for any other
+// target), so a non-target SDK can never load — see scripts/verify-portal.mjs.
 const POKI_SRC = "https://game-cdn.poki.com/scripts/v2/poki-sdk.js";
 const CRAZY_SRC = "https://sdk.crazygames.com/crazygames-sdk-v3.js";
 /** If the portal SDK can't load in this long, boot the game without it. */
@@ -70,6 +88,8 @@ class NullAdapter implements PlatformAdapter {
   gameplayStart(): void {}
   gameplayStop(): void {}
   loadingFinished(): void {}
+  happytime(): void {}
+  syncSettings(): void {}
   async commercialBreak(): Promise<void> {}
   async rewardedBreak(): Promise<boolean> {
     return false;
@@ -96,6 +116,13 @@ class PokiAdapter implements PlatformAdapter {
   loadingFinished(): void {
     this.sdk?.gameLoadingFinished?.();
   }
+
+  happytime(): void {
+    // Poki has no celebration API — a personal best is still worth the local
+    // confetti the game already fires; the portal call is simply absent here.
+  }
+
+  syncSettings(): void {}
 
   async commercialBreak(): Promise<void> {
     const sdk = this.sdk;
@@ -154,6 +181,21 @@ class CrazyAdapter implements PlatformAdapter {
 
   loadingFinished(): void {
     this.sdk?.game?.loadingStop?.();
+  }
+
+  /** Site-wide celebration for a special moment (personal best). Best-effort. */
+  happytime(): void {
+    try {
+      const r = this.sdk?.game?.happytime?.();
+      if (r instanceof Promise) r.catch(() => undefined);
+    } catch {
+      /* celebration must never break the game */
+    }
+  }
+
+  /** Push the portal's current mute state into this adapter's events. */
+  syncSettings(): void {
+    this.events.onPortalMute?.(this.sdk?.game?.settings?.muteAudio === true);
   }
 
   commercialBreak(): Promise<void> {
@@ -218,6 +260,13 @@ class CrazyAdapter implements PlatformAdapter {
 
 let loadPromise: Promise<PlatformName> | null = null;
 let sdkBootPromise: Promise<PlatformName> | null = null;
+/**
+ * Forwards portal mute changes to the newest adapter's events. The SDK
+ * listener is a singleton (registered once at boot), but Game instances come
+ * and go under StrictMode remounts — this ref always points at the live one.
+ */
+let portalMuteHandler: ((muted: boolean) => void) | null = null;
+let settingsListenerRegistered = false;
 
 function scriptFor(target: PlatformName): string | null {
   if (target === "poki") return POKI_SRC;
@@ -282,6 +331,14 @@ function bootstrapSdk(target: PlatformName): Promise<PlatformName> {
       try {
         await window.CrazyGames?.SDK?.init?.();
         window.CrazyGames?.SDK?.game?.loadingStart?.();
+        // Full Implementation requires muteAudio support: honor the current
+        // value and every later change, ahead of the in-game audio toggle.
+        const game = window.CrazyGames?.SDK?.game;
+        portalMuteHandler?.(game?.settings?.muteAudio === true);
+        if (!settingsListenerRegistered && game?.addSettingsChangeListener) {
+          settingsListenerRegistered = true;
+          game.addSettingsChangeListener((s) => portalMuteHandler?.(s.muteAudio === true));
+        }
       } catch {
         // Graceful fallback also supports direct local preview.
       }
@@ -299,11 +356,14 @@ function bootstrapSdk(target: PlatformName): Promise<PlatformName> {
  */
 export async function initPlatform(events: PlatformEvents): Promise<PlatformAdapter> {
   const target = await bootstrapSdk(portalTarget());
+  portalMuteHandler = (muted) => events.onPortalMute?.(muted);
   if (target === "poki") {
     return new PokiAdapter(events);
   }
   if (target === "crazy") {
-    return new CrazyAdapter(events);
+    const adapter = new CrazyAdapter(events);
+    adapter.syncSettings();
+    return adapter;
   }
   return new NullAdapter();
 }

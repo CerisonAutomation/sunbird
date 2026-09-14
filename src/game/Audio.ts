@@ -22,6 +22,7 @@ export class GameAudio {
   private sfxVol = 0.9;
   private adMuted = false;
   private hiddenMuted = false;
+  private portalMuted = false;
   private started = false;
   private pendingMode: MusicMode = "off";
   private pendingBiome: BiomeMusicStyle = "bright";
@@ -146,9 +147,19 @@ export class GameAudio {
     this.applyMasterMute();
   }
 
+  /**
+   * Portal-level mute (CrazyGames `muteAudio` setting). Lives on the master
+   * bus alongside the ad/hidden mutes, so it takes priority over the in-game
+   * audio toggle — as the portal requires — without disturbing saved settings.
+   */
+  setPortalMuted(muted: boolean): void {
+    this.portalMuted = muted;
+    this.applyMasterMute();
+  }
+
   private applyMasterMute(): void {
     if (!this.master || !this.ctx) return;
-    const silent = this.adMuted || this.hiddenMuted;
+    const silent = this.adMuted || this.hiddenMuted || this.portalMuted;
     this.master.gain.setTargetAtTime(silent ? 0 : 0.85, this.ctx.currentTime, silent ? 0.01 : 0.08);
   }
 

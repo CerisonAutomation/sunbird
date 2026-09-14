@@ -27,7 +27,7 @@ with the repo's "no fake multiplayer, no decorative prizes" principles.
 
 ## What was deliberately NOT done (needs infrastructure, not client code)
 
-Per `REPO_TRUTH_AUDIT.md` and `RUST_MIGRATION_PLAN.md`, these remain honest
+Per `../../REPO_TRUTH_AUDIT.md` and `../../RUST_MIGRATION_PLAN.md`, these remain honest
 gaps that cannot be closed client-side without shipping the Rust
 authoritative backend and an account system:
 

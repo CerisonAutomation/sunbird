@@ -8,7 +8,7 @@ import { decideHold } from "./pilot";
 import { CameraRig } from "./CameraRig";
 import { PICKUP_STYLE, Collectibles, type CloudKind, type PickupKind } from "./Collectibles";
 import { evaluateNearMiss, FlowTuner, SessionGoals, type NearMiss } from "./Engagement";
-import { BIG_LAUNCH_QUIPS, FEVER_QUIPS, GEM_QUIPS, MILESTONE_QUIPS, SLEEP_QUIPS, SPLASH_QUIPS, SURRENDER_QUIPS, SurpriseEngine, quip } from "./Surprises";
+import { BIG_LAUNCH_QUIPS, BOP_QUIPS, FEVER_QUIPS, GEM_QUIPS, MILESTONE_QUIPS, SLEEP_QUIPS, SPLASH_QUIPS, SURRENDER_QUIPS, THUD_QUIPS, SurpriseEngine, quip } from "./Surprises";
 import { Fx } from "./Fx";
 import { LaunchSystem, ratingLabel, type LaunchResult } from "./LaunchSystem";
 import { MASS_RACE_FIELD, MODES, modeById, RACE_FINISH, type ModeDef, type ModeId } from "./Modes";
@@ -202,6 +202,8 @@ export class Game {
   private bonus = 0;
   private scoreAccum = 0;
   private splashCd = 0;
+  private thudCount = 0;
+  private bounceCount = 0;
   /** Edge-trigger for the ocean-entry splash burst (see fixedUpdate). */
   private wasInWater = false;
   private hintTimer = 0;
@@ -420,26 +422,46 @@ export class Game {
 
     const isMobile = /Mobi|Android/i.test(navigator.userAgent);
     this.isMobile = isMobile;
-    this.renderer = new THREE.WebGLRenderer({
-      canvas,
-      antialias: !isMobile,
-      powerPreference: isMobile ? "low-power" : "high-performance",
-      stencil: false,
-      alpha: false,
-      premultipliedAlpha: true,
-      failIfMajorPerformanceCaveat: true,
-    });
+
+    // Try hardware-accelerated WebGL first; fall back to software (SwiftShader)
+    // so the game runs in sandboxed/headless environments (e.g. in-app browsers,
+    // CI, Electron without GPU) instead of showing an error screen.
+    let softwareMode = false;
+    try {
+      this.renderer = new THREE.WebGLRenderer({
+        canvas,
+        antialias: !isMobile,
+        powerPreference: isMobile ? "low-power" : "high-performance",
+        stencil: false,
+        alpha: false,
+        premultipliedAlpha: true,
+        failIfMajorPerformanceCaveat: true,
+      });
+    } catch {
+      softwareMode = true;
+      this.renderer = new THREE.WebGLRenderer({
+        canvas,
+        antialias: false,
+        powerPreference: "default",
+        stencil: false,
+        alpha: false,
+        premultipliedAlpha: true,
+        failIfMajorPerformanceCaveat: false,
+      });
+    }
+
     this.renderer.setClearColor(0x87c8ee, 1);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     // 1.27 washed the highlights out under ACES; 1.16 keeps the sun bright
     // but lets the hills hold their colour instead of turning milky.
     this.renderer.toneMappingExposure = 1.16;
-    this.renderer.shadowMap.enabled = true;
+    // Software renderer: disable shadows and cap pixel ratio to keep it usable.
+    this.renderer.shadowMap.enabled = !softwareMode;
     // PCFSoftShadowMap was removed in three r165+ — PCF with a slightly larger
     // shadow map is the soft look without the console warning every load.
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
-    this.dpr = this.preferredDpr();
+    this.dpr = softwareMode ? 1 : this.preferredDpr();
     this.renderer.setPixelRatio(this.dpr);
 
     this.scene = new THREE.Scene();
@@ -588,6 +610,7 @@ export class Game {
     void initPlatform({
       onAdOpened: () => this.beginPortalAd(),
       onAdClosed: () => this.endPortalAd(),
+      onPortalMute: (muted) => this.audio.setPortalMuted(muted),
     }).then((adapter) => {
       if (this.disposed) return;
       this.platform = adapter;
@@ -1003,10 +1026,10 @@ export class Game {
       this.bird.vx = Math.max(this.bird.vx, 34);
       this.bird.inWater = false;
       this.bird.grounded = false;
-      this.particles.emitSplash(this.bird.x, WATER_Y);
-      this.particles.burstRing(this.bird.x, this.bird.y, 0x7fe0ff);
+      this.particles.emitWaterBounce(this.bird.x, WATER_Y);
       this.audio.shield();
       this.hud.toast("Shield bounce!", "power");
+      this.popupAtBird(quip(BOP_QUIPS, this.bounceCount++), "bop");
       this.shake(0.6);
       this.haptic([15, 10, 15, 10, 30]);
     }
@@ -1079,6 +1102,7 @@ export class Game {
       this.particles.emitSplash(this.bird.x, WATER_Y);
       this.particles.burstRing(this.bird.x, WATER_Y + 1, 0xafe8ff);
       this.audio.splash();
+      this.popupAtBird("SPLASH!", "splash");
       if (!this.save.state.settings.reduceMotion) {
         this.hitStopTimer = Math.max(this.hitStopTimer, 0.06);
         this.shake(0.7);
@@ -1428,7 +1452,8 @@ export class Game {
       this.audio.perfect();
       this.audio.duckMusic(0.32, 0.35);
       this.particles.burstRing(this.bird.x, this.bird.y, 0xffe08a);
-      for (let i = 0; i < 10 + combo * 4; i++) this.particles.emitSparkle(this.bird.x, this.bird.y);
+      this.particles.emitPerfectBurst(this.bird.x, this.bird.y, combo);
+      this.popupAtBird(combo >= 3 ? `PERFECT ×${combo}!` : "PERFECT!", "perfect");
       this.flash("perfect");
       this.glow(0.85);
       this.shake(0.35 + Math.min(0.4, combo * 0.06));
@@ -1458,6 +1483,7 @@ export class Game {
       this.awardXp(3);
       this.audio.butter();
       this.particles.burstRing(this.bird.x, this.bird.y, 0xc8f0ff);
+      this.popupAtBird("GREAT!", "great");
       this.camera.punch(3);
       this.haptic(9);
     } else {
@@ -1473,7 +1499,9 @@ export class Game {
     this.awardXp(XP_RULES.coin);
     this.audio.boing();
     this.particles.burstRing(this.bird.x, this.bird.y, 0xffcf33);
+    this.particles.emitBounceBop(this.bird.x, this.bird.y, 1.0, 0.85, 0.2);
     this.particles.emitConfetti(this.bird.x, this.bird.y + 1);
+    this.popupAtBird(quip(BOP_QUIPS, this.bounceCount++), "bop");
     this.camera.punch(4);
     this.hud.toast("🌻 Sunflower bounce +80", "gold");
     this.glow(0.55);
@@ -1500,7 +1528,13 @@ export class Game {
       if (this.bird.impact > 6) {
         this.audio.land(this.bird.impact);
         this.shake(Math.min(0.5, this.bird.impact * 0.035));
-        this.particles.emitDust(this.bird.x, this.bird.y, this.bird.speed(), 0);
+        // Biome-colored thunk burst instead of plain dust.
+        const ridge = this.terrain.biomeAt(this.bird.x).ridge;
+        const tr = ((ridge >> 16) & 255) / 255;
+        const tg = ((ridge >> 8) & 255) / 255;
+        const tb = (ridge & 255) / 255;
+        this.particles.emitThunk(this.bird.x, this.bird.y, tr, tg, tb);
+        if (this.bird.impact > 10) this.popupAtBird(quip(THUD_QUIPS, this.thudCount++), "thud");
       }
     }
   }
@@ -1516,7 +1550,9 @@ export class Game {
       this.hud.toast("FEVER", "fever");
       this.flash("fever");
       this.glow(0.95);
+      this.particles.emitFeverBurst(this.bird.x, this.bird.y);
       this.particles.emitConfetti(this.bird.x, this.bird.y);
+      this.popupAtBird("ON FIRE!", "fever");
       this.hud.toast(quip(FEVER_QUIPS, this.perfectChain), "fever");
       this.telemetry.track("fever", { distance: Math.round(this.bird.x - this.startX) });
     }
@@ -1599,6 +1635,8 @@ export class Game {
     this.audio.balloon();
     this.particles.emitConfetti(x, y + 1);
     this.particles.burstRing(x, y, 0xff6b6b);
+    this.particles.emitBounceBop(x, y, 1.0, 0.42, 0.75);
+    this.popupAtBird(quip(BOP_QUIPS, this.bounceCount++), "bop");
     this.camera.punch(6);
     this.shake(0.3);
     this.hud.toast("🎈 Balloon bounce! +150", "gold");
@@ -1621,7 +1659,8 @@ export class Game {
         this.zenithTimer = ZENITH_DURATION;
         this.camera.punch(9);
         this.particles.burstRing(this.bird.x, this.bird.y, 0xffffff);
-        for (let i = 0; i < 14; i++) this.particles.emitSparkle(this.bird.x, this.bird.y);
+        this.particles.emitPerfectBurst(this.bird.x, this.bird.y, 2);
+        this.popupAtBird(`SKY HIGH! +${pts}`, "zenith");
         this.audio.zenith();
         this.audio.duckMusic(0.6, 0.7);
         this.hud.toast(`ZENITH +${pts}`, "zenith");
@@ -1644,7 +1683,9 @@ export class Game {
     this.pickups += 1;
     this.bonus += 25;
     this.audio.powerup();
-    this.particles.emitCollect(x, y);
+    // Color-coded pickup burst using the pickup's own material color.
+    const pc = PICKUP_STYLE[kind].color;
+    this.particles.emitPickup(x, y, ((pc >> 16) & 255) / 255, ((pc >> 8) & 255) / 255, (pc & 255) / 255);
     this.haptic([40, 30, 40, 30, 100]);
     const wasLive = this.powers.has(kind);
     this.powers.add(kind);
@@ -2166,6 +2207,8 @@ export class Game {
     this.bird.asleep = true;
     const stats = this.runStats();
     this.newBest = this.bestAtStart > 0 && stats.distance > this.bestAtStart;
+    // A personal best is the one moment CrazyGames wants celebrated site-wide.
+    if (this.newBest) this.platform?.happytime();
     this.telemetry.track("run_end", { mode: this.modeId, distance: Math.round(stats.distance), newBest: this.newBest });
 
     // A duel abandoned short of the line is a loss — no free retries on rating.
@@ -2480,6 +2523,8 @@ export class Game {
     this.bonus = 0;
     this.scoreAccum = 0;
     this.splashCd = 0;
+    this.thudCount = 0;
+    this.bounceCount = 0;
     this.wasInWater = false;
     this.hintTimer = 0;
     this.hint = idle ? "" : "HOLD to dive";
@@ -3712,6 +3757,24 @@ export class Game {
   private flash(kind: "perfect" | "fever" | "island" | "sleep"): void {
     if (this.save.state.settings.reduceMotion && kind !== "sleep") return;
     this.hud.flash(kind);
+  }
+
+  /** Project a world position to screen fractions [0..1, 0..1] for popups.
+   *  Returns [0.42, 0.5] as a safe fallback when projection fails. */
+  private projectToScreen(wx: number, wy: number): [number, number] {
+    const cam = this.camera.camera;
+    const v = new THREE.Vector3(wx, wy, 0).project(cam);
+    return [
+      Math.max(0.05, Math.min(0.95, (v.x + 1) / 2)),
+      Math.max(0.05, Math.min(0.95, (-v.y + 1) / 2)),
+    ];
+  }
+
+  /** Fire a floating impact text popup near the bird's current screen position. */
+  private popupAtBird(text: string, kind: "perfect" | "great" | "thud" | "bop" | "fever" | "zenith" | "splash" | "power"): void {
+    if (this.save.state.settings.reduceMotion) return;
+    const [sx, sy] = this.projectToScreen(this.bird.x, this.bird.y + 4);
+    this.hud.popup(text, kind, sx, sy);
   }
 
   private haptic(pattern: number | number[]): void {

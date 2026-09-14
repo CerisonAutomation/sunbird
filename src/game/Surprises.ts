@@ -216,6 +216,46 @@ export const MILESTONE_QUIPS = [
   "A new distance record. The previous one is filing a complaint",
 ];
 
+/** Rotating impact words for hard landings — short, punchy, onomatopoeic. */
+export const THUD_QUIPS = [
+  "THUD!",
+  "THUNK!",
+  "CLUNK!",
+  "BONK!",
+  "WHAM!",
+  "CRUNCH!",
+  "SPLAT!",
+  "SMACK!",
+  "CLONK!",
+  "OOOF!",
+  "BUMP!",
+  "BOOF!",
+  "THWACK!",
+  "DONK!",
+  "WHUMP!",
+  "OUCH!",
+  "DOOF!",
+  "PLONK!",
+];
+
+/** Rotating bop words for bounces (water, sunflower, balloon). */
+export const BOP_QUIPS = [
+  "BOP!",
+  "BOING!",
+  "SPROING!",
+  "BOUNCE!",
+  "PING!",
+  "DOING!",
+  "BLOOP!",
+  "WHOMP!",
+  "BOOP!",
+  "SPRONG!",
+  "HOP!",
+  "WHEEE!",
+  "TWANG!",
+  "PLIP!",
+];
+
 /** Fresh pool: giving up mid-run. */
 export const SURRENDER_QUIPS = [
   "The bird has chosen dignity. Bold move",

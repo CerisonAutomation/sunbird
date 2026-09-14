@@ -10,11 +10,20 @@ import {
   encodeClientMessage,
   parseServerJsonFrame,
   parseServerMessage,
+  type ServerMessage,
 } from "../protocol/v1";
 
-// Test helper: cast parsed message to any so variant-specific property
-// access type-checks (the runtime expect(msg.type) assertions guard correctness).
-const parseFrame = (f: string | Uint8Array): any => parseServerJsonFrame(f);
+// Test helper: parse + assert the variant + narrow, so variant-specific
+// property access type-checks without an `any` cast.
+function parseFrame<T extends ServerMessage["type"]>(
+  f: string | Uint8Array,
+  type: T,
+): Extract<ServerMessage, { type: T }> {
+  const msg = parseServerJsonFrame(f);
+  expect(msg.type).toBe(type);
+  if (msg.type !== type) throw new Error(`expected server message "${type}", got "${msg.type}"`);
+  return msg as Extract<ServerMessage, { type: T }>;
+}
 
 describe("protocol constants", () => {
   it("exposes protocol version 1", () => {
@@ -281,8 +290,7 @@ describe("parseServerJsonFrame — hello", () => {
       serverName: "sunbird-server",
       limits: { version: 1, maxJsonPayloadBytes: 8192, maxNameChars: 14 },
     });
-    const msg = parseFrame(frame);
-    expect(msg.type).toBe("hello");
+    const msg = parseFrame(frame, "hello");
     expect(msg.serverName).toBe("sunbird-server");
     expect(msg.limits.version).toBe(1);
     expect(msg.limits.maxJsonPayloadBytes).toBe(8192);
@@ -323,8 +331,7 @@ describe("parseServerJsonFrame — welcome", () => {
       grant: { roomId: "r1", seatId: "s1", playerId: "p1", generation: 1, reconnectToken: "tok" },
       room: { id: "r1", code: "ABCD", seed: "seed", capacity: 40, hostSeatId: "s1", pilots: [] },
     });
-    const msg = parseFrame(frame);
-    expect(msg.type).toBe("welcome");
+    const msg = parseFrame(frame, "welcome");
     expect(msg.grant.roomId).toBe("r1");
     expect(msg.room.code).toBe("ABCD");
     expect(msg.room.capacity).toBe(40);
@@ -344,7 +351,7 @@ describe("parseServerJsonFrame — welcome", () => {
         pilots: [{ id: "p2", name: "Other", skin: "sunbird", ready: false, reconnecting: false }],
       },
     });
-    const msg = parseFrame(frame);
+    const msg = parseFrame(frame, "welcome");
     expect(msg.room.pilots).toHaveLength(1);
     expect(msg.room.pilots[0].id).toBe("p2");
   });
@@ -369,8 +376,7 @@ describe("parseServerJsonFrame — rosterUpdate", () => {
       version: 1,
       room: { id: "r1", code: "ABCD", seed: "s", capacity: 40, hostSeatId: "s1", pilots: [] },
     });
-    const msg = parseFrame(frame);
-    expect(msg.type).toBe("rosterUpdate");
+    const msg = parseFrame(frame, "rosterUpdate");
     expect(msg.room.code).toBe("ABCD");
   });
 });
@@ -384,8 +390,7 @@ describe("parseServerJsonFrame — started", () => {
       startAt: "2026-09-11T00:00:00Z",
       seed: "seed",
     });
-    const msg = parseFrame(frame);
-    expect(msg.type).toBe("started");
+    const msg = parseFrame(frame, "started");
     expect(msg.startAt).toBe("2026-09-11T00:00:00Z");
   });
 
@@ -414,22 +419,25 @@ describe("parseServerJsonFrame — error messages", () => {
   it("parses unsupportedVersion error", () => {
     const msg = parseFrame(
       JSON.stringify({ type: "error", version: 1, error: { code: "unsupportedVersion", version: 2, minSupported: 1 } }),
+      "error",
     );
-    expect(msg.type).toBe("error");
     expect(msg.error.code).toBe("unsupportedVersion");
   });
 
   it("parses invalidMessage error", () => {
     const msg = parseFrame(
       JSON.stringify({ type: "error", version: 1, error: { code: "invalidMessage", reason: "bad" } }),
+      "error",
     );
     expect(msg.error.code).toBe("invalidMessage");
+    if (msg.error.code !== "invalidMessage") throw new Error("wrong error variant");
     expect(msg.error.reason).toBe("bad");
   });
 
   it("parses payloadTooLarge error", () => {
     const msg = parseFrame(
       JSON.stringify({ type: "error", version: 1, error: { code: "payloadTooLarge", maxBytes: 8192 } }),
+      "error",
     );
     expect(msg.error.code).toBe("payloadTooLarge");
   });
@@ -437,6 +445,7 @@ describe("parseServerJsonFrame — error messages", () => {
   it("parses rateLimited error", () => {
     const msg = parseFrame(
       JSON.stringify({ type: "error", version: 1, error: { code: "rateLimited", retryAfterMs: 500 } }),
+      "error",
     );
     expect(msg.error.code).toBe("rateLimited");
   });
@@ -444,6 +453,7 @@ describe("parseServerJsonFrame — error messages", () => {
   it("parses roomFull error (no extra fields)", () => {
     const msg = parseFrame(
       JSON.stringify({ type: "error", version: 1, error: { code: "roomFull" } }),
+      "error",
     );
     expect(msg.error.code).toBe("roomFull");
   });
@@ -451,6 +461,7 @@ describe("parseServerJsonFrame — error messages", () => {
   it("parses roomNotFound error", () => {
     const msg = parseFrame(
       JSON.stringify({ type: "error", version: 1, error: { code: "roomNotFound" } }),
+      "error",
     );
     expect(msg.error.code).toBe("roomNotFound");
   });
@@ -458,6 +469,7 @@ describe("parseServerJsonFrame — error messages", () => {
   it("parses seatNotFound error", () => {
     const msg = parseFrame(
       JSON.stringify({ type: "error", version: 1, error: { code: "seatNotFound" } }),
+      "error",
     );
     expect(msg.error.code).toBe("seatNotFound");
   });
@@ -465,6 +477,7 @@ describe("parseServerJsonFrame — error messages", () => {
   it("parses invalidReconnectToken error", () => {
     const msg = parseFrame(
       JSON.stringify({ type: "error", version: 1, error: { code: "invalidReconnectToken" } }),
+      "error",
     );
     expect(msg.error.code).toBe("invalidReconnectToken");
   });
@@ -472,8 +485,10 @@ describe("parseServerJsonFrame — error messages", () => {
   it("parses rejected error", () => {
     const msg = parseFrame(
       JSON.stringify({ type: "error", version: 1, error: { code: "rejected", message: "nope" } }),
+      "error",
     );
     expect(msg.error.code).toBe("rejected");
+    if (msg.error.code !== "rejected") throw new Error("wrong error variant");
     expect(msg.error.message).toBe("nope");
   });
 });
@@ -492,7 +507,7 @@ describe("parseServerJsonFrame — structural failures", () => {
         limits: { version: 1, maxJsonPayloadBytes: 8192, maxNameChars: 14 },
       }),
     );
-    const msg = parseFrame(frame);
+    const msg = parseFrame(frame, "hello");
     expect(msg.serverName).toBe("s");
   });
 

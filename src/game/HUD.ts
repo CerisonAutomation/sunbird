@@ -369,6 +369,7 @@ export class HUD {
   private finishCd!: HTMLElement;
   private lastFinishCd = "";
   private emoteWheel!: HTMLElement;
+  private impactPopupsEl!: HTMLElement;
   private lastStandings = "";
   private lastRoster = "";
   private lastRosterAt = 0;
@@ -499,6 +500,7 @@ export class HUD {
 
       <div class="toasts" data-ref="toasts"></div>
       <div class="flash" data-ref="flash"></div>
+      <div class="impact-popups" data-ref="impactPopups"></div>
       <div class="matchmaking hidden" data-ref="matchmaking"><div class="matchmaking-spinner"></div><div class="matchmaking-count" data-ref="matchmakingCount">0 pilots</div><div class="matchmaking-label" data-ref="matchmakingLabel">Searching for live pilots…</div><button class="soft-btn mm-cancel" data-ui data-action="mm-cancel">Cancel</button></div>
     `;
     parent.appendChild(this.root);
@@ -982,6 +984,22 @@ export class HUD {
     this.draftMeter = grab("draftMeter");
     this.finishCd = grab("finishCd");
     this.emoteWheel = grab("emoteWheel");
+    this.impactPopupsEl = grab("impactPopups");
+  }
+
+  /** Floating impact text that rises from a screen position and fades out.
+   *  x/y are screen fractions 0–1 (0,0 = top-left). kind controls the color.
+   *  Use projectBirdToScreen() in Game.ts to get the position. */
+  popup(text: string, kind: "perfect" | "great" | "thud" | "bop" | "fever" | "zenith" | "splash" | "power", sx: number, sy: number): void {
+    const el = document.createElement("div");
+    el.className = `impact-popup impact-popup--${kind}`;
+    el.textContent = text;
+    el.style.left = `${(sx * 100).toFixed(1)}%`;
+    el.style.top = `${(sy * 100).toFixed(1)}%`;
+    this.impactPopupsEl.appendChild(el);
+    // Trigger animation on next frame then remove after it finishes.
+    requestAnimationFrame(() => el.classList.add("rise"));
+    window.setTimeout(() => el.remove(), 1100);
   }
 }
 

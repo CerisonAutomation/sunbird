@@ -24,6 +24,12 @@ class FakeWebSocket {
 
 const instances: FakeWebSocket[] = [];
 
+// Test helper: read client privates (timers, socket, identity) without an
+// `any` cast. Returns unknown fields — the expect() matchers guard correctness.
+function peek(client: unknown): Record<string, unknown> {
+  return client as Record<string, unknown>;
+}
+
 function openSocket(index = 0): void {
   const ws = instances[index];
   if (ws) {
@@ -129,15 +135,15 @@ describe("RealtimeClient — connection lifecycle (12 tests)", () => {
     openSocket();
     instances[0]!.onclose!(null as never);
     client.disconnect();
-    expect((client as any).retryTimer).toBeNull();
+    expect(peek(client).retryTimer).toBeNull();
   });
 
   it("connect is idempotent when already in same room", async () => {
     const client = await loadClient();
     openSocket();
-    const wsBefore = (client as any).ws;
+    const wsBefore = peek(client).ws;
     client.connect("room", "seed");
-    expect((client as any).ws).toBe(wsBefore);
+    expect(peek(client).ws).toBe(wsBefore);
   });
 
   it("room code is uppercased", async () => {
@@ -174,7 +180,7 @@ describe("RealtimeClient — connection lifecycle (12 tests)", () => {
       instances[i]!.onclose!(null as never);
       vi.advanceTimersByTime(20000);
     }
-    expect((client as any).backoff).toBeLessThanOrEqual(15000);
+    expect(peek(client).backoff).toBeLessThanOrEqual(15000);
   });
 });
 
@@ -278,7 +284,7 @@ describe("RealtimeClient — peers dispatch (10 tests)", () => {
     const events = client.drainEvents();
     expect(events).toHaveLength(1);
     expect(events[0]!.type).toBe("join");
-    expect((events[0] as any).name).toBe("Bob");
+    expect(peek(events[0]).name).toBe("Bob");
   });
 
   it("ready flip emits ready event", async () => {
@@ -1118,7 +1124,7 @@ describe("RealtimeClient — malformed frame handling (12 tests)", () => {
     const client = await loadClient();
     openSocket();
     receive(0, JSON.stringify({ type: "welcome", room: "R", seed: "s", capacity: 40 }));
-    expect((client as any).selfId).toBe("");
+    expect(peek(client).selfId).toBe("");
     expect(client.state).toBe("lobby");
   });
 
@@ -1161,7 +1167,7 @@ describe("RealtimeClient — connection failure handling (5 tests)", () => {
     // disconnect nullifies onclose, so we simulate the full close-then-reconnect path
     client.disconnect();
     expect(client.state).toBe("offline");
-    expect((client as any).ws).toBeNull();
+    expect(peek(client).ws).toBeNull();
     vi.advanceTimersByTime(20000);
     expect(instances.length).toBe(1);
   });
@@ -1190,7 +1196,7 @@ describe("RealtimeClient — connection failure handling (5 tests)", () => {
     const client = await loadClient();
     openSocket();
     instances[0]!.onclose!(null as never);
-    expect((client as any).ws).toBeNull();
+    expect(peek(client).ws).toBeNull();
   });
 });
 
@@ -1289,8 +1295,8 @@ describe("RealtimeClient — edge cases (4 tests)", () => {
   it("setIdentity updates name, skin, hue", async () => {
     const client = await loadClient();
     client.setIdentity("NewName", "glider", 0.8);
-    expect((client as any).name).toBe("NewName");
-    expect((client as any).skin).toBe("glider");
-    expect((client as any).hue).toBe(0.8);
+    expect(peek(client).name).toBe("NewName");
+    expect(peek(client).skin).toBe("glider");
+    expect(peek(client).hue).toBe(0.8);
   });
 });

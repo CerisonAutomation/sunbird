@@ -189,23 +189,43 @@ export class ParticleFX {
   }
 
   emitSplash(x: number, y: number): void {
-    for (let i = 0; i < 28; i++) {
-      const a = Math.random() * Math.PI;
-      const p = 6 + Math.random() * 14;
+    // Base spray column — droplets arc upward and fall back with gravity.
+    for (let i = 0; i < 36; i++) {
+      const a = (Math.random() - 0.5) * Math.PI * 1.5;
+      const p = 8 + Math.random() * 18;
+      const col = Math.random() < 0.3;
       this.spawn({
-        x,
+        x: x + (Math.random() - 0.5) * 1.8,
         y,
-        z: (Math.random() - 0.5) * 3,
-        vx: Math.cos(a) * p * (Math.random() < 0.5 ? -1 : 1) * 0.4,
-        vy: Math.sin(a) * p,
-        vz: (Math.random() - 0.5) * 8,
-        life: 0.5 + Math.random() * 0.4,
-        max: 0.8,
-        size: 0.5 + Math.random() * 0.7,
-        r: 0.75,
-        g: 0.9,
+        z: (Math.random() - 0.5) * 4,
+        vx: Math.sin(a) * p * 0.55,
+        vy: Math.cos(a) * p * (0.55 + Math.random() * 0.6),
+        vz: (Math.random() - 0.5) * 10,
+        life: 0.55 + Math.random() * 0.55,
+        max: 0.9,
+        size: 0.5 + Math.random() * 0.9,
+        r: col ? 0.55 : 0.75,
+        g: col ? 0.82 : 0.92,
         b: 1,
         type: "splash",
+      });
+    }
+    // Fine mist — smaller, lingers above the column.
+    for (let i = 0; i < 12; i++) {
+      this.spawn({
+        x: x + (Math.random() - 0.5) * 3,
+        y: y + 1 + Math.random() * 3,
+        z: (Math.random() - 0.5) * 5,
+        vx: (Math.random() - 0.5) * 6,
+        vy: 4 + Math.random() * 8,
+        vz: (Math.random() - 0.5) * 4,
+        life: 0.7 + Math.random() * 0.5,
+        max: 1.1,
+        size: 0.35 + Math.random() * 0.35,
+        r: 0.85,
+        g: 0.95,
+        b: 1,
+        type: "wake",
       });
     }
   }
@@ -355,6 +375,161 @@ export class ParticleFX {
       b: 1.0,
       type: "wake",
     });
+  }
+
+  /** Hard thud landing — biome-colored radial splat with upward debris spray.
+   *  26 particles mirroring the reference game's 'thud' burst, replacing the
+   *  plain emitDust call so bad landings read as a cinematic impact. */
+  emitThunk(x: number, y: number, r: number, g: number, b: number): void {
+    for (let i = 0; i < 26; i++) {
+      const a = (i / 26) * Math.PI * 2;
+      const s = 14 + Math.random() * 8;
+      const upBias = 8 + Math.random() * 6;
+      this.spawn({
+        x: x + (Math.random() - 0.5) * 1.5,
+        y: y + 0.5,
+        z: (Math.random() - 0.5) * 3,
+        vx: Math.cos(a) * s,
+        vy: Math.abs(Math.sin(a)) * s * 0.6 + upBias,
+        vz: (Math.random() - 0.5) * s * 0.4,
+        life: 0.7 + Math.random() * 0.45,
+        max: 1.0,
+        size: 0.7 + Math.random() * 0.6,
+        r: r * (0.75 + Math.random() * 0.2),
+        g: g * (0.75 + Math.random() * 0.2),
+        b: b * (0.75 + Math.random() * 0.2),
+        type: "splash",
+      });
+    }
+    this.burstRing(x, y + 0.5, 0xc8a87e);
+  }
+
+  /** Scaled perfect-launch burst — replaces the sparkle loop.
+   *  chain = launch combo; more chain → more particles and faster speed. */
+  emitPerfectBurst(x: number, y: number, chain: number): void {
+    const n = 14 + Math.min(16, chain * 2);
+    const speed = 22 + chain * 1.5;
+    const gold = chain >= 3;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const s = speed * (0.5 + Math.random() * 0.65);
+      const upBias = 10 + Math.random() * 6;
+      this.spawn({
+        x,
+        y: y + 1,
+        z: (Math.random() - 0.5) * 2.5,
+        vx: Math.cos(a) * s,
+        vy: Math.sin(a) * s * 0.5 + upBias,
+        vz: (Math.random() - 0.5) * s * 0.3,
+        life: 0.55 + Math.random() * 0.4,
+        max: 0.85,
+        size: 0.45 + Math.random() * 0.45,
+        r: gold ? 1.0 : 1.0,
+        g: gold ? 0.88 + Math.random() * 0.12 : 0.95,
+        b: gold ? 0.35 + Math.random() * 0.2 : 1.0,
+        type: "spark",
+      });
+    }
+  }
+
+  /** Shield water bounce — big cinematic splash column. Blue/white upward spray
+   *  with much more energy than the regular ocean splash. */
+  emitWaterBounce(x: number, y: number): void {
+    for (let i = 0; i < 44; i++) {
+      const a = (i / 44) * Math.PI * 2;
+      const upward = Math.random() < 0.7;
+      const p = upward ? 12 + Math.random() * 22 : 6 + Math.random() * 10;
+      this.spawn({
+        x: x + (Math.random() - 0.5) * 2,
+        y,
+        z: (Math.random() - 0.5) * 4,
+        vx: Math.cos(a) * p * (upward ? 0.35 : 0.8),
+        vy: upward ? Math.abs(Math.sin(a)) * p + 14 : Math.sin(a) * p * 0.3,
+        vz: (Math.random() - 0.5) * 10,
+        life: 0.55 + Math.random() * 0.5,
+        max: 0.9,
+        size: 0.55 + Math.random() * 0.7,
+        r: 0.65 + Math.random() * 0.25,
+        g: 0.88 + Math.random() * 0.1,
+        b: 1.0,
+        type: "splash",
+      });
+    }
+    this.burstRing(x, y + 1, 0x7fe8ff);
+    this.burstRing(x, y + 3, 0xbfffff);
+  }
+
+  /** Generic powerup bounce BOP — energetic upward burst, color-matched to the
+   *  source (sunflower=gold, balloon=pink, shield=cyan). */
+  emitBounceBop(x: number, y: number, r: number, g: number, b: number): void {
+    for (let i = 0; i < 20; i++) {
+      const a = (i / 20) * Math.PI * 2;
+      const s = 18 + Math.random() * 12;
+      this.spawn({
+        x: x + (Math.random() - 0.5) * 1.5,
+        y: y + 0.5,
+        z: (Math.random() - 0.5) * 3,
+        vx: Math.cos(a) * s * 0.6,
+        vy: Math.abs(Math.sin(a)) * s + 12,
+        vz: (Math.random() - 0.5) * 6,
+        life: 0.5 + Math.random() * 0.35,
+        max: 0.75,
+        size: 0.5 + Math.random() * 0.55,
+        r,
+        g,
+        b,
+        type: "confetti",
+      });
+    }
+  }
+
+  /** Fever entry explosion — 44 gold particles, large and energetic, filling
+   *  the screen with warmth. Mirrors the reference game's feverStart burst. */
+  emitFeverBurst(x: number, y: number): void {
+    for (let i = 0; i < 44; i++) {
+      const a = (i / 44) * Math.PI * 2;
+      const s = 28 + Math.random() * 12;
+      this.spawn({
+        x,
+        y: y + 1,
+        z: (Math.random() - 0.5) * 5,
+        vx: Math.cos(a) * s,
+        vy: Math.sin(a) * s * 0.6 + 6,
+        vz: (Math.random() - 0.5) * s * 0.4,
+        life: 0.8 + Math.random() * 0.5,
+        max: 1.1,
+        size: 0.55 + Math.random() * 0.55,
+        r: 1.0,
+        g: 0.72 + Math.random() * 0.2,
+        b: 0.25 + Math.random() * 0.2,
+        type: "spark",
+      });
+    }
+  }
+
+  /** Colorful pickup activation burst — replaces plain emitCollect for power-up
+   *  pickups so activating a power-up feels distinct from collecting a coin. */
+  emitPickup(x: number, y: number, r: number, g: number, b: number): void {
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2;
+      const s = 10 + Math.random() * 8;
+      this.spawn({
+        x,
+        y,
+        z: (Math.random() - 0.5) * 2,
+        vx: Math.cos(a) * s,
+        vy: Math.sin(a) * s + 4,
+        vz: (Math.random() - 0.5) * 4,
+        life: 0.35 + Math.random() * 0.2,
+        max: 0.5,
+        size: 0.4 + Math.random() * 0.4,
+        r,
+        g,
+        b,
+        type: "spark",
+      });
+    }
+    this.burstRing(x, y, (Math.round(r * 255) << 16) | (Math.round(g * 255) << 8) | Math.round(b * 255));
   }
 
   emitSonicBoom(x: number, y: number): void {

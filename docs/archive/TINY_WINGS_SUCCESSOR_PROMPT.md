@@ -6,7 +6,7 @@
 > for the current file.** Paste §1 into a fresh agent, approve the plan
 > it produces, then loop §6 to the completion promise.
 > Supersedes `SUNBIRD_PORTAL_EDITION_PROMPT.md` (SKYBOUND v7 — deprecated,
-> wrong game name, do not use).
+> wrong game name, do not use) — archived alongside in this directory.
 
 ## §0. IDENTITY + ANTI-FAKE LAWS (read before §1 — these exist because a
 real build violated every one of them)

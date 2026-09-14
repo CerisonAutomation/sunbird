@@ -169,10 +169,13 @@ textarea {
   width: 70%;
   border-radius: 999px;
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.35));
+  transition: width 0.12s ease-out;
+  box-shadow: 0 0 0 0px rgba(255, 210, 110, 0);
 }
 
 .sun-fill.low {
   animation: pulse 0.8s ease-in-out infinite;
+  box-shadow: 0 0 0 3px rgba(255, 218, 102, 0.45);
 }
 
 .sun-knob {
@@ -182,7 +185,11 @@ textarea {
   transform: translate(-50%, -50%);
   font-size: 22px;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
-  transition: left 0.15s linear;
+  transition: left 0.12s ease-out, filter 0.15s ease;
+}
+
+.sun-track:hover .sun-knob {
+  filter: drop-shadow(0 2px 6px rgba(255, 210, 100, 0.6)) brightness(1.15);
 }
 
 .sun-caption {
@@ -253,6 +260,12 @@ textarea {
   position: absolute;
   top: calc(12px + env(safe-area-inset-top));
   right: 16px;
+}
+/* 44px minimum touch target (portal mobile QA bar). Doubled class for
+   specificity: .icon-btn below also sets width/height. */
+.icon-btn.pause-btn {
+  width: 44px;
+  height: 44px;
 }
 
 .icon-btn {
@@ -354,8 +367,12 @@ textarea {
    solid form. Other screens (shop/pass/etc) keep the solid .paper-card. */
 .paper-card.menu-hero {
   width: min(480px, 100%);
+  /* Translucent stage: the live attract flight shows through behind the
+     title content. Blur keeps the ink readable over moving hills. */
   background:
-    linear-gradient(180deg, rgba(255, 244, 228, 0.94) 0%, rgba(255, 244, 228, 0.9) 34%, rgba(255, 244, 228, 0.96) 100%);
+    linear-gradient(180deg, rgba(255, 244, 228, 0.8) 0%, rgba(255, 244, 228, 0.72) 34%, rgba(255, 244, 228, 0.84) 100%);
+  -webkit-backdrop-filter: blur(16px) saturate(1.15);
+  backdrop-filter: blur(16px) saturate(1.15);
   border: 1px solid rgba(255, 255, 255, 0.65);
   box-shadow:
     0 22px 0 rgba(42, 28, 40, 0.1),
