@@ -1,8 +1,11 @@
 import * as THREE from "three";
-import { biomeForIsland, gapEndFor, rampPeakFor, tierForIsland, type BiomeDef, type DecoKind, type LandmarkKind } from "./Biomes";
+import { flightProgression, terrainDifficulty } from "./FlightProgression";
+import { biomeForIsland, gapEndFor, rampPeakFor, type BiomeDef, type DecoKind, type LandmarkKind } from "./Biomes";
 import {
   CHUNK_RES,
   CHUNK_SIZE,
+  DROP_START,
+  DROP_BLEND_START,
   GAP_START,
   ISLAND_PERIOD,
   OCEAN_FLOOR,
@@ -74,6 +77,7 @@ export class TerrainSystem {
   private scatterParts: DecoPart[] = [];
   private farCenter = -9999;
   private farIsland = -1;
+  private chunkCenter = Number.NaN;
   private readonly segCache = new Map<number, Segment[]>();
   private readonly hKey = new Int32Array(HEIGHT_CACHE_SIZE).fill(0x7fffffff);
   private readonly hVal = new Float64Array(HEIGHT_CACHE_SIZE);
@@ -120,7 +124,9 @@ export class TerrainSystem {
     const key = Math.round(x * 64);
     const slot = key & HEIGHT_CACHE_MASK;
     if (this.hKey[slot] === key) return this.hVal[slot]!;
-    const v = this.computeHeight(x);
+    // Quantise the sample as well as the key: cache results must not depend
+    // on which pilot queried this bin first.
+    const v = this.computeHeight(key / 64);
     this.hKey[slot] = key;
     this.hVal[slot] = v;
     return v;
@@ -132,28 +138,32 @@ export class TerrainSystem {
     const gapEnd = gapEndFor(island);
     const hills = this.hills(x, island);
 
+    const lip = rampPeakFor(island) + 14;
+    // One authored transfer per island: high shoulder -> huge clean descent
+    // -> wide bowl -> launch lip. No noise bumps to steal downhill momentum.
+    const shoulder = lip + 30 + hash01(island, this.seedN) * 6;
+    const valley = 6;
     if (lx >= GAP_START && lx < gapEnd) {
-      const drop = smoothstep(GAP_START, GAP_START + 10, lx) * (1 - smoothstep(gapEnd - 22, gapEnd, lx));
-      return lerp(hills, OCEAN_FLOOR, drop);
+      // Start at the actual ramp height, NOT the unrelated procedural hills.
+      // The old branch had a vertical discontinuity precisely at take-off.
+      const departure = lerp(lip, OCEAN_FLOOR, smoothstep(GAP_START, GAP_START + 26, lx));
+      return lerp(departure, 16, smoothstep(gapEnd - 26, gapEnd, lx));
     }
+    if (lx >= gapEnd) return 16;
 
     let h = hills;
-    if (lx > RAMP_START && lx < GAP_START) {
-      const t = smoothstep(RAMP_START, GAP_START, lx);
-      const peak = rampPeakFor(island) + 14 * t;
-      h = lerp(h, peak, t);
+    if (lx >= DROP_START && lx < RAMP_START) {
+      h = lerp(shoulder, valley, smoothstep(DROP_START, RAMP_START, lx));
+    } else if (lx >= RAMP_START && lx < GAP_START) {
+      h = lerp(valley, lip, smoothstep(RAMP_START, GAP_START, lx));
+    } else if (lx >= DROP_BLEND_START) {
+      h = lerp(hills, shoulder, smoothstep(DROP_BLEND_START, DROP_START, lx));
     }
 
-    // landing shelf at the start of every island (after the gap wraps)
-    const prevGapEnd = gapEndFor(island - 1);
-    const shelfLen = 55 + Math.max(0, prevGapEnd - (GAP_START + 148)) * 0.4;
-    if (lx < shelfLen) {
-      const land = smoothstep(0, shelfLen * 0.65, lx);
-      const landing = 16 + 6 * Math.sin(lx * 0.08);
-      h = lerp(landing, h, land);
-    }
+    // Flat, continuous shore across the wrap, then ease into the next hills.
+    if (lx < 55) h = lerp(16, h, smoothstep(0, 55, lx));
 
-    if (x < 260) {
+    if (x < 270) {
       const w = 1 - smoothstep(160, 270, x);
       const tutorial = 16 + 15 * Math.cos((x - 48) * 0.027);
       h = lerp(h, Math.max(4.5, tutorial), w);
@@ -161,15 +171,24 @@ export class TerrainSystem {
     return h;
   }
 
+  /** A cheap camera anchor; include terrain ahead, keep water at its visible surface. */
+  landingGround(x: number, vx: number): number {
+    const ahead = x + clamp(vx * 0.8, 12, 90);
+    return Math.min(Math.max(WATER_Y, this.heightAt(x)), Math.max(WATER_Y, this.heightAt(ahead)));
+  }
+
   slopeAt(x: number): number {
     const e = 0.45;
     return (this.heightAt(x + e) - this.heightAt(x - e)) / (2 * e);
   }
 
-  normalAt(x: number): { nx: number; ny: number; tx: number; ty: number } {
+  normalAt(x: number, out = { nx: 0, ny: 1, tx: 1, ty: 0 }): { nx: number; ny: number; tx: number; ty: number } {
     const slope = this.slopeAt(x);
     const len = Math.hypot(1, slope);
-    return { tx: 1 / len, ty: slope / len, nx: -slope / len, ny: 1 / len };
+    out.tx = out.ny = 1 / len;
+    out.ty = slope / len;
+    out.nx = -out.ty;
+    return out;
   }
 
   /**
@@ -219,6 +238,7 @@ export class TerrainSystem {
 
   /** Set by the FlowTuner so challenge tracks measured skill. */
   setDifficulty(d: number): void {
+    d = terrainDifficulty(d);
     if (Math.abs(d - this.difficulty) < 0.01) return;
     this.difficulty = d;
     this.invalidate();
@@ -231,6 +251,13 @@ export class TerrainSystem {
     this.padCache.clear();
     this.crests.length = 0;
     this.crestScannedTo = -Infinity;
+    // Collision and rendered geometry must always describe the same hills.
+    for (const chunk of this.chunks.values()) {
+      this.group.remove(chunk.group);
+      for (const disposable of chunk.disposables) disposable.dispose();
+    }
+    this.chunks.clear();
+    this.chunkCenter = Number.NaN;
   }
 
   /**
@@ -309,14 +336,17 @@ export class TerrainSystem {
 
   update(camX: number): void {
     const center = Math.floor(camX / CHUNK_SIZE);
-    const lo = center - VISIBLE_CHUNKS_BACK;
-    const hi = center + VISIBLE_CHUNKS_FWD;
-    for (let id = lo; id <= hi; id++) if (!this.chunks.has(id)) this.spawnChunk(id);
-    for (const [id, chunk] of this.chunks) {
-      if (id < lo || id > hi) {
-        this.group.remove(chunk.group);
-        for (const d of chunk.disposables) d.dispose();
-        this.chunks.delete(id);
+    if (center !== this.chunkCenter) {
+      this.chunkCenter = center;
+      const lo = center - VISIBLE_CHUNKS_BACK;
+      const hi = center + VISIBLE_CHUNKS_FWD;
+      for (let id = lo; id <= hi; id++) if (!this.chunks.has(id)) this.spawnChunk(id);
+      for (const [id, chunk] of this.chunks) {
+        if (id < lo || id > hi) {
+          this.group.remove(chunk.group);
+          for (const d of chunk.disposables) d.dispose();
+          this.chunks.delete(id);
+        }
       }
     }
     if (Math.abs(camX - this.farCenter) > 40) {
@@ -375,8 +405,7 @@ export class TerrainSystem {
    */
   private hills(x: number, island: number): number {
     const b = biomeForIsland(island);
-    const tier = tierForIsland(island);
-    const amp = b.amp * (1 + tier * 0.06 + Math.min(0.22, island * 0.01));
+    const amp = b.amp * flightProgression(island).hillScale;
     const wave = b.wave;
 
     const local = this.localX(x);
@@ -444,7 +473,7 @@ export class TerrainSystem {
     const rng = new SeededRandom(`${this.seedStr}:sunflower:${island}`);
     const out: BouncePad[] = [];
     const base = island * ISLAND_PERIOD;
-    const landLimit = RAMP_START - 34; // keep clear of the launch ramp
+    const landLimit = DROP_BLEND_START - 34; // keep clear of the launch ramp
     let lx = 120 + rng.range(0, 60);
     while (lx < landLimit) {
       const wx = base + lx;
@@ -458,7 +487,7 @@ export class TerrainSystem {
 
   private buildSegments(island: number): Segment[] {
     const b = biomeForIsland(island);
-    const tier = tierForIsland(island);
+    const progression = flightProgression(island);
     const rng = new SeededRandom(`${this.seedStr}:isle:${island}`);
     const out: Segment[] = [];
     let cursor = 0;
@@ -466,7 +495,7 @@ export class TerrainSystem {
 
     // Wavelength scales with the speed the player should be carrying here, so
     // ramps arrive at a rhythm the bird can actually match.
-    const speedScale = ((1 + Math.min(0.28, island * 0.02) + tier * 0.03) * b.wave) / this.difficulty;
+    const speedScale = (progression.rhythmScale * b.wave) / this.difficulty;
 
     const push = (len: number, height: number, nextBase: number): void => {
       out.push({ start: cursor, len, height, base, baseNext: nextBase });
@@ -497,26 +526,26 @@ export class TerrainSystem {
       if (sincePerfect >= 3 && remaining > 380 && roll > 0.4) {
         sincePerfect = 0;
         const s = speedScale;
-        push(92 * s, 24 * b.amp, base - 2); // deep carving valley
-        push(64 * s, 25 * b.amp, base + 1); //  kicker with a crisp lip
-        push(78 * s, 19 * b.amp, base); //     landing roller
-        push(100 * s, 30 * b.amp, base); //     big launch ramp
+        push(92 * s, 24, base - 2); // deep carving valley
+        push(64 * s, 25, base + 1); //  kicker with a crisp lip
+        push(78 * s, 19, base); //     landing roller
+        push(100 * s, 30, base); //     big launch ramp
         used += (92 + 64 + 78 + 100) * s;
         continue;
       }
 
       if (roll < 0.26) {
         len = rng.range(58, 74) * speedScale; // quick roller
-        height = rng.range(11, 15) * b.amp;
+        height = rng.range(11, 15);
       } else if (roll < 0.6) {
         len = rng.range(76, 104) * speedScale; // medium rolling hill
-        height = rng.range(17, 24) * b.amp;
+        height = rng.range(17, 24);
       } else if (roll < 0.82) {
         len = rng.range(112, 148) * speedScale; // long smooth slope
-        height = rng.range(24, 32) * b.amp;
+        height = rng.range(24, 32);
       } else {
         len = rng.range(150, 190) * speedScale; // occasional huge ramp
-        height = rng.range(34, 44) * b.amp;
+        height = rng.range(34, 44);
       }
       if (len > remaining) len = Math.max(62, remaining);
       const drift = rng.range(-2.5, 2.5);
@@ -526,7 +555,7 @@ export class TerrainSystem {
     }
 
     // Run the final arch out past the ramp zone so lookups never fall off the end.
-    push(ISLAND_PERIOD - cursor + 200, 16 * b.amp, base);
+    push(ISLAND_PERIOD - cursor + 200, 16, base);
     return out;
   }
 
@@ -778,7 +807,10 @@ export class TerrainSystem {
           inst.setMatrixAt(i, tmpObj.matrix);
         });
         inst.instanceMatrix.needsUpdate = true;
-        inst.frustumCulled = false;
+        inst.computeBoundingSphere();
+        // Occlusion only shrinks/sinks these props; keep conservative padding.
+        if (inst.boundingSphere) inst.boundingSphere.radius += 4;
+        inst.frustumCulled = true;
         group.add(inst);
         disposables.push({ dispose: () => inst.dispose() });
         made.push({ inst, part });
@@ -952,7 +984,8 @@ export class TerrainSystem {
         inst.setMatrixAt(i, tmpObj.matrix);
       });
       inst.instanceMatrix.needsUpdate = true;
-      inst.frustumCulled = false;
+      inst.computeBoundingSphere();
+      inst.frustumCulled = true;
       group.add(inst);
       disposables.push({ dispose: () => inst.dispose() });
     }
@@ -967,12 +1000,23 @@ export class TerrainSystem {
     for (let layer = 0; layer < 4; layer++) {
       const mesh = this.farMeshes[layer];
       if (!mesh) continue;
-      mesh.geometry.dispose();
+      const geo = mesh.geometry;
+      let attr = geo.getAttribute("position") as THREE.BufferAttribute | undefined;
+      if (!attr) {
+        attr = new THREE.BufferAttribute(new Float32Array((samples + 1) * 6), 3);
+        attr.setUsage(THREE.DynamicDrawUsage);
+        geo.setAttribute("position", attr);
+        const indices = new Uint16Array(samples * 6);
+        for (let i = 0; i < samples; i++) {
+          const a = i * 2;
+          indices.set([a, a + 1, a + 2, a + 1, a + 3, a + 2], i * 6);
+        }
+        geo.setIndex(new THREE.BufferAttribute(indices, 1));
+      }
       const amp = 0.55 + layer * 0.22;
       const yOff = -2 + layer * 7;
       const phase = layer * 45 + this.seedN * 0.01;
-      const positions: number[] = [];
-      const indices: number[] = [];
+      const positions = attr.array as Float32Array;
       for (let i = 0; i <= samples; i++) {
         const t = i / samples;
         const x = lerp(start, end, t);
@@ -982,17 +1026,14 @@ export class TerrainSystem {
           amp * 16 * b.amp * Math.sin(x * (0.01 - layer * 0.0018) / b.wave + phase) +
           amp * 8 * Math.sin(x * 0.024 + phase * 1.3) +
           5 * fbm(x * 0.016 + layer, this.seedN + layer * 17, 3);
-        positions.push(x, y, 0, x, y - 90, 0);
-        if (i < samples) {
-          const a = i * 2;
-          indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
-        }
+        const offset = i * 6;
+        positions[offset] = x;
+        positions[offset + 1] = y;
+        positions[offset + 3] = x;
+        positions[offset + 4] = y - 90;
       }
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-      geo.setIndex(indices);
-      geo.computeVertexNormals();
-      mesh.geometry = geo;
+      // Unlit far silhouettes need no normals. Keep the GPU buffers alive.
+      attr.needsUpdate = true;
     }
   }
 }

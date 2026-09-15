@@ -1,16 +1,21 @@
+import { equalizedRace } from "./RaceRules";
+import { terrainCue, landingLookAhead } from "./FlightGuidance";
+import { ScreenHistory } from "./ScreenHistory";
+import { copyText, shareText } from "./Clipboard";
+import { replayOptions, type RunOptions } from "./Replay";
 import * as THREE from "three";
 import { Achievements } from "./Achievements";
 import { GameAudio } from "./Audio";
 import { BIOMES, biomeForIsland } from "./Biomes";
 import { TRACK_NAMES } from "./Music";
 import { Bird, type BirdStepOpts } from "./Bird";
-import { decideHold } from "./pilot";
+import { AttractPilot } from "./pilot";
 import { CameraRig } from "./CameraRig";
 import { PICKUP_STYLE, Collectibles, type CloudKind, type PickupKind } from "./Collectibles";
 import { evaluateNearMiss, FlowTuner, SessionGoals, type NearMiss } from "./Engagement";
 import { BIG_LAUNCH_QUIPS, BOP_QUIPS, FEVER_QUIPS, GEM_QUIPS, MILESTONE_QUIPS, SLEEP_QUIPS, SPLASH_QUIPS, SURRENDER_QUIPS, THUD_QUIPS, SurpriseEngine, quip } from "./Surprises";
-import { Fx } from "./Fx";
-import { DPR_COOLDOWN_SECONDS, nextDpr, QUALITY_WINDOW_SECONDS } from "./quality";
+import type { Fx } from "./Fx";
+import { DPR_COOLDOWN_SECONDS, nextBloomBudget, nextDpr, QUALITY_WINDOW_SECONDS } from "./quality";
 import { LaunchSystem, ratingLabel, type LaunchResult } from "./LaunchSystem";
 import { MASS_RACE_FIELD, MODES, modeById, RACE_FINISH, type ModeDef, type ModeId } from "./Modes";
 import { MassRace } from "./MassRace";
@@ -93,7 +98,8 @@ import { fetchServerEntitlements,
 } from "./Payments";
 import { SaveData } from "./SaveData";
 import { SeasonPass, seasonId, seasonLabel, XP_RULES } from "./SeasonPass";
-import { buildShareCard, shareOrDownload } from "./Social";
+import { FlightCues } from "./FlightCues";
+import { endlessSpeedScale } from "./FlightProgression";
 import { buildChallengeUrl, readChallengeFromUrl, type RivalChallenge } from "./Challenge";
 import { flag } from "./Flags";
 import { variant } from "./Experiments";
@@ -131,9 +137,17 @@ export class Game {
   private readonly camera: CameraRig;
   private readonly particles: ParticleFX;
   private readonly trail: TrailRibbon;
-  private readonly fx: Fx;
+  private fx: Fx | null = null;
+  private fxLoading = false;
+  private fxFailed = false;
+  private menuRenderAcc = 1 / 30;
+  private readonly attractPilot = new AttractPilot();
+  private readonly flightCues = new FlightCues();
+  private lastHudAt = -Infinity;
+  private lastHudVersion = -1;
   private readonly isMobile: boolean;
   private useBloom = false;
+  private bloomBudget = { enabled: false, goodWindows: 0, cooldown: 0 };
   private readonly sky: Sky;
   private readonly mockPayments = new MockPaymentProvider();
   private readonly ads: AdProvider = new MockAdProvider();
@@ -157,6 +171,7 @@ export class Game {
 
   private state: GameState = "menu";
   private screen: UiScreen = "main";
+  private readonly screenHistory = new ScreenHistory<UiScreen>("main");
   private uiVersion = 0;
   private viewsVersion = -1;
   private missionViews: MissionView[] = [];
@@ -195,6 +210,10 @@ export class Game {
   private perfTimer = 0;
   private qualityTimer = 0;
   private dpr = 1;
+  private renderWidth = 0;
+  private renderHeight = 0;
+  private renderDpr = 0;
+  private dustCooldown = 0;
   private particleBudget = 1;
   private deferredInstall: BeforeInstallPromptEvent | null = null;
   private readonly onBeforeInstall: (e: Event) => void;
@@ -297,6 +316,8 @@ export class Game {
    *  clock, not frame dt — frame time is capped at 100 ms, so on slow
    *  devices an accumulated-dt countdown runs slower than real time. */
   private mmDeadline = 0;
+  private localRace = false;
+  private networkStartAt = 0;
   /** Deferred launch options for when the search resolves. */
   private mmOpts: { ranked: boolean; storm: boolean } | null = null;
   /** The last launched match's options — powers the one-tap Rematch button. */
@@ -378,7 +399,6 @@ export class Game {
   private windEmitAcc = 0;
   private trailFxAcc = 0;
   private powerFxAcc = 0;
-  private atmosphereFxAcc = 0;
   private hueT = 0;
   private lastBiomeId = "";
   private readonly onFocus: () => void;
@@ -513,6 +533,7 @@ export class Game {
     };
     this.onContextRestored = () => {
       this.contextLost = false;
+      this.renderWidth = 0; // force a fresh buffer after GPU/context restoration
       this.audio.setHiddenMuted(false);
       // Rebuild the drawing buffer at the current size and drop the stale clock.
       this.dprCooldown = 0;
@@ -553,7 +574,7 @@ export class Game {
     this.particles.addTo(this.scene);
     this.trail = new TrailRibbon();
     this.trail.addTo(this.scene);
-    this.fx = new Fx(this.renderer, this.scene, this.camera.camera);
+    // Optional post-processing is loaded only when a desktop flight needs it.
     this.sky = new Sky();
     this.scene.add(this.sky.group);
     this.sky.addLights(this.scene);
@@ -640,7 +661,6 @@ export class Game {
     this.raf = requestAnimationFrame(this.loop);
 
     this.goals.reset(this.today);
-    this.terrain.setDifficulty(this.flow.difficulty());
     // Stripe.js is only fetched when the paywall actually opens — no third-
     // party network chatter (or console noise) during normal play.
     this.handleStripeReturn();
@@ -698,6 +718,7 @@ export class Game {
     window.removeEventListener("appinstalled", this.onInstalled);
     window.removeEventListener("focus", this.onFocus);
     this.telemetry.flush();
+    this.squad?.dispose();
     this.telemetry.dispose();
     this.weather.dispose();
     this.net?.disconnect();
@@ -710,7 +731,7 @@ export class Game {
     this.bird.dispose();
     this.particles.dispose();
     this.trail.dispose();
-    this.fx.dispose();
+    this.fx?.dispose();
     this.sky.dispose();
     this.collect.dispose();
     this.p1?.dispose(this.scene);
@@ -744,11 +765,11 @@ export class Game {
       this.roomCode = code;
       this.setScreen("live");
       this.preseatLobby();
-      this.hud.toast(`🎟 Invited to room ${code} — press START to fly`, "gold");
+      this.hud.toast(`🎟 Invited to room ${code} — ready up together to race`, "gold");
       this.telemetry.track("room_invite_opened", { room: code });
     }
     // Club chat: light polling only while the Squad screen is on screen.
-    if (this.screen === "squad" && this.state === "menu" && this.squad?.live) {
+    if (this.screen === "squad" && (this.state === "menu" || this.state === "gameover") && this.squad?.live) {
       this.squadPoll += raw;
       if (this.squadPoll >= 4) {
         this.squadPoll = 0;
@@ -789,7 +810,7 @@ export class Game {
       case "playing":
         if (this.countdown > 0) {
           const before = Math.ceil(this.countdown - 1);
-          this.countdown -= raw;
+          this.countdown = this.networkStartAt > 0 ? Math.max(0, (this.networkStartAt - Date.now()) / 1000) : this.countdown - raw;
           const after = Math.ceil(this.countdown - 1);
           if (after !== before) this.audio.chirp();
           if (this.countdown <= 0) this.audio.island();
@@ -870,7 +891,7 @@ export class Game {
     this.demoAcc = Math.min(this.demoAcc + dt, 0.25);
     let n = 0;
     while (this.demoAcc >= PHYS_DT && n < 12) {
-      const hold = decideHold(this.bird, this.terrain);
+      const hold = this.attractPilot.update(PHYS_DT, this.bird, this.terrain);
       this.bird.step(PHYS_DT, { diving: hold, fever: false, speedMult: 1, boost: false }, this.terrain);
       if (this.bird.justLanded && !calm && this.bird.impact > 5) {
         this.particles.emitDust(
@@ -905,7 +926,7 @@ export class Game {
       if (this.needRelease) return;
       this.menuHold += dt;
       if (this.menuHold > threshold) {
-        if (this.state === "gameover" && this.portalEnabled()) void this.restartWithPortalBreak();
+        if (this.state === "gameover") this.replayRun(true);
         else this.startRun();
       }
     } else {
@@ -937,8 +958,8 @@ export class Game {
     // momentum burst. It is deliberately cooldown-gated and additive, so the
     // hill timing remains the skill expression. A stalled bird can also use
     // the same rescue burst once the cooldown is clear.
-    if (this.save.hasUpgrade("doubletap") && this.save.state.settings.doubleTapBoost && this.input.consumeBoost() && this.manualBoostCooldown <= 0) this.activateManualBoost("double_tap");
-    if (this.save.hasUpgrade("doubletap") && this.save.state.settings.doubleTapBoost && this.bird.grounded && this.bird.speed() < STALL_SPEED && this.manualBoostCooldown <= 0 && this.runTime > 1.2) {
+    if (!this.fairRace && this.save.hasUpgrade("doubletap") && this.save.state.settings.doubleTapBoost && this.input.consumeBoost() && this.manualBoostCooldown <= 0) this.activateManualBoost("double_tap");
+    if (!this.fairRace && this.save.hasUpgrade("doubletap") && this.save.state.settings.doubleTapBoost && this.bird.grounded && this.bird.speed() < STALL_SPEED && this.manualBoostCooldown <= 0 && this.runTime > 1.2) {
       this.activateManualBoost("stall_rescue");
     }
 
@@ -958,6 +979,9 @@ export class Game {
       this.terrain,
     );
 
+    const cue = this.flightCues.update(dt, this.bird, this.terrain.islandIndex(this.bird.x), this.terrain.localX(this.bird.x));
+    if (cue === "runup") this.audio.runup();
+    else if (cue === "apex") this.audio.apexChime();
     if (this.bird.justLaunched) this.onLaunch();
     if (this.bird.bounced) {
       this.bird.bounced = false;
@@ -1121,7 +1145,7 @@ export class Game {
         } else {
           this.particles.emitDust(this.bird.x, this.bird.y, this.bird.speed(), slope);
         }
-      } else if (this.bird.impact < 2.4 && this.bird.speed() > 36 && diving && slope < -0.05) {
+      } else if (this.bird.landingQuality < LAND_PERFECT && this.bird.impact < 2.4 && this.bird.speed() > 36 && diving && slope < -0.05) {
         // tangential touchdown at speed on a downslope: reward the finesse
         this.bonus += 10;
         this.audio.butter();
@@ -1129,7 +1153,9 @@ export class Game {
         this.particles.burstRing(this.bird.x, this.bird.y, 0xffffff);
       }
     }
-    if (this.bird.grounded && this.bird.speed() > 10) {
+    this.dustCooldown = Math.max(0, this.dustCooldown - dt);
+    if (this.bird.grounded && this.bird.speed() > 10 && this.dustCooldown <= 1e-6) {
+      this.dustCooldown = 1 / 30;
       this.particles.emitDust(this.bird.x, this.terrain.heightAt(this.bird.x) + 0.3, this.bird.speed(), slope);
     }
 
@@ -1148,7 +1174,7 @@ export class Game {
         const pts = 6;
         this.bonus += pts;
         this.awardXp(XP_RULES.coin);
-        this.audio.butter();
+        this.audio.ridgeSkim();
         this.hud.toast(`Ridge skim +${pts}`, "cloud");
         this.particles.emitDust(this.bird.x, this.terrain.heightAt(this.bird.x) + 0.4, this.bird.speed(), slope);
       }
@@ -1164,13 +1190,6 @@ export class Game {
     if (this.powerFxAcc <= 0) {
       this.powerFxAcc = 0.05;
       this.emitPowerFx();
-    }
-
-    this.atmosphereFxAcc -= dt;
-    if (this.atmosphereFxAcc <= 0) {
-      const biomeFx = this.terrain.biomeAt(this.bird.x);
-      this.particles.emitBiomeAtmosphere(this.bird.x, this.bird.y, biomeFx.id);
-      this.atmosphereFxAcc = this.bird.altitude > 20 ? 0.08 : 0.19;
     }
 
     this.splashCd -= dt;
@@ -1471,10 +1490,6 @@ export class Game {
       } else if (!goldenNow && this.goldenHour) {
         this.goldenHour = false; // sun flask refilled the day
       }
-      // Golden Hour magic: the air itself glitters — drifting amber motes.
-      if (this.goldenHour && Math.random() < dt * 6) {
-        this.particles.emitSparkle(this.bird.x + 6 + Math.random() * 18, this.bird.y + (Math.random() - 0.5) * 10, 1, 0.72, 0.25);
-      }
       if (this.daylight <= 0 && !this.bird.asleep) {
         this.onDaylightOut();
         return;
@@ -1521,7 +1536,9 @@ export class Game {
     const combo = this.launch.combo;
     this.launchBannerText = ratingLabel(res.rating, combo);
     this.launchBannerT = res.rating === "perfect" ? 1.25 : 0.9;
-    this.audio.launchWhoosh(res.rating, res.speed);
+    const local = this.terrain.localX(this.bird.x);
+    if (local >= 845 && local < 954) this.audio.rampLaunch(res.speed);
+    else this.audio.launchWhoosh(res.rating, res.speed);
 
     if (res.rating === "perfect") {
       this.perfects += 1;
@@ -1605,8 +1622,7 @@ export class Game {
         this.hitStopTimer = Math.max(this.hitStopTimer, 0.08);
       }
       if (this.bird.impact > 6) {
-        this.audio.land(this.bird.impact);
-        this.shake(Math.min(0.5, this.bird.impact * 0.035));
+        // Contact sound and camera impulse are emitted once by the main step.
         // Biome-colored thunk burst instead of plain dust.
         const ridge = this.terrain.biomeAt(this.bird.x).ridge;
         const tr = ((ridge >> 16) & 255) / 255;
@@ -1687,7 +1703,7 @@ export class Game {
     const pts = 30 + chainBonus;
     this.bonus += pts;
     this.awardXp(XP_RULES.cloud);
-    this.audio.boing();
+    this.audio.ringPass(this.ringChain);
     this.bird.vx += 8 + Math.min(14, this.ringChain * 2);
     this.particles.burstRing(x, y, 0xffd76a);
     this.particles.emitSonicBoom(x, y);
@@ -1696,7 +1712,8 @@ export class Game {
       this.hud.toast(`RING CHAIN ×${this.ringChain} +${pts}`, "gold");
       this.flash("fever");
       this.glow(0.6);
-      this.audio.fanfare();
+      // The ring chord already marks the chain; a five-note fanfare on every
+      // subsequent ring drowned out landing/timing cues.
     } else {
       this.hud.toast(`Through the ring +${pts}`, "gold");
     }
@@ -1866,13 +1883,19 @@ export class Game {
 
   private computeHint(): string {
     const novice = this.save.state.tutorialRuns < 3;
+    const local = this.terrain.localX(this.bird.x);
+    const cue = terrainCue({ grounded: this.bird.grounded, localX: local,
+      altitude: this.bird.altitude, vy: this.bird.vy,
+      landingSlope: !this.bird.grounded && this.bird.altitude < 55 && this.bird.vy < -8
+        ? this.terrain.slopeAt(this.bird.x + landingLookAhead(this.bird.altitude, this.bird.vx, this.bird.vy)) : 0 });
+    if (cue) return cue;
     if (this.hintTimer > (novice ? 26 : 8)) {
       if (this.terrain.isOcean(this.bird.x + 40) && !this.terrain.isOcean(this.bird.x) && this.island < 2) return "Build speed — then RELEASE";
       return "";
     }
     const slope = this.terrain.slopeAt(this.bird.x);
     if (this.hintTimer < 2.6 && slope < -0.08) return "HOLD to dive";
-    if (novice && this.save.hasUpgrade("doubletap") && this.save.state.settings.doubleTapBoost && this.hintTimer >= 3 && this.hintTimer < 5.8) return "DOUBLE TAP for a boost";
+    if (novice && !this.fairRace && this.save.hasUpgrade("doubletap") && this.save.state.settings.doubleTapBoost && this.hintTimer >= 3 && this.hintTimer < 5.8) return "DOUBLE TAP for a boost";
     if (slope > 0.16 && this.bird.grounded && this.bird.speed() > 18) return "RELEASE to launch";
     // No thermal line here: the ♨ HUD chip already says "release!" — three
     // simultaneous thermal texts (toast + chip + hint) was the worst offender
@@ -1951,6 +1974,13 @@ export class Game {
   }
 
   private render(visDt: number, rawDt: number): void {
+    // Keep input, matchmaking and clocks live; decorative menus only need 30 Hz.
+    if (this.state === "menu" || this.state === "paused") {
+      this.menuRenderAcc += rawDt;
+      if (this.menuRenderAcc < 1 / 30) return;
+      visDt = rawDt = this.menuRenderAcc;
+    }
+    this.menuRenderAcc = 0;
     const playing = this.state === "playing";
     const diving = playing && this.input.diving;
 
@@ -1975,7 +2005,7 @@ export class Game {
     // Attract framing in the menu only: the demo bird leads into the open
     // margin beside the card. Every other state keeps gameplay framing.
     const attract = this.state === "menu" && !this.versus;
-    this.camera.update(rawDt, this.bird, playing, this.terrain.heightAt(this.bird.x), attract, this.feverOn);
+    this.camera.update(rawDt, this.bird, playing, this.terrain.landingGround(this.bird.x, this.bird.vx), attract, this.feverOn);
     // Sink foreground props that would cross the bird's sight line (per-view
     // in split-screen so neither player loses their bird behind a tree).
     this.terrain.updateOcclusion(
@@ -1996,7 +2026,8 @@ export class Game {
     const size = this.renderer.getSize(this.tmpSize);
     this.renderer.setViewport(0, 0, size.x, size.y);
     this.renderer.setScissorTest(false);
-    if (this.useBloom) {
+    if (this.useBloom && playing) this.ensureFx();
+    if (this.useBloom && playing && this.fx) {
       this.updateGlowBase();
       this.fx.render(rawDt);
     } else {
@@ -2008,11 +2039,11 @@ export class Game {
   private applyWorldLook(x: number, altitude: number): void {
     const biome = this.terrain.biomeAt(x + 60);
     this.audio.setBiome(biome.musicMode);
-    const dayT = Math.max(0, Math.min(1, this.daylight / this.daylightMax()));
+    const dayT = this.state === "menu" ? 0.86 : Math.max(0, Math.min(1, this.daylight / this.daylightMax()));
     const altT = clamp((altitude - ALT_CLOUDS) / (ALT_STRATO - ALT_CLOUDS), 0, 1);
     const isAurora = biome.id === "aurora";
     const auroraVal = isAurora ? 0.9 : altT > 0.4 ? (altT - 0.4) * 1.3 : 0;
-    this.sky.setBiomeTint(biome.skyTop, biome.skyHorizon, biome.skyMix);
+    this.sky.setBiomeTint(biome.skyTop, biome.skyHorizon, this.state === "menu" ? biome.skyMix * 0.3 : biome.skyMix);
     this.sky.setBiomeAtmosphere(biome.cloudTint, biome.cloudDensity, biome.glow);
     this.sky.setFlightAltitude(altitude);
     this.sky.setAltitude(altT);
@@ -2096,7 +2127,7 @@ export class Game {
 
   /* ------------------------------------------------------------- run flow */
 
-  private startRun(opts?: { duel?: boolean; challenge?: "" | "daily" | `gauntlet${number}`; event?: boolean; storm?: boolean }): void {
+  private startRun(opts?: RunOptions): void {
     this.exitVersus();
     this.mode = modeById(this.modeId);
     // Snapshot the record to beat BEFORE this run writes anything, so the
@@ -2156,8 +2187,15 @@ export class Game {
     // identical for anyone flying this race. Real players take over slots as
     // they join; unfilled slots keep flying as local squadron pilots.
     if (this.modeId === "massrace") {
-      const fieldSize = this.duelActive ? 1 : this.roomSize;
+      const livePeers = !this.duelActive && !this.localRace && this.net?.connected ? this.net.roster() : null;
+      const fieldSize = this.duelActive ? 1 : livePeers ? Math.max(1, livePeers.length) : this.roomSize;
       this.massRace.spawn(fieldSize, `${this.seed}:${this.modeId}:${fieldSize}`, this.terrain, this.startX);
+      // Reserve actual human seats immediately; do not simulate 40 phantom
+      // opponents in a two-person room while waiting for the first packet.
+      if (livePeers) livePeers.forEach((peer, i) => {
+        const rival = this.massRace.rivals[i];
+        if (rival) { rival.id = peer.id; rival.name = peer.name; rival.kind = "remote"; rival.hue = peer.hue; }
+      });
       if (this.duelActive) {
         // Duel: one seeded opponent whose skill tracks your rating band.
         const opp = duelOpponent(`${this.seed}:${this.today}`, this.save.state.rival.rating);
@@ -2170,7 +2208,7 @@ export class Game {
       }
       // Time-shifted multiplayer: seat doppelgängers of real players from the
       // global board over local slots (name + skill from their best run).
-      if (!this.duelActive) {
+      if (!this.duelActive && !livePeers) {
         const page = this.board.peek("global", "distance");
         const rows = (page?.entries ?? [])
           .filter((en) => !en.you && en.name)
@@ -2199,7 +2237,8 @@ export class Game {
     if (this.mode.finish > 0) this.finishGate.place(this.startX + this.mode.finish, this.terrain);
     else this.finishGate.hide();
 
-    const armed = this.save.consumeArmedBoosts();
+    // Race boosts are retained for a later solo flight, never spent invisibly.
+    const armed = this.fairRace ? [] : this.save.consumeArmedBoosts();
     for (const id of armed) this.applyBoost(id);
     if (this.eventRun) {
       const ev = weeklyEvent();
@@ -2337,7 +2376,6 @@ export class Game {
     );
     this.save.noteRecords(this.maxAltitude, this.launch.best);
     this.flow.noteRun(stats.distance, this.perfects, this.launch.goods + this.launch.greats + this.launch.perfects, this.save);
-    this.terrain.setDifficulty(this.flow.difficulty());
 
     // Publish this flight to the ghost network (daily seed only, best-per-
     // pilot kept server-side; silent no-op without a backend).
@@ -2610,7 +2648,12 @@ export class Game {
   }
 
   private resetRun(idle: boolean): void {
-    this.masteryPerk = masteryPerks(this.save, this.modeId);
+    this.attractPilot.reset();
+    this.flightCues.reset();
+    this.masteryPerk = this.fairRace ? NO_MASTERY_PERKS : masteryPerks(this.save, this.modeId);
+    // Shared/daily/ranked seeds must not depend on an individual save's skill.
+    // Apply adaptive calibration only to an unshared casual flight, before sampling spawn.
+    this.terrain.setDifficulty(this.modeId !== "massrace" && this.seed.startsWith("fly-") ? this.flow.difficulty() : 1);
     this.startX = 64;
     const y = this.terrain.heightAt(this.startX) + BIRD_RADIUS;
     this.bird.reset(this.startX, y);
@@ -2642,6 +2685,7 @@ export class Game {
     this.runRings = 0;
     this.ringChain = 0;
     this.ringChainTimer = 0;
+    this.dustCooldown = 0;
     this.runBalloons = 0;
     this.runSunflowers = 0;
     this.pendingXp = 0;
@@ -2649,7 +2693,6 @@ export class Game {
     this.trailFxAcc = 0;
     this.powerFxAcc = 0;
     this.trail.clear();
-    this.atmosphereFxAcc = 0;
     this.magnetTimer = 0;
     this.shield = 0;
     this.boostTimer = 0;
@@ -2694,7 +2737,6 @@ export class Game {
     this.recordBanner = "";
     this.goalPop = "";
     this.goalPopT = 0;
-    this.terrain.setDifficulty(this.flow.difficulty());
     this.maxAltitude = 0;
     this.maxSpeed = 0;
     this.launchBannerT = 0;
@@ -2702,6 +2744,7 @@ export class Game {
     this.lastLaunch = null;
     this.altZone = 0;
     this.countdown = 0;
+    this.networkStartAt = 0;
     this.versusGrace = 5;
     this.collect.reset();
     this.weather.reset();
@@ -2723,6 +2766,7 @@ export class Game {
         this.setScreen("modes");
         break;
       case "pick-mode":
+        if (id === "massrace") { this.setScreen("live"); break; }
         this.modeId = (id || "daytrip") as ModeId;
         this.mode = modeById(this.modeId);
         this.exitVersus();
@@ -2735,19 +2779,7 @@ export class Game {
         if (this.state !== "ad" && this.state !== "continue") this.startRun();
         break;
       case "retry":
-        if (this.state !== "ad" && this.state !== "continue") {
-          if (this.portalEnabled()) void this.restartWithPortalBreak();
-          // Retrying keeps the flavour of the run you just flew: duels rematch,
-          // an unfinished challenge gets another attempt, plain runs stay plain.
-          else if (this.duelActive) this.startRun({ duel: true });
-          else if (this.challengeRun === "daily" && !this.save.isDailyDone(this.today)) this.startRun({ challenge: "daily" });
-          else if (this.challengeRun.startsWith("gauntlet")) {
-            const idx = Number(this.challengeRun.slice(8)) || 0;
-            if (!this.save.gauntletDone(weekKey()).includes(idx)) this.startRun({ challenge: this.challengeRun });
-            else this.startRun();
-          } else if (this.eventRun) this.startRun({ event: true });
-          else this.startRun();
-        }
+        if (this.state === "gameover") this.replayRun(true);
         break;
       case "pause":
         if (this.state === "playing") this.setState("paused");
@@ -2756,13 +2788,22 @@ export class Game {
         if (this.state === "paused") this.setState("playing");
         break;
       case "restart-flight":
-        if (this.state === "paused" || this.state === "playing") {
-          this.startRun();
-        }
+        if (this.state === "paused" || this.state === "playing") this.replayRun(false);
         break;
       case "menu":
         this.exitVersus();
         this.goToMenu();
+        break;
+      case "open-practice":
+        this.setScreen("practice");
+        break;
+      case "practice-ranked":
+      case "practice-storm":
+        this.roomCode = "";
+        this.launchMatch({ ranked: true, storm: action === "practice-storm" }, true);
+        break;
+      case "open-progress":
+        this.setScreen("progress");
         break;
       case "open-shop":
         this.setScreen("shop");
@@ -2850,29 +2891,34 @@ export class Game {
         this.sendEmote(id || "👋");
         break;
       case "host-room": {
+        if (!isMultiplayerConfigured()) { this.hud.toast("Private rooms are unavailable in this edition. Try a practice race.", "info"); break; }
+        this.disconnectRace();
+        this.localRace = false;
         this.roomCode = makeRoomCode();
         this.modeId = "massrace";
         this.mode = modeById("massrace");
         this.rankedRace = false;
         this.setScreen("live");
         this.preseatLobby();
-        this.copyRoomInvite(this.roomCode);
-        this.hud.toast(`Room ${this.roomCode} created — invite your flock, then ready up`, "gold");
+        this.hud.toast("Connecting your room… Copy the invite once connected.", "info");
         break;
       }
       case "join-room": {
+        if (!isMultiplayerConfigured()) { this.hud.toast("Private rooms are unavailable in this edition. Try a practice race.", "info"); break; }
         const code = normalizeRoomCode(this.hud.readValue("roomCode"));
         if (!code) {
           this.hud.toast("Enter a 5-letter room code", "warn");
           break;
         }
+        this.disconnectRace();
+        this.localRace = false;
         this.roomCode = code;
         this.modeId = "massrace";
         this.mode = modeById("massrace");
         this.rankedRace = false;
         this.setScreen("live");
         this.preseatLobby();
-        this.hud.toast(`Joined room ${code} — ready up when everyone is here`, "gold");
+        this.hud.toast(`Connecting to room ${code}…`, "info");
         break;
       }
       case "copy-invite": {
@@ -3002,6 +3048,22 @@ export class Game {
         this.squadNotice = "";
         void this.squad?.refresh();
         break;
+      case "squad-page": {
+        const [kind, page] = id.split(":");
+        this.squad?.setPage(kind, Number(page));
+        break;
+      }
+      case "squad-copy-code": {
+        const code = this.squad?.state.myCode;
+        if (code) void copyText(code).then(ok => {
+          if (this.disposed) return;
+          if (ok) this.hud.toast("Friend code copied", "info"); else this.hud.offerCopy(code);
+        });
+        break;
+      }
+      case "squad-new-profile":
+        void this.squad?.startNewProfile(this.hud.readChecked("squadRecoveryConsent"));
+        break;
       case "squad-refresh":
         this.squadNotice = "";
         void this.squad?.refresh();
@@ -3041,7 +3103,10 @@ export class Game {
         break;
       case "squad-chat": {
         const text = this.hud.readValue("chatText");
-        void this.squad?.sendChat(text).then(() => this.bump());
+        void this.squad?.sendChat(text).then(sent => {
+          if (sent && this.hud.readValue("chatText") === text) this.hud.clearValue("chatText");
+          this.bump();
+        });
         break;
       }
       case "room-size": {
@@ -3078,10 +3143,16 @@ export class Game {
         this.bump();
         break;
       case "room-close":
+        this.cancelMatchmaking();
+        this.disconnectRace();
         this.massRace.clear();
         this.roomCode = "";
-        this.hud.toast("Room closed", "warn");
+        this.hud.toast("You left the room", "info");
         this.bump();
+        break;
+      case "practice-race":
+        this.roomCode = "";
+        this.launchMatch({ ranked: false, storm: false }, true);
         break;
       case "pvp-casual":
         this.beginMatchmaking({ ranked: false, storm: false });
@@ -3103,14 +3174,10 @@ export class Game {
         break;
       case "open-live":
         this.setScreen("live");
-        // Seat into the public room immediately so the lobby shows real
-        // pilots before you commit — PvP should feel alive from the lobby.
-        this.preseatLobby();
+        // Browsing must not seat an unready spectator into public matchmaking.
         break;
       case "back":
-        this.checkoutOk = false;
-        this.checkoutWaiting = false;
-        this.setScreen(this.screen === "checkout" ? "paywall" : "main");
+        this.backScreen();
         break;
       case "buy-nest": {
         const price = this.save.nestUpgradePrice();
@@ -3157,7 +3224,7 @@ export class Game {
         this.payDemo();
         break;
       case "checkout-cancel":
-        if (!this.checkoutBusy) this.setScreen("paywall");
+        if (!this.checkoutBusy) this.backScreen();
         break;
       case "stripe-open":
         this.openStripeTab();
@@ -3172,15 +3239,13 @@ export class Game {
         this.redeem();
         break;
       case "copy-referral":
-        void navigator.clipboard?.writeText(this.save.state.referralCode);
-        this.hud.toast("Code copied", "info");
+        void this.copyWithFeedback(this.save.state.referralCode, "Code copied");
         break;
       case "redeem-referral":
         this.redeemReferral();
         break;
       case "copy-cloud":
-        void navigator.clipboard?.writeText(this.save.exportCode());
-        this.hud.toast("Save code copied", "info");
+        void this.copyWithFeedback(this.save.exportCode(), "Save code copied");
         break;
       case "import-cloud":
         this.importCloud();
@@ -3202,7 +3267,10 @@ export class Game {
       case "rematch":
         // Same stakes, zero menu round-trips — back through the honest
         // search so live pilots can seat into the new field.
-        if (this.state === "gameover" && this.lastMatchOpts) this.beginMatchmaking(this.lastMatchOpts);
+        if (this.state === "gameover") {
+          if (this.lastMatchOpts && !this.duelActive && !this.roomCode) this.beginMatchmaking(this.lastMatchOpts);
+          else this.replayRun(true);
+        }
         break;
       case "share":
         void this.shareRun();
@@ -3271,7 +3339,7 @@ export class Game {
         break;
       case "set-music-vol": {
         const cur = this.save.state.settings.musicVolume;
-        const next = cur >= 1 ? 0 : Math.round((cur + 0.25) * 100) / 100;
+        const next = id !== "" && Number.isFinite(Number(id)) ? Math.max(0, Math.min(1, Number(id) / 100)) : cur >= 1 ? 0 : Math.min(1, Math.round((cur + 0.25) * 100) / 100);
         this.save.state.settings.musicVolume = next;
         this.save.persist();
         this.applySettings();
@@ -3279,7 +3347,7 @@ export class Game {
       }
       case "set-sfx-vol": {
         const cur = this.save.state.settings.sfxVolume;
-        const next = cur >= 1 ? 0 : Math.round((cur + 0.25) * 100) / 100;
+        const next = id !== "" && Number.isFinite(Number(id)) ? Math.max(0, Math.min(1, Number(id) / 100)) : cur >= 1 ? 0 : Math.min(1, Math.round((cur + 0.25) * 100) / 100);
         this.save.state.settings.sfxVolume = next;
         this.save.persist();
         this.applySettings();
@@ -3288,7 +3356,7 @@ export class Game {
       }
       case "set-track": {
         const cur = this.save.state.settings.musicTrack;
-        const next = cur === "shuffle" ? 0 : cur >= TRACK_NAMES.length - 1 ? "shuffle" : cur + 1;
+        const next = id === "shuffle" ? "shuffle" : id !== "" && Number.isInteger(Number(id)) && Number(id) >= 0 && Number(id) < TRACK_NAMES.length ? Number(id) : cur === "shuffle" ? 0 : cur >= TRACK_NAMES.length - 1 ? "shuffle" : cur + 1;
         this.save.state.settings.musicTrack = next;
         this.save.persist();
         this.applySettings();
@@ -3318,7 +3386,7 @@ export class Game {
       case "set-quality": {
         const order = ["auto", "high", "low"] as const;
         const cur = this.save.state.settings.quality;
-        this.save.state.settings.quality = order[(order.indexOf(cur) + 1) % order.length]!;
+        this.save.state.settings.quality = id === "auto" || id === "high" || id === "low" ? id : order[(order.indexOf(cur) + 1) % order.length]!;
         this.save.persist();
         this.applySettings();
         break;
@@ -3353,16 +3421,17 @@ export class Game {
 
   private handleHotkeys(): void {
     if (this.input.consumePause()) {
+      if (this.hud.dismissCopy()) return;
+      if (this.mmOpts) { this.cancelMatchmaking(); return; }
       if (this.state === "playing") this.setState("paused");
       else if (this.state === "paused") this.setState("playing");
-      else if (this.screen !== "main" && !this.checkoutBusy) this.setScreen("main");
+      else if (this.screen !== "main" && !this.checkoutBusy) this.backScreen();
     }
     if (this.input.consumeRestart()) {
       if (this.state === "gameover") {
-        if (this.portalEnabled()) void this.restartWithPortalBreak();
-        else this.startRun();
+        this.replayRun(true);
       } else if (this.state === "playing" || this.state === "paused") {
-        this.startRun();
+        this.replayRun(false);
       }
     }
   }
@@ -3378,6 +3447,8 @@ export class Game {
       // A graceful retreat still deserves a punchline.
       this.hud.toast(quip(SURRENDER_QUIPS, Math.round(this.bird.x)), "cloud");
     }
+    this.disconnectRace();
+    this.roomCode = "";
     this.duelActive = false;
     this.duelResult = "";
     this.challengeRun = "";
@@ -3675,8 +3746,19 @@ export class Game {
 
   private importCloud(): void {
     const code = this.hud.readValue("cloudImport");
-    if (!code.trim()) return;
+    if (!code.trim()) {
+      this.cloudMessage = "Paste a save code first.";
+      this.bump();
+      return;
+    }
+    if (!this.hud.readChecked("confirmImport")) {
+      this.cloudMessage = "Confirm that you want to replace this device’s progress before importing.";
+      this.bump();
+      return;
+    }
+    this.hud.clearValue("confirmImport");
     if (this.save.importCode(code)) {
+      this.hud.clearValue("cloudImport");
       this.applySkin();
       this.applySettings();
       this.cloudMessage = "Save imported! Welcome back.";
@@ -3693,6 +3775,7 @@ export class Game {
     this.shareBusy = true;
     this.bump();
     try {
+      const { buildShareCard, shareOrDownload } = await import("./Social");
       // Fuse the two viral halves: the image card carries its own beat-me
       // link, so one share (not card + separate link) is the whole loop.
       // Gated behind challengeShare like throw-challenge — rollout-safe.
@@ -3707,11 +3790,14 @@ export class Game {
         skin: this.skin,
         referralCode: this.save.state.referralCode,
         seedLabel: this.seedLabel(),
+        flightPath: this.flightPath,
         challengeUrl,
       });
       const result = await shareOrDownload(card, undefined, !this.portalEnabled());
       this.telemetry.track("share_run", { result });
-      this.hud.toast(result === "shared" ? "Shared!" : "Image saved", "info");
+      if (this.disposed) return;
+      if (result === "unavailable") this.hud.offerCopy(card.text);
+      else if (result !== "cancelled") this.hud.toast(result === "shared" ? "Shared!" : result === "copied" ? "Flight link copied" : "Image download requested", "info");
     } catch {
       this.hud.toast("Couldn't build the share card", "warn");
     } finally {
@@ -3826,20 +3912,24 @@ export class Game {
     return skinById(this.save.state.activeSkin);
   }
 
-  /** Cosmetic loadout is always rendered; ranked flight perks are neutral. */
+  private get fairRace(): boolean {
+    return equalizedRace(this.modeId, this.rankedRace, this.localRace, this.duelActive);
+  }
+
+  /** Keep the chosen artwork, but not paid flight advantages in a live race. */
   private get gameplaySkin(): SkinDef {
-    return this.rankedRace && this.modeId === "massrace" ? skinById("sunbird") : this.skin;
+    return this.fairRace ? skinById("sunbird") : this.skin;
   }
 
   /** Speed boost for modes with `escalate: true`. Grows with island index and
    *  time so Endless mode feels genuinely harder as you go deeper. */
   private escalateMult(): number {
     if (!this.mode.escalate) return 1;
-    return 1 + Math.min(1.2, this.island * 0.04 + this.elapsed / 900);
+    return endlessSpeedScale(this.island, this.runTime);
   }
 
   private daylightMax(): number {
-    return (this.save.state.gold ? DAYLIGHT_MAX_GOLD : DAYLIGHT_MAX) + this.gameplaySkin.daylightBonus + this.masteryPerk.daylightBonus;
+    return (this.save.state.gold && !this.fairRace ? DAYLIGHT_MAX_GOLD : DAYLIGHT_MAX) + this.gameplaySkin.daylightBonus + this.masteryPerk.daylightBonus;
   }
 
   private applySkin(): void {
@@ -3856,8 +3946,9 @@ export class Game {
     this.camera.setReduceMotion(s.reduceMotion);
     // Bloom is the expensive effect — desktop high/auto only, and never under
     // reduced-motion (a steady glow reads as flicker to some players).
-    this.useBloom = !s.reduceMotion && !this.isMobile && s.quality !== "low";
-    if (!this.useBloom) this.fx.setBase(0);
+    this.useBloom = !s.reduceMotion && !this.isMobile && s.quality === "high";
+    this.bloomBudget = { enabled: false, goodWindows: 0, cooldown: 0 };
+    if (!this.useBloom) this.fx?.setBase(0);
     // Accessibility classes live on <html> so every overlay inherits them.
     document.documentElement.classList.toggle("a11y-color", s.colorAssist);
     document.documentElement.classList.toggle("a11y-bigtext", s.bigText);
@@ -3915,6 +4006,8 @@ export class Game {
     // Resolution is two-way: step down when the budget is blown, and back up
     // when headroom returns, with a lock-out so it cannot oscillate. The old
     // loop only ever stepped down, so one bad moment degraded the whole session.
+    this.bloomBudget = nextBloomBudget(this.bloomBudget, this.frameEma, !this.isMobile && !this.save.state.settings.reduceMotion && !this.versus);
+    this.useBloom = this.bloomBudget.enabled;
     const previousDpr = this.dpr;
     this.dpr = nextDpr(this.dpr, this.preferredDpr(), this.frameEma, this.dprCooldown);
     if (this.dpr !== previousDpr) {
@@ -3935,7 +4028,7 @@ export class Game {
         this.particleBudget = Math.max(0.3, this.particleBudget - 0.2);
         this.particles.setBudget(this.particleBudget);
       }
-    } else if (this.frameEma < 1 / 58 && this.renderer.shadowMap.enabled === false) {
+    } else if (this.frameEma < 1 / 58 && !this.isMobile && this.renderer.shadowMap.enabled === false) {
       // Headroom is back — restore soft shadows (they were only shed under load).
       this.renderer.shadowMap.enabled = true;
       this.particleBudget = Math.min(1, this.particleBudget + 0.2);
@@ -3947,6 +4040,21 @@ export class Game {
     this.camera.bump(amount);
   }
 
+  /** A single in-flight import; low-power devices never allocate bloom targets. */
+  private ensureFx(): void {
+    if (this.fx || this.fxLoading || this.fxFailed || this.disposed) return;
+    this.fxLoading = true;
+    void import("./Fx").then(({ Fx: Effects }) => {
+      if (this.disposed || !this.useBloom) return;
+      const fx = new Effects(this.renderer, this.scene, this.camera.camera);
+      const size = this.renderer.getSize(this.tmpSize);
+      fx.resize(size.x, size.y, this.dpr);
+      this.fx = fx;
+    }).catch(() => {
+      this.fxFailed = true; // Plain rendering stays playable if the optional chunk fails.
+    }).finally(() => { this.fxLoading = false; });
+  }
+
   /** Ambient bloom from game state, refreshed once per rendered frame. */
   private updateGlowBase(): void {
     if (!this.useBloom) return;
@@ -3954,13 +4062,13 @@ export class Game {
     const fever = this.feverOn ? 0.5 : 0;
     const wings = this.powers.has("goldenwings") ? 0.45 : 0;
     const boost = this.boostTimer > 0 ? 0.25 : 0;
-    this.fx.setBase(0.1 + Math.max(golden, fever, wings, boost));
+    this.fx?.setBase(0.1 + Math.max(golden, fever, wings, boost));
   }
 
   /** Transient bloom spike on a trigger moment. */
   private glow(amount: number): void {
     if (!this.useBloom) return;
-    this.fx.pulse(amount);
+    this.fx?.pulse(amount);
   }
 
   private flash(kind: "perfect" | "fever" | "island" | "sleep"): void {
@@ -4015,22 +4123,17 @@ export class Game {
 
   /* ------------------------------------------------------- matchmaking */
 
-  /**
-   * Honest search phase (the pattern every live racer uses):
-   *  1. connect to the public room and WAIT — up to MM_WINDOW seconds;
-   *  2. if enough real pilots are seated, launch immediately;
-   *  3. on timeout, launch anyway — remaining slots backfill with
-   *     leaderboard ghosts + squadron pilots, clearly labeled.
-   * Cancelable at any moment; canceling never kicks you from the room.
-   */
+  /** Opt into a public room, ready when connected, and launch only on the
+   * server's shared start. A timed-out search explicitly disconnects before
+   * starting local AI practice. Browsing or cancelling cannot block a room. */
   private static readonly MM_WINDOW = 8;
-  private static readonly MM_LAUNCH_AT = 4; // enough humans → go now
 
   private beginMatchmaking(opts: { ranked: boolean; storm: boolean }): void {
+    this.disconnectRace();
     this.roomCode = "";
+    this.localRace = false;
     if (!isMultiplayerConfigured()) {
-      // No server configured: skip the theater, launch with bots honestly.
-      this.launchMatch(opts);
+      this.launchMatch(opts, true);
       return;
     }
     this.mmOpts = opts;
@@ -4043,6 +4146,8 @@ export class Game {
   private cancelMatchmaking(): void {
     this.mmDeadline = 0;
     this.mmOpts = null;
+    this.net?.sendReady(false);
+    this.disconnectRace();
     this.hud.setMatchmaking(false, 0, this.roomSize, 0);
     this.bump();
   }
@@ -4058,20 +4163,23 @@ export class Game {
     const secsLeft = (this.mmDeadline - performance.now()) / 1000;
     const live = this.liveCount();
     this.hud.setMatchmaking(true, live, this.roomSize, Math.max(0, secsLeft));
-    const enough = live + 1 >= Math.min(Game.MM_LAUNCH_AT, this.roomSize + 1);
-    if (enough || secsLeft <= 0) {
+    // Public entrants opt in by pressing Find race. The server, not each
+    // player's eight-second timer, decides when both pilots may launch.
+    if (this.net?.state === "lobby" && !this.net.info().ready) this.net.sendReady(true);
+    if (secsLeft <= 0) {
       const opts = this.mmOpts;
       this.mmOpts = null;
       this.mmDeadline = 0;
       this.hud.setMatchmaking(false, live, this.roomSize, 0);
-      if (live > 0) this.hud.toast(`${live} live pilot${live === 1 ? "" : "s"} in the field`, "gold");
-      else this.hud.toast("No live pilots right now — flying player ghosts", "info");
-      this.launchMatch(opts);
+      this.hud.toast("No shared start received — starting an AI practice race", "info");
+      this.launchMatch(opts, true);
     }
   }
 
-  private launchMatch(opts: { ranked: boolean; storm: boolean }): void {
+  private launchMatch(opts: { ranked: boolean; storm: boolean }, local = false): void {
     this.lastMatchOpts = opts;
+    this.localRace = local;
+    if (local) this.disconnectRace();
     this.modeId = "massrace";
     this.mode = modeById("massrace");
     this.rankedRace = opts.ranked;
@@ -4091,12 +4199,13 @@ export class Game {
       this.massRace.attachTransport(this.net);
     }
     this.net.setIdentity(this.racedName(), this.skin.id, 0.06);
-    this.net.connect(this.roomCode, `${this.seed}:massrace`);
+    this.net.connect(this.roomCode, this.roomCode ? this.seed : `${this.today}${this.mmOpts?.storm ? ":storm" : ""}`);
   }
 
   /** Opens (or reuses) a realtime seat for the current race seed. */
   private connectRace(): void {
-    if (!isMultiplayerConfigured()) return;
+    if (!isMultiplayerConfigured() || this.localRace) return;
+    if (this.net?.connected) { this.massRace.attachTransport(this.net); return; }
     if (!this.net) {
       this.net = new RealtimeClient(this.save.state.deviceId, this.pilotName, this.skin.id, 0.06);
       this.massRace.attachTransport(this.net);
@@ -4148,17 +4257,31 @@ export class Game {
         case "finish":
           this.hud.toast(`🏁 ${e.name} finished P${e.place}`, "gold");
           break;
-        case "start":
-          this.hud.toast("🚦 Live race — GO!", "gold");
-          // A race may only leave the party lobby after the authoritative
-          // room server broadcasts its start. This closes the old gap where
-          // the UI said a room had started but the player stayed on the menu.
-          if (this.state === "menu" && this.screen === "live") {
-            this.modeId = "massrace";
-            this.mode = modeById("massrace");
-            this.rankedRace = false;
-            this.startRun();
+        case "interrupted":
+          this.serverPlaceApplied = false;
+          if (this.state === "playing" || this.state === "paused") {
+            this.massRace.clear();
+            this.networkStartAt = 0;
+            this.setState("menu");
+            this.setScreen("live");
           }
+          this.hud.toast(e.message, "warn");
+          this.bump();
+          break;
+        case "start": {
+          if (this.mmOpts || (this.state === "menu" && this.screen === "live" && this.roomCode)) {
+            const opts = this.mmOpts ?? { ranked: false, storm: false };
+            this.mmOpts = null;
+            this.mmDeadline = 0;
+            this.hud.setMatchmaking(false, this.liveCount(), this.roomSize, 0);
+            // Adopt the host/server terrain BEFORE resetting the player/grid.
+            if (net.seed && net.seed !== this.seed) this.rebuildWorld(net.seed);
+            this.launchMatch(opts);
+            this.networkStartAt = net.startsAt;
+            this.countdown = Math.max(0, (net.startsAt - Date.now()) / 1000);
+            this.hud.toast("Room ready — starting together", "gold");
+          }
+        }
           break;
       }
     }
@@ -4254,10 +4377,27 @@ export class Game {
   }
 
   /** A portal-controlled commercial break at the natural death/restart seam. */
-  private async restartWithPortalBreak(): Promise<void> {
+  private replayRun(allowPortalBreak: boolean): void {
+    if (this.versus) { this.startVersus(); return; }
+    if (this.modeId === "massrace" && this.roomCode && !this.localRace) {
+      this.disconnectRace();
+      this.roomCode = "";
+      this.setState("menu");
+      this.setScreen("live");
+      this.hud.toast("Race complete — create or join a new room for the next race", "info");
+      return;
+    }
+    const options = replayOptions({ duel: this.duelActive, challenge: this.challengeRun,
+      dailyDone: this.save.isDailyDone(this.today), gauntletDone: this.save.gauntletDone(weekKey()),
+      event: this.eventRun, storm: this.stormfront });
+    if (allowPortalBreak && this.portalEnabled()) void this.restartWithPortalBreak(options);
+    else this.startRun(options);
+  }
+
+  private async restartWithPortalBreak(options: RunOptions = {}): Promise<void> {
     const platform = this.platform;
     if (!platform || platform.name === "none") {
-      this.startRun();
+      this.startRun(options);
       return;
     }
     this.setState("ad");
@@ -4265,7 +4405,7 @@ export class Game {
     await platform.commercialBreak();
     if (this.disposed) return;
     this.endPortalAd();
-    this.startRun();
+    this.startRun(options);
   }
 
   /** Rewarded continue never succeeds unless the platform explicitly grants it. */
@@ -4325,7 +4465,17 @@ export class Game {
     return out;
   }
 
+  private backScreen(): void {
+    if (this.checkoutBusy) return;
+    this.checkoutOk = false;
+    this.checkoutWaiting = false;
+    if (this.screen === "live") { this.disconnectRace(); this.roomCode = ""; }
+    this.setScreen(this.screenHistory.back());
+  }
+
   private setScreen(s: UiScreen): void {
+    this.screenHistory.visit(s);
+    if (this.screen === "live" && s !== "live" && this.state === "menu") this.net?.sendReady(false);
     if (s !== this.screen) this.audio.uiTick();
     this.screen = s;
     this.menuHold = 0;
@@ -4352,21 +4502,21 @@ export class Game {
     this.shareText(text, `Invite link copied — send it to friends`);
   }
 
-  /** Native share sheet when available (mobile), clipboard + toast otherwise. */
+  private async copyWithFeedback(text: string, copiedToast: string): Promise<void> {
+    const copied = await copyText(text);
+    if (this.disposed) return;
+    if (copied) this.hud.toast(copiedToast, "info");
+    else this.hud.offerCopy(text);
+  }
+
+  /** Cancellation is deliberate. Never copy or download behind a dismissed sheet. */
   private shareText(text: string, copiedToast: string): void {
-    const nav = navigator as Navigator & { share?: (d: ShareData) => Promise<void> };
-    if (nav.share && flag("nativeShare")) {
-      void nav
-        .share({ title: "Sunbird", text })
-        .then(() => this.hud.toast("Shared!", "gold"))
-        .catch(() => {
-          void navigator.clipboard?.writeText(text).catch(() => undefined);
-          this.hud.toast(copiedToast, "gold");
-        });
-      return;
-    }
-    void navigator.clipboard?.writeText(text).catch(() => undefined);
-    this.hud.toast(copiedToast, "gold");
+    void shareText(text, flag("nativeShare")).then(result => {
+      if (this.disposed) return;
+      if (result === "shared") this.hud.toast("Shared!", "gold");
+      else if (result === "copied") this.hud.toast(copiedToast, "gold");
+      else if (result === "unavailable") this.hud.offerCopy(text);
+    });
   }
 
   private lastRunDistance(): number {
@@ -4579,6 +4729,11 @@ export class Game {
   }
 
   private pushHud(): void {
+    const now = performance.now();
+    // Values refresh at 30 Hz; screen/action changes still commit immediately.
+    if (this.lastHudVersion === this.uiVersion && now - this.lastHudAt < 1000 / 30) return;
+    this.lastHudAt = now;
+    this.lastHudVersion = this.uiVersion;
     if (this.viewsVersion !== this.uiVersion) this.refreshViews();
     const st = this.save.state;
     const stats = this.runStats();
@@ -4707,6 +4862,7 @@ export class Game {
       modeIcon: this.mode.icon,
       countdown: this.countdown,
       versus: this.versus,
+      splitLayout: this.input.splitMode,
       versusWinner: this.versusWinner,
       p1Stats: this.p1 && this.versus ? this.p1.stats : null,
       p2Stats: this.p2 && this.versus ? this.p2.stats : null,
@@ -4741,13 +4897,13 @@ export class Game {
       raceField: this.raceField,
       raceFinishTime: this.raceFinishTime,
       massRace: this.modeId === "massrace",
-      multiplayerLive: isMultiplayerConfigured(),
+      multiplayerLive: isMultiplayerConfigured() && !(this.state === "playing" && this.localRace),
       roster:
         this.massRace.active && this.state === "playing"
           ? this.massRace.roster(this.bird.x, this.startX, this.mode.finish, this.pilotName)
           : [],
-      roomCode: this.net?.info().code ?? this.roomCode,
-      roomCount: this.net?.info().count ?? this.massRace.fieldSize + 1,
+      roomCode: this.roomCode,
+      roomCount: this.net?.info().count ?? 0,
       roomCapacity: this.net?.info().capacity ?? MASS_RACE_FIELD,
       roomReady: this.net?.info().ready ?? false,
       roomReadyCount: (this.net?.roster().filter((p) => p.ready).length ?? 0) + (this.net?.info().ready ? 1 : 0),
@@ -4766,8 +4922,8 @@ export class Game {
       lobbyRivals: (() => {
         // Real pilots seated in the room always outrank seeded flavor text.
         const live = (this.net?.roster() ?? [])
-          .slice(0, 3)
-          .map((p) => ({ name: p.name, tag: "in room · live" }));
+          .slice(0, 39)
+          .map((p) => ({ name: p.name, tag: "in room · live", ready: p.ready, skin: p.skin }));
         if (live.length) return live;
         // Next best: time-shifted doubles of real leaderboard players.
         const page = this.board.peek("global", "distance");
@@ -4810,6 +4966,8 @@ export class Game {
   /* ------------------------------------------------------- versus (2P) */
 
   private startVersus(): void {
+    this.disconnectRace();
+    this.roomCode = "";
     this.versus = true;
     this.modeId = "race";
     this.mode = modeById("race");
@@ -4827,8 +4985,8 @@ export class Game {
     this.p1.camera.setBaseFov(58);
     this.p2.camera.setBaseFov(58);
 
-    this.countdown = 3.99;
-    this.input.splitMode = "vertical";
+    this.countdown = 3;
+    this.resize(); // Resolve touch halves immediately, not after a later resize event.
     this.setState("playing");
     this.setScreen("main");
     void this.audio.resume();
@@ -4922,11 +5080,18 @@ export class Game {
   private resize(): void {
     const w = this.host.clientWidth || window.innerWidth;
     const h = this.host.clientHeight || window.innerHeight;
-    this.renderer.setPixelRatio(this.dpr);
-    this.renderer.setSize(w, h, false);
-    this.camera.resize(w / Math.max(1, h));
-    this.camera.setBaseFov(50);
-    this.fx.resize(w, h, this.dpr);
+    // A ResizeObserver and window resize can report the same size. Avoid
+    // resetting canvas storage / bloom targets twice (or on unchanged DPR).
+    if (w !== this.renderWidth || h !== this.renderHeight || this.dpr !== this.renderDpr) {
+      if (this.dpr !== this.renderDpr) this.renderer.setPixelRatio(this.dpr);
+      this.renderer.setSize(w, h, false);
+      this.camera.resize(w / Math.max(1, h));
+      this.camera.setBaseFov(50);
+      this.fx?.resize(w, h, this.dpr);
+      this.renderWidth = w;
+      this.renderHeight = h;
+      this.renderDpr = this.dpr;
+    }
     if (this.p1 && this.p2) {
       const vertical = w / Math.max(1, h) >= 1.25;
       this.input.splitMode = this.versus ? (vertical ? "vertical" : "horizontal") : "off";

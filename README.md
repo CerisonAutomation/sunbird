@@ -26,13 +26,14 @@ Sunbird is a complete HTML5 arcade game: 8 flight modes, 40-pilot races, daily/w
 | Multiplayer | Self-hosted Rust room server ([rust/](./rust/)) — lobby, seats, synchronized starts, server-authoritative finish order and a movement envelope that rejects impossible client positions |
 | Leaderboard | Vercel Functions ([api/](./api/)) + Upstash Redis, on-device fallback ([LEADERBOARD_API.md](./LEADERBOARD_API.md)) |
 | Ghosts | Async PvP via ghost publish/chase ([src/game/GhostNet.ts](./src/game/GhostNet.ts)) |
-| PWA | Service worker (build-stamped cache) + manifest (web builds only) |
+| Caching | Content-hashed Vite assets + immutable HTTP caching; legacy service worker safely retired |
 
 ## Quick start
 
 ```bash
-npm ci
-npm run dev            # game on :5173
+corepack enable
+pnpm install --frozen-lockfile
+pnpm dev            # game on :5173
 cargo run --release -p sunbird-server   # optional: multiplayer rooms on :8080
 ```
 
@@ -66,6 +67,7 @@ Copy `.env.example` → `.env.local`. All variables are optional — the game ru
 | `npm test` | Run the full Vitest suite |
 | `npm run verify` | typecheck + test + build |
 | `npm run lint` | ESLint over src, scripts (`--max-warnings 0`) |
+| `npm run test:e2e` | Production-browser smoke tests using desktop/phone Page Objects (`pnpm exec playwright install chromium` once) |
 | `npm run test:mp` | Two-client multiplayer smoke test — needs `npm run dev` **and** the room server running |
 | `npm run botsim` | Headless load test: N real WebSocket pilots on the wire protocol |
 | `npm run botsim:40` | 40-pilot load + anti-cheat + resume run (the CI gate) |
@@ -73,6 +75,8 @@ Copy `.env.example` → `.env.local`. All variables are optional — the game ru
 | `npm run gen-icons` | Regenerate PWA icons |
 
 ## Testing
+
+For the flight/performance changes and measurement limits, see [Flight & performance audit](docs/FLIGHT_PERFORMANCE_AUDIT.md).
 
 - **Unit** — `npm test`: pure-function coverage across PvP rating, challenges, mastery, economy, ghost codecs, protocol parsing, and bit-exact `Bird.step()` determinism on seeded terrain.
 - **Stability** — the suite is loop-safe: 100 consecutive runs green with zero flakes (each run is independent; no shared state, no wall-clock dependence — season/week tests are timezone-independent).
@@ -112,6 +116,7 @@ public/         PWA manifest, service worker, icons, self-hosted fonts
 - [SOCIAL_API.md](./SOCIAL_API.md) — social layer API
 - [DEPLOY.md](./DEPLOY.md) — hosting, env, Stripe webhook setup
 - [RUST_MIGRATION_PLAN.md](./RUST_MIGRATION_PLAN.md) — phased backend plan + rollback
+- [Menu UX audit](./docs/MENU_UX_AUDIT.md) — prioritized findings, fixes, browser coverage and remaining validation boundaries.
 - [docs/archive/](./docs/archive/) — superseded prompts + dated audit snapshots (history, not guidance)
 
 ## Deployment
@@ -128,3 +133,20 @@ public/         PWA manifest, service worker, icons, self-hosted fonts
 ## License
 
 [MIT](./LICENSE)
+
+### Current UX and multiplayer consolidation
+
+The home dropdown has been replaced with visible play/navigation choices.
+**Same-screen 1v1** is on Home (P1: A/Space, P2: L/Enter; touch your own half).
+**Play online** opens Create/Join room; practice settings are on a separate page.
+
+`pnpm test:e2e:multiplayer` runs two real browser clients against isolated room
+and Squad services. First install the social service dependency with
+`npm ci --prefix server/social --ignore-scripts`. For local Squad preview, run
+`node server/social/social-server.mjs` on port 8788 alongside Vite. The dev proxy
+uses `/social`; deployed builds need `VITE_SOCIAL_URL` and a reachable service.
+
+See [the consolidation audit](docs/CONSOLIDATION_AUDIT.md) for findings, tests,
+canonical modules and **mandatory Squad credential migration/deployment limits**.
+The reference Node race server is for preview/protocol testing, not a replacement
+for the production Rust service.

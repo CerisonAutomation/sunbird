@@ -69,6 +69,7 @@ export default function App() {
     if (!el) return;
     let game: Game | null = null;
     let cancelled = false;
+    let readyFrame = 0;
 
     // The game is code-split on purpose: the renderer, terrain, audio engine and
     // the whole Three.js graph now load AFTER first paint instead of blocking it.
@@ -78,6 +79,11 @@ export default function App() {
         const { Game: GameCtor } = await import("./game/Game");
         if (cancelled) return;
         game = new GameCtor(el);
+        readyFrame = requestAnimationFrame(() => {
+          if (cancelled) return;
+          document.getElementById("boot-shell")?.remove();
+          window.dispatchEvent(new Event("sunbird-ready"));
+        });
       } catch (err) {
         console.error("Sunbird failed to boot:", err);
         if (cancelled) return;
@@ -85,7 +91,11 @@ export default function App() {
         // cascading re-render; a microtask keeps the boot-failure path clean.
         const msg = err instanceof Error ? err.message : String(err);
         queueMicrotask(() => {
-          if (!cancelled) setFailed(msg);
+          if (!cancelled) {
+            document.getElementById("boot-shell")?.remove();
+            window.dispatchEvent(new Event("sunbird-ready"));
+            setFailed(msg);
+          }
         });
       }
     };
@@ -96,11 +106,13 @@ export default function App() {
       // still in flight: the stale run constructs nothing, and anything it did
       // construct before cleanup is disposed here.
       cancelled = true;
+      cancelAnimationFrame(readyFrame);
       game?.dispose();
     };
   }, []);
 
   if (failed) {
+    const chunkFailed = /fetch|import|module|chunk|network|load failed/i.test(failed);
     return (
       <div
         style={{
@@ -117,10 +129,11 @@ export default function App() {
       >
         <div>
           <div style={{ fontSize: 42, marginBottom: 8 }}>🌤</div>
-          <h1 style={{ margin: "0 0 8px", fontSize: 22 }}>Sunbird can't spread its wings here</h1>
+          <h1 style={{ margin: "0 0 8px", fontSize: 22 }}>{chunkFailed ? "The flight download was interrupted" : "Sunbird can’t spread its wings here"}</h1>
           <p style={{ opacity: 0.7, fontSize: 14, maxWidth: 420, margin: "0 auto 16px" }}>
-            This browser couldn't start the 3D renderer (WebGL). Try a recent version of Chrome, Edge,
-            Firefox or Safari — or check that hardware acceleration is enabled.
+            {chunkFailed
+              ? "Check your connection, then try again. A new game version may have arrived while this page was open."
+              : "The game could not start. Try reloading, or check that your browser supports WebGL and hardware acceleration is enabled."}
           </p>
           <button
             onClick={() => window.location.reload()}

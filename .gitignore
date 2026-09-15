@@ -55,3 +55,12 @@ dist-itch/
 # botsim CI reports (uploaded as artifacts, never committed)
 botsim-*.json
 *.png  # screenshot artifacts — do not version
+
+# Browser test artifacts
+test-results/
+playwright-report/
+
+dist-multiplayer/
+
+.cache/
+sunbird-social-data/

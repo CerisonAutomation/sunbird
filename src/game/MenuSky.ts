@@ -29,7 +29,7 @@ type Flocker = {
   depth: number;
 };
 
-const FLOCK_SIZE = 18;
+const FLOCK_SIZE = 7;
 
 export class MenuSky {
   readonly host: HTMLDivElement;

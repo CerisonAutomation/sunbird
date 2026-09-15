@@ -1,6 +1,8 @@
+import "./boot";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
+import "./game/menu-polish.css";
 import App from "./App";
 
 createRoot(document.getElementById("root")!).render(

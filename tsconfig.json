@@ -27,5 +27,5 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "api", "vite.config.ts"]
+  "include": ["src", "api", "e2e", "e2e-multiplayer", "playwright.multiplayer.config.ts", "vite.config.ts", "playwright.config.ts"]
 }

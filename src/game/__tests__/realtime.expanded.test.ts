@@ -175,10 +175,11 @@ describe("RealtimeClient — connection lifecycle (12 tests)", () => {
     const client = await loadClient();
     openSocket();
     for (let i = 0; i < 20; i++) {
-      openSocket(i);
+      const wait = peek(client).backoff as number;
       instances[i]!.readyState = 3;
       instances[i]!.onclose!(null as never);
-      vi.advanceTimersByTime(20000);
+      // Reach the retry, not the next attempt's independent connect timeout.
+      vi.advanceTimersByTime(wait);
     }
     expect(peek(client).backoff).toBeLessThanOrEqual(15000);
   });
@@ -700,14 +701,15 @@ describe("RealtimeClient — start event (6 tests)", () => {
     expect(client.state).toBe("lobby");
   });
 
-  it("start in racing state stays racing", async () => {
+  it("a duplicate start cannot rewrite an active race seed", async () => {
     const client = await loadClient();
     openSocket();
     receive(0, JSON.stringify({ type: "start", at: Date.now() + 2000, seed: "s" }));
     expect(client.state).toBe("racing");
     receive(0, JSON.stringify({ type: "start", at: Date.now() + 3000, seed: "s2" }));
     expect(client.state).toBe("racing");
-    expect(client.seed).toBe("s2");
+    expect(client.seed).toBe("s");
+    expect(client.drainEvents().filter(e => e.type === "start")).toHaveLength(1);
   });
 });
 
@@ -911,6 +913,7 @@ describe("RealtimeClient — tick & staleness (5 tests)", () => {
       peers: [{ id: "p2", name: "Alice", hue: 0.3, skin: "s" }],
     }));
     expect(client.roster()).toHaveLength(1);
+    receive(0, JSON.stringify({ type: "start", at: Date.now(), seed: "seed" }));
     client.tick(7);
     expect(client.roster()).toHaveLength(0);
   });
@@ -944,6 +947,7 @@ describe("RealtimeClient — tick & staleness (5 tests)", () => {
       type: "peers",
       peers: [{ id: "p2", name: "Alice", hue: 0.3, skin: "s" }],
     }));
+    receive(0, JSON.stringify({ type: "start", at: Date.now(), seed: "seed" }));
     client.tick(6.01);
     expect(client.roster()).toHaveLength(0);
   });
@@ -1308,5 +1312,92 @@ describe("RealtimeClient — edge cases (4 tests)", () => {
     expect(peek(client).name).toBe("NewName");
     expect(peek(client).skin).toBe("glider");
     expect(peek(client).hue).toBe(0.8);
+  });
+});
+
+
+describe("live room journey regressions", () => {
+  it("keeps the public socket after the server assigns a room code", async () => {
+    const client = await createClient();
+    client.connect("", "today"); openSocket();
+    receive(0, JSON.stringify({ type: "welcome", id: "you", room: "ABCDE", seed: "today", capacity: 40 }));
+    client.connect("", "today");
+    expect(instances).toHaveLength(1);
+    expect(client.roomCode).toBe("ABCDE");
+  });
+  it("keeps a private socket after adopting the host's different terrain seed", async () => {
+    const client = await createClient();
+    client.connect("ABCDE", "guest-terrain"); openSocket();
+    receive(0, JSON.stringify({ type: "welcome", id: "you", room: "ABCDE", seed: "host-terrain", capacity: 40 }));
+    client.connect("ABCDE", "guest-terrain");
+    expect(instances).toHaveLength(1);
+    expect(client.seed).toBe("host-terrain");
+  });
+  it("does not invent departures for motionless lobby pilots", async () => {
+    const client = await loadClient(); openSocket();
+    receive(0, JSON.stringify({ type: "peers", peers: [{ id: "friend", name: "Friend" }] }));
+    client.tick(65);
+    expect(client.roster()).toHaveLength(1);
+    receive(0, JSON.stringify({ type: "left", id: "friend" }));
+    expect(client.roster()).toHaveLength(0);
+  });
+  it("refreshes lobby liveness without movement or changing ready state", async () => {
+    const client = await loadClient(); openSocket();
+    client.sendReady(true); client.tick(15);
+    expect(JSON.parse(instances[0]!.sent.at(-1)!)).toEqual({ type: "ready", ready: true });
+  });
+  it("disconnect clears delayed start events, readiness, and visible room identity", async () => {
+    const client = await loadClient(); openSocket(); client.sendReady(true);
+    receive(0, JSON.stringify({ type: "start", at: Date.now() + 6000, seed: "seed" }));
+    client.disconnect();
+    expect(client.drainEvents()).toEqual([]);
+    expect(client.info()).toMatchObject({ code: "", ready: false, startsInMs: 0 });
+  });
+});
+
+
+it("an invalid deployment socket URL becomes visible error state, not an uncaught exception", async () => {
+  vi.stubEnv("VITE_MULTIPLAYER_URL", "https://[");
+  vi.stubGlobal("WebSocket", FakeWebSocket);
+  const { RealtimeClient } = await import("../Realtime");
+  const client = new RealtimeClient("test", "Pilot", "sunbird", 0);
+  expect(() => client.connect("ABCDE", "seed")).not.toThrow();
+  expect(client.info()).toMatchObject({ state: "error", error: "Could not reach the race server" });
+});
+
+
+describe("race interruption boundaries", () => {
+  it("ends a stuck connection attempt and ignores its late open callback", async () => {
+    const client = await loadClient();
+    vi.advanceTimersByTime(10000);
+    expect(client.state).toBe("error");
+    expect(client.errorText).toContain("timed out");
+    openSocket();
+    expect(client.state).toBe("error");
+    client.disconnect();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+  it("does not silently rejoin another race after a mid-race disconnect", async () => {
+    const client = await loadClient(); openSocket();
+    receive(0, JSON.stringify({ type: "start", at: Date.now() + 3000, seed: "s" }));
+    instances[0]!.onclose!();
+    expect(client.state).toBe("error");
+    expect(client.myPlace).toBe(0);
+    expect(client.drainEvents()).toEqual([{ type: "interrupted", message: client.errorText }]);
+    vi.advanceTimersByTime(60000);
+    expect(instances).toHaveLength(1);
+    client.connect("ROOM", "s");
+    expect(instances).toHaveLength(2);
+    expect(client.state).toBe("connecting");
+    client.disconnect();
+  });
+  it("does not retry a server-rejected room forever", async () => {
+    const client = await loadClient(); openSocket();
+    receive(0, JSON.stringify({ type: "error", message: "Room full" }));
+    instances[0]!.onclose!();
+    vi.advanceTimersByTime(60000);
+    expect(instances).toHaveLength(1);
+    expect(client.errorText).toBe("Room full");
+    expect(client.state).toBe("error");
   });
 });

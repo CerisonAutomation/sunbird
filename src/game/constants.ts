@@ -64,6 +64,8 @@ export const ALT_HIGH = 135;
 export const ALT_STRATO = 230;
 
 export const ISLAND_PERIOD = 1100;
+export const DROP_START = 710;
+export const DROP_BLEND_START = 630;
 export const RAMP_START = 845;
 export const GAP_START = 928;
 export const OCEAN_FLOOR = -18;

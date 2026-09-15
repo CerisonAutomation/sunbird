@@ -1,3 +1,4 @@
+import { uploadDensePrefix } from "./bufferUpdates";
 import * as THREE from "three";
 import { ALT_CLOUDS, ALT_HIGH, ALT_SKY, MAGNET_RADIUS, MAGNET_RADIUS_NORMAL, RAMP_START } from "./constants";
 import { hash01, SeededRandom } from "./math";
@@ -43,6 +44,7 @@ export const PICKUP_STYLE: Record<PickupKind, { color: number; emissive: number;
   cloudboost: { color: 0xc8e8ff, emissive: 0x2a5a8a, icon: "☁", label: "Cloud Boost" },
 };
 
+const SPAWN_CELL = 26;
 const MAX_COINS = 512;
 const MAX_GEMS = 96;
 const MAX_RINGS = 72;
@@ -104,15 +106,15 @@ export class Collectibles {
     // still independent in the lightweight Coin records below.
     this.coinMesh = new THREE.InstancedMesh(this.coinGeo, this.coinMat, MAX_COINS);
     this.gemMesh = new THREE.InstancedMesh(this.gemGeo, this.gemMat, MAX_GEMS);
-    this.coinMesh.count = MAX_COINS;
-    this.gemMesh.count = MAX_GEMS;
+    this.coinMesh.count = 0;
+    this.gemMesh.count = 0;
     this.coinMesh.frustumCulled = false;
     this.gemMesh.frustumCulled = false;
     this.group.add(this.coinMesh, this.gemMesh);
-    for (let i = 0; i < MAX_COINS; i++) this.hideCoinSlot(this.coinMesh, i);
-    for (let i = 0; i < MAX_GEMS; i++) this.hideCoinSlot(this.gemMesh, i);
-    this.coinMesh.instanceMatrix.needsUpdate = true;
-    this.gemMesh.instanceMatrix.needsUpdate = true;
+    this.coinMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.gemMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    uploadDensePrefix(this.coinMesh.instanceMatrix, this.coinMesh.count);
+    uploadDensePrefix(this.gemMesh.instanceMatrix, this.gemMesh.count);
     this.pickupGeo = new THREE.IcosahedronGeometry(0.85, 0);
     for (const k of Object.keys(PICKUP_STYLE) as PickupKind[]) {
       const s = PICKUP_STYLE[k];
@@ -127,11 +129,11 @@ export class Collectibles {
     this.ringGeo.rotateY(Math.PI / 2);
     this.ringMat = new THREE.MeshLambertMaterial({ color: 0xffcf3e, emissive: 0x7a4200 });
     this.ringMesh = new THREE.InstancedMesh(this.ringGeo, this.ringMat, MAX_RINGS);
-    this.ringMesh.count = MAX_RINGS;
+    this.ringMesh.count = 0;
     this.ringMesh.frustumCulled = false;
     this.group.add(this.ringMesh);
-    for (let i = 0; i < MAX_RINGS; i++) this.hideRingSlot(i);
-    this.ringMesh.instanceMatrix.needsUpdate = true;
+    this.ringMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    uploadDensePrefix(this.ringMesh.instanceMatrix, this.ringMesh.count);
 
     this.knotMat = new THREE.MeshLambertMaterial({ color: 0x7a4a20 });
     for (const c of BALLOON_COLORS) {
@@ -147,12 +149,12 @@ export class Collectibles {
 
   reset(): void {
     this.spawnedUntil = -1;
+    this.coinMesh.count = this.gemMesh.count = this.ringMesh.count = 0;
     for (const c of this.activeCoins) {
       c.taken = true;
-      this.hideCoin(c);
     }
-    this.coinMesh.instanceMatrix.needsUpdate = true;
-    this.gemMesh.instanceMatrix.needsUpdate = true;
+    uploadDensePrefix(this.coinMesh.instanceMatrix, this.coinMesh.count);
+    uploadDensePrefix(this.gemMesh.instanceMatrix, this.gemMesh.count);
     for (const c of this.activeClouds) {
       c.taken = true;
       c.sprite.visible = false;
@@ -163,13 +165,12 @@ export class Collectibles {
     }
     for (const r of this.activeRings) {
       r.taken = true;
-      this.hideRing(r);
     }
     for (const b of this.activeBalloons) {
       b.taken = true;
       b.root.visible = false;
     }
-    this.ringMesh.instanceMatrix.needsUpdate = true;
+    uploadDensePrefix(this.ringMesh.instanceMatrix, this.ringMesh.count);
     this.activeCoins.length = 0;
     this.activeClouds.length = 0;
     this.activePickups.length = 0;
@@ -178,18 +179,20 @@ export class Collectibles {
   }
 
   update(dt: number, bird: Bird, terrain: TerrainSystem, magnetOn: boolean, time: number, magnetScale: number, ev: CollectEvents): void {
-    const ahead = bird.x + 420;
+    // Spawn complete cells exactly once. The old fractional boundary rounded
+    // DOWN inside spawnRange, re-creating the last cell on every physics tick.
+    const ahead = Math.ceil((bird.x + 420) / SPAWN_CELL) * SPAWN_CELL;
     if (ahead > this.spawnedUntil) {
       this.spawnRange(Math.max(this.spawnedUntil, bird.x - 20), ahead, terrain);
       this.spawnedUntil = ahead;
     }
 
+    this.coinMesh.count = this.gemMesh.count = 0;
     const magnet = magnetOn ? MAGNET_RADIUS * magnetScale : MAGNET_RADIUS_NORMAL;
     for (let i = this.activeCoins.length - 1; i >= 0; i--) {
       const c = this.activeCoins[i]!;
       if (c.taken || c.x < bird.x - 30) {
         c.taken = true;
-        this.hideCoin(c);
         this.activeCoins.splice(i, 1);
         continue;
       }
@@ -203,15 +206,15 @@ export class Collectibles {
       }
       if (d < (c.gem ? 2.4 : 1.7)) {
         c.taken = true;
-        this.hideCoin(c);
         this.activeCoins.splice(i, 1);
         ev.onCoin(c.x, c.y, c.gem);
         continue;
       }
-      this.writeCoin(c, time);
+      const mesh = c.gem ? this.gemMesh : this.coinMesh;
+      this.writeCoin(c, time, mesh.count++);
     }
-    this.coinMesh.instanceMatrix.needsUpdate = true;
-    this.gemMesh.instanceMatrix.needsUpdate = true;
+    uploadDensePrefix(this.coinMesh.instanceMatrix, this.coinMesh.count);
+    uploadDensePrefix(this.gemMesh.instanceMatrix, this.gemMesh.count);
 
     for (let i = this.activeClouds.length - 1; i >= 0; i--) {
       const c = this.activeClouds[i]!;
@@ -257,24 +260,22 @@ export class Collectibles {
       }
     }
 
+    this.ringMesh.count = 0;
     for (let i = this.activeRings.length - 1; i >= 0; i--) {
       const r = this.activeRings[i]!;
       if (r.taken || r.x < bird.x - 40) {
         r.taken = true;
-        this.hideRing(r);
         this.activeRings.splice(i, 1);
         continue;
       }
-      this.writeRing(r, time);
       // Threading the gate: crossing the ring's plane while inside its radius.
       if (Math.abs(bird.x - r.x) < 2.2 && Math.abs(bird.y - r.y) < r.r - 0.4) {
         r.taken = true;
-        this.hideRing(r);
         this.activeRings.splice(i, 1);
         ev.onRing(r.x, r.y);
-      }
+      } else this.writeRing(r, time, this.ringMesh.count++);
     }
-    this.ringMesh.instanceMatrix.needsUpdate = true;
+    uploadDensePrefix(this.ringMesh.instanceMatrix, this.ringMesh.count);
 
     for (let i = this.activeBalloons.length - 1; i >= 0; i--) {
       const b = this.activeBalloons[i]!;
@@ -299,6 +300,9 @@ export class Collectibles {
   }
 
   dispose(): void {
+    this.coinMesh.dispose();
+    this.gemMesh.dispose();
+    this.ringMesh.dispose();
     this.coinGeo.dispose();
     this.gemGeo.dispose();
     this.coinMat.dispose();
@@ -329,8 +333,8 @@ export class Collectibles {
    *   • rare gems parked in the cloud layers as a reward for flying high
    */
   private spawnRange(x0: number, x1: number, terrain: TerrainSystem): void {
-    const step = 26;
-    const start = Math.floor(x0 / step) * step;
+    const step = SPAWN_CELL;
+    const start = Math.ceil(x0 / step) * step;
     for (let x = start; x < x1; x += step) {
       if (x < 40 || terrain.isOcean(x)) continue;
       const cell = Math.floor(x / step);
@@ -449,6 +453,7 @@ export class Collectibles {
 
   private placeCoin(x: number, y: number, gem: boolean): void {
     const coin = this.allocCoin(gem);
+    if (coin.slot < 0) return;
     coin.x = x;
     coin.y = y;
     coin.gem = gem;
@@ -501,31 +506,19 @@ export class Collectibles {
     return coin;
   }
 
-  private writeCoin(c: Coin, time: number): void {
+  private writeCoin(c: Coin, time: number, slot = c.slot): void {
     if (c.slot < 0) return;
     const mesh = c.gem ? this.gemMesh : this.coinMesh;
     coinDummy.position.set(c.x, c.y + Math.sin(time * 5 + c.x * 0.35) * 0.22, 0);
     coinDummy.rotation.set(c.gem ? time * 0.8 : 0, c.gem ? time * 1.6 : time * 3.2, c.gem ? time * 0.45 : Math.PI / 2);
     coinDummy.scale.setScalar(1);
     coinDummy.updateMatrix();
-    mesh.setMatrixAt(c.slot, coinDummy.matrix);
-  }
-
-  private hideCoin(c: Coin): void {
-    if (c.slot < 0) return;
-    this.hideCoinSlot(c.gem ? this.gemMesh : this.coinMesh, c.slot);
-  }
-
-  private hideCoinSlot(mesh: THREE.InstancedMesh, slot: number): void {
-    coinDummy.position.set(0, -9999, 0);
-    coinDummy.rotation.set(0, 0, 0);
-    coinDummy.scale.setScalar(0.001);
-    coinDummy.updateMatrix();
     mesh.setMatrixAt(slot, coinDummy.matrix);
   }
 
   private placeRing(x: number, y: number, r: number): void {
     const ring = this.allocRing();
+    if (ring.slot < 0) return;
     ring.x = x;
     ring.y = y;
     ring.r = r;
@@ -548,25 +541,12 @@ export class Collectibles {
     return ring;
   }
 
-  private writeRing(r: Ring, time: number): void {
+  private writeRing(r: Ring, time: number, slot = r.slot): void {
     if (r.slot < 0) return;
     const pulse = 1 + Math.sin(time * 3 + r.x * 0.2) * 0.06;
     coinDummy.position.set(r.x, r.y, 0);
     coinDummy.rotation.set(0, 0, 0);
     coinDummy.scale.setScalar(pulse);
-    coinDummy.updateMatrix();
-    this.ringMesh.setMatrixAt(r.slot, coinDummy.matrix);
-  }
-
-  private hideRing(r: Ring): void {
-    if (r.slot < 0) return;
-    this.hideRingSlot(r.slot);
-  }
-
-  private hideRingSlot(slot: number): void {
-    coinDummy.position.set(0, -9999, 0);
-    coinDummy.rotation.set(0, 0, 0);
-    coinDummy.scale.setScalar(0.001);
     coinDummy.updateMatrix();
     this.ringMesh.setMatrixAt(slot, coinDummy.matrix);
   }

@@ -1,4 +1,4 @@
-import { GAP_START } from "./constants";
+import { GAP_START, ISLAND_PERIOD } from "./constants";
 import type { BiomeMusicStyle } from "./Music";
 
 export type DecoKind = "tree" | "palm" | "pine" | "spire" | "crystal" | "cactus";
@@ -377,15 +377,15 @@ export function tierForIsland(island: number): number {
 }
 
 /**
- * Ocean gap widens forever — every island asks for a little more air. Growth
- * is deliberately gentle so it stays fair for many islands while still
- * escalating without end (the "harder and harder" curve).
+ * Ocean gaps widen gradually, but always leave a landing shelf before the
+ * island wraps. Later difficulty comes from the biomes, not impossible gaps.
  */
 export function gapEndFor(island: number): number {
-  return GAP_START + 148 + island * 7;
+  // Reserve a real landing shelf: a local-x gap must never wrap past the island.
+  return Math.min(ISLAND_PERIOD - 24, GAP_START + 132 + Math.max(0, island) * 4);
 }
 
-/** Launch ramp peak grows to match the ever-wider gap it has to clear. */
+/** Ramp height grows with the crossing, capped to preserve a rideable slope. */
 export function rampPeakFor(island: number): number {
-  return 28 + island * 2;
+  return 28 + Math.min(20, Math.max(0, island) * 2);
 }

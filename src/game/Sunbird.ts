@@ -278,6 +278,8 @@ export type SunbirdSvgOptions = {
   width?: number;
   title?: string;
   className?: string;
+  /** CSS wingbeat for the lightweight boot loader only. */
+  animateWings?: boolean;
 };
 
 function cmdToSvg(cmd: Cmd): string {
@@ -313,7 +315,10 @@ export function sunbirdSVG(opts: SunbirdSvgOptions = {}): string {
         a !== 0 && part.pivot
           ? ` transform="rotate(${round(a * DEG)} ${part.pivot[0]} ${part.pivot[1]})"`
           : "";
-      body = `<path d="${d}" fill="${fill}"${transform}/>`;
+      const wing = opts.animateWings && part.pivot
+        ? ` class="boot-wing" style="transform-origin:${part.pivot[0]}px ${part.pivot[1]}px"`
+        : "";
+      body = `<path d="${d}" fill="${fill}"${transform}${wing}/>`;
     }
     return body;
   }).join("");

@@ -1,3 +1,13 @@
+> **2026-09-15 security update:** the shipped PGlite service now requires
+> `Authorization: Bearer <64 lowercase hex characters>` on every non-health
+> request. This browser-local capability is separate from public race IDs.
+> GET requests include `device`; chat also verifies club membership. Friend
+> saving is now one-way. Existing unauthenticated profiles require trusted
+> administrator migration, not automatic claiming by device ID. Frontend and
+> backend must be deployed together. See
+> [deployment and migration limits](docs/CONSOLIDATION_AUDIT.md).
+> The older examples below must be used with these authentication requirements.
+
 # Sunbird social server (friends · clubs · chat)
 
 A tiny REST service backed by **PGlite** (embedded Postgres, zero external
