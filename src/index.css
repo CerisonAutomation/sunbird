@@ -399,7 +399,7 @@ textarea {
      sheet light and let the world show; legibility is carried by the text
      halo below rather than by opacity. */
   background:
-    linear-gradient(180deg, rgba(255, 247, 233, 0.42) 0%, rgba(255, 244, 228, 0.34) 34%, rgba(255, 244, 228, 0.46) 100%);
+    linear-gradient(180deg, rgba(255, 247, 233, 0.70) 0%, rgba(255, 244, 228, 0.62) 34%, rgba(255, 244, 228, 0.74) 100%);
   -webkit-backdrop-filter: blur(4px) saturate(1.06);
   backdrop-filter: blur(4px) saturate(1.06);
   border: 1px solid rgba(255, 255, 255, 0.5);
@@ -424,6 +424,26 @@ textarea {
   text-shadow:
     0 1px 0 rgba(255, 250, 240, 0.92),
     0 0 10px rgba(255, 248, 236, 0.72);
+}
+
+/* The menu is a launch surface, not scenery: keep its hierarchy readable
+   over both the attract flight's bright sky and dark valley silhouettes. */
+.paper-card.menu-hero .hero-sub,
+.paper-card.menu-hero .mode-desc,
+.paper-card.menu-hero .quick-action span {
+  color: #5f443d;
+}
+.paper-card.menu-hero .mode-card-main {
+  min-height: 148px;
+}
+.paper-card.menu-hero .mode-card-main.primary {
+  box-shadow: 0 12px 24px rgba(180, 91, 31, 0.22), inset 0 1px rgba(255,255,255,.65);
+}
+.paper-card.menu-hero .mode-card-main:focus-visible,
+.paper-card.menu-hero .quick-action:focus-visible,
+.paper-card.menu-hero .daily-strip:focus-visible {
+  outline: 3px solid #1e5f73;
+  outline-offset: 3px;
 }
 
 /* Without backdrop-filter (older Firefox/Safari) the live world would sit
@@ -505,6 +525,8 @@ textarea {
 
 /* Mobile touch target contract: keep the compact two-up actions easy to hit. */
 @media (max-width: 640px) {
+  .paper-card.menu-hero { padding: 22px 14px 16px; }
+  .paper-card.menu-hero .mode-card-main { min-height: 132px; }
   .quick-action { min-height: 48px; }
   .menu-quick-actions { gap: 10px; }
 }
