@@ -132,6 +132,12 @@ export type SaveState = {
   events: { week: string; clearsThisWeek: number; month: string; clearsThisMonth: number; claimedTrailMonth: string };
   /** Local-first social graph (friends, clubs, DMs, challenges, replays). */
   social: SocialState;
+  /** Piggy Bank accumulator storage. */
+  piggyBank: { coins: number; maxCoins: number };
+  /** Prestige / Rebirth tier (+25% coin earning multiplier per level). */
+  prestige: { level: number; multiplier: number };
+  /** Wheel of Fortune / Daily Lucky Spin state. */
+  wheel: { lastFreeSpin: string; spinsToday: number };
 };
 
 export type DuelState = {
@@ -230,6 +236,9 @@ function defaults(): SaveState {
     campaignClaimed: [],
     events: { week: "", clearsThisWeek: 0, month: "", clearsThisMonth: 0, claimedTrailMonth: "" },
     social: emptySocialState(),
+    piggyBank: { coins: 0, maxCoins: 1000 },
+    prestige: { level: 0, multiplier: 1.0 },
+    wheel: { lastFreeSpin: "", spinsToday: 0 },
   };
 }
 
@@ -300,6 +309,8 @@ export class SaveData {
   /** Invoked (throttled) when a persist fails — lets the game observe data-
    *  loss risk instead of swallowing it silently. */
   onPersistError: (() => void) | null = null;
+  /** Optional platform SDK adapter for cloud save syncing (e.g. CrazyGames data.setItem). */
+  platformAdapter: { saveData?: (key: string, data: string) => Promise<void> } | null = null;
   private lastPersistErrorAt = 0;
 
   constructor() {
@@ -472,6 +483,18 @@ export class SaveData {
               }
             : d.events,
         social: parseSocial(p.social),
+        piggyBank:
+          p.piggyBank && typeof p.piggyBank === "object"
+            ? { coins: num(p.piggyBank.coins), maxCoins: num(p.piggyBank.maxCoins) || 1000 }
+            : d.piggyBank,
+        prestige:
+          p.prestige && typeof p.prestige === "object"
+            ? { level: num(p.prestige.level), multiplier: num(p.prestige.multiplier) || 1.0 }
+            : d.prestige,
+        wheel:
+          p.wheel && typeof p.wheel === "object"
+            ? { lastFreeSpin: String(p.wheel.lastFreeSpin ?? ""), spinsToday: num(p.wheel.spinsToday) }
+            : d.wheel,
       };
     } catch {
       // Corruption recovery: never destroy a player's data. If we actually read
@@ -491,8 +514,12 @@ export class SaveData {
   }
 
   private persistNow(state: SaveState): void {
+    const raw = JSON.stringify(state);
     try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+      localStorage.setItem(SAVE_KEY, raw);
+      if (this.platformAdapter?.saveData) {
+        void this.platformAdapter.saveData(SAVE_KEY, raw);
+      }
     } catch {
       // A write that silently no-ops loses player progress with no signal. Call
       // the observer (if any) — throttled here so a full/blocked store can't
@@ -511,19 +538,70 @@ export class SaveData {
 
   recordRun(distance: number, coins: number, score: number, date: string, island = 0, biomeId = ""): void {
     const s = this.state;
-    s.totalCoins += coins;
-    s.wallet += coins;
+    // Apply prestige coin multiplier bonus
+    const prestigeBonus = Math.round(coins * ((s.prestige?.multiplier ?? 1.0) - 1));
+    const totalRunCoins = coins + prestigeBonus;
+
+    s.totalCoins += totalRunCoins;
+    s.wallet += totalRunCoins;
     s.runsPlayed += 1;
     s.tutorialRuns += 1;
     s.lifetime.distance += distance;
-    s.lifetime.coins += coins;
+    s.lifetime.coins += totalRunCoins;
+
+    // Accumulate +20% bonus coins into Piggy Bank
+    const bonusPiggy = Math.max(1, Math.round(totalRunCoins * 0.2));
+    if (!s.piggyBank) s.piggyBank = { coins: 0, maxCoins: 1000 };
+    s.piggyBank.coins = Math.min(s.piggyBank.maxCoins, s.piggyBank.coins + bonusPiggy);
+
     if (score > s.bestScore) s.bestScore = score;
     if (distance > s.bestDistance) s.bestDistance = distance;
     if (island > s.farthestIsland) s.farthestIsland = island;
     if (biomeId && !s.biomesSeen.includes(biomeId)) s.biomesSeen.push(biomeId);
-    s.highScores.push({ date, distance, coins, score, vip: s.vip, island });
+    s.highScores.push({ date, distance, coins: totalRunCoins, score, vip: s.vip, island });
     s.highScores.sort((a, b) => b.score - a.score);
     s.highScores = s.highScores.slice(0, 8);
+    this.persist();
+  }
+
+  smashPiggyBank(): number {
+    const s = this.state;
+    if (!s.piggyBank || s.piggyBank.coins <= 0) return 0;
+    const amount = s.piggyBank.coins;
+    s.piggyBank.coins = 0;
+    s.wallet += amount;
+    s.totalCoins += amount;
+    this.persist();
+    return amount;
+  }
+
+  performPrestige(): boolean {
+    const s = this.state;
+    if (s.nestBought < 5 && s.nestLevel < 5) return false;
+    s.nestBought = 0;
+    s.nestLevel = s.completedMissions.length;
+    if (!s.prestige) s.prestige = { level: 0, multiplier: 1.0 };
+    s.prestige.level += 1;
+    s.prestige.multiplier = Number((1.0 + s.prestige.level * 0.25).toFixed(2));
+    this.persist();
+    return true;
+  }
+
+  canFreeWheelSpin(today: string): boolean {
+    const s = this.state;
+    if (!s.wheel) s.wheel = { lastFreeSpin: "", spinsToday: 0 };
+    return s.wheel.lastFreeSpin !== today;
+  }
+
+  recordWheelSpin(today: string): void {
+    const s = this.state;
+    if (!s.wheel) s.wheel = { lastFreeSpin: "", spinsToday: 0 };
+    if (s.wheel.lastFreeSpin !== today) {
+      s.wheel.lastFreeSpin = today;
+      s.wheel.spinsToday = 1;
+    } else {
+      s.wheel.spinsToday += 1;
+    }
     this.persist();
   }
 

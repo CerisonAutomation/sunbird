@@ -351,6 +351,7 @@ export class GameAudio {
     this.tone(659.25, 0.2, "sine", 0.12, 659.25);
     this.tone(783.99, 0.24, "sine", 0.12, 783.99);
     this.tone(1046.5, 0.28, "triangle", 0.08, 1046.5);
+    this.music?.sidechainPump(0.3, 0.15);
   }
 
   feverOn(): void {
@@ -358,6 +359,20 @@ export class GameAudio {
     this.tone(523.25, 0.14, "square", 0.05, 659.25);
     this.tone(783.99, 0.2, "square", 0.06, 1046.5);
     this.tone(1046.5, 0.25, "triangle", 0.08, 1318.5);
+    this.music?.triggerBeatDrop(1.2);
+    this.music?.triggerViralGlissando();
+  }
+
+  triggerBeatDrop(intensityMult?: number): void {
+    this.music?.triggerBeatDrop(intensityMult);
+  }
+
+  triggerViralGlissando(): void {
+    this.music?.triggerViralGlissando();
+  }
+
+  sidechainPump(duckAmount?: number, duration?: number): void {
+    this.music?.sidechainPump(duckAmount, duration);
   }
 
   splash(): void {

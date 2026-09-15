@@ -1,4 +1,5 @@
 import { dateSeed, truncate } from "./math";
+import { generatePilotName } from "./pilotNameGenerator";
 
 /**
  * Global leaderboard.
@@ -75,14 +76,20 @@ export function isLeaderboardOnline(): boolean {
   return API.length > 0;
 }
 
-export function loadPilotName(fallbackId: string): string {
+export function loadPilotName(_fallbackId: string): string {
   try {
     const v = localStorage.getItem(NAME_KEY);
     if (v && v.trim()) return truncate(v.trim(), 14);
   } catch {
     /* private mode */
   }
-  return `Pilot ${fallbackId.slice(-4).toUpperCase()}`;
+  const auto = generatePilotName();
+  try {
+    localStorage.setItem(NAME_KEY, auto);
+  } catch {
+    /* private mode */
+  }
+  return auto;
 }
 
 export function savePilotName(name: string): string {

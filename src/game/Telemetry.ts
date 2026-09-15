@@ -1,11 +1,16 @@
+import { isPortalBuild } from "../sdk/platform";
+
 type Props = Record<string, string | number | boolean>;
 type Entry = { name: string; props: Props; t: number };
 
 const ENV = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
 
 /** Backend telemetry endpoint, derived from the multiplayer base URL.
- * Empty string = no backend configured = network telemetry is a no-op. */
+ * Empty string = no backend configured = network telemetry is a no-op.
+ * In portal builds (CrazyGames/Poki/generic), external network telemetry is
+ * strictly disabled per portal compliance rules. */
 function endpoint(): string {
+  if (isPortalBuild()) return "";
   const base = ENV.VITE_MULTIPLAYER_URL ?? "";
   if (!base) return "";
   return `${base.replace(/\/$/, "").replace(/^ws/, "http")}/telemetry`;

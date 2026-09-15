@@ -79,34 +79,108 @@ export class GhostRecorder {
   }
 }
 
-/** Renders a translucent silhouette that replays a saved ghost run. */
+/** Renders a full 3D translucent bird mesh that replays a saved ghost run. */
 export class GhostPlayer {
   readonly mesh: THREE.Group;
   private record: GhostRecord | null = null;
   private cursor = 0;
   private flapT = 0;
   private readonly body: THREE.Mesh;
-  private readonly wingL: THREE.Mesh;
-  private readonly wingR: THREE.Mesh;
+  private readonly belly: THREE.Mesh;
+  private readonly beak: THREE.Mesh;
+  private readonly tail: THREE.Mesh;
+  private readonly wingL: THREE.Group;
+  private readonly wingR: THREE.Group;
+  private readonly mat: THREE.MeshBasicMaterial;
+  private readonly wingMat: THREE.MeshBasicMaterial;
+  private readonly accentMat: THREE.MeshBasicMaterial;
   active = false;
 
   constructor() {
     this.mesh = new THREE.Group();
-    const mat = new THREE.MeshBasicMaterial({
+    this.mat = new THREE.MeshBasicMaterial({
       color: 0x9fd8ff,
       transparent: true,
-      opacity: 0.42,
+      opacity: 0.55,
       depthWrite: false,
     });
-    this.body = new THREE.Mesh(new THREE.SphereGeometry(0.62, 10, 8), mat);
+    this.wingMat = new THREE.MeshBasicMaterial({
+      color: 0xcdeeff,
+      transparent: true,
+      opacity: 0.5,
+      depthWrite: false,
+    });
+    this.accentMat = new THREE.MeshBasicMaterial({
+      color: 0xffe0a0,
+      transparent: true,
+      opacity: 0.65,
+      depthWrite: false,
+    });
+
+    // Full 3D Bird Body
+    this.body = new THREE.Mesh(new THREE.SphereGeometry(0.62, 10, 8), this.mat);
     this.body.scale.set(1.15, 0.92, 0.92);
-    const wingMat = new THREE.MeshBasicMaterial({ color: 0xcdeeff, transparent: true, opacity: 0.4, depthWrite: false });
-    this.wingL = new THREE.Mesh(new THREE.SphereGeometry(0.46, 8, 6), wingMat);
-    this.wingR = new THREE.Mesh(new THREE.SphereGeometry(0.46, 8, 6), wingMat);
-    this.wingL.scale.set(0.95, 0.16, 0.55);
-    this.wingR.scale.set(0.95, 0.16, 0.55);
+
+    this.belly = new THREE.Mesh(new THREE.SphereGeometry(0.42, 8, 6), this.wingMat);
+    this.belly.position.set(0.08, -0.18, 0);
+    this.body.add(this.belly);
+
+    // Beak
+    this.beak = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.42, 6), this.accentMat);
+    this.beak.rotation.z = -Math.PI / 2;
+    this.beak.position.set(0.78, 0.18, 0);
+    this.body.add(this.beak);
+
+    // Eyes
+    const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), this.wingMat);
+    const eyeR = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), this.wingMat);
+    eyeL.position.set(0.42, 0.38, 0.38);
+    eyeR.position.set(0.42, 0.38, -0.38);
+    this.body.add(eyeL, eyeR);
+
+    // Head crest
+    for (let i = 0; i < 3; i++) {
+      const crest = new THREE.Mesh(new THREE.ConeGeometry(0.08 - i * 0.015, 0.38 - i * 0.05, 5), this.wingMat);
+      crest.position.set(0.18 - i * 0.17, 0.6 + i * 0.03, 0);
+      crest.rotation.z = 0.55 + i * 0.35;
+      this.body.add(crest);
+    }
+
+    // Fanned tail
+    this.tail = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.62, 5), this.wingMat);
+    this.tail.rotation.z = Math.PI / 2.4;
+    this.tail.position.set(-0.7, 0.05, 0);
+    this.body.add(this.tail);
+
+    // Wings
+    this.wingL = new THREE.Group();
+    this.wingR = new THREE.Group();
+
+    const wMeshL = new THREE.Mesh(new THREE.SphereGeometry(0.46, 8, 6), this.wingMat);
+    wMeshL.scale.set(0.95, 0.16, 0.55);
+    this.wingL.add(wMeshL);
+
+    const wMeshR = new THREE.Mesh(new THREE.SphereGeometry(0.46, 8, 6), this.wingMat);
+    wMeshR.scale.set(0.95, 0.16, 0.55);
+    this.wingR.add(wMeshR);
+
+    for (let i = 0; i < 3; i++) {
+      const tipL = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.35, 4), this.wingMat);
+      tipL.rotation.x = Math.PI / 2;
+      tipL.rotation.z = -0.25 - i * 0.18;
+      tipL.position.set(-0.28 - i * 0.14, -0.02, 0.34 + i * 0.05);
+      this.wingL.add(tipL);
+
+      const tipR = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.35, 4), this.wingMat);
+      tipR.rotation.x = -Math.PI / 2;
+      tipR.rotation.z = -0.25 - i * 0.18;
+      tipR.position.set(-0.28 - i * 0.14, -0.02, -0.34 - i * 0.05);
+      this.wingR.add(tipR);
+    }
+
     this.wingL.position.set(-0.05, 0.1, 0.42);
     this.wingR.position.set(-0.05, 0.1, -0.42);
+
     this.mesh.add(this.body, this.wingL, this.wingR);
     this.mesh.scale.setScalar(1.18);
     this.mesh.visible = false;
@@ -130,10 +204,10 @@ export class GhostPlayer {
     return this.active;
   }
 
-  /** Recolor the silhouette (rival ghosts read amber, yours reads ice-blue). */
+  /** Recolor the translucent bird (rival ghosts read amber, yours reads ice-blue). */
   setTint(body: number, wings: number): void {
-    (this.body.material as THREE.MeshBasicMaterial).color.setHex(body);
-    (this.wingL.material as THREE.MeshBasicMaterial).color.setHex(wings);
+    this.mat.color.setHex(body);
+    this.wingMat.color.setHex(wings);
   }
 
   bestDistance(): number {

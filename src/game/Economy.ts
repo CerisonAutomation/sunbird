@@ -617,7 +617,8 @@ export function dailyDealBoost(dateStr: string): { id: string; price: number } {
 
 export const GOLD = {
   sku: "sunbird_gold" as const,
-  price: "$2.99",
+  price: "● 500",
+  coinPrice: 500,
   name: "Sunbird Gold",
   features: [
     "Phoenix skin — permanent coin magnet & ember trail",
@@ -636,7 +637,8 @@ export const GOLD = {
  * one; its job is to convert, not to profit. */
 export const STARTER_PACK = {
   sku: "sunbird_starter" as const,
-  price: "$0.99",
+  price: "● 250",
+  coinPrice: 250,
   name: "First Flight Pack",
   coins: 1200,
   trailId: "trail_gold",
@@ -645,9 +647,9 @@ export const STARTER_PACK = {
 
 export const VIP = {
   sku: "sunbird_vip" as const,
-  price: "$1.99/mo",
-  /** Portal-friendly unlock: no external checkout inside CrazyGames/Poki. */
-  coinPrice: 3000,
+  price: "● 1,500",
+  /** Pure coin unlock — earnable directly through gameplay. */
+  coinPrice: 1500,
   coinAdReward: 500,
   name: "Sunbird VIP",
   features: [
@@ -693,3 +695,23 @@ export type ShopTrailView = {
   equipped: boolean;
   affordable: boolean;
 };
+
+export type WheelSector = {
+  id: string;
+  label: string;
+  icon: string;
+  kind: "coins" | "boost" | "vault";
+  value: number | string;
+  color: string;
+};
+
+export const WHEEL_SECTORS: WheelSector[] = [
+  { id: "c100", label: "100 Coins", icon: "●", kind: "coins", value: 100, color: "#ff8c00" },
+  { id: "c250", label: "250 Coins", icon: "●", kind: "coins", value: 250, color: "#e0392a" },
+  { id: "magnet", label: "Coin Magnet", icon: "🧲", kind: "boost", value: "magnet", color: "#3d8bf2" },
+  { id: "c500", label: "500 Coins", icon: "●", kind: "coins", value: 500, color: "#2f855a" },
+  { id: "headstart", label: "Head Start", icon: "🚀", kind: "boost", value: "headstart", color: "#6b46c1" },
+  { id: "c1000", label: "1,000 JACKPOT!", icon: "💎", kind: "coins", value: 1000, color: "#d69e2e" },
+  { id: "vault", label: "Vault Key", icon: "🥚", kind: "vault", value: 1, color: "#d63384" },
+  { id: "c150", label: "150 Coins", icon: "●", kind: "coins", value: 150, color: "#00a3c4" },
+];

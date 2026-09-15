@@ -1,0 +1,1408 @@
+{
+  "barrel": {
+    "app.title": {
+      "sourceText": "Sunbird",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Main application title"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Sunbird",
+        "es": "Sunbird",
+        "de": "Sunbird",
+        "fr": "Sunbird",
+        "it": "Sunbird",
+        "pt-BR": "Sunbird",
+        "ar": "Sunbird",
+        "zh-CN": "太陽鳥",
+        "ja": "サンバード",
+        "mt": "Sunbird"
+      }
+    },
+    "hud.menu.play": {
+      "sourceText": "Play Race",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Main menu primary play button"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Play Race",
+        "es": "Jugar Carrera",
+        "de": "Rennen Spielen",
+        "fr": "Lancer la Course",
+        "it": "Gioca Gara",
+        "pt-BR": "Jogar Corrida",
+        "ar": "ابدأ السباق",
+        "zh-CN": "開始比賽",
+        "ja": "レーススタート",
+        "mt": "Ilgħab It-Tluq"
+      }
+    },
+    "hud.menu.pvp": {
+      "sourceText": "PvP Rivalry",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "PvP match selection button"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "PvP Rivalry",
+        "es": "Rivalidad PvP",
+        "de": "PvP-Rivalität",
+        "fr": "Rivalité JcJ",
+        "it": "Rivalità PvP",
+        "pt-BR": "Rivalidade PvP",
+        "ar": "منافسة PvP",
+        "zh-CN": "PvP 競技",
+        "ja": "PvP ライバル戦",
+        "mt": "Rivalità PvP"
+      }
+    },
+    "hud.menu.leaderboard": {
+      "sourceText": "Leaderboards & Prizes",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Leaderboards menu button"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Leaderboards & Prizes",
+        "es": "Clasificación y Premios",
+        "de": "Bestenliste & Preise",
+        "fr": "Classement et Prix",
+        "it": "Classifiche e Premi",
+        "pt-BR": "Placar e Prêmios",
+        "ar": "لوحة الصدارة والجوائز",
+        "zh-CN": "排行榜與獎勵",
+        "ja": "リーダーボードと賞品",
+        "mt": "Klassifiki u Premji"
+      }
+    },
+    "hud.menu.settings": {
+      "sourceText": "Settings",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Settings menu title"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Settings",
+        "es": "Ajustes",
+        "de": "Einstellungen",
+        "fr": "Paramètres",
+        "it": "Impostazioni",
+        "pt-BR": "Configurações",
+        "ar": "الإعدادات",
+        "zh-CN": "設置",
+        "ja": "設定",
+        "mt": "Settings"
+      }
+    },
+    "hud.menu.account": {
+      "sourceText": "Account",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Account screen title"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Account",
+        "es": "Cuenta",
+        "de": "Konto",
+        "fr": "Compte",
+        "it": "Account",
+        "pt-BR": "Conta",
+        "ar": "الحساب",
+        "zh-CN": "帳戶",
+        "ja": "アカウント",
+        "mt": "Kont"
+      }
+    },
+    "hud.pilot.name": {
+      "sourceText": "Pilot Name",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Pilot name input field label"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Pilot Name",
+        "es": "Nombre de Piloto",
+        "de": "Pilotenname",
+        "fr": "Nom du Pilote",
+        "it": "Nome Pilota",
+        "pt-BR": "Nome do Piloto",
+        "ar": "اسم الطيار",
+        "zh-CN": "飛行員名稱",
+        "ja": "パイロット名",
+        "mt": "Isem il-Pilota"
+      }
+    },
+    "hud.pilot.autogenerate": {
+      "sourceText": "Autogenerate 🎲",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Button to autogenerate a random pilot name"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Autogenerate 🎲",
+        "es": "Generar 🎲",
+        "de": "Generieren 🎲",
+        "fr": "Générer 🎲",
+        "it": "Genera 🎲",
+        "pt-BR": "Gerar 🎲",
+        "ar": "توليد تلقائي 🎲",
+        "zh-CN": "自動生成 🎲",
+        "ja": "自動生成 🎲",
+        "mt": "Ġenera Awtomatikament 🎲"
+      }
+    },
+    "pvp.division.fledgling": {
+      "sourceText": "Fledgling",
+      "meta": {
+        "file": "src/game/pvp.ts",
+        "context": "Entry PvP division rank name"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Fledgling",
+        "es": "Novato",
+        "de": "Küken",
+        "fr": "Oisillon",
+        "it": "Novizio",
+        "pt-BR": "Novato",
+        "ar": "مبتدئ",
+        "zh-CN": "雛鳥",
+        "ja": "ひよこ",
+        "mt": "Mubtddi"
+      }
+    },
+    "pvp.division.glider": {
+      "sourceText": "Glider",
+      "meta": {
+        "file": "src/game/pvp.ts",
+        "context": "Glider PvP division rank name"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Glider",
+        "es": "Planeador",
+        "de": "Gleiter",
+        "fr": "Planeur",
+        "it": "Aliante",
+        "pt-BR": "Planador",
+        "ar": "تحليق",
+        "zh-CN": "滑翔者",
+        "ja": "グライダー",
+        "mt": "Gliżatur"
+      }
+    },
+    "pvp.division.racer": {
+      "sourceText": "Sky Racer",
+      "meta": {
+        "file": "src/game/pvp.ts",
+        "context": "Sky Racer PvP division rank name"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Sky Racer",
+        "es": "Corredor del Cielo",
+        "de": "Himmelsrenner",
+        "fr": "Pilote Céleste",
+        "it": "Corridore dei Cieli",
+        "pt-BR": "Piloto do Céu",
+        "ar": "متسابق السماء",
+        "zh-CN": "天空競速者",
+        "ja": "スカイレーサー",
+        "mt": "Racer tas-Sema"
+      }
+    },
+    "pvp.division.ace": {
+      "sourceText": "Sky Ace",
+      "meta": {
+        "file": "src/game/pvp.ts",
+        "context": "Sky Ace PvP division rank name"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Sky Ace",
+        "es": "As del Cielo",
+        "de": "Himmelsass",
+        "fr": "As du Ciel",
+        "it": "Asso dei Cieli",
+        "pt-BR": "Ás do Céu",
+        "ar": "بطل السماء",
+        "zh-CN": "王牌飛行員",
+        "ja": "スカイエース",
+        "mt": "As tas-Sema"
+      }
+    },
+    "pvp.division.legend": {
+      "sourceText": "Sunbird Legend",
+      "meta": {
+        "file": "src/game/pvp.ts",
+        "context": "Top PvP division rank name"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Sunbird Legend",
+        "es": "Leyenda Sunbird",
+        "de": "Sunbird-Legende",
+        "fr": "Légende Sunbird",
+        "it": "Leggenda Sunbird",
+        "pt-BR": "Lenda Sunbird",
+        "ar": "أسطورة طائر الشمس",
+        "zh-CN": "太陽鳥傳奇",
+        "ja": "サンバードレジェンド",
+        "mt": "Legġenda Sunbird"
+      }
+    },
+    "pvp.draft.boost": {
+      "sourceText": "SLIPSTREAM DRAFT +{{boost}}% SPEED!",
+      "meta": {
+        "file": "src/game/MassRace.ts",
+        "context": "Slipstream boost notification"
+      },
+      "placeholders": [
+        "{{boost}}"
+      ],
+      "translations": {
+        "en": "SLIPSTREAM DRAFT +{{boost}}% SPEED!",
+        "es": "¡REBUJO +{{boost}}% DE VELOCIDAD!",
+        "de": "WINDSCHATTEN +{{boost}}% TEMPO!",
+        "fr": "ASPIRATION +{{boost}}% DE VITESSE!",
+        "it": "SCIA +{{boost}}% DI VELOCITÀ!",
+        "pt-BR": "VÁCUO +{{boost}}% DE VELOCIDADE!",
+        "ar": "تيار السحب +{{boost}}% سرعة!",
+        "zh-CN": "尾流加速 +{{boost}}% 速度！",
+        "ja": "スリップストリーム +{{boost}}% スピード！",
+        "mt": "DRAFFT FIS-SIA +{{boost}}% VELOĊITÀ!"
+      }
+    },
+    "pvp.overtake.notice": {
+      "sourceText": "Overtook {{name}} for #{{place}}!",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Notification when overtaking another player"
+      },
+      "placeholders": [
+        "{{name}}",
+        "{{place}}"
+      ],
+      "translations": {
+        "en": "Overtook {{name}} for #{{place}}!",
+        "es": "¡Adelantaste a {{name}} por el #{{place}}!",
+        "de": "{{name}} für Platz #{{place}} überholt!",
+        "fr": "Dépassement de {{name}} pour la #{{place}} place!",
+        "it": "Superato {{name}} per la posizione #{{place}}!",
+        "pt-BR": "Ultrapassou {{name}} pela posição #{{place}}!",
+        "ar": "تجاوزت {{name}} للمركز #{{place}}!",
+        "zh-CN": "超越了 {{name}} 升至第 {{place}} 名！",
+        "ja": "{{name}} を抜いて #{{place}} 位に！",
+        "mt": "Għaddejt lil {{name}} għal rebaħ #{{place}}!"
+      }
+    },
+    "hud.leaderboard.claim": {
+      "sourceText": "Claim Rank Prize",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Button to claim leaderboard prize"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Claim Rank Prize",
+        "es": "Reclamar Premio de Rango",
+        "de": "Rangpreis einfordern",
+        "fr": "Réclamer le Prix de Rang",
+        "it": "Riscatta Premio di Grado",
+        "pt-BR": "Resgatar Prêmio de Rank",
+        "ar": "استلام جائزة الترتيب",
+        "zh-CN": "領取排名獎勵",
+        "ja": "ランク賞品を受け取る",
+        "mt": "Ikseb il-Premju tal-Klassi"
+      }
+    },
+    "hud.prizes.title": {
+      "sourceText": "Leaderboard Tournament Prizes",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Title of the leaderboard prizes modal"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Leaderboard Tournament Prizes",
+        "es": "Premios del Torneo de Clasificación",
+        "de": "Bestenlisten-Turnierpreise",
+        "fr": "Prix du Tournoi de Classement",
+        "it": "Premi del Torneo in Classifica",
+        "pt-BR": "Prêmios do Torneio do Placar",
+        "ar": "جوائز بطولة لوحة الصدارة",
+        "zh-CN": "排行榜錦標賽獎勵",
+        "ja": "リーダーボード大会賞品",
+        "mt": "Premji tat-Tornament tal-Klassifika"
+      }
+    },
+    "onboarding.holdToDive": {
+      "sourceText": "HOLD to dive down the hill",
+      "meta": {
+        "file": "src/game/FirstFlight.ts",
+        "context": "First-flight tutorial step 1"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "HOLD to dive down the hill",
+        "es": "MANTÉN PRESIONADO para picar por la colina",
+        "de": "HALTEN um den Hügel hinabzutauchen",
+        "fr": "MAINTENEZ pour plonger la pente",
+        "it": "TIENI PREMUTO per picchiare in discesa",
+        "pt-BR": "SEGURE para mergulhar no morro",
+        "ar": "اضغط مع الاستمرار للغوص أسفل التل",
+        "zh-CN": "按住俯冲下山",
+        "ja": "長押しで丘を急降下",
+        "mt": "ŻOMM meħud biex tinżel l-għoljiet"
+      }
+    },
+    "onboarding.releaseToLaunch": {
+      "sourceText": "RELEASE at the top to launch",
+      "meta": {
+        "file": "src/game/FirstFlight.ts",
+        "context": "First-flight tutorial step 2"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "RELEASE at the top to launch",
+        "es": "SUELTA en la cima para despegar",
+        "de": "LOSLASSEN oben um zu starten",
+        "fr": "RELÂCHEZ en haut pour décoller",
+        "it": "RILASCIA in cima per decollare",
+        "pt-BR": "SOLTE no topo para decolar",
+        "ar": "اترك عند القمة للانطلاق",
+        "zh-CN": "松开冲向高空",
+        "ja": "頂上で離して大ジャンプ",
+        "mt": "ITLAQ mill-quċċata biex ttir"
+      }
+    },
+    "onboarding.soarInAir": {
+      "sourceText": "RELEASE & SOAR — stay airborne!",
+      "meta": {
+        "file": "src/game/FirstFlight.ts",
+        "context": "First-flight tutorial step 3"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "RELEASE & SOAR — stay airborne!",
+        "es": "¡SUELTA Y PLANEA — mantente en el aire!",
+        "de": "GLEITEN — bleib in der Luft!",
+        "fr": "PLANEZ — restez dans les airs!",
+        "it": "VOLA — resta in aria!",
+        "pt-BR": "VOE — fique no ar!",
+        "ar": "حلّق — ابقَ في الهواء!",
+        "zh-CN": "翱翔 — 保持飞行！",
+        "ja": "滑空 — 空中に留まろう！",
+        "mt": "ITROQ — ibqa fl-arja!"
+      }
+    },
+    "onboarding.launchSub": {
+      "sourceText": "Hold to dive · release to glide",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Main menu home launch subtext"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Hold to dive · release to glide",
+        "es": "Mantén para picar · suelta para mecerte",
+        "de": "Halten zum Tauchen · Loslassen zum Gleiten",
+        "fr": "Maintenez pour plonger · relâchez pour planer",
+        "it": "Tieni per picchiare · rilascia per planare",
+        "pt-BR": "Segure para mergulhar · solte para mecer",
+        "ar": "اضغط للغوص · اترك للتحليق",
+        "zh-CN": "按住俯冲 · 松开滑翔",
+        "ja": "長押しで急降下 · 離して滑空",
+        "mt": "Żomm biex tinżel · itlaq biex ttir"
+      }
+    },
+    "onboarding.skyIsYours": {
+      "sourceText": "THE SKY IS YOURS",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Main menu launch banner kicker"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "THE SKY IS YOURS",
+        "es": "EL CIELO ES TUYO",
+        "de": "DER HIMMEL GEHÖRT DIR",
+        "fr": "LE CIEL EST À VOUS",
+        "it": "IL CIELO È TUO",
+        "pt-BR": "O CÉU É SEU",
+        "ar": "السماء ملكك",
+        "zh-CN": "天空属于你",
+        "ja": "大空はあなたのもの",
+        "mt": "IS-SEMA HU TIEGĦEK"
+      }
+    },
+    "onboarding.buildSpeed": {
+      "sourceText": "HOLD · build speed down the big drop",
+      "meta": {
+        "file": "src/game/FlightGuidance.ts",
+        "context": "In-flight terrain cue"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "HOLD · build speed down the big drop",
+        "es": "MANTÉN · gana velocidad bajando",
+        "de": "HALTEN · Tempo aufbauen",
+        "fr": "MAINTENEZ · prenez de la vitesse",
+        "it": "TIENI PREMUTO · prendi velocità",
+        "pt-BR": "SEGURE · ganhe velocidade",
+        "ar": "اضغط · زِد السرعة في المنحدر",
+        "zh-CN": "按住 · 俯冲下坡加速",
+        "ja": "長押し · 急坂で加速",
+        "mt": "ŻOMM · żid il-veloċità fl-inżul"
+      }
+    },
+    "onboarding.rideRamp": {
+      "sourceText": "RELEASE · ride the ramp to launch",
+      "meta": {
+        "file": "src/game/FlightGuidance.ts",
+        "context": "In-flight terrain cue"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "RELEASE · ride the ramp to launch",
+        "es": "SUELTA · aprovecha la rampa para despegar",
+        "de": "LOSLASSEN · Rampe nutzen zum Starten",
+        "fr": "RELÂCHEZ · utilisez le tremplin pour décoller",
+        "it": "RILASCIA · usa la rampa per decollare",
+        "pt-BR": "SOLTE · use a rampa para decolar",
+        "ar": "اترك · استغل المنحدر للانطلاق",
+        "zh-CN": "松开 · 利用坡道飞翔",
+        "ja": "離して · 坂で飛躍",
+        "mt": "ITLAQ · uża r-rampa biex ttir"
+      }
+    },
+    "onboarding.catchDownslope": {
+      "sourceText": "HOLD · catch the downslope",
+      "meta": {
+        "file": "src/game/FlightGuidance.ts",
+        "context": "In-flight terrain cue"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "HOLD · catch the downslope",
+        "es": "MANTÉN · aprovecha la bajada",
+        "de": "HALTEN · Abhang nutzen",
+        "fr": "MAINTENEZ · attrapez la descente",
+        "it": "TIENI PREMUTO · cogli la discesa",
+        "pt-BR": "SEGURE · pegue a descida",
+        "ar": "اضغط · استغل المنحدر",
+        "zh-CN": "按住 · 顺着下坡着陆",
+        "ja": "長押し · 下り坂に着地",
+        "mt": "ŻOMM · uża l-inżul"
+      }
+    },
+    "onboarding.softenLanding": {
+      "sourceText": "RELEASE · soften the landing",
+      "meta": {
+        "file": "src/game/FlightGuidance.ts",
+        "context": "In-flight terrain cue"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "RELEASE · soften the landing",
+        "es": "SUELTA · suaviza el aterrizaje",
+        "de": "LOSLASSEN · Landung abfedern",
+        "fr": "RELÂCHEZ · adoucissez l’atterrissage",
+        "it": "RILASCIA · ammorbidisci l’atterraggio",
+        "pt-BR": "SOLTE · suavize o pouso",
+        "ar": "اترك · لتهبيط سلس",
+        "zh-CN": "松开 · 缓冲着陆",
+        "ja": "離して · 着陸を和らげる",
+        "mt": "ITLAQ · tnaqqas l-impatt tal-inżul"
+      }
+    },
+    "onboarding.holdToDescend": {
+      "sourceText": "HOLD to descend · look for a downhill landing",
+      "meta": {
+        "file": "src/game/FlightGuidance.ts",
+        "context": "In-flight high altitude cue"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "HOLD to descend · look for a downhill landing",
+        "es": "MANTÉN para descender · busca una bajada",
+        "de": "HALTEN zum Sinken · suche eine Abfahrt",
+        "fr": "MAINTENEZ pour descendre · visez une pente",
+        "it": "TIENI PREMUTO per scendere · cerca una discesa",
+        "pt-BR": "SEGURE para descer · busque um declive",
+        "ar": "اضغط للهبوط · ابحث عن منحدر",
+        "zh-CN": "按住下降 · 寻找下坡着陆",
+        "ja": "長押しで下降 · 下り坂を探そう",
+        "mt": "ŻOMM biex tinżel · fittex għoljiet"
+      }
+    },
+    "hud.menu.chooseAdventure": {
+      "sourceText": "Choose your adventure",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Main menu section 1 title"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Choose your adventure",
+        "es": "Elige tu aventura",
+        "de": "Wähle dein Abenteuer",
+        "fr": "Choisissez votre aventure",
+        "it": "Scegli la tua avventura",
+        "pt-BR": "Escolha sua aventura",
+        "ar": "اختر مغامرتك",
+        "zh-CN": "选择你的冒险",
+        "ja": "冒険を選ぼう",
+        "mt": "Agħżel l-avventura tiegħek"
+      }
+    },
+    "hud.menu.makeItYours": {
+      "sourceText": "Make it yours",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Main menu section 2 title"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Make it yours",
+        "es": "Hazlo tuyo",
+        "de": "Mache es zu deinem",
+        "fr": "Personnalisez-le",
+        "it": "Fallo tuo",
+        "pt-BR": "Faça do seu jeito",
+        "ar": "اجعلها ملكك",
+        "zh-CN": "打造个性定制",
+        "ja": "自分好みにカスタマイズ",
+        "mt": "Kustomizza kif trid"
+      }
+    },
+    "hud.menu.everyFlightCounts": {
+      "sourceText": "Every flight counts",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Main menu section 3 title"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Every flight counts",
+        "es": "Cada vuelo cuenta",
+        "de": "Jeder Flug zählt",
+        "fr": "Chaque vol compte",
+        "it": "Ogni volo conta",
+        "pt-BR": "Cada voo conta",
+        "ar": "كل رحلة تحسب",
+        "zh-CN": "每次飞行都有意义",
+        "ja": "すべてのフライトが大切",
+        "mt": "Kull tluq huwa importanti"
+      }
+    },
+    "hud.menu.personalBest": {
+      "sourceText": "Personal best",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Main menu record kicker"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Personal best",
+        "es": "Mejor récord",
+        "de": "Persönliche Bestleistung",
+        "fr": "Meilleur score",
+        "it": "Miglior record",
+        "pt-BR": "Melhor recorde",
+        "ar": "أفضل رقم شخصي",
+        "zh-CN": "个人最佳记录",
+        "ja": "自己ベスト",
+        "mt": "L-aħjar rekord tiegħek"
+      }
+    },
+    "hud.menu.coinBalance": {
+      "sourceText": "coin balance",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Main menu wallet subtext"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "coin balance",
+        "es": "balance de monedas",
+        "de": "Münzguthaben",
+        "fr": "solde de pièces",
+        "it": "bilancio monete",
+        "pt-BR": "saldo de moedas",
+        "ar": "رصيد العملات",
+        "zh-CN": "硬币余额",
+        "ja": "コイン残高",
+        "mt": "bilanċ tal-muniti"
+      }
+    },
+    "hud.stat.distance": {
+      "sourceText": "Distance",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Play HUD distance stat header"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Distance",
+        "es": "Distancia",
+        "de": "Distanz",
+        "fr": "Distance",
+        "it": "Distanza",
+        "pt-BR": "Distância",
+        "ar": "المسافة",
+        "zh-CN": "距离",
+        "ja": "距離",
+        "mt": "Distanza"
+      }
+    },
+    "hud.stat.coins": {
+      "sourceText": "Coins",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Play HUD coins stat header"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Coins",
+        "es": "Monedas",
+        "de": "Münzen",
+        "fr": "Pièces",
+        "it": "Monete",
+        "pt-BR": "Moedas",
+        "ar": "العملات",
+        "zh-CN": "金币",
+        "ja": "コイン",
+        "mt": "Muniti"
+      }
+    },
+    "hud.stat.daylight": {
+      "sourceText": "daylight",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Play HUD daylight meter caption"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "daylight",
+        "es": "luz del día",
+        "de": "Tageslicht",
+        "fr": "lumière du jour",
+        "it": "luce del giorno",
+        "pt-BR": "luz do dia",
+        "ar": "ضوء النهار",
+        "zh-CN": "日光",
+        "ja": "日光",
+        "mt": "dawl tal-jum"
+      }
+    },
+    "hud.progress.title": {
+      "sourceText": "Your progress",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Progress screen title"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Your progress",
+        "es": "Tu progreso",
+        "de": "Dein Fortschritt",
+        "fr": "Votre progression",
+        "it": "Il tuo progresso",
+        "pt-BR": "Seu progresso",
+        "ar": "تقدمك",
+        "zh-CN": "你的进度",
+        "ja": "あなたの進捗",
+        "mt": "Il-progress tiegħek"
+      }
+    },
+    "hud.settings.title": {
+      "sourceText": "Settings",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Settings screen title"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Settings",
+        "es": "Ajustes",
+        "de": "Einstellungen",
+        "fr": "Paramètres",
+        "it": "Impostazioni",
+        "pt-BR": "Configurações",
+        "ar": "الإعدادات",
+        "zh-CN": "设置",
+        "ja": "設定",
+        "mt": "Settings"
+      }
+    },
+    "hud.settings.sound": {
+      "sourceText": "Sound Effects",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Settings sound toggle"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Sound Effects",
+        "es": "Efectos de sonido",
+        "de": "Soundeffekte",
+        "fr": "Effets sonores",
+        "it": "Effetti sonori",
+        "pt-BR": "Efeitos sonoros",
+        "ar": "المؤثرات الصوتية",
+        "zh-CN": "音效",
+        "ja": "効果音",
+        "mt": "Effetti tal-ħoss"
+      }
+    },
+    "hud.settings.music": {
+      "sourceText": "Music Volume",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Settings music slider"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Music Volume",
+        "es": "Volumen de música",
+        "de": "Musiklautstärke",
+        "fr": "Volume de la musique",
+        "it": "Volume musica",
+        "pt-BR": "Volume da música",
+        "ar": "مستوى الموسيقى",
+        "zh-CN": "音乐音量",
+        "ja": "BGM音量",
+        "mt": "Volum tal-mużika"
+      }
+    },
+    "hud.settings.reduceMotion": {
+      "sourceText": "Reduce Motion",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Settings reduce motion toggle"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Reduce Motion",
+        "es": "Reducir movimiento",
+        "de": "Bewegung reduzieren",
+        "fr": "Réduire les mouvements",
+        "it": "Riduci movimento",
+        "pt-BR": "Reduzir movimento",
+        "ar": "تقليل الحركة",
+        "zh-CN": "减少动作",
+        "ja": "視覚効果を軽減",
+        "mt": "Naqqas il-moviment"
+      }
+    },
+    "hud.account.title": {
+      "sourceText": "Pilot Account",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Account screen title"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Pilot Account",
+        "es": "Cuenta de piloto",
+        "de": "Pilotenkonto",
+        "fr": "Compte pilote",
+        "it": "Account pilota",
+        "pt-BR": "Conta de piloto",
+        "ar": "حساب الطيار",
+        "zh-CN": "飞行员账户",
+        "ja": "パイロットアカウント",
+        "mt": "Kont tal-Pilota"
+      }
+    },
+    "hud.gameover.title": {
+      "sourceText": "Flight Completed",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Game over screen title"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Flight Completed",
+        "es": "Vuelo completado",
+        "de": "Flug beendet",
+        "fr": "Vol terminé",
+        "it": "Volo completato",
+        "pt-BR": "Voo concluído",
+        "ar": "اكتملت الرحلة",
+        "zh-CN": "飞行结束",
+        "ja": "フライト完了",
+        "mt": "It-Tluq Lest"
+      }
+    },
+    "hud.gameover.flyAgain": {
+      "sourceText": "Fly Again",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Game over restart button"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Fly Again",
+        "es": "Volar de nuevo",
+        "de": "Erneut fliegen",
+        "fr": "Voler à nouveau",
+        "it": "Vola di nuovo",
+        "pt-BR": "Voar novamente",
+        "ar": "طِر مجدداً",
+        "zh-CN": "再次飞行",
+        "ja": "もう一度飛ぶ",
+        "mt": "Ttir mill-ġdid"
+      }
+    },
+    "hud.gameover.mainMenu": {
+      "sourceText": "Main Menu",
+      "meta": {
+        "file": "src/game/HUD.ts",
+        "context": "Game over menu button"
+      },
+      "placeholders": [],
+      "translations": {
+        "en": "Main Menu",
+        "es": "Menú principal",
+        "de": "Hauptmenü",
+        "fr": "Menu principal",
+        "it": "Menu principale",
+        "pt-BR": "Menu principal",
+        "ar": "القائمة الرئيسية",
+        "zh-CN": "主菜单",
+        "ja": "メインメニュー",
+        "mt": "Menu Prinċipali"
+      }
+    }
+  },
+  "files": {
+    "translations.barrel.json": {
+      "app.title": "Sunbird",
+      "hud.menu.play": "Play Race",
+      "hud.menu.pvp": "PvP Rivalry",
+      "hud.menu.leaderboard": "Leaderboards & Prizes",
+      "hud.menu.settings": "Settings",
+      "hud.menu.account": "Account",
+      "hud.pilot.name": "Pilot Name",
+      "hud.pilot.autogenerate": "Autogenerate 🎲",
+      "pvp.division.fledgling": "Fledgling",
+      "pvp.division.glider": "Glider",
+      "pvp.division.racer": "Sky Racer",
+      "pvp.division.ace": "Sky Ace",
+      "pvp.division.legend": "Sunbird Legend",
+      "pvp.draft.boost": "SLIPSTREAM DRAFT +{{boost}}% SPEED!",
+      "pvp.overtake.notice": "Overtook {{name}} for #{{place}}!",
+      "hud.leaderboard.claim": "Claim Rank Prize",
+      "hud.prizes.title": "Leaderboard Tournament Prizes"
+    },
+    "translations.en.json": {
+      "app.title": "Sunbird",
+      "hud.menu.play": "Play Race",
+      "hud.menu.pvp": "PvP Rivalry",
+      "hud.menu.leaderboard": "Leaderboards & Prizes",
+      "hud.menu.settings": "Settings",
+      "hud.menu.account": "Account",
+      "hud.pilot.name": "Pilot Name",
+      "hud.pilot.autogenerate": "Autogenerate 🎲",
+      "pvp.division.fledgling": "Fledgling",
+      "pvp.division.glider": "Glider",
+      "pvp.division.racer": "Sky Racer",
+      "pvp.division.ace": "Sky Ace",
+      "pvp.division.legend": "Sunbird Legend",
+      "pvp.draft.boost": "SLIPSTREAM DRAFT +{{boost}}% SPEED!",
+      "pvp.overtake.notice": "Overtook {{name}} for #{{place}}!",
+      "hud.leaderboard.claim": "Claim Rank Prize",
+      "hud.prizes.title": "Leaderboard Tournament Prizes"
+    },
+    "translations.es.json": {
+      "app.title": "Sunbird",
+      "hud.menu.play": "Jugar Carrera",
+      "hud.menu.pvp": "Rivalidad PvP",
+      "hud.menu.leaderboard": "Clasificación y Premios",
+      "hud.menu.settings": "Ajustes",
+      "hud.menu.account": "Cuenta",
+      "hud.pilot.name": "Nombre de Piloto",
+      "hud.pilot.autogenerate": "Generar 🎲",
+      "pvp.division.fledgling": "Novato",
+      "pvp.division.glider": "Planeador",
+      "pvp.division.racer": "Corredor del Cielo",
+      "pvp.division.ace": "As del Cielo",
+      "pvp.division.legend": "Leyenda Sunbird",
+      "pvp.draft.boost": "¡REBUJO +{{boost}}% DE VELOCIDAD!",
+      "pvp.overtake.notice": "¡Adelantaste a {{name}} por el #{{place}}!",
+      "hud.leaderboard.claim": "Reclamar Premio de Rango",
+      "hud.prizes.title": "Premios del Torneo de Clasificación"
+    }
+  },
+  "translations.en.json": {
+    "app.title": "Sunbird",
+    "hud.menu.play": "Play Race",
+    "hud.menu.pvp": "PvP Rivalry",
+    "hud.menu.leaderboard": "Leaderboards & Prizes",
+    "hud.menu.settings": "Settings",
+    "hud.menu.account": "Account",
+    "hud.pilot.name": "Pilot Name",
+    "hud.pilot.autogenerate": "Autogenerate 🎲",
+    "pvp.division.fledgling": "Fledgling",
+    "pvp.division.glider": "Glider",
+    "pvp.division.racer": "Sky Racer",
+    "pvp.division.ace": "Sky Ace",
+    "pvp.division.legend": "Sunbird Legend",
+    "pvp.draft.boost": "SLIPSTREAM DRAFT +{{boost}}% SPEED!",
+    "pvp.overtake.notice": "Overtook {{name}} for #{{place}}!",
+    "hud.leaderboard.claim": "Claim Rank Prize",
+    "hud.prizes.title": "Leaderboard Tournament Prizes",
+    "onboarding.holdToDive": "HOLD to dive down the hill",
+    "onboarding.releaseToLaunch": "RELEASE at the top to launch",
+    "onboarding.soarInAir": "RELEASE & SOAR — stay airborne!",
+    "onboarding.launchSub": "Hold to dive · release to glide",
+    "onboarding.skyIsYours": "THE SKY IS YOURS",
+    "onboarding.buildSpeed": "HOLD · build speed down the big drop",
+    "onboarding.rideRamp": "RELEASE · ride the ramp to launch",
+    "onboarding.catchDownslope": "HOLD · catch the downslope",
+    "onboarding.softenLanding": "RELEASE · soften the landing",
+    "onboarding.holdToDescend": "HOLD to descend · look for a downhill landing",
+    "hud.menu.chooseAdventure": "Choose your adventure",
+    "hud.menu.makeItYours": "Make it yours",
+    "hud.menu.everyFlightCounts": "Every flight counts",
+    "hud.menu.personalBest": "Personal best",
+    "hud.menu.coinBalance": "coin balance",
+    "hud.stat.distance": "Distance",
+    "hud.stat.coins": "Coins",
+    "hud.stat.daylight": "daylight",
+    "hud.progress.title": "Your progress",
+    "hud.settings.title": "Settings",
+    "hud.settings.sound": "Sound Effects",
+    "hud.settings.music": "Music Volume",
+    "hud.settings.reduceMotion": "Reduce Motion",
+    "hud.account.title": "Pilot Account",
+    "hud.gameover.title": "Flight Completed",
+    "hud.gameover.flyAgain": "Fly Again",
+    "hud.gameover.mainMenu": "Main Menu"
+  },
+  "translations.es.json": {
+    "app.title": "Sunbird",
+    "hud.menu.play": "Jugar Carrera",
+    "hud.menu.pvp": "Rivalidad PvP",
+    "hud.menu.leaderboard": "Clasificación y Premios",
+    "hud.menu.settings": "Ajustes",
+    "hud.menu.account": "Cuenta",
+    "hud.pilot.name": "Nombre de Piloto",
+    "hud.pilot.autogenerate": "Generar 🎲",
+    "pvp.division.fledgling": "Novato",
+    "pvp.division.glider": "Planeador",
+    "pvp.division.racer": "Corredor del Cielo",
+    "pvp.division.ace": "As del Cielo",
+    "pvp.division.legend": "Leyenda Sunbird",
+    "pvp.draft.boost": "¡REBUJO +{{boost}}% DE VELOCIDAD!",
+    "pvp.overtake.notice": "¡Adelantaste a {{name}} por el #{{place}}!",
+    "hud.leaderboard.claim": "Reclamar Premio de Rango",
+    "hud.prizes.title": "Premios del Torneo de Clasificación",
+    "onboarding.holdToDive": "MANTÉN PRESIONADO para picar por la colina",
+    "onboarding.releaseToLaunch": "SUELTA en la cima para despegar",
+    "onboarding.soarInAir": "¡SUELTA Y PLANEA — mantente en el aire!",
+    "onboarding.launchSub": "Mantén para picar · suelta para mecerte",
+    "onboarding.skyIsYours": "EL CIELO ES TUYO",
+    "onboarding.buildSpeed": "MANTÉN · gana velocidad bajando",
+    "onboarding.rideRamp": "SUELTA · aprovecha la rampa para despegar",
+    "onboarding.catchDownslope": "MANTÉN · aprovecha la bajada",
+    "onboarding.softenLanding": "SUELTA · suaviza el aterrizaje",
+    "onboarding.holdToDescend": "MANTÉN para descender · busca una bajada",
+    "hud.menu.chooseAdventure": "Elige tu aventura",
+    "hud.menu.makeItYours": "Hazlo tuyo",
+    "hud.menu.everyFlightCounts": "Cada vuelo cuenta",
+    "hud.menu.personalBest": "Mejor récord",
+    "hud.menu.coinBalance": "balance de monedas",
+    "hud.stat.distance": "Distancia",
+    "hud.stat.coins": "Monedas",
+    "hud.stat.daylight": "luz del día",
+    "hud.progress.title": "Tu progreso",
+    "hud.settings.title": "Ajustes",
+    "hud.settings.sound": "Efectos de sonido",
+    "hud.settings.music": "Volumen de música",
+    "hud.settings.reduceMotion": "Reducir movimiento",
+    "hud.account.title": "Cuenta de piloto",
+    "hud.gameover.title": "Vuelo completado",
+    "hud.gameover.flyAgain": "Volar de nuevo",
+    "hud.gameover.mainMenu": "Menú principal"
+  },
+  "translations.de.json": {
+    "app.title": "Sunbird",
+    "hud.menu.play": "Rennen Spielen",
+    "hud.menu.pvp": "PvP-Rivalität",
+    "hud.menu.leaderboard": "Bestenliste & Preise",
+    "hud.menu.settings": "Einstellungen",
+    "hud.menu.account": "Konto",
+    "hud.pilot.name": "Pilotenname",
+    "hud.pilot.autogenerate": "Generieren 🎲",
+    "pvp.division.fledgling": "Küken",
+    "pvp.division.glider": "Gleiter",
+    "pvp.division.racer": "Himmelsrenner",
+    "pvp.division.ace": "Himmelsass",
+    "pvp.division.legend": "Sunbird-Legende",
+    "pvp.draft.boost": "WINDSCHATTEN +{{boost}}% TEMPO!",
+    "pvp.overtake.notice": "{{name}} für Platz #{{place}} überholt!",
+    "hud.leaderboard.claim": "Rangpreis einfordern",
+    "hud.prizes.title": "Bestenlisten-Turnierpreise",
+    "onboarding.holdToDive": "HALTEN um den Hügel hinabzutauchen",
+    "onboarding.releaseToLaunch": "LOSLASSEN oben um zu starten",
+    "onboarding.soarInAir": "GLEITEN — bleib in der Luft!",
+    "onboarding.launchSub": "Halten zum Tauchen · Loslassen zum Gleiten",
+    "onboarding.skyIsYours": "DER HIMMEL GEHÖRT DIR",
+    "onboarding.buildSpeed": "HALTEN · Tempo aufbauen",
+    "onboarding.rideRamp": "LOSLASSEN · Rampe nutzen zum Starten",
+    "onboarding.catchDownslope": "HALTEN · Abhang nutzen",
+    "onboarding.softenLanding": "LOSLASSEN · Landung abfedern",
+    "onboarding.holdToDescend": "HALTEN zum Sinken · suche eine Abfahrt",
+    "hud.menu.chooseAdventure": "Wähle dein Abenteuer",
+    "hud.menu.makeItYours": "Mache es zu deinem",
+    "hud.menu.everyFlightCounts": "Jeder Flug zählt",
+    "hud.menu.personalBest": "Persönliche Bestleistung",
+    "hud.menu.coinBalance": "Münzguthaben",
+    "hud.stat.distance": "Distanz",
+    "hud.stat.coins": "Münzen",
+    "hud.stat.daylight": "Tageslicht",
+    "hud.progress.title": "Dein Fortschritt",
+    "hud.settings.title": "Einstellungen",
+    "hud.settings.sound": "Soundeffekte",
+    "hud.settings.music": "Musiklautstärke",
+    "hud.settings.reduceMotion": "Bewegung reduzieren",
+    "hud.account.title": "Pilotenkonto",
+    "hud.gameover.title": "Flug beendet",
+    "hud.gameover.flyAgain": "Erneut fliegen",
+    "hud.gameover.mainMenu": "Hauptmenü"
+  },
+  "translations.fr.json": {
+    "app.title": "Sunbird",
+    "hud.menu.play": "Lancer la Course",
+    "hud.menu.pvp": "Rivalité JcJ",
+    "hud.menu.leaderboard": "Classement et Prix",
+    "hud.menu.settings": "Paramètres",
+    "hud.menu.account": "Compte",
+    "hud.pilot.name": "Nom du Pilote",
+    "hud.pilot.autogenerate": "Générer 🎲",
+    "pvp.division.fledgling": "Oisillon",
+    "pvp.division.glider": "Planeur",
+    "pvp.division.racer": "Pilote Céleste",
+    "pvp.division.ace": "As du Ciel",
+    "pvp.division.legend": "Légende Sunbird",
+    "pvp.draft.boost": "ASPIRATION +{{boost}}% DE VITESSE!",
+    "pvp.overtake.notice": "Dépassement de {{name}} pour la #{{place}} place!",
+    "hud.leaderboard.claim": "Réclamer le Prix de Rang",
+    "hud.prizes.title": "Prix du Tournoi de Classement",
+    "onboarding.holdToDive": "MAINTENEZ pour plonger la pente",
+    "onboarding.releaseToLaunch": "RELÂCHEZ en haut pour décoller",
+    "onboarding.soarInAir": "PLANEZ — restez dans les airs!",
+    "onboarding.launchSub": "Maintenez pour plonger · relâchez pour planer",
+    "onboarding.skyIsYours": "LE CIEL EST À VOUS",
+    "onboarding.buildSpeed": "MAINTENEZ · prenez de la vitesse",
+    "onboarding.rideRamp": "RELÂCHEZ · utilisez le tremplin pour décoller",
+    "onboarding.catchDownslope": "MAINTENEZ · attrapez la descente",
+    "onboarding.softenLanding": "RELÂCHEZ · adoucissez l’atterrissage",
+    "onboarding.holdToDescend": "MAINTENEZ pour descendre · visez une pente",
+    "hud.menu.chooseAdventure": "Choisissez votre aventure",
+    "hud.menu.makeItYours": "Personnalisez-le",
+    "hud.menu.everyFlightCounts": "Chaque vol compte",
+    "hud.menu.personalBest": "Meilleur score",
+    "hud.menu.coinBalance": "solde de pièces",
+    "hud.stat.distance": "Distance",
+    "hud.stat.coins": "Pièces",
+    "hud.stat.daylight": "lumière du jour",
+    "hud.progress.title": "Votre progression",
+    "hud.settings.title": "Paramètres",
+    "hud.settings.sound": "Effets sonores",
+    "hud.settings.music": "Volume de la musique",
+    "hud.settings.reduceMotion": "Réduire les mouvements",
+    "hud.account.title": "Compte pilote",
+    "hud.gameover.title": "Vol terminé",
+    "hud.gameover.flyAgain": "Voler à nouveau",
+    "hud.gameover.mainMenu": "Menu principal"
+  },
+  "translations.it.json": {
+    "app.title": "Sunbird",
+    "hud.menu.play": "Gioca Gara",
+    "hud.menu.pvp": "Rivalità PvP",
+    "hud.menu.leaderboard": "Classifiche e Premi",
+    "hud.menu.settings": "Impostazioni",
+    "hud.menu.account": "Account",
+    "hud.pilot.name": "Nome Pilota",
+    "hud.pilot.autogenerate": "Genera 🎲",
+    "pvp.division.fledgling": "Novizio",
+    "pvp.division.glider": "Aliante",
+    "pvp.division.racer": "Corridore dei Cieli",
+    "pvp.division.ace": "Asso dei Cieli",
+    "pvp.division.legend": "Leggenda Sunbird",
+    "pvp.draft.boost": "SCIA +{{boost}}% DI VELOCITÀ!",
+    "pvp.overtake.notice": "Superato {{name}} per la posizione #{{place}}!",
+    "hud.leaderboard.claim": "Riscatta Premio di Grado",
+    "hud.prizes.title": "Premi del Torneo in Classifica",
+    "onboarding.holdToDive": "TIENI PREMUTO per picchiare in discesa",
+    "onboarding.releaseToLaunch": "RILASCIA in cima per decollare",
+    "onboarding.soarInAir": "VOLA — resta in aria!",
+    "onboarding.launchSub": "Tieni per picchiare · rilascia per planare",
+    "onboarding.skyIsYours": "IL CIELO È TUO",
+    "onboarding.buildSpeed": "TIENI PREMUTO · prendi velocità",
+    "onboarding.rideRamp": "RILASCIA · usa la rampa per decollare",
+    "onboarding.catchDownslope": "TIENI PREMUTO · cogli la discesa",
+    "onboarding.softenLanding": "RILASCIA · ammorbidisci l’atterraggio",
+    "onboarding.holdToDescend": "TIENI PREMUTO per scendere · cerca una discesa",
+    "hud.menu.chooseAdventure": "Scegli la tua avventura",
+    "hud.menu.makeItYours": "Fallo tuo",
+    "hud.menu.everyFlightCounts": "Ogni volo conta",
+    "hud.menu.personalBest": "Miglior record",
+    "hud.menu.coinBalance": "bilancio monete",
+    "hud.stat.distance": "Distanza",
+    "hud.stat.coins": "Monete",
+    "hud.stat.daylight": "luce del giorno",
+    "hud.progress.title": "Il tuo progresso",
+    "hud.settings.title": "Impostazioni",
+    "hud.settings.sound": "Effetti sonori",
+    "hud.settings.music": "Volume musica",
+    "hud.settings.reduceMotion": "Riduci movimento",
+    "hud.account.title": "Account pilota",
+    "hud.gameover.title": "Volo completato",
+    "hud.gameover.flyAgain": "Vola di nuovo",
+    "hud.gameover.mainMenu": "Menu principale"
+  },
+  "translations.pt-BR.json": {
+    "app.title": "Sunbird",
+    "hud.menu.play": "Jogar Corrida",
+    "hud.menu.pvp": "Rivalidade PvP",
+    "hud.menu.leaderboard": "Placar e Prêmios",
+    "hud.menu.settings": "Configurações",
+    "hud.menu.account": "Conta",
+    "hud.pilot.name": "Nome do Piloto",
+    "hud.pilot.autogenerate": "Gerar 🎲",
+    "pvp.division.fledgling": "Novato",
+    "pvp.division.glider": "Planador",
+    "pvp.division.racer": "Piloto do Céu",
+    "pvp.division.ace": "Ás do Céu",
+    "pvp.division.legend": "Lenda Sunbird",
+    "pvp.draft.boost": "VÁCUO +{{boost}}% DE VELOCIDADE!",
+    "pvp.overtake.notice": "Ultrapassou {{name}} pela posição #{{place}}!",
+    "hud.leaderboard.claim": "Resgatar Prêmio de Rank",
+    "hud.prizes.title": "Prêmios do Torneio do Placar",
+    "onboarding.holdToDive": "SEGURE para mergulhar no morro",
+    "onboarding.releaseToLaunch": "SOLTE no topo para decolar",
+    "onboarding.soarInAir": "VOE — fique no ar!",
+    "onboarding.launchSub": "Segure para mergulhar · solte para mecer",
+    "onboarding.skyIsYours": "O CÉU É SEU",
+    "onboarding.buildSpeed": "SEGURE · ganhe velocidade",
+    "onboarding.rideRamp": "SOLTE · use a rampa para decolar",
+    "onboarding.catchDownslope": "SEGURE · pegue a descida",
+    "onboarding.softenLanding": "SOLTE · suavize o pouso",
+    "onboarding.holdToDescend": "SEGURE para descer · busque um declive",
+    "hud.menu.chooseAdventure": "Escolha sua aventura",
+    "hud.menu.makeItYours": "Faça do seu jeito",
+    "hud.menu.everyFlightCounts": "Cada voo conta",
+    "hud.menu.personalBest": "Melhor recorde",
+    "hud.menu.coinBalance": "saldo de moedas",
+    "hud.stat.distance": "Distância",
+    "hud.stat.coins": "Moedas",
+    "hud.stat.daylight": "luz do dia",
+    "hud.progress.title": "Seu progresso",
+    "hud.settings.title": "Configurações",
+    "hud.settings.sound": "Efeitos sonoros",
+    "hud.settings.music": "Volume da música",
+    "hud.settings.reduceMotion": "Reduzir movimento",
+    "hud.account.title": "Conta de piloto",
+    "hud.gameover.title": "Voo concluído",
+    "hud.gameover.flyAgain": "Voar novamente",
+    "hud.gameover.mainMenu": "Menu principal"
+  },
+  "translations.ar.json": {
+    "app.title": "Sunbird",
+    "hud.menu.play": "ابدأ السباق",
+    "hud.menu.pvp": "منافسة PvP",
+    "hud.menu.leaderboard": "لوحة الصدارة والجوائز",
+    "hud.menu.settings": "الإعدادات",
+    "hud.menu.account": "الحساب",
+    "hud.pilot.name": "اسم الطيار",
+    "hud.pilot.autogenerate": "توليد تلقائي 🎲",
+    "pvp.division.fledgling": "مبتدئ",
+    "pvp.division.glider": "تحليق",
+    "pvp.division.racer": "متسابق السماء",
+    "pvp.division.ace": "بطل السماء",
+    "pvp.division.legend": "أسطورة طائر الشمس",
+    "pvp.draft.boost": "تيار السحب +{{boost}}% سرعة!",
+    "pvp.overtake.notice": "تجاوزت {{name}} للمركز #{{place}}!",
+    "hud.leaderboard.claim": "استلام جائزة الترتيب",
+    "hud.prizes.title": "جوائز بطولة لوحة الصدارة",
+    "onboarding.holdToDive": "اضغط مع الاستمرار للغوص أسفل التل",
+    "onboarding.releaseToLaunch": "اترك عند القمة للانطلاق",
+    "onboarding.soarInAir": "حلّق — ابقَ في الهواء!",
+    "onboarding.launchSub": "اضغط للغوص · اترك للتحليق",
+    "onboarding.skyIsYours": "السماء ملكك",
+    "onboarding.buildSpeed": "اضغط · زِد السرعة في المنحدر",
+    "onboarding.rideRamp": "اترك · استغل المنحدر للانطلاق",
+    "onboarding.catchDownslope": "اضغط · استغل المنحدر",
+    "onboarding.softenLanding": "اترك · لتهبيط سلس",
+    "onboarding.holdToDescend": "اضغط للهبوط · ابحث عن منحدر",
+    "hud.menu.chooseAdventure": "اختر مغامرتك",
+    "hud.menu.makeItYours": "اجعلها ملكك",
+    "hud.menu.everyFlightCounts": "كل رحلة تحسب",
+    "hud.menu.personalBest": "أفضل رقم شخصي",
+    "hud.menu.coinBalance": "رصيد العملات",
+    "hud.stat.distance": "المسافة",
+    "hud.stat.coins": "العملات",
+    "hud.stat.daylight": "ضوء النهار",
+    "hud.progress.title": "تقدمك",
+    "hud.settings.title": "الإعدادات",
+    "hud.settings.sound": "المؤثرات الصوتية",
+    "hud.settings.music": "مستوى الموسيقى",
+    "hud.settings.reduceMotion": "تقليل الحركة",
+    "hud.account.title": "حساب الطيار",
+    "hud.gameover.title": "اكتملت الرحلة",
+    "hud.gameover.flyAgain": "طِر مجدداً",
+    "hud.gameover.mainMenu": "القائمة الرئيسية"
+  },
+  "translations.zh-CN.json": {
+    "app.title": "太陽鳥",
+    "hud.menu.play": "開始比賽",
+    "hud.menu.pvp": "PvP 競技",
+    "hud.menu.leaderboard": "排行榜與獎勵",
+    "hud.menu.settings": "設置",
+    "hud.menu.account": "帳戶",
+    "hud.pilot.name": "飛行員名稱",
+    "hud.pilot.autogenerate": "自動生成 🎲",
+    "pvp.division.fledgling": "雛鳥",
+    "pvp.division.glider": "滑翔者",
+    "pvp.division.racer": "天空競速者",
+    "pvp.division.ace": "王牌飛行員",
+    "pvp.division.legend": "太陽鳥傳奇",
+    "pvp.draft.boost": "尾流加速 +{{boost}}% 速度！",
+    "pvp.overtake.notice": "超越了 {{name}} 升至第 {{place}} 名！",
+    "hud.leaderboard.claim": "領取排名獎勵",
+    "hud.prizes.title": "排行榜錦標賽獎勵",
+    "onboarding.holdToDive": "按住俯冲下山",
+    "onboarding.releaseToLaunch": "松开冲向高空",
+    "onboarding.soarInAir": "翱翔 — 保持飞行！",
+    "onboarding.launchSub": "按住俯冲 · 松开滑翔",
+    "onboarding.skyIsYours": "天空属于你",
+    "onboarding.buildSpeed": "按住 · 俯冲下坡加速",
+    "onboarding.rideRamp": "松开 · 利用坡道飞翔",
+    "onboarding.catchDownslope": "按住 · 顺着下坡着陆",
+    "onboarding.softenLanding": "松开 · 缓冲着陆",
+    "onboarding.holdToDescend": "按住下降 · 寻找下坡着陆",
+    "hud.menu.chooseAdventure": "选择你的冒险",
+    "hud.menu.makeItYours": "打造个性定制",
+    "hud.menu.everyFlightCounts": "每次飞行都有意义",
+    "hud.menu.personalBest": "个人最佳记录",
+    "hud.menu.coinBalance": "硬币余额",
+    "hud.stat.distance": "距离",
+    "hud.stat.coins": "金币",
+    "hud.stat.daylight": "日光",
+    "hud.progress.title": "你的进度",
+    "hud.settings.title": "设置",
+    "hud.settings.sound": "音效",
+    "hud.settings.music": "音乐音量",
+    "hud.settings.reduceMotion": "减少动作",
+    "hud.account.title": "飞行员账户",
+    "hud.gameover.title": "飞行结束",
+    "hud.gameover.flyAgain": "再次飞行",
+    "hud.gameover.mainMenu": "主菜单"
+  },
+  "translations.ja.json": {
+    "app.title": "サンバード",
+    "hud.menu.play": "レーススタート",
+    "hud.menu.pvp": "PvP ライバル戦",
+    "hud.menu.leaderboard": "リーダーボードと賞品",
+    "hud.menu.settings": "設定",
+    "hud.menu.account": "アカウント",
+    "hud.pilot.name": "パイロット名",
+    "hud.pilot.autogenerate": "自動生成 🎲",
+    "pvp.division.fledgling": "ひよこ",
+    "pvp.division.glider": "グライダー",
+    "pvp.division.racer": "スカイレーサー",
+    "pvp.division.ace": "スカイエース",
+    "pvp.division.legend": "サンバードレジェンド",
+    "pvp.draft.boost": "スリップストリーム +{{boost}}% スピード！",
+    "pvp.overtake.notice": "{{name}} を抜いて #{{place}} 位に！",
+    "hud.leaderboard.claim": "ランク賞品を受け取る",
+    "hud.prizes.title": "リーダーボード大会賞品",
+    "onboarding.holdToDive": "長押しで丘を急降下",
+    "onboarding.releaseToLaunch": "頂上で離して大ジャンプ",
+    "onboarding.soarInAir": "滑空 — 空中に留まろう！",
+    "onboarding.launchSub": "長押しで急降下 · 離して滑空",
+    "onboarding.skyIsYours": "大空はあなたのもの",
+    "onboarding.buildSpeed": "長押し · 急坂で加速",
+    "onboarding.rideRamp": "離して · 坂で飛躍",
+    "onboarding.catchDownslope": "長押し · 下り坂に着地",
+    "onboarding.softenLanding": "離して · 着陸を和らげる",
+    "onboarding.holdToDescend": "長押しで下降 · 下り坂を探そう",
+    "hud.menu.chooseAdventure": "冒険を選ぼう",
+    "hud.menu.makeItYours": "自分好みにカスタマイズ",
+    "hud.menu.everyFlightCounts": "すべてのフライトが大切",
+    "hud.menu.personalBest": "自己ベスト",
+    "hud.menu.coinBalance": "コイン残高",
+    "hud.stat.distance": "距離",
+    "hud.stat.coins": "コイン",
+    "hud.stat.daylight": "日光",
+    "hud.progress.title": "あなたの進捗",
+    "hud.settings.title": "設定",
+    "hud.settings.sound": "効果音",
+    "hud.settings.music": "BGM音量",
+    "hud.settings.reduceMotion": "視覚効果を軽減",
+    "hud.account.title": "パイロットアカウント",
+    "hud.gameover.title": "フライト完了",
+    "hud.gameover.flyAgain": "もう一度飛ぶ",
+    "hud.gameover.mainMenu": "メインメニュー"
+  },
+  "translations.mt.json": {
+    "app.title": "Sunbird",
+    "hud.menu.play": "Ilgħab It-Tluq",
+    "hud.menu.pvp": "Rivalità PvP",
+    "hud.menu.leaderboard": "Klassifiki u Premji",
+    "hud.menu.settings": "Settings",
+    "hud.menu.account": "Kont",
+    "hud.pilot.name": "Isem il-Pilota",
+    "hud.pilot.autogenerate": "Ġenera Awtomatikament 🎲",
+    "pvp.division.fledgling": "Mubtddi",
+    "pvp.division.glider": "Gliżatur",
+    "pvp.division.racer": "Racer tas-Sema",
+    "pvp.division.ace": "As tas-Sema",
+    "pvp.division.legend": "Legġenda Sunbird",
+    "pvp.draft.boost": "DRAFFT FIS-SIA +{{boost}}% VELOĊITÀ!",
+    "pvp.overtake.notice": "Għaddejt lil {{name}} għal rebaħ #{{place}}!",
+    "hud.leaderboard.claim": "Ikseb il-Premju tal-Klassi",
+    "hud.prizes.title": "Premji tat-Tornament tal-Klassifika",
+    "onboarding.holdToDive": "ŻOMM meħud biex tinżel l-għoljiet",
+    "onboarding.releaseToLaunch": "ITLAQ mill-quċċata biex ttir",
+    "onboarding.soarInAir": "ITROQ — ibqa fl-arja!",
+    "onboarding.launchSub": "Żomm biex tinżel · itlaq biex ttir",
+    "onboarding.skyIsYours": "IS-SEMA HU TIEGĦEK",
+    "onboarding.buildSpeed": "ŻOMM · żid il-veloċità fl-inżul",
+    "onboarding.rideRamp": "ITLAQ · uża r-rampa biex ttir",
+    "onboarding.catchDownslope": "ŻOMM · uża l-inżul",
+    "onboarding.softenLanding": "ITLAQ · tnaqqas l-impatt tal-inżul",
+    "onboarding.holdToDescend": "ŻOMM biex tinżel · fittex għoljiet",
+    "hud.menu.chooseAdventure": "Agħżel l-avventura tiegħek",
+    "hud.menu.makeItYours": "Kustomizza kif trid",
+    "hud.menu.everyFlightCounts": "Kull tluq huwa importanti",
+    "hud.menu.personalBest": "L-aħjar rekord tiegħek",
+    "hud.menu.coinBalance": "bilanċ tal-muniti",
+    "hud.stat.distance": "Distanza",
+    "hud.stat.coins": "Muniti",
+    "hud.stat.daylight": "dawl tal-jum",
+    "hud.progress.title": "Il-progress tiegħek",
+    "hud.settings.title": "Settings",
+    "hud.settings.sound": "Effetti tal-ħoss",
+    "hud.settings.music": "Volum tal-mużika",
+    "hud.settings.reduceMotion": "Naqqas il-moviment",
+    "hud.account.title": "Kont tal-Pilota",
+    "hud.gameover.title": "It-Tluq Lest",
+    "hud.gameover.flyAgain": "Ttir mill-ġdid",
+    "hud.gameover.mainMenu": "Menu Prinċipali"
+  }
+}

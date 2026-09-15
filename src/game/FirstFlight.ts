@@ -7,6 +7,8 @@
  * the way the moment the player demonstrates each skill.
  */
 
+import { t } from "../i18n";
+
 export type CoachState = {
   /** Big instruction line, empty when the coach is idle/done. */
   text: string;
@@ -69,7 +71,11 @@ export class FirstFlight {
       return { text: "", step: STEPS, steps: STEPS, justCompleted: true };
     }
     if (!this.active) return { text: "", step: -1, steps: STEPS, justCompleted: false };
-    const text = ["⬇ HOLD to dive down the hill", "⬆ RELEASE at the top to launch", "🕊 Now soar — stay in the air"][this.step]!;
+    const text = [
+      `⬇ ${t("onboarding.holdToDive", undefined, "HOLD to dive down the hill")}`,
+      `⬆ ${t("onboarding.releaseToLaunch", undefined, "RELEASE at the top to launch")}`,
+      `🕊 ${t("onboarding.soarInAir", undefined, "RELEASE & SOAR — stay airborne!")}`,
+    ][this.step]!;
     return { text, step: this.step, steps: STEPS, justCompleted: false };
   }
 }

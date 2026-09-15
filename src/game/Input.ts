@@ -25,6 +25,7 @@ export class Input {
   private readonly boundKeyDown: (e: KeyboardEvent) => void;
   private readonly boundKeyUp: (e: KeyboardEvent) => void;
   private readonly boundContext: (e: Event) => void;
+  private readonly boundTouchMove: (e: TouchEvent) => void;
 
   constructor(el: HTMLElement, onFirstGesture: () => void) {
     this.el = el;
@@ -35,6 +36,11 @@ export class Input {
     this.boundKeyDown = (e) => this.onKeyDown(e);
     this.boundKeyUp = (e) => this.onKeyUp(e);
     this.boundContext = (e) => e.preventDefault();
+    this.boundTouchMove = (e) => {
+      if (!this.isTyping(e.target) && !this.isInteractive(e.target)) {
+        if (e.cancelable) e.preventDefault();
+      }
+    };
 
     el.addEventListener("pointerdown", this.boundPointerDown);
     window.addEventListener("pointerup", this.boundPointerUp);
@@ -43,6 +49,7 @@ export class Input {
     window.addEventListener("keydown", this.boundKeyDown);
     window.addEventListener("keyup", this.boundKeyUp);
     el.addEventListener("contextmenu", this.boundContext);
+    el.addEventListener("touchmove", this.boundTouchMove, { passive: false });
   }
 
   get diving(): boolean {
@@ -103,6 +110,7 @@ export class Input {
     window.removeEventListener("keydown", this.boundKeyDown);
     window.removeEventListener("keyup", this.boundKeyUp);
     this.el.removeEventListener("contextmenu", this.boundContext);
+    this.el.removeEventListener("touchmove", this.boundTouchMove);
   }
 
   private markFirst(): void {
