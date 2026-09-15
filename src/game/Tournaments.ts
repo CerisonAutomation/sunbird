@@ -71,7 +71,7 @@ const CATALOG: {
     cuts: { bronze: 600, silver: 1400, gold: 2600, diamond: 4200 },
   },
   {
-    name: "Zenith Trials",
+    name: "Skyline Trials",
     blurb: "Chain launches and touch the stratosphere.",
     icon: "🚀",
     mode: "zenith",

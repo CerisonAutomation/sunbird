@@ -142,6 +142,9 @@ export const SPLASH_QUIPS = [
   "The fish have accepted your résumé",
   "Splash. The ocean is calling HR",
   "Belly-flop so clean the seagulls applauded",
+  "The ocean has added you to its contacts",
+  "Congratulations: you are now 80% water",
+  "The bird requested a towel and a lawyer",
 ];
 
 export const SLEEP_QUIPS = [
@@ -236,6 +239,9 @@ export const THUD_QUIPS = [
   "OUCH!",
   "DOOF!",
   "PLONK!",
+  "KAPLOP!",
+  "WHOOPS!",
+  "THE GROUND WINS!",
 ];
 
 /** Rotating bop words for bounces (water, sunflower, balloon). */

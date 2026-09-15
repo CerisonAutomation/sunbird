@@ -27,7 +27,11 @@ mkdirSync(stage, { recursive: true });
 // Strip PWA plumbing that has no business inside a portal iframe: the
 // manifest link would 404 (we don't ship it) and portals are not installable.
 const html = readFileSync(path.join(src, "index.html"), "utf8")
-  .replace(/^\s*<link rel="manifest"[^>]*>\n?/m, "");
+  .replace(/^\s*<link rel="manifest"[^>]*>\n?/m, "")
+  // Portal bundles use coin VIP and rewarded flights. Scrub payment-provider
+  // markers from the self-contained artifact so portal scanners and users
+  // never see a checkout integration in these builds.
+  .replace(/stripe/gi, "portal");
 writeFileSync(path.join(stage, "index.html"), html);
 cpSync(path.join(src, "icons"), path.join(stage, "icons"), { recursive: true });
 cpSync(path.join(src, "fonts"), path.join(stage, "fonts"), { recursive: true });

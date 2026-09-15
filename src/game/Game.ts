@@ -10,6 +10,7 @@ import { PICKUP_STYLE, Collectibles, type CloudKind, type PickupKind } from "./C
 import { evaluateNearMiss, FlowTuner, SessionGoals, type NearMiss } from "./Engagement";
 import { BIG_LAUNCH_QUIPS, BOP_QUIPS, FEVER_QUIPS, GEM_QUIPS, MILESTONE_QUIPS, SLEEP_QUIPS, SPLASH_QUIPS, SURRENDER_QUIPS, THUD_QUIPS, SurpriseEngine, quip } from "./Surprises";
 import { Fx } from "./Fx";
+import { DPR_COOLDOWN_SECONDS, nextDpr, QUALITY_WINDOW_SECONDS } from "./quality";
 import { LaunchSystem, ratingLabel, type LaunchResult } from "./LaunchSystem";
 import { MASS_RACE_FIELD, MODES, modeById, RACE_FINISH, type ModeDef, type ModeId } from "./Modes";
 import { MassRace } from "./MassRace";
@@ -57,9 +58,13 @@ import {
   FEVER_NEED,
   HEADSTART_DISTANCE,
   MAGNET_TIME,
+  MANUAL_BOOST_COOLDOWN,
+  MANUAL_BOOST_SPEED,
+  MANUAL_BOOST_TIME,
   PHYS_DT,
   PICKUP_SUN_TIME,
   REFERRAL_BONUS,
+  STALL_SPEED,
   WATER_Y,
   ZENITH_ALT,
   ZENITH_DURATION,
@@ -171,6 +176,12 @@ export class Game {
   private runTime = 0;
   private disposed = false;
   private hidden = false;
+  /** The browser dropped the WebGL context (GPU reset, driver crash, a long
+   *  background stint). We stop drawing and wait for webglcontextrestored
+   *  instead of burning frames against a dead context. */
+  private contextLost = false;
+  /** Anti-oscillation lock-out for resolution changes, in seconds. */
+  private dprCooldown = 0;
   private timeScale = 1;
   private zenithTimer = 0;
   private hitStopTimer = 0;
@@ -188,6 +199,8 @@ export class Game {
   private deferredInstall: BeforeInstallPromptEvent | null = null;
   private readonly onBeforeInstall: (e: Event) => void;
   private readonly onInstalled: () => void;
+  private readonly onContextLost: (e: Event) => void;
+  private readonly onContextRestored: () => void;
 
   private daylight = DAYLIGHT_MAX;
   private startX = 64;
@@ -223,6 +236,7 @@ export class Game {
   private splashQuipN = 0;
   private shield = 0;
   private boostTimer = 0;
+  private manualBoostCooldown = 0;
   private continuesUsed = 0;
   private continueTimer = 0;
   private adTimer = 0;
@@ -420,7 +434,10 @@ export class Game {
     canvas.className = "game-canvas";
     host.appendChild(canvas);
 
-    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+    // Embedded portal browsers often expose a desktop UA at a phone-sized
+    // viewport. Treat the narrow viewport as mobile too, otherwise we keep a
+    // 2x render target and shadows that make the flight feel laggy.
+    const isMobile = /Mobi|Android/i.test(navigator.userAgent) || window.innerWidth < 700;
     this.isMobile = isMobile;
 
     // Try hardware-accelerated WebGL first; fall back to software (SwiftShader)
@@ -435,7 +452,10 @@ export class Game {
         stencil: false,
         alpha: false,
         premultipliedAlpha: true,
-        failIfMajorPerformanceCaveat: true,
+        // A mobile browser may report a performance caveat even when its
+        // hardware WebGL path is substantially faster than software. Rejecting
+        // it here caused lag spikes on embedded portal browsers.
+        failIfMajorPerformanceCaveat: false,
       });
     } catch {
       softwareMode = true;
@@ -467,7 +487,43 @@ export class Game {
     this.scene = new THREE.Scene();
     // Fog pushed well past the action: at near=62 the hills the bird is about
     // to fly through were already washed out, which read as permanent mist.
-    this.scene.fog = new THREE.Fog(0x8ed0ee, 160, 900);
+    // Keep the horizon readable. The old near fog started inside the play
+    // space and made the whole menu/gameplay read as a white cloud layer.
+    this.scene.fog = new THREE.Fog(0x8ed0ee, 600, 2600);
+
+    // WebGL context loss. A mobile GPU reset, a driver hiccup or a long
+    // background stint can drop the context; without preventDefault() the
+    // browser never restores it and the canvas stays frozen with no
+    // explanation. Three.js re-initialises its own GPU state on restore, so we
+    // only need to stop drawing, tell the player, and resume.
+    this.onContextLost = (e: Event) => {
+      e.preventDefault();
+      this.contextLost = true;
+      if (this.state === "playing") this.setState("paused");
+      this.audio.setHiddenMuted(true);
+      this.hud.toast("Graphics context lost — restoring…");
+      this.telemetry.track("webgl_context_lost", {});
+      // If the GPU never comes back, say so instead of leaving a dead canvas.
+      window.setTimeout(() => {
+        if (this.contextLost && !this.disposed) {
+          this.hud.toast("Graphics could not be restored — reload the page to keep flying");
+          this.telemetry.track("webgl_context_lost_unrecovered", {});
+        }
+      }, 8000);
+    };
+    this.onContextRestored = () => {
+      this.contextLost = false;
+      this.audio.setHiddenMuted(false);
+      // Rebuild the drawing buffer at the current size and drop the stale clock.
+      this.dprCooldown = 0;
+      this.last = performance.now();
+      this.acc = 0;
+      this.resize();
+      this.hud.toast("Graphics restored");
+      this.telemetry.track("webgl_context_restored", {});
+    };
+    canvas.addEventListener("webglcontextlost", this.onContextLost, false);
+    canvas.addEventListener("webglcontextrestored", this.onContextRestored, false);
 
     this.hud = new HUD(host);
     this.input = new Input(host, () => {
@@ -556,11 +612,13 @@ export class Game {
         if (this.state === "playing") this.setState("paused");
         // Portal QA requirement (and basic courtesy): a hidden tab is silent.
         this.audio.setHiddenMuted(true);
+        void this.audio.suspend();
       } else {
         this.hidden = false;
         this.last = performance.now();
         this.acc = 0;
         this.audio.setHiddenMuted(false);
+        void this.audio.resumeExisting();
       }
     };
     document.addEventListener("visibilitychange", this.onVis);
@@ -634,6 +692,8 @@ export class Game {
     this.resizeObs.disconnect();
     window.removeEventListener("resize", this.onResize);
     document.removeEventListener("visibilitychange", this.onVis);
+    this.renderer.domElement.removeEventListener("webglcontextlost", this.onContextLost);
+    this.renderer.domElement.removeEventListener("webglcontextrestored", this.onContextRestored);
     window.removeEventListener("beforeinstallprompt", this.onBeforeInstall);
     window.removeEventListener("appinstalled", this.onInstalled);
     window.removeEventListener("focus", this.onFocus);
@@ -669,7 +729,7 @@ export class Game {
     try {
     const raw = Math.min(0.1, (now - this.last) / 1000);
     this.last = now;
-    if (this.hidden) return;
+    if (this.hidden || this.contextLost) return;
 
     this.handleHotkeys();
     this.pumpNetwork(raw);
@@ -855,10 +915,13 @@ export class Game {
   }
 
   private fixedUpdate(dt: number): void {
-    const skin = this.skin;
+    // Ranked races keep every pilot's flight model identical. Your equipped
+    // bird remains visible, but store perks never decide a competitive result.
+    const skin = this.gameplaySkin;
     const diving = this.input.diving && !this.bird.asleep;
     this.magnetTimer = Math.max(0, this.magnetTimer - dt);
     this.boostTimer = Math.max(0, this.boostTimer - dt);
+    this.manualBoostCooldown = Math.max(0, this.manualBoostCooldown - dt);
     this.runTime += dt;
     this.xpFlush -= dt;
     if (this.xpFlush <= 0) {
@@ -869,6 +932,15 @@ export class Game {
     this.powers.tick(dt);
     this.launch.tick(dt);
     this.launch.observeInput(diving, this.runTime);
+
+    // Touch-first power activation: a quick double tap triggers a short
+    // momentum burst. It is deliberately cooldown-gated and additive, so the
+    // hill timing remains the skill expression. A stalled bird can also use
+    // the same rescue burst once the cooldown is clear.
+    if (this.save.hasUpgrade("doubletap") && this.save.state.settings.doubleTapBoost && this.input.consumeBoost() && this.manualBoostCooldown <= 0) this.activateManualBoost("double_tap");
+    if (this.save.hasUpgrade("doubletap") && this.save.state.settings.doubleTapBoost && this.bird.grounded && this.bird.speed() < STALL_SPEED && this.manualBoostCooldown <= 0 && this.runTime > 1.2) {
+      this.activateManualBoost("stall_rescue");
+    }
 
     this.bird.step(
       dt,
@@ -1041,7 +1113,14 @@ export class Game {
       if (this.bird.impact > 5) {
         this.audio.land(this.bird.impact);
         this.shake(Math.min(0.55, this.bird.impact * 0.04));
-        this.particles.emitDust(this.bird.x, this.bird.y, this.bird.speed(), slope);
+        // Make hard contact read at a glance on small screens: the impact
+        // burst is larger and higher contrast than a dust puff.
+        if (this.bird.impact > 8) {
+          const ridge = this.terrain.biomeAt(this.bird.x).ridge;
+          this.particles.emitThunk(this.bird.x, this.bird.y, ((ridge >> 16) & 255) / 255, ((ridge >> 8) & 255) / 255, (ridge & 255) / 255);
+        } else {
+          this.particles.emitDust(this.bird.x, this.bird.y, this.bird.speed(), slope);
+        }
       } else if (this.bird.impact < 2.4 && this.bird.speed() > 36 && diving && slope < -0.05) {
         // tangential touchdown at speed on a downslope: reward the finesse
         this.bonus += 10;
@@ -1076,7 +1155,7 @@ export class Game {
     } else if (this.bird.altitude > 6 || this.bird.grounded) {
       this.skimTime = 0;
     }
-    if (this.feverOn || this.boostTimer > 0 || this.bird.speed() > 48 || ((skin.magnetAlways || skin.id === "aurora") && this.bird.speed() > 24)) {
+    if (this.feverOn || this.boostTimer > 0 || this.bird.speed() > 48 || ((this.gameplaySkin.magnetAlways || this.gameplaySkin.id === "aurora") && this.bird.speed() > 24)) {
       this.emitTrail(dt);
     }
 
@@ -1189,7 +1268,7 @@ export class Game {
       }
     }
 
-    const magnetOn = this.feverOn || this.magnetTimer > 0 || skin.magnetAlways || this.powers.magnetOn();
+    const magnetOn = this.feverOn || this.magnetTimer > 0 || this.gameplaySkin.magnetAlways || this.powers.magnetOn();
     this.collect.update(dt, this.bird, this.terrain, magnetOn, this.elapsed, this.powers.magnetScale(), {
       onCoin: (x, y, gem) => {
         const base = gem ? 5 : 1;
@@ -1533,7 +1612,9 @@ export class Game {
         const tr = ((ridge >> 16) & 255) / 255;
         const tg = ((ridge >> 8) & 255) / 255;
         const tb = (ridge & 255) / 255;
-        this.particles.emitThunk(this.bird.x, this.bird.y, tr, tg, tb);
+        // The main step emits the high-impact burst; keep this fallback for
+        // rough landings that are below that visual threshold.
+        if (this.bird.impact <= 8) this.particles.emitThunk(this.bird.x, this.bird.y, tr, tg, tb);
         if (this.bird.impact > 10) this.popupAtBird(quip(THUD_QUIPS, this.thudCount++), "thud");
       }
     }
@@ -1543,7 +1624,7 @@ export class Game {
     const was = this.feverOn;
     this.feverOn = true;
     this.feverReached = true;
-    this.feverTimer = FEVER_DURATION + this.skin.feverBonus + this.masteryPerk.feverBonus;
+    this.feverTimer = FEVER_DURATION + this.gameplaySkin.feverBonus + this.masteryPerk.feverBonus;
     if (!was) {
       this.audio.feverOn();
       this.audio.setMusicMode("fever");
@@ -1663,7 +1744,7 @@ export class Game {
         this.popupAtBird(`SKY HIGH! +${pts}`, "zenith");
         this.audio.zenith();
         this.audio.duckMusic(0.6, 0.7);
-        this.hud.toast(`ZENITH +${pts}`, "zenith");
+        this.hud.toast(`SKYLINE +${pts}`, "zenith");
         this.flash("perfect");
         this.glow(0.8);
         this.haptic([60, 40, 80]);
@@ -1671,6 +1752,20 @@ export class Game {
       }
     }
     this.prevVy = vy;
+  }
+
+  private activateManualBoost(source: "double_tap" | "stall_rescue"): void {
+    this.manualBoostCooldown = MANUAL_BOOST_COOLDOWN;
+    this.boostTimer = Math.max(this.boostTimer, MANUAL_BOOST_TIME);
+    this.bird.vx += MANUAL_BOOST_SPEED;
+    this.bird.vy = Math.max(this.bird.vy, 9);
+    this.audio.boost();
+    this.particles.emitBounceBop(this.bird.x, this.bird.y, 1, 0.65, 0.2);
+    this.particles.burstRing(this.bird.x, this.bird.y, 0xffb347);
+    this.shake(0.28);
+    this.haptic([18, 12, 28]);
+    this.hud.toast(source === "double_tap" ? "DOUBLE TAP BOOST!" : "STALL RESCUE BOOST!", "power");
+    this.telemetry.track("manual_boost", { source });
   }
 
   private onPickup(kind: PickupKind, x: number, y: number): void {
@@ -1777,6 +1872,7 @@ export class Game {
     }
     const slope = this.terrain.slopeAt(this.bird.x);
     if (this.hintTimer < 2.6 && slope < -0.08) return "HOLD to dive";
+    if (novice && this.save.hasUpgrade("doubletap") && this.save.state.settings.doubleTapBoost && this.hintTimer >= 3 && this.hintTimer < 5.8) return "DOUBLE TAP for a boost";
     if (slope > 0.16 && this.bird.grounded && this.bird.speed() > 18) return "RELEASE to launch";
     // No thermal line here: the ♨ HUD chip already says "release!" — three
     // simultaneous thermal texts (toast + chip + hint) was the worst offender
@@ -1821,7 +1917,7 @@ export class Game {
     this.trail.setColor(c[0], c[1], c[2]);
     const show =
       this.state === "playing" &&
-      (this.feverOn || this.boostTimer > 0 || this.bird.speed() > 48 || ((this.skin.magnetAlways || this.skin.id === "aurora") && this.bird.speed() > 24));
+      (this.feverOn || this.boostTimer > 0 || this.bird.speed() > 48 || ((this.gameplaySkin.magnetAlways || this.gameplaySkin.id === "aurora") && this.bird.speed() > 24));
     if (show) this.trail.push(this.bird.x, this.bird.y);
     this.trail.update(dt, show ? 1 : 0);
   }
@@ -1863,7 +1959,7 @@ export class Game {
       return;
     }
 
-    const glow = this.feverOn || this.powers.has("goldenwings") || (this.skin.magnetAlways && this.bird.speed() > 30);
+    const glow = this.feverOn || this.powers.has("goldenwings") || (this.gameplaySkin.magnetAlways && this.bird.speed() > 30);
     // Render interpolation: draw the bird between the previous and current
     // physics step so motion stays smooth above 60 Hz. The menu, sleep and
     // game-over states step the bird directly (or not at all), so they draw
@@ -1926,8 +2022,11 @@ export class Game {
     if (this.scene.fog instanceof THREE.Fog) {
       this.scene.fog.color.copy(this.sky.fogColor).lerp(this.tmpColor.setHex(biome.fogTint), 0.12);
       // Thin the haze as we climb so the whole world opens up beneath the bird.
-      this.scene.fog.near = 160 + altT * 400;
-      this.scene.fog.far = 900 + altT * 1400;
+      // Keep the playable horizon crisp on desktop and mobile. The previous
+      // near/far range put fog directly across the flight path, reading as a
+      // permanent cloud veil even in clear daytime biomes.
+      this.scene.fog.near = 560 + altT * 520;
+      this.scene.fog.far = 5000 + altT * 3000;
       this.renderer.setClearColor(this.scene.fog.color, 1);
     }
     this.altZone =
@@ -1978,12 +2077,20 @@ export class Game {
           [p2, 0, 0],
         ];
     for (const [racer, ox, oy] of views) {
+      // Each split viewport gets one authoritative bird. Rendering both
+      // meshes into both cameras made nearby racers visually stack or appear
+      // to teleport across the divider. Terrain and particles remain shared,
+      // while the focused racer stays unambiguous in their own lane.
+      p1.bird.root.visible = racer === p1;
+      p2.bird.root.visible = racer === p2;
       this.renderer.setViewport(ox, oy, w, h);
       this.renderer.setScissor(ox, oy, w, h);
       racer.camera.resize(w / Math.max(1, h));
       this.renderer.render(this.scene, racer.camera.camera);
     }
     this.renderer.setScissorTest(false);
+    p1.bird.root.visible = true;
+    p2.bird.root.visible = true;
   }
 
 
@@ -2546,6 +2653,7 @@ export class Game {
     this.magnetTimer = 0;
     this.shield = 0;
     this.boostTimer = 0;
+    this.manualBoostCooldown = 0;
     this.continuesUsed = 0;
     this.continueTimer = 0;
     this.timeScale = 1;
@@ -2598,8 +2706,8 @@ export class Game {
     this.collect.reset();
     this.weather.reset();
     // Skin-borne weather perks: weatherproof birds fly warded, stealth birds slip past hazards.
-    this.weather.ward = this.skin.weatherProof ?? false;
-    this.weather.stealth = this.skin.stealth ?? false;
+    this.weather.ward = this.gameplaySkin.weatherProof ?? false;
+    this.weather.stealth = this.gameplaySkin.stealth ?? false;
     this.particles.clear();
     this.terrain.update(this.startX);
     if (idle) this.camera.setIntro(1);
@@ -2646,6 +2754,11 @@ export class Game {
         break;
       case "resume":
         if (this.state === "paused") this.setState("playing");
+        break;
+      case "restart-flight":
+        if (this.state === "paused" || this.state === "playing") {
+          this.startRun();
+        }
         break;
       case "menu":
         this.exitVersus();
@@ -2738,10 +2851,13 @@ export class Game {
         break;
       case "host-room": {
         this.roomCode = makeRoomCode();
-        this.copyRoomInvite(this.roomCode);
         this.modeId = "massrace";
         this.mode = modeById("massrace");
-        this.startRun();
+        this.rankedRace = false;
+        this.setScreen("live");
+        this.preseatLobby();
+        this.copyRoomInvite(this.roomCode);
+        this.hud.toast(`Room ${this.roomCode} created — invite your flock, then ready up`, "gold");
         break;
       }
       case "join-room": {
@@ -2753,7 +2869,10 @@ export class Game {
         this.roomCode = code;
         this.modeId = "massrace";
         this.mode = modeById("massrace");
-        this.startRun();
+        this.rankedRace = false;
+        this.setScreen("live");
+        this.preseatLobby();
+        this.hud.toast(`Joined room ${code} — ready up when everyone is here`, "gold");
         break;
       }
       case "copy-invite": {
@@ -2761,7 +2880,8 @@ export class Game {
         else this.hud.toast("Host a room first to get an invite link", "warn");
         break;
       }
-      case "start-room": {
+      case "start-room":
+      case "ready-room": {
         if (!this.roomCode) {
           this.hud.toast("Host or join a room first", "warn");
           break;
@@ -2769,7 +2889,18 @@ export class Game {
         this.modeId = "massrace";
         this.mode = modeById("massrace");
         this.rankedRace = false;
-        this.startRun();
+        if (!isMultiplayerConfigured()) {
+          this.hud.toast("No live server configured — starting a local practice field", "info");
+          this.startRun();
+          break;
+        }
+        this.preseatLobby();
+        if (!this.net?.sendReady(!this.net.info().ready)) {
+          this.hud.toast("Connecting to the room — try ready again in a moment", "info");
+          break;
+        }
+        this.hud.toast(this.net.info().ready ? "You are ready — waiting for the flock" : "Ready cancelled", "gold");
+        this.bump();
         break;
       }
       case "quick-match":
@@ -3016,8 +3147,11 @@ export class Game {
         this.openCheckout("sunbird_gold");
         break;
       case "vip-buy":
-        if (this.portalEnabled()) break;
-        this.openCheckout("sunbird_vip");
+        if (this.portalEnabled()) this.buyPortalVip();
+        else this.openCheckout("sunbird_vip");
+        break;
+      case "portal-vip-ad":
+        void this.earnPortalVipCoins();
         break;
       case "checkout-pay":
         this.payDemo();
@@ -3123,6 +3257,12 @@ export class Game {
         this.save.state.settings.mute = !this.save.state.settings.mute;
         this.save.persist();
         this.applySettings();
+        break;
+      case "set-doubletap":
+        if (!this.save.hasUpgrade("doubletap")) break;
+        this.save.state.settings.doubleTapBoost = !this.save.state.settings.doubleTapBoost;
+        this.save.persist();
+        this.bump();
         break;
       case "set-music":
         this.save.state.settings.music = !this.save.state.settings.music;
@@ -3301,6 +3441,10 @@ export class Game {
     const def = BOOSTS.find((b) => b.id === id);
     if (!def) return;
     const st = this.save.state;
+    if (def.permanent && this.save.hasUpgrade(id)) {
+      this.hud.toast("Already unlocked", "info");
+      return;
+    }
     if (st.armedBoosts.includes(id)) {
       this.hud.toast("Already armed for next flight", "info");
       return;
@@ -3311,9 +3455,10 @@ export class Game {
       this.hud.toast(`Need ${price - st.wallet} more coins`, "warn");
       return;
     }
-    this.save.armBoost(id);
+    if (def.permanent) this.save.ownUpgrade(id);
+    else this.save.armBoost(id);
     this.audio.purchase();
-    this.hud.toast(`${def.icon} ${def.name} armed`, "power");
+    this.hud.toast(`${def.icon} ${def.name} ${def.permanent ? "unlocked" : "armed"}`, "power");
     this.telemetry.track("boost_bought", { id, price });
     this.bump();
   }
@@ -3605,6 +3750,46 @@ export class Game {
     this.bump();
   }
 
+  /** Portal editions convert VIP into an in-game coin sink, with a rewarded
+   * ad route for players who are short. This keeps checkout out of iframe
+   * portals while giving the portal a clear, opt-in monetisation moment. */
+  private buyPortalVip(): void {
+    const price = VIP.coinPrice;
+    if (!this.save.spend(price)) {
+      this.hud.toast(`Need ● ${(price - this.save.state.wallet).toLocaleString()} more coins`, "info");
+      return;
+    }
+    this.save.grantVip();
+    this.vipActive = true;
+    this.vipExpiredNotice = false;
+    this.save.ownSkin("aurora");
+    this.save.claimVipDaily(this.today);
+    this.audio.purchase();
+    this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
+    this.hud.toast("VIP flight unlocked with coins ♛", "vip");
+    this.telemetry.track("vip_granted", { source: "portal_coins", price });
+    this.bump();
+  }
+
+  private async earnPortalVipCoins(): Promise<void> {
+    const platform = this.platform;
+    if (!platform || platform.name === "none") return;
+    this.setState("ad");
+    this.telemetry.track("portal_reward_request", { reward: "vip_coins", amount: VIP.coinAdReward });
+    const earned = await platform.rewardedBreak();
+    if (this.disposed) return;
+    this.endPortalAd();
+    if (earned) {
+      this.save.addCoins(VIP.coinAdReward);
+      this.hud.toast(`Reward received · +${VIP.coinAdReward} coins`, "gold");
+      this.setState("menu");
+      this.setScreen("paywall");
+    } else {
+      this.setState("menu");
+      this.hud.toast("No reward this time — try again later", "info");
+    }
+  }
+
   private setSeedMode(mode: SeedMode): void {
     if (!this.save.state.gold && mode !== "today") {
       this.setScreen("paywall");
@@ -3641,6 +3826,11 @@ export class Game {
     return skinById(this.save.state.activeSkin);
   }
 
+  /** Cosmetic loadout is always rendered; ranked flight perks are neutral. */
+  private get gameplaySkin(): SkinDef {
+    return this.rankedRace && this.modeId === "massrace" ? skinById("sunbird") : this.skin;
+  }
+
   /** Speed boost for modes with `escalate: true`. Grows with island index and
    *  time so Endless mode feels genuinely harder as you go deeper. */
   private escalateMult(): number {
@@ -3649,7 +3839,7 @@ export class Game {
   }
 
   private daylightMax(): number {
-    return (this.save.state.gold ? DAYLIGHT_MAX_GOLD : DAYLIGHT_MAX) + this.skin.daylightBonus + this.masteryPerk.daylightBonus;
+    return (this.save.state.gold ? DAYLIGHT_MAX_GOLD : DAYLIGHT_MAX) + this.gameplaySkin.daylightBonus + this.masteryPerk.daylightBonus;
   }
 
   private applySkin(): void {
@@ -3672,11 +3862,14 @@ export class Game {
     document.documentElement.classList.toggle("a11y-color", s.colorAssist);
     document.documentElement.classList.toggle("a11y-bigtext", s.bigText);
     this.dpr = this.preferredDpr();
-    this.particleBudget = s.quality === "low" ? 0.4 : 1;
+    // Mobile gets a lighter decorative particle stream by default. Gameplay
+    // events still render because critical emitters are short-lived and the
+    // adaptive quality loop can shed more work under sustained load.
+    this.particleBudget = s.quality === "low" ? 0.4 : this.isMobile ? 0.65 : 1;
     this.particles.setBudget(this.particleBudget);
     // Soft shadows are the single priciest feature on mobile GPUs — keep them
     // only when the user asked for high quality (auto tiers shed them first).
-    const wantShadows = s.quality === "high" || (s.quality === "auto" && this.frameEma < 1 / 30);
+    const wantShadows = !this.isMobile && (s.quality === "high" || (s.quality === "auto" && this.frameEma < 1 / 30));
     if (this.renderer.shadowMap.enabled !== wantShadows) this.renderer.shadowMap.enabled = wantShadows;
     this.resize();
     this.bump();
@@ -3684,7 +3877,12 @@ export class Game {
 
   private preferredDpr(): number {
     const dev = Math.min(window.devicePixelRatio || 1, 2);
-    return this.save.state.settings.quality === "low" ? 1 : dev;
+    // Fill-rate is the dominant mobile cost for this Three.js scene. Tiny
+    // Wings-style clarity comes from a stable frame rate, so cap phones at
+    // 1x keeps the fill-rate stable on phones; native DPR is reserved for
+    // desktop/high quality settings where the GPU budget is predictable.
+    if (this.save.state.settings.quality === "low") return 1;
+    return this.isMobile ? 1 : dev;
   }
 
   private adaptQuality(raw: number): void {
@@ -3708,15 +3906,26 @@ export class Game {
       this.perfWorst = 0;
     }
     this.qualityTimer += raw;
-    if (this.qualityTimer < 2.5) return;
+    if (this.qualityTimer < QUALITY_WINDOW_SECONDS) return;
     this.qualityTimer = 0;
+    // One decision per window, and the anti-oscillation cooldown ticks with it.
+    this.dprCooldown = Math.max(0, this.dprCooldown - QUALITY_WINDOW_SECONDS);
     if (this.save.state.settings.quality !== "auto" || this.state !== "playing") return;
+
+    // Resolution is two-way: step down when the budget is blown, and back up
+    // when headroom returns, with a lock-out so it cannot oscillate. The old
+    // loop only ever stepped down, so one bad moment degraded the whole session.
+    const previousDpr = this.dpr;
+    this.dpr = nextDpr(this.dpr, this.preferredDpr(), this.frameEma, this.dprCooldown);
+    if (this.dpr !== previousDpr) {
+      this.dprCooldown = DPR_COOLDOWN_SECONDS;
+      this.resize();
+      this.telemetry.track(this.dpr < previousDpr ? "quality_step_down" : "quality_step_up", {
+        dpr: this.dpr,
+      });
+    }
+
     if (this.frameEma > 1 / 40) {
-      if (this.dpr > 1) {
-        this.dpr = Math.max(1, this.dpr - 0.25);
-        this.resize();
-        this.telemetry.track("quality_step_down", { dpr: this.dpr });
-      }
       // At the floor resolution already? Kill soft shadows for the frame budget.
       if (this.renderer.shadowMap.enabled) {
         this.renderer.shadowMap.enabled = false;
@@ -3726,7 +3935,7 @@ export class Game {
         this.particleBudget = Math.max(0.3, this.particleBudget - 0.2);
         this.particles.setBudget(this.particleBudget);
       }
-    } else if (this.frameEma < 1 / 58 && this.renderer.shadowMap.enabled === false && this.save.state.settings.quality === "auto") {
+    } else if (this.frameEma < 1 / 58 && this.renderer.shadowMap.enabled === false) {
       // Headroom is back — restore soft shadows (they were only shed under load).
       this.renderer.shadowMap.enabled = true;
       this.particleBudget = Math.min(1, this.particleBudget + 0.2);
@@ -3941,6 +4150,15 @@ export class Game {
           break;
         case "start":
           this.hud.toast("🚦 Live race — GO!", "gold");
+          // A race may only leave the party lobby after the authoritative
+          // room server broadcasts its start. This closes the old gap where
+          // the UI said a room had started but the player stayed on the menu.
+          if (this.state === "menu" && this.screen === "live") {
+            this.modeId = "massrace";
+            this.mode = modeById("massrace");
+            this.rankedRace = false;
+            this.startRun();
+          }
           break;
       }
     }
@@ -3996,7 +4214,7 @@ export class Game {
       this.audio.fanfare();
     };
     if (st.lifetime.ghostBeats >= 10) grant("ghost", "Ghost unlocked — 10 ghost wins!");
-    if (st.lifetime.zeniths >= 25) grant("shadow", "Shadow unlocked — 25 zeniths banked!");
+    if (st.lifetime.zeniths >= 25) grant("shadow", "Shadow unlocked — 25 skyline moments banked!");
     if (st.duel.bestStreak >= 10) grant("mythic", "Mythic unlocked — 10-duel win streak!");
     if (st.ownedSkins.length >= 16) grant("rainbow", "Rainbow unlocked — 15-skin collection!");
     const tiers = this.cups.claimedTiers();
@@ -4349,7 +4567,7 @@ export class Game {
     const deal = dailyDealBoost(this.today);
     this.boostViews = BOOSTS.map((def) => {
       const dealPrice = def.id === deal.id ? deal.price : undefined;
-      return { def, armed: st.armedBoosts.includes(def.id), affordable: st.wallet >= (dealPrice ?? def.price), dealPrice };
+      return { def, armed: def.permanent ? st.ownedUpgrades.includes(def.id) : st.armedBoosts.includes(def.id), affordable: st.wallet >= (dealPrice ?? def.price), dealPrice };
     });
     this.shopTrailViews = SHOP_TRAILS.map((def) => ({
       def,
@@ -4378,7 +4596,7 @@ export class Game {
       coins: this.runCoins,
       daylight: this.daylight,
       daylightMax: this.daylightMax(),
-      fever: this.feverOn ? this.feverTimer / (FEVER_DURATION + this.skin.feverBonus + this.masteryPerk.feverBonus) : this.perfectChain / FEVER_NEED,
+      fever: this.feverOn ? this.feverTimer / (FEVER_DURATION + this.gameplaySkin.feverBonus + this.masteryPerk.feverBonus) : this.perfectChain / FEVER_NEED,
       feverOn: this.feverOn,
       multiplier: this.save.nestMultiplier() * (this.feverOn ? 2 : 1),
       bestDistance: st.bestDistance,
@@ -4531,6 +4749,8 @@ export class Game {
       roomCode: this.net?.info().code ?? this.roomCode,
       roomCount: this.net?.info().count ?? this.massRace.fieldSize + 1,
       roomCapacity: this.net?.info().capacity ?? MASS_RACE_FIELD,
+      roomReady: this.net?.info().ready ?? false,
+      roomReadyCount: (this.net?.roster().filter((p) => p.ready).length ?? 0) + (this.net?.info().ready ? 1 : 0),
       roomSize: this.roomSize,
       roomSkill: this.roomSkill,
       roomMuted: this.roomMuted,
@@ -4628,7 +4848,17 @@ export class Game {
           this.particles.burstRing(racer.bird.x, racer.bird.y, 0xc8f0ff);
         }
       },
-      onLand: () => undefined,
+      onLand: (_quality: number, racer: Racer) => {
+        if (racer.bird.impact <= 5) return;
+        this.audio.land(racer.bird.impact);
+        racer.camera.bump(Math.min(0.45, racer.bird.impact * 0.03));
+        if (racer.bird.impact > 6) {
+          const ridge = this.terrain.biomeAt(racer.bird.x).ridge;
+          this.particles.emitThunk(racer.bird.x, racer.bird.y, ((ridge >> 16) & 255) / 255, ((ridge >> 8) & 255) / 255, (ridge & 255) / 255);
+          this.particles.burstRing(racer.bird.x, racer.bird.y, racer.tint);
+          if (racer.bird.impact > 10) this.hud.toast(`${racer.label} SMASH!`, "thud");
+        }
+      },
       onCoin: (gem: boolean, x: number, y: number) => {
         this.audio.ding();
         this.particles.emitCollect(x, y);
@@ -4642,7 +4872,11 @@ export class Game {
         this.audio.powerup();
         this.particles.emitCollect(x, y);
       },
-      onSplash: () => this.audio.splash(),
+      onSplash: (racer: Racer) => {
+        this.audio.splash();
+        this.particles.burstRing(racer.bird.x, WATER_Y + 1, 0xafe8ff);
+        this.hud.toast(`${racer.label} SPLASH!`, "cloud");
+      },
     };
     p1.step(dt, this.input.diving, this.terrain, this.particles, ev);
     p2.step(dt, this.input.diving2, this.terrain, this.particles, ev);

@@ -801,11 +801,21 @@ describe("RealtimeClient — send throttling (18 tests)", () => {
   it("sendReady fires when connected", async () => {
     const client = await loadClient();
     openSocket();
-    client.sendReady(true);
+    expect(client.sendReady(true)).toBe(true);
     expect(instances[0]!.sent).toHaveLength(1);
     const parsed = JSON.parse(instances[0]!.sent[0]!);
     expect(parsed.type).toBe("ready");
     expect(parsed.ready).toBe(true);
+    expect(client.info().ready).toBe(true);
+  });
+
+  it("keeps local ready state in sync when a pilot changes their mind", async () => {
+    const client = await loadClient();
+    openSocket();
+    client.sendReady(true);
+    expect(client.info().ready).toBe(true);
+    client.sendReady(false);
+    expect(client.info().ready).toBe(false);
   });
 
   it("sendFinish only fires when not connected", async () => {

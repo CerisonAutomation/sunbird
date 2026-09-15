@@ -68,7 +68,8 @@ magnitude reach another pilot fails the build.
 - Same room codes / matchmaking / 40-pilot capacity as the client expects.
 - A single 15 Hz packed `state` broadcast per room; server-assigned `finish`
   places (clients never decide who won).
-- `start` is broadcast once two pilots are seated (3 s countdown).
+- `start` is broadcast once at least two pilots are seated and every pilot has
+  pressed ready (6 s countdown).
 - Stale seats are reaped after 60 s of silence; empty rooms are torn down
   after a 60 s TTL.
 

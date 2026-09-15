@@ -7,7 +7,7 @@ import type { BoardMetric, BoardPage, BoardScope } from "./Leaderboard";
 import type { TournamentView } from "./Tournaments";
 import type { RosterBird, Standing } from "./MassRace";
 import { VIP_DAILY_GIFT } from "./constants";
-import { COLLECTIONS, type BoostView, type ShopTrailView, type SkinView } from "./Economy";
+import { COLLECTIONS, VIP, type BoostView, type ShopTrailView, type SkinView } from "./Economy";
 import { MenuSky } from "./MenuSky";
 import { GREY_PALETTE, rivalPalette, skinPalette, sunSVG, sunbirdSVG } from "./Sunbird";
 import { formatDistance } from "./math";
@@ -226,6 +226,8 @@ export type HudSnapshot = {
   roomCode: string;
   roomCount: number;
   roomCapacity: number;
+  roomReady: boolean;
+  roomReadyCount: number;
   roomSize: number;
   roomSkill: string;
   roomMuted: boolean;
@@ -337,6 +339,11 @@ export class HUD {
   private menuCard!: HTMLElement;
   private pauseEl!: HTMLElement;
   private pauseBtnEl!: HTMLElement;
+  private muteBtnEl!: HTMLButtonElement;
+  /** Menu-sheet mute control. The play HUD's button only exists mid-flight, so
+   *  the shell needs its own always-reachable toggle. */
+  private menuMuteEl: HTMLButtonElement | null = null;
+  private menuMuteShown: boolean | null = null;
   private contEl!: HTMLElement;
   private contCard!: HTMLElement;
   private adEl!: HTMLElement;
@@ -447,7 +454,7 @@ export class HUD {
         <div class="launch-banner" data-ref="launchBanner"></div>
         <div class="power-strip" data-ref="powerStrip"></div>
         <div class="goal-strip" data-ref="goalStrip"></div>
-        <div class="goal-pop" data-ref="goalPop"></div>
+        <div class="goal-pop" data-ref="goalPop" role="status" aria-live="polite" aria-atomic="true"></div>
         <div class="countdown" data-ref="countdown"></div>
         <div class="versus-bar hidden" data-ref="versusBar"></div>
         <div class="standings hidden" data-ref="standings"></div>
@@ -477,20 +484,26 @@ export class HUD {
           <div class="fever-label">FEVER</div>
           <div class="fever-bar"><div class="fever-fill" data-ref="feverFill"></div></div>
         </div>
+        <button class="icon-btn mute-btn" data-ui data-action="set-mute" data-ref="muteBtn" aria-label="Mute sound" title="Mute sound">🔊</button>
         <button class="icon-btn pause-btn" data-ui data-action="pause" data-ref="pauseBtn" aria-label="Pause">❙❙</button>
         <div class="combo" data-ref="combo"></div>
-        <div class="hint" data-ref="hint"></div>
+        <div class="hint" data-ref="hint" role="status" aria-live="polite" aria-atomic="true"></div>
         <div class="hand" data-ref="hand">☝</div>
       </div>
 
       <div class="overlay menu hidden" data-ref="menu"><div class="paper-card" data-ref="menuCard"></div></div>
 
       <div class="overlay pause hidden" data-ref="pause">
-        <div class="paper-card slim">
-          <h2>Paused</h2>
-          <p class="tagline">The sun waits for no bird.</p>
-          <button class="primary-btn" data-ui data-action="resume">Resume</button>
-          <button class="ghost-btn" data-ui data-action="menu">Give up</button>
+        <div class="paper-card slim pause-card">
+          <div class="pause-kicker">FLIGHT ON HOLD</div>
+          <h2>Take a breath</h2>
+          <p class="tagline">Your run is safe. Ready when you are.</p>
+          <div class="pause-actions">
+            <button class="primary-btn" data-ui data-action="resume">▶ Keep flying</button>
+            <button class="ghost-btn" data-ui data-action="restart-flight">↻ Restart flight</button>
+            <button class="ghost-btn danger-btn" data-ui data-action="menu">✕ Exit flight</button>
+          </div>
+          <p class="pause-exit-note">Restart begins a fresh flight. Exit returns you to the launch pad.</p>
         </div>
       </div>
 
@@ -520,6 +533,10 @@ export class HUD {
 
   onAction(handler: ActionHandler): void {
     this.root.addEventListener("click", (e) => {
+      const details = (e.target as HTMLElement).closest("summary")?.parentElement;
+      if (details instanceof HTMLDetailsElement && details.dataset.ref === "homeMore") this.homeMoreOpen = !details.open;
+    });
+    this.root.addEventListener("click", (e) => {
       const t = (e.target as HTMLElement).closest("[data-action]") as HTMLElement | null;
       if (!t || (t as HTMLButtonElement).disabled) return;
       e.preventDefault();
@@ -534,6 +551,10 @@ export class HUD {
   }
 
   update(s: HudSnapshot): void {
+    // Keep the menu bird animated by default. The in-game Reduce motion
+    // switch remains the explicit opt-out; relying solely on the browser's
+    // media query made the hero appear frozen on some desktop profiles.
+    document.documentElement.classList.toggle("sb-reduce-motion", s.settings.reduceMotion);
     const key = `${s.state}|${s.screen}|${s.version}`;
     if (key !== this.lastKey) {
       this.lastKey = key;
@@ -557,6 +578,26 @@ export class HUD {
     // The pause control only makes sense in live flight — hide it while the
     // crash "second wind" card is up so it can't read as a dead button.
     this.pauseBtnEl.classList.toggle("hidden", s.state !== "playing");
+    this.muteBtnEl.classList.toggle("hidden", !inPlay);
+    const muted = s.settings.mute;
+    this.muteBtnEl.textContent = muted ? "🔇" : "🔊";
+    this.muteBtnEl.setAttribute("aria-label", muted ? "Unmute sound" : "Mute sound");
+    this.muteBtnEl.title = muted ? "Unmute sound" : "Mute sound";
+    // Menu mute stays in sync without re-querying every frame. Re-query only
+    // when the sheet was re-rendered (the old node is detached).
+    if (this.menuMuteEl && !this.menuMuteEl.isConnected) this.menuMuteEl = null;
+    if (!this.menuMuteEl) {
+      this.menuMuteEl = this.menuCard.querySelector<HTMLButtonElement>("[data-menu-mute]");
+      if (this.menuMuteEl) this.menuMuteShown = null;
+    }
+    if (this.menuMuteEl && this.menuMuteShown !== muted) {
+      this.menuMuteShown = muted;
+      const label = muted ? "Unmute sound" : "Mute sound";
+      this.menuMuteEl.textContent = muted ? "\u{1F507}" : "\u{1F50A}";
+      this.menuMuteEl.setAttribute("aria-pressed", muted ? "true" : "false");
+      this.menuMuteEl.setAttribute("aria-label", label);
+      this.menuMuteEl.title = label;
+    }
     this.contEl.classList.toggle("hidden", s.state !== "continue");
     this.adEl.classList.toggle("hidden", s.state !== "ad");
     this.overEl.classList.toggle("hidden", !(s.state === "gameover" && s.screen === "main"));
@@ -860,6 +901,7 @@ export class HUD {
   }
 
   private resizeObs: ResizeObserver | null = null;
+  private homeMoreOpen = false;
 
   dispose(): void {
     this.resizeObs?.disconnect();
@@ -869,8 +911,15 @@ export class HUD {
 
   private renderStatic(s: HudSnapshot): void {
     if (s.state === "menu" || (s.state === "gameover" && s.screen !== "main")) {
+      const expandedRef =
+        (this.menuCard.querySelector("details[open][data-ref]") as HTMLDetailsElement | null)?.dataset.ref ??
+        (s.screen === "main" && this.homeMoreOpen ? "homeMore" : undefined);
       this.menuCard.className = `paper-card ${s.screen === "main" ? "menu-hero" : s.screen === "shop" || s.screen === "pass" ? "wide" : ""}`;
       this.menuCard.innerHTML = this.renderScreen(s);
+      if (expandedRef) {
+        const next = this.menuCard.querySelector(`[data-ref="${CSS.escape(expandedRef)}"]`) as HTMLDetailsElement | null;
+        if (next) next.open = true;
+      }
     }
     if (s.state === "gameover") this.overCard.innerHTML = renderGameOver(s);
     if (s.state === "continue") {
@@ -954,6 +1003,7 @@ export class HUD {
     this.menuCard = grab("menuCard");
     this.pauseEl = grab("pause");
     this.pauseBtnEl = grab("pauseBtn");
+    this.muteBtnEl = grab("muteBtn") as HTMLButtonElement;
     this.contEl = grab("continue");
     this.contCard = grab("contCard");
     this.adEl = grab("ad");
@@ -1188,6 +1238,8 @@ function renderLive(s: HudSnapshot): string {
   const seated = Math.min(fieldSize, flock.length + 1);
   const openSeats = fieldSize - seated;
   const seatPct = Math.round((seated / fieldSize) * 100);
+  const readyLabel = s.roomReady ? "READY · waiting for flock" : "READY UP";
+  const readyHint = s.roomReadyCount >= 2 ? "The referee will start the race" : "Need one more bird to ready up";
   return `
     ${head("Race Lobby", "back", status)}
 
@@ -1210,6 +1262,15 @@ function renderLive(s: HudSnapshot): string {
       </div>
       <div class="seat-bar"><i style="width:${seatPct}%"></i></div>
     </div>
+
+    ${
+      s.roomCode
+        ? `<div class="ready-room ${s.roomReady ? "is-ready" : ""}">
+             <div><b>${s.roomReadyCount} ready</b><span>${readyHint}</span></div>
+             <button class="primary-btn race40" data-ui data-action="ready-room">${readyLabel}</button>
+           </div>`
+        : ""
+    }
 
     ${
       s.roomCode
@@ -1294,7 +1355,7 @@ function renderLive(s: HudSnapshot): string {
         ${
           s.roomCode
             ? `<button class="soft-btn wide invite-btn" data-ui data-action="copy-invite">🔗 Copy invite link</button>
-               <button class="primary-btn race40 hero room-fly" data-ui data-action="start-room"><span class="hero-label">⚡ FLY · room ${escapeHtml(s.roomCode)}</span><span class="hero-hint">friends join your room by link</span></button>`
+               <button class="soft-btn wide room-fly" data-ui data-action="ready-room"><span class="hero-label">${s.roomReady ? "✓ YOU ARE READY" : "READY UP TO RACE"}</span><span class="hero-hint">the room starts when two birds are ready</span></button>`
             : ""
         }
         <div class="redeem">
@@ -1314,7 +1375,7 @@ function renderLive(s: HudSnapshot): string {
     <button class="ghost-btn" data-ui data-action="menu">Back out</button>
     <p class="fineprint">${
       s.multiplayerLive
-        ? "Connected to the configured race server. Finish order is decided server-side."
+        ? "Create or join a room, then ready up. The server starts the race once the flock is ready and decides the finish order."
         : "Race against AI pilots on today's hills. Each pilot flies the same terrain with unique skill levels."
     }</p>
   `;
@@ -1699,6 +1760,15 @@ function renderMain(s: HudSnapshot): string {
       ? `<p class="portal-note">${s.portalName === "poki" ? "Poki edition · portal rewards enabled" : s.portalName === "crazy" ? "CrazyGames edition · portal rewards enabled" : "Portal edition"}</p>`
       : `<button class="lock-chip" data-ui data-action="open-paywall">✦ Pick your hills with Gold</button>`;
   return `
+    <button
+      class="icon-btn menu-mute"
+      data-ui
+      data-action="set-mute"
+      data-menu-mute
+      aria-pressed="${s.settings.mute ? "true" : "false"}"
+      aria-label="${s.settings.mute ? "Unmute sound" : "Mute sound"}"
+      title="${s.settings.mute ? "Unmute sound" : "Mute sound"}"
+    >${s.settings.mute ? "\u{1F507}" : "\u{1F50A}"}</button>
     <header class="hero">
       <!-- Sun and bird both come from Sunbird.ts, so the title screen, the
            lobby and the flock in the menu sky are literally one sun and one
@@ -1711,6 +1781,10 @@ function renderMain(s: HudSnapshot): string {
         <p class="hero-sub">Dive the valleys · ride the ridgeline · outrun the sunset</p>
       </div>
     </header>
+    <div class="menu-quick-actions" role="group" aria-label="Quick actions">
+      <button class="quick-action shop" data-ui data-action="open-shop">🛍 <b>SHOP</b><span>Upgrade your bird</span></button>
+      <button class="quick-action" data-ui data-action="open-settings">⚙ <b>SETTINGS</b><span>Audio · controls</span></button>
+    </div>
 
     <div class="hero-meta">
       <span class="pill seed-pill">${s.seedLabel}</span>
@@ -1733,28 +1807,37 @@ function renderMain(s: HudSnapshot): string {
         <span class="mode-desc">Free flight — hold to dive, release to soar</span>
       </button>
       <button class="mode-card-main endless" data-ui data-action="start-endless" aria-label="Play Endless mode — no clock, hills get faster">
-        <span class="mode-icon-lg endless-inf">∞</span>
+        <span class="mode-icon-lg endless-inf" aria-hidden="true"><svg class="mi endless-mark" viewBox="0 0 48 48"><path d="M13.5 24c0-5.1 3-8.5 7.1-8.5 3.1 0 5.1 2 7.5 5.3l2.2 3.1c2 2.8 3.4 4.6 5.7 4.6 3 0 5-2.3 5-5.5s-2-5.5-5-5.5c-2.5 0-4.1 1.7-6 4.2l-2.2 3.1C25.3 28.7 22.9 33 19.2 33c-4.1 0-7.2-3.5-7.2-9z" fill="none" stroke="currentColor" stroke-width="3.8" stroke-linecap="round"/><path d="M24 8v5M24 35v5M8 24h5M35 24h5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" opacity=".55"/></svg></span>
         <span class="mode-name">ENDLESS</span>
         <span class="mode-desc">No clock · hills accelerate forever</span>
       </button>
     </div>
 
-    <div class="section-title">More ways to fly <small>PvE · cups · live rooms</small></div>
+    <button class="daily-strip ${s.daily.done ? "done" : ""}" data-ui data-action="${s.daily.done ? "open-challenges" : "play-daily"}">
+      <span class="ds-icon">${s.daily.done ? "✓" : s.daily.modifierIcon}</span>
+      <span class="ds-body"><b>Daily · ${s.daily.title}</b><em>${s.daily.done ? "Complete — gauntlet & calendar inside" : `${s.daily.modifierLabel} · ${escapeHtml(s.daily.metric)} ≥ ${s.daily.target} · ● ${s.daily.reward}`}</em></span>
+      <span class="ds-go">${s.daily.done ? "›" : "FLY"}</span>
+    </button>
+
+    <section class="home-more expanded" data-ref="homeMore" aria-label="Events, progress and collection">
+      <div class="home-more-heading">Explore your flight <span>modes · events · rank · shop</span></div>
+      <div class="home-more-body">
+    <div class="section-title">Choose a flight <small>race others, master solo flight, earn rewards</small></div>
     <div class="mode-cards" role="group" aria-label="Play modes">
       <button class="mode-card-main pvp" data-ui data-action="open-live">
         <span class="mode-icon-lg"><svg class="mi" viewBox="0 0 48 48"><defs><linearGradient id="gPvp" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7a6a"/><stop offset="1" stop-color="#d84a5a"/></linearGradient></defs><g stroke="url(#gPvp)" stroke-width="3.4" stroke-linecap="round"><line x1="10" y1="10" x2="34" y2="34"/><line x1="38" y1="10" x2="14" y2="34"/></g><g stroke="#a83a4a" stroke-width="3.4" stroke-linecap="round"><line x1="31" y1="37" x2="37" y2="31"/><line x1="11" y1="31" x2="17" y2="37"/></g><circle cx="24" cy="22" r="4.5" fill="#fff" opacity="0.9"/></svg></span>
-        <span class="mode-name">PVP</span>
-        <span class="mode-desc">Race 40 pilots · duels · rooms</span>
+        <span class="mode-name">RACE</span>
+        <span class="mode-desc">Live rooms, duels &amp; local practice</span>
       </button>
       <button class="mode-card-main pve" data-ui data-action="open-challenges">
         <span class="mode-icon-lg"><svg class="mi" viewBox="0 0 48 48"><defs><linearGradient id="gPve" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6ab8ff"/><stop offset="1" stop-color="#3a7ad8"/></linearGradient></defs><circle cx="24" cy="24" r="16" fill="none" stroke="url(#gPve)" stroke-width="3.4"/><circle cx="24" cy="24" r="9" fill="none" stroke="url(#gPve)" stroke-width="3"/><circle cx="24" cy="24" r="3.2" fill="url(#gPve)"/></svg></span>
-        <span class="mode-name">PVE</span>
-        <span class="mode-desc">Daily challenge & storm gauntlet</span>
+        <span class="mode-name">CHALLENGES</span>
+        <span class="mode-desc">Daily flights, gauntlets &amp; storms</span>
       </button>
       <button class="mode-card-main cup" data-ui data-action="open-cups">
         <span class="mode-icon-lg"><svg class="mi" viewBox="0 0 48 48"><defs><linearGradient id="gCup" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe08a"/><stop offset="1" stop-color="#e8a020"/></linearGradient></defs><path d="M15 8h18v10a9 9 0 0 1-18 0z" fill="url(#gCup)"/><path d="M15 10H8a7 7 0 0 0 7 9M33 10h7a7 7 0 0 1-7 9" fill="none" stroke="url(#gCup)" stroke-width="3"/><rect x="21" y="26" width="6" height="7" fill="url(#gCup)"/><path d="M16 36h16v4H16z" fill="#c8871a"/></svg></span>
-        <span class="mode-name">TOURNAMENT</span>
-        <span class="mode-desc">Weekly cups — win exclusive gear</span>
+        <span class="mode-name">CUPS</span>
+        <span class="mode-desc">Weekly flights with exclusive rewards</span>
       </button>
     </div>
 
@@ -1770,20 +1853,6 @@ function renderMain(s: HudSnapshot): string {
       } · 🔥${s.rival.streak} streak</span>
     </button>
 
-    <div class="section-title">Race formats <small>all on-device unless in a room</small></div>
-    <div class="pvp-modes" role="group" aria-label="Race formats">
-      <button class="pvp-mode rated" data-ui data-action="pvp-ranked"><i>🏆</i><b>Ranked 40</b><span>Local rating</span></button>
-      <button class="pvp-mode rated" data-ui data-action="pvp-duel"><i>⚔</i><b>Duel 1v1</b><span>Local ±16</span></button>
-      <button class="pvp-mode" data-ui data-action="pvp-casual"><i>🐦</i><b>Casual 40</b><span>Practice · no rating</span></button>
-      <button class="pvp-mode storm" data-ui data-action="pvp-storm"><i>⛈</i><b>Stormfront</b><span>Practice · PvE × PvP</span></button>
-      <button class="pvp-mode" data-ui data-action="versus"><i>👥</i><b>Local 2P</b><span>Same screen</span></button>
-    </div>
-
-    <button class="daily-strip ${s.daily.done ? "done" : ""}" data-ui data-action="${s.daily.done ? "open-challenges" : "play-daily"}">
-      <span class="ds-icon">${s.daily.done ? "✓" : s.daily.modifierIcon}</span>
-      <span class="ds-body"><b>Daily · ${s.daily.title}</b><em>${s.daily.done ? "Complete — gauntlet & calendar inside" : `${s.daily.modifierLabel} · ${escapeHtml(s.daily.metric)} ≥ ${s.daily.target} · ● ${s.daily.reward}`}</em></span>
-      <span class="ds-go">${s.daily.done ? "›" : "FLY"}</span>
-    </button>
     <button class="event-strip" data-ui data-action="play-event">
       <span class="ds-icon">${s.weeklyEvent.icon}</span>
       <span class="ds-body"><b>Event · ${s.weeklyEvent.name}</b><em>${s.monthlyTheme.icon} ${s.monthlyTheme.name} · fly ${s.weeklyEvent.target.toLocaleString()} m · ● ${s.weeklyEvent.reward}</em></span>
@@ -1802,22 +1871,15 @@ function renderMain(s: HudSnapshot): string {
 
     ${renderMiniBoard(s)}
 
-    <nav class="nav-grid compact">
-      <button class="nav-btn" data-ui data-action="mode-select"><i>🎯</i><span>Modes</span></button>
-      <button class="nav-btn" data-ui data-action="open-challenges"><i>☀</i><span>Daily</span></button>
-      <button class="nav-btn" data-ui data-action="open-live"><i>🐦</i><span>Race</span></button>
-      <button class="nav-btn" data-ui data-action="open-board"><i>🌍</i><span>Board</span></button>
-      <button class="nav-btn" data-ui data-action="open-cups"><i>🏆</i><span>Cups</span></button>
-      <button class="nav-btn" data-ui data-action="open-shop"><i><svg viewBox="0 0 24 24" class="ti"><path d="M6 8h12l-1.2 12H7.2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 8V6a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="2"/></svg></i><span>Shop</span></button>
+    <div class="menu-section-label">Your hangar</div>
+    <nav class="nav-grid compact hangar-nav" aria-label="Collection and account">
       <button class="nav-btn" data-ui data-action="open-pass"><i><svg viewBox="0 0 24 24" class="ti"><path d="M4 9a2 2 0 0 0 0 6v3h16v-3a2 2 0 0 1 0-6V6H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><line x1="14" y1="6" x2="14" y2="18" stroke="currentColor" stroke-width="2" stroke-dasharray="2 2.4"/></svg></i><span>Pass ${s.season.tier}</span></button>
       <button class="nav-btn" data-ui data-action="open-trophies"><i>🏅</i><span>${s.trophyCounts.unlocked}/${s.trophyCounts.total}</span></button>
-      <button class="nav-btn" data-ui data-action="open-rank"><i>⚔</i><span>Rank</span></button>
       <button class="nav-btn" data-ui data-action="open-campaign"><i>🧭</i><span>Story ${s.campaignDone}/${s.campaignTotal}</span></button>
       <button class="nav-btn" data-ui data-action="open-squad"><i>🤝</i><span>Squad</span></button>
       <button class="nav-btn" data-ui data-action="open-atlas"><i>🗺</i><span>Atlas</span></button>
       <button class="nav-btn" data-ui data-action="open-scores"><i>📈</i><span>Scores</span></button>
       <button class="nav-btn" data-ui data-action="open-account"><i>👤</i><span>Account</span></button>
-      <button class="nav-btn" data-ui data-action="open-settings" aria-label="Settings"><i>⚙</i><span>Settings</span></button>
     </nav>
 
     ${
@@ -1841,6 +1903,8 @@ function renderMain(s: HudSnapshot): string {
     ${renderQuests(s.quests)}
     ${renderMissions(s.missions)}
     <div class="menu-stats"><div>Best <b>${formatDistance(s.bestDistance)}</b></div><div>Today <b>${formatDistance(s.todayBest)}</b></div></div>
+      </div>
+    </section>
   `;
 }
 
@@ -1923,12 +1987,12 @@ function renderBoostRow(v: BoostView, wallet: number): string {
   const missing = Math.max(0, price - wallet);
   const priceLabel = v.dealPrice !== undefined ? `<s>● ${d.price}</s> ● ${price}` : `● ${price}`;
   const action = v.armed
-    ? `<span class="tag on">Armed ✓</span>`
+    ? `<span class="tag on">${d.permanent ? "Unlocked ✓" : "Armed ✓"}</span>`
     : v.affordable
       ? `<button class="mini-btn ${v.dealPrice !== undefined ? "gold" : ""}" data-ui data-action="buy-boost" data-id="${d.id}">${priceLabel}</button>`
       : `<span class="tag need">Need ${missing}●</span>`;
   const dealTag = v.dealPrice !== undefined && !v.armed ? `<span class="deal-tag">TODAY −50%</span>` : "";
-  return `<div class="boost-row ${v.armed ? "armed" : ""} ${v.dealPrice !== undefined ? "deal" : ""}"><span class="bi">${d.icon}</span><div><div class="mt">${d.name}<span class="boost-once">one flight</span>${dealTag}</div><div class="md">${d.desc}</div></div>${action}</div>`;
+  return `<div class="boost-row ${v.armed ? "armed" : ""} ${v.dealPrice !== undefined ? "deal" : ""}"><span class="bi">${d.icon}</span><div><div class="mt">${d.name}${d.permanent ? `<span class="boost-once">permanent</span>` : `<span class="boost-once">one flight</span>`}${dealTag}</div><div class="md">${d.desc}</div></div>${action}</div>`;
 }
 
 function renderTrailCard(v: ShopTrailView, wallet: number): string {
@@ -1991,12 +2055,24 @@ function renderShop(s: HudSnapshot): string {
 function renderPaywall(s: HudSnapshot): string {
   if (s.portalName !== "none") {
     return `
-      ${head("Portal Edition")}
+      ${head("Portal Rewards")}
       <div class="portal-card">
         <div class="logo-mark">✦</div>
-        <h2>Play Fair. Fly Far.</h2>
-        <p class="tagline">This portal edition has no direct checkout, no external ads, no paywall.${s.portalName === "poki" || s.portalName === "crazy" ? " Rewards come from the portal." : ""}</p>
-        <p class="fineprint">Keep your momentum, complete missions, and earn every cosmetic through play.</p>
+        <h2>Make your own VIP flight</h2>
+        <p class="tagline">Use coins earned in this game. No external checkout, account, or payment page is required.</p>
+        <ul class="feature-list tight">${VIP.features.map((f) => `<li>${f}</li>`).join("")}</ul>
+        ${s.vip
+          ? s.wallet >= VIP.coinPrice
+            ? `<div class="owned-banner vip">VIP active — ${s.vipDaysLeft} day${s.vipDaysLeft === 1 ? "" : "s"} left</div>
+               <button class="primary-btn vip" data-ui data-action="vip-buy">Extend 30 days · ● ${VIP.coinPrice.toLocaleString()}</button>`
+            : `<div class="owned-banner vip">VIP active — ${s.vipDaysLeft} day${s.vipDaysLeft === 1 ? "" : "s"} left</div>
+               <p class="fineprint">Need ● ${(VIP.coinPrice - s.wallet).toLocaleString()} more coins to extend.</p>
+               <button class="soft-btn wide" data-ui data-action="portal-vip-ad">Watch a rewarded flight · +● ${VIP.coinAdReward}</button>`
+          : s.wallet >= VIP.coinPrice
+            ? `<button class="primary-btn vip" data-ui data-action="vip-buy">Unlock 30 days · ● ${VIP.coinPrice.toLocaleString()}</button>`
+            : `<div class="owned-banner">Need ● ${(VIP.coinPrice - s.wallet).toLocaleString()} more coins</div>
+               <button class="soft-btn wide" data-ui data-action="portal-vip-ad">Watch a rewarded flight · +● ${VIP.coinAdReward}</button>`}
+        <p class="fineprint">${s.portalName === "poki" || s.portalName === "crazy" ? "Rewarded flights are supplied by the portal." : "Earn coins from flights, quests, streaks, and challenges."}</p>
       </div>
     `;
   }
@@ -2084,12 +2160,13 @@ function renderSettings(s: HudSnapshot): string {
   const sPct = Math.round((s.settings.sfxVolume ?? 0.9) * 100);
   return `
     ${head("Settings")}
-    ${toggle("Sound Effects", "mute", !s.settings.mute)}
+    ${toggle("Mute all sound", "mute", !s.settings.mute)}
     <div class="setting-row"><span>SFX Volume</span><button class="mini-btn" data-ui data-action="set-sfx-vol">${s.settings.mute ? "Muted" : `${sPct}%`}</button></div>
     ${toggle("Music", "music", s.settings.music)}
     <div class="setting-row"><span>Music Volume</span><button class="mini-btn" data-ui data-action="set-music-vol">${!s.settings.music ? "Off" : `${mPct}%`}</button></div>
     <div class="setting-row"><span>Music Track</span><button class="mini-btn" data-ui data-action="set-track">${s.settings.musicTrack === "shuffle" ? "Shuffle (all 10)" : `${s.settings.musicTrack + 1}. ${TRACK_NAMES[s.settings.musicTrack] ?? ""}`}</button></div>
     ${toggle("Haptics", "haptics", s.settings.haptics)}
+    ${s.boosts.some((b) => b.def.id === "doubletap" && b.armed) ? toggle("Double-tap boost", "doubletap", s.settings.doubleTapBoost) : ""}
     ${toggle("Reduce motion", "motion", s.settings.reduceMotion)}
     ${toggle("Colorblind assist", "colorassist", s.settings.colorAssist)}
     ${toggle("Large text", "bigtext", s.settings.bigText)}
@@ -2306,7 +2383,7 @@ function renderGameOver(s: HudSnapshot): string {
       <div><span>Score</span><b>${Math.floor(s.score).toLocaleString()}</b></div>
       <div><span>Coins</span><b>${s.coins}</b></div>
       <div><span>Perfects</span><b>${s.perfects}</b></div>
-      <div><span>Zeniths</span><b>${s.zeniths}</b></div>
+      <div><span>Skyline moments</span><b>${s.zeniths}</b></div>
       <div><span>Rings</span><b>${s.rings}</b></div>
       <div><span>Balloons</span><b>${s.balloons}</b></div>
       <div><span>Sunflowers</span><b>${s.sunflowers}</b></div>

@@ -16,26 +16,28 @@ immutable icon caching, `no-cache` on `sw.js`, and security headers.
 
 **Leaderboard on Vercel:** the `api/` directory ships two serverless functions
 (`GET /api/board`, `POST /api/score`) implementing `LEADERBOARD_API.md`.
-They persist to Vercel KV when `KV_REST_API_URL` + `KV_REST_API_TOKEN` are set,
+They persist to Upstash Redis when `KV_REST_API_URL` + `KV_REST_API_TOKEN` are set,
 and fall back to an in-memory board otherwise (preview only, resets on cold
 start). To enable it:
 
-1. Create a KV store in the Vercel dashboard and add its `KV_REST_API_URL` +
+1. Create an Upstash Redis database and add its `KV_REST_API_URL` +
    `KV_REST_API_TOKEN` to the project environment.
 2. Set `VITE_LEADERBOARD_URL=/api` (same origin) in the build env and redeploy.
 3. Optionally set `VITE_LEADERBOARD_SALT` (build) and `LEADERBOARD_SALT`
    (functions) to require HMAC-signed score submissions.
+4. Verify `GET https://<deployment>/api/health` returns `ok: true` and
+   `storage: "upstash-redis"` before enabling global ranking.
 
 **Multiplayer:** the Rust `sunbird-server` owns the WebSocket room protocol
-(`GET /ws`, 15 Hz state, server-refereed finishes). It is **live on a GCP
-free-tier VM**:
+(`GET /ws`, 15 Hz state, server-refereed finishes). The deployment script
+targets a GCP free-tier VM; treat it as unverified until the current binary and
+production WSS smoke check pass:
 
 - Host: `sunbird-mp` — e2-micro, `us-central1-a`, Ubuntu 24.04, 30 GB
   standard disk, 4 GB swap (e2-micro has 1 GB RAM), external IP
   `34.123.76.46`, running as a hardened systemd unit (`User=nobody`,
   `MemoryMax=700M`, restart-on-failure). Always-free eligible.
-- Endpoint: `ws://34.123.76.46:8080/ws` — two-client join/welcome/peers/
-  start smoke-tested against the live VM.
+- Endpoint: `ws://34.123.76.46:8080/ws` is a development probe only; the current binary and production WSS endpoint must be verified before release.
 - Redeploy after server changes: `bash rust/deploy/gcloud/deploy.sh`
   (cross-compiles for linux/amd64 in Docker, ships, restarts the service).
 
@@ -105,7 +107,7 @@ this is deliberate and tested; do not make the font link render-blocking.
 | Variable | Web | Poki | Crazy |
 |---|---|---|---|
 | `VITE_PORTAL_TARGET` | unset | `poki` | `crazy` |
-| `VITE_MULTIPLAYER_URL` | `/mp` (dev) or `wss://…` | unset (portals: solo field) | unset |
+| `VITE_MULTIPLAYER_URL` | `/mp` (dev) or verified `wss://…` | unset until portal-safe WSS is approved | unset until portal Full Launch multiplayer is approved |
 | `VITE_CRAZY_BANNER_ID` | — | — | optional |
 
 ## 5. Stripe webhook entitlements (server-authoritative purchases)

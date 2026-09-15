@@ -112,7 +112,7 @@ const GAUNTLET_POOL: { mode: ModeId; metric: ChallengeMetric; base: number; labe
   { mode: "distance", metric: "distance", base: 800, label: "Distance run" },
   { mode: "daytrip", metric: "coins", base: 14, label: "Coin sweep" },
   { mode: "perfect", metric: "perfects", base: 3, label: "Perfect chain" },
-  { mode: "zenith", metric: "zenith", base: 1, label: "Zenith hunt" },
+  { mode: "zenith", metric: "zenith", base: 1, label: "Skyline hunt" },
   { mode: "coinrush", metric: "coins", base: 18, label: "Rush hour" },
 ];
 

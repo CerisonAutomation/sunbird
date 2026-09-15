@@ -1,5 +1,8 @@
 import { Component, type ErrorInfo, type ReactNode, useEffect, useRef, useState } from "react";
-import { Game } from "./game/Game";
+// Type-only import: erased at compile time, so it does NOT drag the game (or
+// Three.js) into the initial bundle. The runtime module is fetched by the
+// dynamic import inside the mount effect, behind the inline boot loader.
+import type { Game } from "./game/Game";
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
   state = { error: null as string | null };
@@ -66,11 +69,18 @@ export default function App() {
     if (!el) return;
     let game: Game | null = null;
     let cancelled = false;
-    try {
-      game = new Game(el);
-    } catch (err) {
-      console.error("Sunbird failed to boot:", err);
-      if (!cancelled) {
+
+    // The game is code-split on purpose: the renderer, terrain, audio engine and
+    // the whole Three.js graph now load AFTER first paint instead of blocking it.
+    // The inline boot loader in index.html covers the gap.
+    const boot = async (): Promise<void> => {
+      try {
+        const { Game: GameCtor } = await import("./game/Game");
+        if (cancelled) return;
+        game = new GameCtor(el);
+      } catch (err) {
+        console.error("Sunbird failed to boot:", err);
+        if (cancelled) return;
         // Defer: setState synchronously inside an effect body forces a
         // cascading re-render; a microtask keeps the boot-failure path clean.
         const msg = err instanceof Error ? err.message : String(err);
@@ -78,8 +88,13 @@ export default function App() {
           if (!cancelled) setFailed(msg);
         });
       }
-    }
+    };
+    void boot();
+
     return () => {
+      // Also covers the StrictMode mount/unmount/mount cycle while the chunk is
+      // still in flight: the stale run constructs nothing, and anything it did
+      // construct before cleanup is disposed here.
       cancelled = true;
       game?.dispose();
     };

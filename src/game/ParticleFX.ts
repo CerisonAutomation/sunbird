@@ -190,7 +190,7 @@ export class ParticleFX {
 
   emitSplash(x: number, y: number): void {
     // Base spray column — droplets arc upward and fall back with gravity.
-    for (let i = 0; i < 36; i++) {
+    for (let i = 0; i < 46; i++) {
       const a = (Math.random() - 0.5) * Math.PI * 1.5;
       const p = 8 + Math.random() * 18;
       const col = Math.random() < 0.3;
@@ -201,9 +201,9 @@ export class ParticleFX {
         vx: Math.sin(a) * p * 0.55,
         vy: Math.cos(a) * p * (0.55 + Math.random() * 0.6),
         vz: (Math.random() - 0.5) * 10,
-        life: 0.55 + Math.random() * 0.55,
-        max: 0.9,
-        size: 0.5 + Math.random() * 0.9,
+        life: 0.65 + Math.random() * 0.6,
+        max: 1.1,
+        size: 0.7 + Math.random() * 1.1,
         r: col ? 0.55 : 0.75,
         g: col ? 0.82 : 0.92,
         b: 1,
@@ -211,7 +211,7 @@ export class ParticleFX {
       });
     }
     // Fine mist — smaller, lingers above the column.
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 16; i++) {
       this.spawn({
         x: x + (Math.random() - 0.5) * 3,
         y: y + 1 + Math.random() * 3,
@@ -354,7 +354,7 @@ export class ParticleFX {
       vz: 0.8,
       life: 0.24,
       max: 0.24,
-      size: 0.35 * a,
+        size: 0.5 * a,
       r: 0.9,
       g: 0.95,
       b: 1.0,
@@ -381,8 +381,8 @@ export class ParticleFX {
    *  26 particles mirroring the reference game's 'thud' burst, replacing the
    *  plain emitDust call so bad landings read as a cinematic impact. */
   emitThunk(x: number, y: number, r: number, g: number, b: number): void {
-    for (let i = 0; i < 26; i++) {
-      const a = (i / 26) * Math.PI * 2;
+    for (let i = 0; i < 34; i++) {
+      const a = (i / 34) * Math.PI * 2;
       const s = 14 + Math.random() * 8;
       const upBias = 8 + Math.random() * 6;
       this.spawn({
@@ -392,9 +392,9 @@ export class ParticleFX {
         vx: Math.cos(a) * s,
         vy: Math.abs(Math.sin(a)) * s * 0.6 + upBias,
         vz: (Math.random() - 0.5) * s * 0.4,
-        life: 0.7 + Math.random() * 0.45,
-        max: 1.0,
-        size: 0.7 + Math.random() * 0.6,
+        life: 0.85 + Math.random() * 0.5,
+        max: 1.2,
+        size: 0.95 + Math.random() * 0.8,
         r: r * (0.75 + Math.random() * 0.2),
         g: g * (0.75 + Math.random() * 0.2),
         b: b * (0.75 + Math.random() * 0.2),
@@ -559,9 +559,9 @@ export class ParticleFX {
     const ring = this.rings.find((r) => !r.visible) ?? this.rings[0]!;
     ring.visible = true;
     ring.position.set(x, y, 0.8);
-    ring.scale.setScalar(0.4);
+    ring.scale.setScalar(0.65);
     const mat = ring.material as THREE.MeshBasicMaterial;
-    mat.opacity = 0.9;
+    mat.opacity = 1;
     mat.color.setHex(color);
     ring.userData.life = 1;
   }

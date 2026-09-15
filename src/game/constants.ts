@@ -122,6 +122,12 @@ export const PICKUP_SUN_TIME = 6;
 export const MAGNET_TIME = 12;
 export const BOOST_TIME = 1.6;
 export const BOOST_EXTRA_SPEED = 42;
+/** Manual double-tap burst: short, readable, and capped so it cannot replace
+ * the hill timing loop. */
+export const MANUAL_BOOST_TIME = 1.1;
+export const MANUAL_BOOST_SPEED = 30;
+export const MANUAL_BOOST_COOLDOWN = 3.5;
+export const STALL_SPEED = 8;
 export const HEADSTART_DISTANCE = 300;
 
 /* ---------- Stripe (see .env.example) ---------- */

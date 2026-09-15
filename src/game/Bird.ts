@@ -192,6 +192,14 @@ export class Bird {
     });
 
     this.root.add(this.squash);
+    // The bird is the primary gameplay affordance. Render it above foreground
+    // props so narrow screens never lose the player silhouette to terrain
+    // depth sorting or translucent haze.
+    this.root.renderOrder = 50;
+    this.squash.traverse((o) => {
+      if (o instanceof THREE.Mesh) o.renderOrder = 50;
+    });
+    this.shadow.renderOrder = 10;
   }
 
   addTo(scene: THREE.Scene): void {

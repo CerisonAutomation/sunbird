@@ -3,6 +3,7 @@ export class Input {
   held = false;
   pausePressed = false;
   restartPressed = false;
+  boostPressed = false;
   /** Player 2: Enter / right-half touch / second gamepad. */
   p2Key = false;
   p2Touch = false;
@@ -13,6 +14,7 @@ export class Input {
   splitMode: "off" | "vertical" | "horizontal" = "off";
   private readonly touches = new Map<number, 1 | 2>();
   private first = false;
+  private lastTapAt = 0;
   private readonly onFirstGesture: () => void;
   private readonly el: HTMLElement;
   private readonly boundPointerDown: (e: PointerEvent) => void;
@@ -84,6 +86,12 @@ export class Input {
     return v;
   }
 
+  consumeBoost(): boolean {
+    const v = this.boostPressed;
+    this.boostPressed = false;
+    return v;
+  }
+
   dispose(): void {
     this.el.removeEventListener("pointerdown", this.boundPointerDown);
     window.removeEventListener("pointerup", this.boundPointerUp);
@@ -124,6 +132,9 @@ export class Input {
     if (this.isInteractive(e.target)) return;
     if (!this.isTyping(e.target)) e.preventDefault();
     this.markFirst();
+    const now = performance.now();
+    if (now - this.lastTapAt <= 280) this.boostPressed = true;
+    this.lastTapAt = now;
     const who = this.whichPlayer(e);
     this.touches.set(e.pointerId, who);
     if (who === 2) this.p2Touch = true;

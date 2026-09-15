@@ -22,9 +22,9 @@ Sunbird is a complete HTML5 arcade game: 8 flight modes, 40-pilot races, daily/w
 | Bundler / style | Vite 7 + Tailwind CSS v4 |
 | Physics | Fixed-step deterministic client sim (`Bird.step()`, bit-exact tested) |
 | Audio | Zero-asset procedural WebAudio synth (SFX + adaptive score, portal-safe) |
-| Payments | Stripe Payment Links (no backend); portal builds strip all payment surfaces |
+| Payments | Stripe Payment Links on web; portal builds use coin-only VIP progression and optional host rewarded ads |
 | Multiplayer | Self-hosted Rust room server ([rust/](./rust/)) — lobby, seats, synchronized starts, server-authoritative finish order and a movement envelope that rejects impossible client positions |
-| Leaderboard | Vercel Functions ([api/](./api/)) + Vercel KV, on-device fallback ([LEADERBOARD_API.md](./LEADERBOARD_API.md)) |
+| Leaderboard | Vercel Functions ([api/](./api/)) + Upstash Redis, on-device fallback ([LEADERBOARD_API.md](./LEADERBOARD_API.md)) |
 | Ghosts | Async PvP via ghost publish/chase ([src/game/GhostNet.ts](./src/game/GhostNet.ts)) |
 | PWA | Service worker (build-stamped cache) + manifest (web builds only) |
 
@@ -63,7 +63,7 @@ Copy `.env.example` → `.env.local`. All variables are optional — the game ru
 | `npm run build:poki` / `build:crazy` / `build:generic` | Portal zips (see [PORTAL_PUBLISHING.md](./PORTAL_PUBLISHING.md)) |
 | `npm run build:portals` | All three portal zips |
 | `npm run typecheck` | TypeScript type-check without emit |
-| `npm test` | Run Vitest unit tests (212 tests, 31 files) |
+| `npm test` | Run the full Vitest suite |
 | `npm run verify` | typecheck + test + build |
 | `npm run lint` | ESLint over src, scripts (`--max-warnings 0`) |
 | `npm run test:mp` | Two-client multiplayer smoke test — needs `npm run dev` **and** the room server running |
@@ -117,7 +117,7 @@ public/         PWA manifest, service worker, icons, self-hosted fonts
 ## Deployment
 
 - **Frontend** — Vercel: `vercel deploy --prod` (config in `vercel.json`). See [DEPLOY.md](./DEPLOY.md).
-- **Leaderboard** — Vercel Functions in `api/`, persisted in Vercel KV (optional; in-memory fallback for previews).
+- **Leaderboard** — Vercel Functions in `api/`, persisted in Upstash Redis (required for production; in-memory fallback for previews).
 - **Multiplayer** — Self-hosted Rust: `cargo build --release -p sunbird-server`. In-memory rooms cost nothing while empty. See [rust/README.md](./rust/README.md).
 - **Portals** — `npm run build:portals` produces submission-ready zips for Poki, CrazyGames, and 10+ generic HTML5 portals.
 

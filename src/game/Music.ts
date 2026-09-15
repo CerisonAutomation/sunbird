@@ -17,6 +17,31 @@ type Voicing = number[];
 const BEAT_BPM = 112;
 const LOOKAHEAD = 0.16;
 const TICK_MS = 25;
+/** Hard ceiling on steps scheduled in one timer tick. */
+const MAX_STEPS_PER_TICK = 8;
+/** How far behind the clock the sequencer may fall before it re-anchors. */
+const MAX_LAG = 0.28;
+
+/**
+ * Guard against the "machine-gun" failure mode of a lookahead sequencer.
+ *
+ * Browsers throttle timers in hidden/occluded tabs to >= 1 s. On return, the
+ * scheduler's tick loop would otherwise find `nextTime` a whole bar behind the
+ * audio clock and schedule every missed step at once — the same instant —
+ * which the player hears as the music stuttering or repeating. When the
+ * sequencer has fallen further behind than `maxLag`, skip forward instead of
+ * replaying the backlog.
+ *
+ * Exported for unit testing; it is pure.
+ */
+export function clampSequencerTime(
+  nextTime: number,
+  now: number,
+  maxLag = MAX_LAG,
+  reanchor = 0.05,
+): number {
+  return nextTime < now - maxLag ? now + reanchor : nextTime;
+}
 
 // Ukulele GCEA voicings (midi)
 const UKE: Record<string, Voicing> = {
@@ -494,10 +519,20 @@ export class Music {
     if (this.ctx.state !== "running") return;
     // Smooth the intensity so the hat layer swells instead of stuttering.
     this.intensity += (this.intensityTarget - this.intensity) * 0.12;
-    while (this.nextTime < this.ctx.currentTime + LOOKAHEAD) {
-      if (this.mode === "sleep") this.scheduleLullaby(this.nextTime);
-      else this.scheduleStep(this.nextTime);
+    const now = this.ctx.currentTime;
+    // If the timer was throttled (background tab, occluded window, locked
+    // phone) the sequencer will be far behind. Re-anchor so we skip the missed
+    // music rather than dumping the whole backlog onto the audio clock at once.
+    this.nextTime = clampSequencerTime(this.nextTime, now);
+    let scheduled = 0;
+    while (this.nextTime < now + LOOKAHEAD && scheduled < MAX_STEPS_PER_TICK) {
+      // Never hand Web Audio a timestamp in the past: it plays immediately, so
+      // every missed step would stack into one percussive burst.
+      const t = Math.max(this.nextTime, now + 0.001);
+      if (this.mode === "sleep") this.scheduleLullaby(t);
+      else this.scheduleStep(t);
       this.advance();
+      scheduled++;
     }
   }
 

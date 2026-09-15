@@ -21,22 +21,12 @@
  *                              connects to VITE_MULTIPLAYER_URL verbatim)
  */
 
-export { RoomDO } from "./room";
 export { LeaderboardDO } from "./leaderboard";
 import { entitlementFromEvent, verifyStripeSignature } from "./entitlements";
 
 export interface Env {
-  ROOMS: DurableObjectNamespace;
   BOARD: DurableObjectNamespace;
   STRIPE_WEBHOOK_SECRET?: string;
-}
-
-const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-function newCode(): string {
-  let out = "";
-  for (let i = 0; i < 5; i++) out += CODE_ALPHABET[(Math.random() * CODE_ALPHABET.length) | 0];
-  return out;
 }
 
 function todayStr(): string {
@@ -56,46 +46,11 @@ function json(data: unknown, status = 200): Response {
   });
 }
 
-/**
- * Public matchmaking directory.
- *
- * One well-known DO per (seed, shard) tracks which public room code is
- * currently filling. Private rooms skip this entirely: the room code *is* the
- * DO name, so friends land in the same object by construction.
- */
-async function pickPublicRoom(env: Env, seed: string): Promise<string> {
-  const dirId = env.ROOMS.idFromName(`dir:${seed}`);
-  const dir = env.ROOMS.get(dirId);
-  const res = await dir.fetch("https://do/directory/pick", { method: "POST" });
-  if (res.ok) {
-    const body = (await res.json()) as { code?: string };
-    if (body.code) return body.code;
-  }
-  return newCode();
-}
-
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
-
-    /* -------------------------------------------------- WebSocket rooms */
-    if (request.headers.get("upgrade")?.toLowerCase() === "websocket") {
-      const seed = (url.searchParams.get("seed") ?? todayStr()).slice(0, 64);
-      let code = (url.searchParams.get("room") ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
-      const isPublic = code.length === 0;
-      if (isPublic) code = await pickPublicRoom(env, seed);
-
-      const roomId = env.ROOMS.idFromName(`room:${code}`);
-      const room = env.ROOMS.get(roomId);
-      // Forward the original query string so the room sees device/name/skin/hue.
-      const fwd = new URL(`https://do/join${url.search}`);
-      fwd.searchParams.set("room", code);
-      fwd.searchParams.set("seed", seed);
-      fwd.searchParams.set("public", isPublic ? "1" : "0");
-      return room.fetch(fwd.toString(), request);
-    }
 
     /* ------------------------------------------------------ HTTP routes */
     const board = env.BOARD.get(env.BOARD.idFromName("global"));

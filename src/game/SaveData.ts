@@ -29,6 +29,8 @@ export type Quality = "auto" | "high" | "low";
 
 export type Settings = {
   mute: boolean;
+  /** Purchased double-tap boost can be disabled without losing ownership. */
+  doubleTapBoost: boolean;
   music: boolean;
   musicVolume: number;
   sfxVolume: number;
@@ -79,6 +81,8 @@ export type SaveState = {
   ownedSkins: string[];
   activeSkin: string;
   armedBoosts: string[];
+  /** Permanent gameplay upgrades purchased with coins. */
+  ownedUpgrades: string[];
   settings: Settings;
   quests: { date: string; claimed: string[] };
   streak: { last: string; days: number; claimedDate: string };
@@ -148,6 +152,7 @@ export type ChallengeState = {
 
 const DEFAULT_SETTINGS: Settings = {
   mute: false,
+  doubleTapBoost: true,
   music: true,
   musicVolume: 0.8,
   sfxVolume: 0.9,
@@ -190,6 +195,7 @@ function defaults(): SaveState {
     ownedSkins: ["sunbird"],
     activeSkin: "sunbird",
     armedBoosts: [],
+    ownedUpgrades: [],
     settings: { ...DEFAULT_SETTINGS },
     quests: { date: "", claimed: [] },
     streak: { last: "", days: 0, claimedDate: "" },
@@ -346,8 +352,10 @@ export class SaveData {
         ownedSkins: owned,
         activeSkin: typeof p.activeSkin === "string" ? p.activeSkin : "sunbird",
         armedBoosts: strArr(p.armedBoosts),
+        ownedUpgrades: strArr(p.ownedUpgrades),
         settings: {
           mute: Boolean(p.settings?.mute),
+          doubleTapBoost: p.settings?.doubleTapBoost === undefined ? true : Boolean(p.settings.doubleTapBoost),
           music: p.settings?.music === undefined ? true : Boolean(p.settings.music),
           musicVolume:
             p.settings?.musicVolume !== undefined
@@ -799,6 +807,17 @@ export class SaveData {
   armBoost(id: string): void {
     if (!this.state.armedBoosts.includes(id)) this.state.armedBoosts.push(id);
     this.persist();
+  }
+
+  hasUpgrade(id: string): boolean {
+    return this.state.ownedUpgrades.includes(id);
+  }
+
+  ownUpgrade(id: string): boolean {
+    if (this.state.ownedUpgrades.includes(id)) return false;
+    this.state.ownedUpgrades.push(id);
+    this.persist();
+    return true;
   }
 
   consumeArmedBoosts(): string[] {

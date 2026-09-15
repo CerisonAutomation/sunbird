@@ -12,8 +12,8 @@ import * as THREE from "three";
  * with per-bird wingbeat phase so the flock never strobes in unison.
  */
 
-const FLOCKS = 3;
-const BIRDS_PER_FLOCK = 5;
+const FLOCKS = 2;
+const BIRDS_PER_FLOCK = 4;
 const TOTAL = FLOCKS * BIRDS_PER_FLOCK;
 
 type FlockState = {
@@ -105,7 +105,8 @@ export class LivingBackground extends THREE.Group {
       const mat = new THREE.SpriteMaterial({
         map: this.cloudTex,
         transparent: true,
-        opacity: 0.07 + (i / 5) * 0.09,
+        // Menu depth cue only: keep the sky airy instead of overcast.
+        opacity: 0.018 + (i / 5) * 0.028,
         depthWrite: false,
         fog: false,
       });
@@ -133,16 +134,16 @@ export class LivingBackground extends THREE.Group {
       });
     }
 
-    // Balloons: slow, high, colorful — 7 instances, 1 draw call
+    // Balloons: slow, high, colorful — kept sparse so the playfield stays calm.
     {
       const g = new THREE.SphereGeometry(1.6, 10, 8);
       g.scale(1, 1.18, 1);
       const m = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.92 });
-      this.balloonMesh = new THREE.InstancedMesh(g, m, 7);
+      this.balloonMesh = new THREE.InstancedMesh(g, m, 4);
       this.balloonMesh.frustumCulled = false;
       this.balloonMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       this.add(this.balloonMesh);
-      for (let i = 0; i < 7; i++) {
+      for (let i = 0; i < 4; i++) {
         this.balloons.push({
           ox: i * 47 - 80, oy: 42 + (i % 3) * 14, depth: 0.08 + (i % 3) * 0.07,
           speed: 0.7 + (i % 4) * 0.25, phase: i * 1.31, scale: 0.9 + (i % 3) * 0.5,
@@ -150,18 +151,18 @@ export class LivingBackground extends THREE.Group {
         });
       }
     }
-    // Kites: fast darts with figure-eight wobble — 8 instances, 1 draw call
+    // Kites: fast darts with figure-eight wobble — sparse for visual clarity.
     {
       const g = new THREE.BufferGeometry();
       g.setAttribute("position", new THREE.Float32BufferAttribute([0, 0.9, 0, -0.7, -0.5, 0, 0.7, -0.5, 0], 3));
       g.setIndex([0, 1, 2]);
       g.computeVertexNormals();
       const m = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
-      this.kiteMesh = new THREE.InstancedMesh(g, m, 8);
+      this.kiteMesh = new THREE.InstancedMesh(g, m, 4);
       this.kiteMesh.frustumCulled = false;
       this.kiteMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       this.add(this.kiteMesh);
-      for (let i = 0; i < 8; i++) {
+      for (let i = 0; i < 4; i++) {
         this.kites.push({
           ox: i * 37 - 60, oy: 26 + (i % 4) * 9, depth: 0.15 + (i % 3) * 0.09,
           speed: 3.2 + (i % 3) * 1.1, phase: i * 2.17, scale: 0.8 + (i % 2) * 0.5,
@@ -169,16 +170,16 @@ export class LivingBackground extends THREE.Group {
         });
       }
     }
-    // Lanterns: warm rising drift — 12 instances, 1 draw call
+    // Lanterns: warm rising drift — a few accents, never a wall of dots.
     {
       const g = new THREE.SphereGeometry(0.55, 8, 6);
       g.scale(1, 1.25, 1);
       const m = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.95 });
-      this.lanternMesh = new THREE.InstancedMesh(g, m, 12);
+      this.lanternMesh = new THREE.InstancedMesh(g, m, 6);
       this.lanternMesh.frustumCulled = false;
       this.lanternMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       this.add(this.lanternMesh);
-      for (let i = 0; i < 12; i++) {
+      for (let i = 0; i < 6; i++) {
         this.lanterns.push({
           ox: i * 29 - 90, oy: 18 + (i % 5) * 7, depth: 0.2 + (i % 4) * 0.08,
           speed: 1.1 + (i % 3) * 0.4, phase: i * 0.97, scale: 0.7 + (i % 3) * 0.3,

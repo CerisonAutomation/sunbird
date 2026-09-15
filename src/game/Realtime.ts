@@ -56,6 +56,8 @@ export type RoomInfo = {
   state: PresenceState;
   startsInMs: number;
   error: string;
+  /** Optimistic local ready state. The server only lists other peers. */
+  ready: boolean;
 };
 
 /** A live multiplayer signal, surfaced as an in-flight toast by the game. */
@@ -132,6 +134,7 @@ export class RealtimeClient implements NetTransport {
   capacity = 40;
   errorText = "";
   startsAt = 0;
+  private localReady = false;
 
   private ws: WebSocket | null = null;
   private readonly tracks = new Map<string, Track>();
@@ -181,6 +184,7 @@ export class RealtimeClient implements NetTransport {
     this.roomCode = code.toUpperCase();
     this.seed = seed;
     this.myPlace = 0;
+    this.localReady = false;
     this.state = "connecting";
     this.errorText = "";
     this.open();
@@ -438,8 +442,11 @@ export class RealtimeClient implements NetTransport {
     this.push({ type: "finish", time: Math.round(time * 100) / 100, d: Math.round(distance) });
   }
 
-  sendReady(ready: boolean): void {
+  sendReady(ready: boolean): boolean {
+    if (!this.connected || this.state !== "lobby") return false;
+    this.localReady = ready;
     this.push({ type: "ready", ready });
+    return true;
   }
 
   private push(payload: Record<string, unknown>): void {
@@ -530,6 +537,7 @@ export class RealtimeClient implements NetTransport {
       state: this.state,
       startsInMs: this.startsAt > 0 ? Math.max(0, this.startsAt - Date.now()) : 0,
       error: this.errorText,
+      ready: this.localReady,
     };
   }
 }

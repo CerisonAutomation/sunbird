@@ -29,8 +29,10 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim()),
+      .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+      .then(() => self.registration.unregister())
+      .then(() => self.clients.matchAll({ type: "window" }))
+      .then((clients) => clients.forEach((client) => client.navigate(client.url))),
   );
 });
 
@@ -38,18 +40,24 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   // Only cache same-origin requests to prevent cross-origin cache poisoning
   if (!event.request.url.startsWith(self.location.origin)) return;
+  const url = new URL(event.request.url);
+  // Keep the HTML shell and API fresh after deploys. Cache-first navigation
+  // was the source of stale menus and stale account/leaderboard responses.
+  const networkFirst = event.request.mode === "navigate" || url.pathname === "/" || url.pathname === "/index.html" || url.pathname.startsWith("/api/");
   event.respondWith(
-    caches.match(event.request).then(
-      (cached) =>
-        cached ||
-        fetch(event.request)
-          .then((res) => {
-            const copy = res.clone();
-            caches.open(CACHE).then((cache) => cache.put(event.request, copy)).catch(() => undefined);
-            return res;
-          })
-          .catch(() => caches.match("/index.html")),
-    ),
+    (networkFirst ? fetch(event.request).then((res) => {
+      if (res.ok && !url.pathname.startsWith("/api/")) {
+        const copy = res.clone();
+        caches.open(CACHE).then((cache) => cache.put(event.request, copy)).catch(() => undefined);
+      }
+      return res;
+    }).catch(() => caches.match(event.request).then((cached) => cached || caches.match("/index.html"))) : caches.match(event.request).then(
+      (cached) => cached || fetch(event.request).then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE).then((cache) => cache.put(event.request, copy)).catch(() => undefined);
+        return res;
+      }).catch(() => caches.match("/index.html")),
+    )),
   );
 });
 

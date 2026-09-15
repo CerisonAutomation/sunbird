@@ -112,16 +112,27 @@ export class CameraRig {
     this.dollyVel *= Math.pow(0.02, dt);
     this.dolly += this.dollyVel * dt;
     this.punchZ *= Math.pow(0.03, dt);
-    const zoom = CAMERA_BASE_Z + sNorm * 14 + altPull - this.punchZ + this.dolly * 5 + (attract ? 12 : 0);
+    // Portrait phones show much less horizontal world at the same camera
+    // distance. Pull back gently on narrow aspects so the bird and the next
+    // landing both stay readable instead of crowding the edges.
+    const portraitPull = clamp((0.9 - this.camera.aspect) * 18, 0, 10);
+    const zoom = CAMERA_BASE_Z + sNorm * 14 + altPull + portraitPull - this.punchZ + this.dolly * 5 + (attract ? 12 : 0);
 
     // A touch more lookahead keeps the bird in the left third of the frame so
     // the player reads the hills ahead, not the bird's back. In attract the
     // lookahead is proportional: a fixed fraction of the visible half-width
     // puts the bird at ~28% screen width on any viewport (fixed offsets
     // drift behind the card as speed/altitude change the zoom).
-    const ahead = attract
-      ? 0.44 * Math.tan((this.fov * Math.PI) / 360) * zoom * this.camera.aspect
-      : 9.5 + speed * CAMERA_LOOKAHEAD + altPull * 0.12;
+    const visibleHalfWidth = Math.tan((this.fov * Math.PI) / 360) * zoom * this.camera.aspect;
+    const gameplayAhead = 9.5 + speed * CAMERA_LOOKAHEAD + altPull * 0.12;
+    // Portrait screens expose far less horizontal world than desktop. A fixed
+    // look-ahead was wider than the entire phone camera, sending the bird off
+    // the left edge. Keep it in the readable left third at every aspect ratio.
+    // Keep the subject comfortably inside the portrait safe area. At 0.48 the
+    // bird sits almost on the left edge of a phone (and can disappear behind
+    // the rounded viewport/cutout). A tighter lead keeps the bird readable
+    // while still leaving enough terrain visible ahead for timing landings.
+    const ahead = attract ? 0.72 * visibleHalfWidth : Math.min(gameplayAhead, 0.32 * visibleHalfWidth);
     const targetLookX = bird.x + ahead;
     // When very high, bias the look point downward so the landscape stays in frame.
     const downBias = smoothstep(ALT_SKY, ALT_HIGH, alt) * 14;

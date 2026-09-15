@@ -38,7 +38,7 @@ export const COLLECTIONS: { id: CollectionId; name: string; icon: string }[] = [
   { id: "achievement", name: "Achievement", icon: "🎖" },
 ];
 
-export const SKINS: SkinDef[] = [
+const BASE_SKINS: SkinDef[] = [
   {
     id: "sunbird",
     name: "Sunbird",
@@ -535,6 +535,22 @@ export const SKINS: SkinDef[] = [
   { id: "dark_matter", name: "Dark Matter", perk: "+4% speed · +4 s fever", price: 850, body: 0x1a1a2e, wing: 0x333355, belly: 0x4a4a6a, beak: 0x8888aa, speedMult: 1.04, feverBonus: 4, daylightBonus: 0, magnetAlways: false, rarity: "mythic", collection: "cosmic" },
 ];
 
+/**
+ * Cosmetics are a long-term collection goal. Keeping the original catalogue
+ * values separate makes the economy curve intentional and auditable rather
+ * than a wall of hand-edited numbers. Earn-only and real-money items retain
+ * their existing rules.
+ */
+function collectionPrice(price: number): number {
+  return price === 0 ? 0 : Math.ceil((price * 1.75) / 25) * 25;
+}
+
+export const SKINS: SkinDef[] = BASE_SKINS.map((skin) =>
+  skin.price === 0 || skin.goldOnly || skin.vipOnly || skin.prizeOnly
+    ? skin
+    : { ...skin, price: collectionPrice(skin.price) },
+);
+
 export function skinById(id: string): SkinDef {
   return SKINS.find((s) => s.id === id) ?? SKINS[0]!;
 }
@@ -545,16 +561,24 @@ export type BoostDef = {
   desc: string;
   price: number;
   icon: string;
+  permanent?: boolean;
 };
 
-export const BOOSTS: BoostDef[] = [
+const BASE_BOOSTS: BoostDef[] = [
   { id: "shield", name: "Sea Shield", desc: "Bounce off the ocean once", price: 60, icon: "🛡" },
   { id: "magnet", name: "Coin Magnet", desc: "Take off with 15 s of magnet", price: 40, icon: "🧲" },
   { id: "sunflask", name: "Sun Flask", desc: "+12 s daylight at takeoff", price: 50, icon: "☀" },
   { id: "headstart", name: "Head Start", desc: "Launch from 300 m at full speed", price: 90, icon: "🚀" },
   { id: "stormward", name: "Storm Ward", desc: "Ash clouds and gusts barely touch you", price: 70, icon: "🌩" },
   { id: "hotwings", name: "Hot Wings", desc: "Take off already in Fever", price: 80, icon: "🔥" },
+  { id: "doubletap", name: "Sunburst Trigger", desc: "Double-tap in flight for a powerful burst", price: 420, icon: "⚡", permanent: true },
 ];
+
+/** Consumables rise modestly; daily deals remain a valuable return visit. */
+export const BOOSTS: BoostDef[] = BASE_BOOSTS.map((boost) => ({
+  ...boost,
+  price: Math.ceil((boost.price * 1.25) / 5) * 5,
+}));
 
 /* ---------- shop trails (coins) — prize trails still come from cups ---------- */
 
@@ -567,7 +591,7 @@ export type ShopTrailDef = {
   css: string[];
 };
 
-export const SHOP_TRAILS: ShopTrailDef[] = [
+const BASE_SHOP_TRAILS: ShopTrailDef[] = [
   { id: "trail_ember", label: "Emberline", desc: "A streak of live coals", price: 300, css: ["#ff8a3a", "#ff4a2a", "#ffd27a"] },
   { id: "trail_tide", label: "Tideglass", desc: "Cool sea-green ribbon", price: 350, css: ["#3ae0c8", "#2a9ad8", "#c8fff2"] },
   { id: "trail_bloom", label: "Petalfall", desc: "Drifting pink petals", price: 350, css: ["#ff9ac8", "#ff6a9a", "#ffe0ee"] },
@@ -577,6 +601,11 @@ export const SHOP_TRAILS: ShopTrailDef[] = [
   { id: "trail_rose", label: "Rosewind", desc: "Warm rose-gold shimmer", price: 380, css: ["#ffb0a0", "#ff7a6a", "#ffe8d8"] },
   { id: "trail_neon", label: "Neonpulse", desc: "Electric arcade glow", price: 450, css: ["#3affff", "#ff3aff", "#ffff3a"] },
 ];
+
+export const SHOP_TRAILS: ShopTrailDef[] = BASE_SHOP_TRAILS.map((trail) => ({
+  ...trail,
+  price: Math.ceil((trail.price * 1.5) / 25) * 25,
+}));
 
 /** Deterministic daily deal: one boost at half price, same for everyone all day. */
 export function dailyDealBoost(dateStr: string): { id: string; price: number } {
@@ -617,6 +646,9 @@ export const STARTER_PACK = {
 export const VIP = {
   sku: "sunbird_vip" as const,
   price: "$1.99/mo",
+  /** Portal-friendly unlock: no external checkout inside CrazyGames/Poki. */
+  coinPrice: 3000,
+  coinAdReward: 500,
   name: "Sunbird VIP",
   features: [
     "Exclusive Aurora bird skin with a rainbow trail",

@@ -84,6 +84,19 @@ describe("attract bird visibility", () => {
   });
 });
 
+describe("mobile gameplay framing", () => {
+  it("pulls back on portrait screens", () => {
+    const wide = rigAt();
+    settle(wide.rig, wide.bird, 240, false);
+    const wideZ = wide.rig.camera.position.z;
+    const narrow = new CameraRig(390 / 844);
+    narrow.snapTo(wide.bird);
+    settle(narrow, wide.bird, 240, false);
+    expect(narrow.camera.position.z).toBeGreaterThan(wideZ + 4);
+    wide.terrain.dispose();
+  });
+});
+
 describe("attract framing", () => {
   it("pulls back and leads farther than gameplay framing", () => {
     const a = rigAt();

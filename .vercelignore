@@ -1,0 +1,16 @@
+node_modules/
+rust/target/
+coverage/
+dist/
+dist-poki/
+dist-crazy/
+dist-generic/
+dist-itch/
+.git/
+.graph-it/
+.playwright-mcp/
+.vercel/
+*.zip
+*.png
+*.log
+server/social/sunbird-social-data/

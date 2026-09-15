@@ -5,8 +5,8 @@ Sunbird ships four explicit build targets through `VITE_PORTAL_TARGET`:
 | Target | Monetization path | Direct Stripe / VIP UI | Notes |
 | --- | --- | --- | --- |
 | `none` | Standalone/PWA model | Enabled | Default local and self-hosted build. |
-| `poki` | Poki SDK commercial + rewarded breaks | Disabled | No banner integration. |
-| `crazy` | CrazyGames SDK midgame + rewarded breaks | Disabled | Optional dashboard banner slot. |
+| `poki` | Poki SDK commercial + rewarded breaks | Coin-only VIP progression; no IAP | No banner integration; Poki rules prohibit IAP. |
+| `crazy` | CrazyGames SDK midgame + rewarded breaks | Coin-only VIP progression; no IAP | Optional dashboard banner slot; live multiplayer requires Full Launch approval. |
 | `generic` | None (clean build) | Disabled | For every other HTML5 portal — see matrix below. |
 
 ## Build commands
@@ -27,7 +27,7 @@ of any CDN — verified by serving the zip from a deep subpath and playing it.
 
 | Requirement | Enforced by | How Sunbird complies |
 | --- | --- | --- |
-| No external payment providers | Poki, CrazyGames, GD, Yandex | Stripe is imported via `@stripe/stripe-js/pure` (no script injection at import) **and** `ensureStripeJs()` refuses to run in any portal build. Paywall/checkout actions are double-gated. Verified: zero requests to `js.stripe.com` from portal zips. |
+| No external payment providers | Poki, CrazyGames, GD, Yandex | Stripe is imported via `@stripe/stripe-js/pure` (no script injection at import) **and** `ensureStripeJs()` refuses to run in any portal build. Web checkout is absent; portal VIP is earned with coins/rewarded ads. Verified: zero requests to `js.stripe.com` from portal zips. |
 | No external links out of the iframe | All portals | The only `window.open` is the Stripe tab — hard-gated behind `!isPortalBuild()`. No `<a href>` to external sites anywhere in the UI. |
 | Relative asset paths (served from CDN subpaths) | All portals | `base: "./"` in vite config; no absolute `/asset` references (grep-verified in built html). |
 | Silent when tab is hidden | CrazyGames QA, Poki QA | `visibilitychange` pauses gameplay **and** hard-mutes the master audio bus (`setHiddenMuted`). |

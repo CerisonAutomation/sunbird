@@ -31,6 +31,10 @@ const CAPACITY = 40;
 const TICK_HZ = 15;
 const EMPTY_ROOM_TTL_MS = 60_000;
 const MAX_NAME = 14;
+// Keep the reference server's movement guard aligned with the client physics
+// ceiling. A state frame may cover a few network ticks, but never a whole map.
+const MAX_STATE_MAGNITUDE = 1_000_000;
+const MAX_STATE_STEP = 234 * 4;
 
 /* ----------------------------------------------------------------- state */
 
@@ -75,9 +79,10 @@ class Room {
       capacity: CAPACITY,
     });
     this.broadcastPeers();
-    // A room becomes "racing" as soon as two pilots are present; solo players
-    // still fly (against local squadron pilots) with zero waiting.
-    if (this.pilots.size >= 2 && !this.startedAt) {
+    // Do not launch people before they press Ready. This prevents a second
+    // tab or a late joiner from starting a private room while the host is
+    // still sharing the invite. Solo players still fly locally with zero wait.
+    if (this.pilots.size >= 2 && [...this.pilots.values()].every((p) => p.ready) && !this.startedAt) {
       this.startedAt = Date.now() + 6000;
       this.broadcast({ type: "start", at: this.startedAt, seed: this.seed });
     }
@@ -160,6 +165,9 @@ class Pilot {
     this.rot = 0;
     this.distance = 0;
     this.hasState = false;
+    this.lastStateX = 0;
+    this.lastStateY = 0;
+    this.lastStateDistance = 0;
     this.finished = false;
     this.finishTime = 0;
     this.ready = false;
@@ -303,10 +311,31 @@ wss.on("connection", (ws, req) => {
     }
     switch (msg.type) {
       case "state":
-        pilot.x = num(msg.x);
-        pilot.y = num(msg.y);
-        pilot.rot = num(msg.r);
-        pilot.distance = num(msg.d);
+        // Validate before mutating or broadcasting. This prevents absurd
+        // values and single-frame teleports from poisoning every peer's
+        // interpolation buffer (the production Rust server applies the same
+        // policy; this reference server should remain safe for local testing).
+        const nextX = Number(msg.x);
+        const nextY = Number(msg.y);
+        const nextRot = Number(msg.r);
+        const nextDistance = Number(msg.d);
+        const finite = [nextX, nextY, nextRot, nextDistance].every(Number.isFinite);
+        const bounded = [nextX, nextY, nextRot, nextDistance].every(
+          (value) => Math.abs(value) <= MAX_STATE_MAGNITUDE,
+        );
+        const stepped =
+          !pilot.hasState ||
+          (Math.abs(nextX - pilot.lastStateX) <= MAX_STATE_STEP &&
+            Math.abs(nextY - pilot.lastStateY) <= MAX_STATE_STEP &&
+            nextDistance >= pilot.lastStateDistance - MAX_STATE_STEP);
+        if (!finite || !bounded || !stepped) break;
+        pilot.x = nextX;
+        pilot.y = nextY;
+        pilot.rot = nextRot;
+        pilot.distance = nextDistance;
+        pilot.lastStateX = nextX;
+        pilot.lastStateY = nextY;
+        pilot.lastStateDistance = nextDistance;
         pilot.hasState = true;
         break;
       case "emote":

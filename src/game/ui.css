@@ -3235,11 +3235,11 @@ button {
    the sun and the bird reads as its rider, not a second oversized emblem. */
 .hero-bird {
   position: absolute;
-  top: 5px;
+  top: -4px;
   left: 50%;
-  width: 56px;
-  height: 56px;
-  margin-left: -28px;
+  width: 82px;
+  height: 82px;
+  margin-left: -41px;
   overflow: visible;
   filter: drop-shadow(0 4px 9px rgba(120, 60, 20, 0.3));
   animation: heroBob 3.4s ease-in-out infinite;
@@ -3249,9 +3249,91 @@ button {
   0%, 100% { transform: translateY(0) rotate(-2deg); }
   50% { transform: translateY(-5px) rotate(2deg); }
 }
-.hero { padding-top: 42px; }
-.hero-sun { opacity: 0.55; }
-@media (prefers-reduced-motion: reduce) { .hero-bird { animation: none; } }
+.hero { padding-top: 58px; }
+.hero-sun { opacity: 0.72; }
+.sb-reduce-motion .hero-bird { animation: none; }
+
+/* The home screen is a launch pad. Its long-tail systems stay one deliberate
+   tap away, leaving the moving flight readable around the card. */
+.home-more {
+  margin: 14px 0 6px;
+  border: 1px solid rgba(42, 28, 40, 0.14);
+  border-radius: 16px;
+  overflow: clip;
+  background: rgba(255, 255, 255, 0.34);
+}
+
+/* Pause is a decision point, so give the two actions a clear hierarchy and
+   enough breathing room for thumbs on a phone. */
+.pause-card { text-align: center; }
+.pause-kicker {
+  color: #a05a00;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  margin-bottom: 6px;
+}
+.pause-actions { display: grid; gap: 9px; margin-top: 16px; }
+.danger-btn { color: #7a3a36; border-color: rgba(160, 75, 65, 0.28); }
+.pause-exit-note { margin: 11px 4px 0; color: #8a6a62; font-size: 11px; line-height: 1.4; }
+.home-more-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 12px 13px 2px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: left;
+}
+.menu-section-label {
+  margin: 16px 2px 7px;
+  color: #8a6a62;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.hangar-nav { margin-top: 0; }
+.home-more-heading span {
+  color: #8a6a62;
+  font-size: 11px;
+  font-weight: 700;
+}
+.home-more summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 13px;
+  cursor: pointer;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  list-style: none;
+}
+.home-more summary::-webkit-details-marker { display: none; }
+.home-more summary::before { content: "⌄"; color: #a05a00; font-size: 18px; line-height: 1; }
+.home-more[open] summary::before { transform: rotate(180deg); }
+.home-more summary span { margin-left: auto; color: #8a6a62; font-size: 11px; font-weight: 700; }
+.home-more[open] summary span { visibility: hidden; }
+.home-more-body { padding: 0 10px 12px; }
+.shop-direct { width: calc(100% - 20px); margin: 8px 10px 4px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.shop-direct span { font-size: 11px; font-weight: 600; opacity: .82; }
+
+@media (max-width: 640px) {
+  /* Phones are short and the launch pad is tall, so the card used to fill ~91%
+     of the screen and the live world behind it read as a milky wash. Let the
+     world frame the card instead; the card scrolls inside itself. */
+  .paper-card.menu-hero {
+    max-height: 78dvh;
+  }
+}
+
+@media (min-width: 840px) {
+  .overlay.menu { justify-content: flex-end; padding-right: clamp(32px, 9vw, 176px); }
+  .overlay.menu > .paper-card.menu-hero { width: min(430px, 40vw); margin: auto 0 auto auto; }
+}
 
 /* ---------- hero button label / hint typography (was missing! buttons stacked
    label+hint via .hero's flex-col but the spans inherited full button font) ---------- */
@@ -3969,6 +4051,7 @@ button:focus-visible, .toggle:focus-visible {
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+.endless-inf .endless-mark { width: 44px; height: 44px; display: block; margin: 0 auto; color: #5f58c8; filter: drop-shadow(0 2px 3px rgba(60, 30, 20, 0.18)); }
 .mode-card-main.primary {
   flex-direction: row;
   gap: 12px;
@@ -4157,6 +4240,26 @@ button:focus-visible, .toggle:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 .room-now .mini-btn { margin-left: auto; }
+
+/* Party-room commitment is deliberately explicit: an invited bird can see
+   whether the room is merely open or actually about to launch. */
+.ready-room {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 11px;
+  padding: 10px 11px;
+  border: 1px solid rgba(255, 176, 32, 0.42);
+  border-radius: 14px;
+  background: rgba(255, 249, 238, 0.72);
+}
+.ready-room > div { display: grid; gap: 2px; }
+.ready-room b { color: #9b5600; font-size: 13px; }
+.ready-room span { color: var(--muted, #6b5f57); font-size: 11px; }
+.ready-room .primary-btn { width: auto; min-height: 42px; padding: 9px 12px; white-space: nowrap; }
+.ready-room.is-ready { border-color: rgba(47, 153, 92, 0.55); background: rgba(224, 249, 232, 0.78); }
+.ready-room.is-ready b { color: #207445; }
 
 /* ================= glass stage: every overlay card ========================
    All menu/pause/results cards let the live world show through (the title

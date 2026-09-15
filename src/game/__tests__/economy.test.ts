@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOOSTS, SHOP_TRAILS, SKINS, dailyDealBoost, skinById } from "../Economy";
+import { BOOSTS, SHOP_TRAILS, SKINS, VIP, dailyDealBoost, skinById } from "../Economy";
 import { SEASON_TIER_DEFS } from "../SeasonPass";
 import { TRAILS } from "../Tournaments";
 import { MODES } from "../Modes";
@@ -19,6 +19,12 @@ describe("skin catalogue", () => {
       expect(s.feverBonus).toBeLessThanOrEqual(5);
       expect(s.daylightBonus).toBeLessThanOrEqual(10);
     }
+  });
+
+  it("keeps cosmetics as meaningful long-term unlocks without charging for prize birds", () => {
+    const purchasable = SKINS.filter((s) => s.price > 0 && !s.goldOnly && !s.vipOnly && !s.prizeOnly);
+    expect(Math.min(...purchasable.map((s) => s.price))).toBeGreaterThanOrEqual(275);
+    expect(Math.max(...purchasable.map((s) => s.price))).toBeGreaterThanOrEqual(1500);
   });
 
   it("prize skins are never purchasable and explain how to earn them", () => {
@@ -94,6 +100,10 @@ describe("shop trails", () => {
     }
   });
 
+  it("prices trails above a single-run impulse purchase", () => {
+    expect(Math.min(...SHOP_TRAILS.map((t) => t.price))).toBeGreaterThanOrEqual(400);
+  });
+
   it("shop trail ids never collide with prize trail ids or each other", () => {
     const ids = SHOP_TRAILS.map((t) => t.id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -118,6 +128,14 @@ describe("daily deal", () => {
     const seen = new Set<string>();
     for (let d = 1; d <= 20; d++) seen.add(dailyDealBoost(`2026-10-${String(d).padStart(2, "0")}`).id);
     expect(seen.size).toBeGreaterThan(1);
+  });
+});
+
+describe("portal coin VIP", () => {
+  it("has a visible coin sink and a smaller rewarded-ad step", () => {
+    expect(VIP.coinPrice).toBeGreaterThan(0);
+    expect(VIP.coinAdReward).toBeGreaterThan(0);
+    expect(VIP.coinAdReward).toBeLessThan(VIP.coinPrice);
   });
 });
 

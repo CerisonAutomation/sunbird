@@ -23,13 +23,12 @@ until proven otherwise. This file exists so the commit log can't overclaim.
 - Server-refereed race placements carry a visible "✓ refereed" stamp on the
   results card — honesty is the trust brand
 
-## 🟡 Written, tested, NOT deployed to a public host yet
+## 🟡 Written and tested, deployment verification still required
 - `rust/` — `sunbird-server` (rooms, 15 Hz state, server-refereed finishes).
-  **WIRED END-TO-END in dev**: `.env.example` + the vite `/mp` proxy connect
+  **WIRED END-TO-END in dev**: `.env.example` + the Vite `/mp` proxy connect
   the client to the Rust `/ws` socket; two real sockets joining the same room
-  and exchanging 15 Hz state is verified by test (`npm run test:mp`), and the
-  crate is CI-verified (fmt · clippy · tests · release build). Production
-  needs only a WebSocket-capable host + `VITE_MULTIPLAYER_URL=wss://…`.
+  and exchanging 15 Hz state is verified by test. The GCP VM rollout and a
+  browser-safe WSS hostname still require direct production verification.
 - `server/social/` — PGlite social layer (friends, squads, feed)
 - Without a configured URL the game still falls back to local squadron
   pilots with human-sounding names — the lobby badge says which one you got.
@@ -73,8 +72,8 @@ until proven otherwise. This file exists so the commit log can't overclaim.
 ## Next (in order)
 1. Retire `scripts/mp-smoke.mjs` once this PR has been green a while — botsim
    supersedes it (40 clients vs 2, and it is actually wired into CI)
-2. Wire the client to consume the `snapshot` message it can now parse — the
-   parser is no longer the blocker for authoritative rooms
+2. Add score rate limiting, idempotency, and deterministic replay validation
+   before ranked seasons accept public submissions.
 
 See `ARCHITECTURE_REVIEW.md` for the full comparison against the proposed
 Bevy/Replicon rewrite, including what was rejected and why.

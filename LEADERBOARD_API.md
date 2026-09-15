@@ -16,7 +16,7 @@ is deliberate and should be kept.
 > `GET /ws` with server-authoritative finish order.
 >
 > **The leaderboard half ships in [`api/`](api/board.ts)** as Vercel Functions
-> (`GET /api/board`, `POST /api/score`), persisted in Vercel KV when
+> (`GET /api/board`, `POST /api/score`), persisted in Upstash Redis when
 > `KV_REST_API_URL` + `KV_REST_API_TOKEN` are set (in-memory fallback for
 > previews). Any host that speaks this JSON also works — see the reference
 > `server/sunbird-server.mjs` for an in-process implementation.
@@ -26,6 +26,10 @@ is deliberate and should be kept.
 ## 1. Leaderboard HTTP contract
 
 Two endpoints. Any stack that speaks this JSON works (Workers, Lambda, Express…).
+
+`GET /health` is the deployment readiness probe. Production returns `200` only
+when Upstash Redis is configured and reachable; local/preview environments
+return a `memory-preview` status so they cannot be mistaken for durable storage.
 
 ### `GET /board?scope=<global|daily|friends>&metric=<distance|altitude|perfects|coins>&device=<id>`
 
@@ -79,7 +83,7 @@ loses credit for a run because of a network blip.
 
 - **Validate before trusting.** `seed` and `mode` are included so you can
   re-simulate or sanity-bound a submission. The client is not authoritative.
-- Rate-limit by `deviceId`; keep only each pilot's personal best per metric.
+- Rate-limit by `deviceId` and IP; keep only each pilot's personal best per metric.
 - `name` is player-supplied. The client escapes it on render, but sanitise on
   ingest too.
 
@@ -150,4 +154,5 @@ enforces plausibility gates regardless of signature:
 - `score > distance × 40 + 50,000` → `422 implausible score`
 
 True tamper-proofing requires replay validation (deterministic re-simulation
-of the run from its seed + input trace) — tracked in ROADMAP.md.
+of the run from its seed + input trace), plus production rate limiting and
+storage health checks — tracked in ROADMAP.md.

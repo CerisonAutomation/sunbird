@@ -66,7 +66,7 @@ for (const portal of PORTALS) {
   const html = zipHtml(portal);
   const list = zipList(portal);
   if (/manifest/i.test(html)) failures.push(`${portal}: manifest reference survived in staged index.html.`);
-  if (/js\.stripe\.com/.test(html)) failures.push(`${portal}: js.stripe.com URL in bundle (external payments banned).`);
+  if (/stripe/i.test(html)) failures.push(`${portal}: payment-provider marker survived (portal builds are coin-only).`);
   if (/(href|src)="\/[^"]*"/.test(html)) failures.push(`${portal}: absolute /asset reference (breaks CDN subpaths).`);
   if (!/icons\//.test(list) || !/fonts\//.test(list)) failures.push(`${portal}: icons/ or fonts/ missing from zip.`);
   // SDK profile: the build must SHIP its own portal integration, and must not

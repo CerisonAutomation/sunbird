@@ -38,8 +38,8 @@ export const MODES: ModeDef[] = [
   },
   {
     id: "zenith",
-    name: "Zenith",
-    blurb: "Ninety seconds to launch as high as the sky allows.",
+    name: "Skyline",
+    blurb: "Ninety seconds to climb above the clouds and bonk the skybox.",
     icon: "🚀",
     clock: 90,
     finish: 0,

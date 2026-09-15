@@ -18,7 +18,7 @@
  *                     one line: `--seed <n>`.
  *
  * Usage:
- *   node scripts/botsim.mjs --url ws://127.0.0.1:8787 --players 40 --seconds 12
+ *   node scripts/botsim.mjs --url ws://127.0.0.1:8080/ws --players 40 --seconds 12
  *   node scripts/botsim.mjs --seed 1234 --cheaters 3 --require-anticheat
  *
  * Exit code is 0 only when every gate passes.
@@ -34,7 +34,9 @@ const opt = (name, fallback) => {
 };
 const flag = (name) => argv.includes(`--${name}`);
 
-const URL = opt("url", "ws://127.0.0.1:8787");
+// Match the Rust room server used by Vite's /mp proxy. Override with --url
+// for a deployed WSS endpoint or another local server.
+const URL = opt("url", "ws://127.0.0.1:8080/ws");
 const PLAYERS = Number(opt("players", 40));
 const SECONDS = Number(opt("seconds", 12));
 const SEED = opt("seed", String(Date.now()));

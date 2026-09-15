@@ -74,9 +74,10 @@ const STOPS: { t: number; s: SkyStop }[] = [
     t: 0.7,
     s: {
       top: 0x4aa4ea,
-      horizon: 0xa8e4ff,
-      bottom: 0x7ec8e8,
-      fog: 0x8ed0ee,
+      // Keep midday contrast clear instead of washing the playfield in white.
+      horizon: 0x80c6e2,
+      bottom: 0x70b8d5,
+      fog: 0x78b8d2,
       sun: 0xfff6c8,
       farA: 0x6bb87a,
       farB: 0x4d8aaa,
@@ -294,7 +295,7 @@ export class Sky {
     // Soft, deep background cloud banks create altitude scale without adding
     // interaction noise. They are parallaxed independently from the hills.
     this.hazeTex = makeHazeTexture();
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 4; i++) {
       const mat = new THREE.SpriteMaterial({
         map: this.hazeTex,
         color: 0xffffff,
@@ -511,9 +512,9 @@ export class Sky {
     // overcast. Density response is cut a second time (~50% again) because the
     // banks read as a grey wash over the hills rather than weather. Gameplay
     // clouds in Collectibles are untouched — these are atmosphere only.
-    // Haze is crystal-clear by default — just a whisper at full density. 0.012
-    // multiplier (was 0.026) keeps the sky readable as sunlit and open.
-    const hazeAlpha = (0.008 + this.hazeDensity * 0.012) * (1 - this.altT * 0.8) * (0.5 + t * 0.5);
+    // Haze stays a very faint depth cue. Keep the horizon open so the bird,
+    // terrain silhouette, and daylight meter remain readable on small screens.
+    const hazeAlpha = (0.001 + this.hazeDensity * 0.0025) * (1 - this.altT * 0.8) * (0.5 + t * 0.5);
     for (const sprite of this.haze) {
       const mat = sprite.material as THREE.SpriteMaterial;
       const phase = sprite.userData.phase as number;
@@ -600,7 +601,10 @@ export class Sky {
   }
 
   private makeStars(): THREE.Points {
-    const n = 420;
+    // Stars are atmosphere, not gameplay. Keeping the field lean avoids a
+    // large transparent point cloud on phones while preserving the altitude
+    // cue when the bird climbs into the night.
+    const n = 140;
     const pos = new Float32Array(n * 3);
     const size = new Float32Array(n);
     const col = new Float32Array(n * 3);
@@ -791,5 +795,3 @@ function hexAlpha(hex: number, a: number): string {
   const b = hex & 255;
   return "rgba(" + r + "," + g + "," + b + "," + a + ")";
 }
-
-
