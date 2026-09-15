@@ -329,7 +329,10 @@ async fn issue_reconnect_token(
     // broadcasts), so issuing for an arbitrary (seat, generation) pair
     // would let any room member mint a hijack token for a disconnected
     // pilot.
-    match shared.rooms.seat_generation(request.room_id, request.seat_id) {
+    match shared
+        .rooms
+        .seat_generation(request.room_id, request.seat_id)
+    {
         None => Err(ApiError {
             status: StatusCode::NOT_FOUND,
             error: ProtocolError::SeatNotFound,
@@ -342,7 +345,12 @@ async fn issue_reconnect_token(
     }
     let token = shared
         .issuer
-        .issue(request.player_id, request.room_id, request.seat_id, request.generation)
+        .issue(
+            request.player_id,
+            request.room_id,
+            request.seat_id,
+            request.generation,
+        )
         .map_err(|err| ApiError::internal(err.to_string()))?;
     metrics::note_reconnect_token_issued();
     Ok(Json(SeatGrant {
@@ -473,7 +481,10 @@ mod tests {
         assert!(String::from_utf8_lossy(&body).contains("seatNotFound"));
 
         // A real seat: join, then mint for its current generation.
-        let outcome = shared.rooms.join("TOK1", "2026-09-16", "Pilot", "sunbird", None).unwrap();
+        let outcome = shared
+            .rooms
+            .join("TOK1", "2026-09-16", "Pilot", "sunbird", None)
+            .unwrap();
         let grant = outcome.grant;
         let response = issue_reconnect_token(
             State(shared.clone()),
@@ -500,7 +511,10 @@ mod tests {
             .grant;
         // After a reattach the generation bumps; the old generation must
         // no longer mint tokens.
-        shared.rooms.reconnect(grant.room_id, grant.seat_id).unwrap();
+        shared
+            .rooms
+            .reconnect(grant.room_id, grant.seat_id)
+            .unwrap();
         let stale = issue_reconnect_token(
             State(shared),
             Json(ReconnectTokenRequest {

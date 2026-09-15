@@ -33,7 +33,10 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use futures_util::{sink::SinkExt, stream::StreamExt};
-use std::{sync::Arc, time::{Duration, Instant}};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use sunbird_protocol::{
     ClientMessage, ProtocolError, ServerMessage, ValidationError, MAX_JSON_PAYLOAD_BYTES,
     PROTOCOL_VERSION,
@@ -106,11 +109,7 @@ pub fn spawn_sweeper(rooms: Arc<RoomManager>) {
     });
 }
 
-async fn serve_socket(
-    socket: WebSocket,
-    rooms: Arc<RoomManager>,
-    issuer: Arc<SeatTokenIssuer>,
-) {
+async fn serve_socket(socket: WebSocket, rooms: Arc<RoomManager>, issuer: Arc<SeatTokenIssuer>) {
     let (mut sink, mut stream) = socket.split();
     let (out_tx, mut out_rx) = mpsc::channel::<ServerMessage>(OUT_QUEUE);
 
@@ -154,7 +153,9 @@ async fn serve_socket(
             let _ = out_tx
                 .send(ServerMessage::Error {
                     version: PROTOCOL_VERSION,
-                    error: ProtocolError::RateLimited { retry_after_ms: 250 },
+                    error: ProtocolError::RateLimited {
+                        retry_after_ms: 250,
+                    },
                 })
                 .await;
             break;
@@ -393,7 +394,12 @@ fn fill_reconnect_token(
 ) -> sunbird_protocol::SeatGrant {
     let mut grant = grant.clone();
     grant.reconnect_token = issuer
-        .issue(grant.player_id, grant.room_id, grant.seat_id, grant.generation)
+        .issue(
+            grant.player_id,
+            grant.room_id,
+            grant.seat_id,
+            grant.generation,
+        )
         .unwrap_or_default();
     grant
 }
@@ -424,20 +430,25 @@ fn to_protocol_error(err: ValidationError) -> ProtocolError {
     }
 }
 
-
 #[cfg(test)]
 mod reconnect_tests {
     use super::*;
 
     fn issuer() -> Arc<SeatTokenIssuer> {
-        Arc::new(SeatTokenIssuer::new(b"01234567890123456789012345678901", Duration::from_secs(30)))
+        Arc::new(SeatTokenIssuer::new(
+            b"01234567890123456789012345678901",
+            Duration::from_secs(30),
+        ))
     }
 
     #[test]
     fn reconnect_is_enforced_by_the_seat_token() {
         let rooms = RoomManager::new();
         let issuer = issuer();
-        let grant = rooms.join("HIJ1", "2026-09-16", "Victim", "sunbird", None).unwrap().grant;
+        let grant = rooms
+            .join("HIJ1", "2026-09-16", "Victim", "sunbird", None)
+            .unwrap()
+            .grant;
 
         // 1. Bogus token: rejected.
         let mut seat: Option<(Uuid, Uuid)> = None;
@@ -458,7 +469,12 @@ mod reconnect_tests {
 
         // 2. Valid token: reattach succeeds, generation bumps, fresh token.
         let token = issuer
-            .issue(grant.player_id, grant.room_id, grant.seat_id, grant.generation)
+            .issue(
+                grant.player_id,
+                grant.room_id,
+                grant.seat_id,
+                grant.generation,
+            )
             .unwrap();
         let ok = handle(
             &rooms,
@@ -504,9 +520,17 @@ mod reconnect_tests {
     fn a_seated_socket_cannot_reconnect_a_second_seat() {
         let rooms = RoomManager::new();
         let issuer = issuer();
-        let grant = rooms.join("HIJ2", "2026-09-16", "TwoSeats", "sunbird", None).unwrap().grant;
+        let grant = rooms
+            .join("HIJ2", "2026-09-16", "TwoSeats", "sunbird", None)
+            .unwrap()
+            .grant;
         let token = issuer
-            .issue(grant.player_id, grant.room_id, grant.seat_id, grant.generation)
+            .issue(
+                grant.player_id,
+                grant.room_id,
+                grant.seat_id,
+                grant.generation,
+            )
             .unwrap();
         // Seat the socket with Join.
         let mut seat: Option<(Uuid, Uuid)> = None;

@@ -288,7 +288,12 @@ impl RoomManager {
     /// so a captured token goes stale on first reuse.
     pub fn seat_generation(&self, room_id: Uuid, seat_id: Uuid) -> Option<u64> {
         let reg = self.inner.read();
-        reg.rooms.get(&room_id)?.seats.iter().find(|s| s.seat_id == seat_id).map(|s| s.generation)
+        reg.rooms
+            .get(&room_id)?
+            .seats
+            .iter()
+            .find(|s| s.seat_id == seat_id)
+            .map(|s| s.generation)
     }
 
     /// Reattach to an existing seat after a dropped socket. Bumps the seat
