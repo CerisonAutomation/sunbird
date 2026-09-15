@@ -477,7 +477,9 @@ mod tests {
         .await;
         let response = unknown.into_response();
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
-        let body = axum::body::to_bytes(response.into_body(), 4096).await.unwrap();
+        let body = axum::body::to_bytes(response.into_body(), 4096)
+            .await
+            .unwrap();
         assert!(String::from_utf8_lossy(&body).contains("seatNotFound"));
 
         // A real seat: join, then mint for its current generation.
