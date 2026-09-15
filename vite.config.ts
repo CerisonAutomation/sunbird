@@ -113,6 +113,21 @@ export default defineConfig({
               manualChunks: {
                 three: ["three"],
                 react: ["react", "react-dom"],
+                audio: [
+                  "./src/game/Audio.ts",
+                  "./src/game/Music.ts",
+                ],
+                net: [
+                  "./src/game/Realtime.ts",
+                  "./src/game/MassRace.ts",
+                  "./src/game/GhostNet.ts",
+                  "./src/game/bufferUpdates.ts",
+                ],
+                social: [
+                  "./src/game/Leaderboard.ts",
+                  "./src/game/Squad.ts",
+                  "./src/game/Tournaments.ts",
+                ],
               },
             }),
       },

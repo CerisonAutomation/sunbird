@@ -1,6 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "npm run build:vercel",
+  "buildCommand": "pnpm run build:vercel",
+  "installCommand": "pnpm install --frozen-lockfile",
   "outputDirectory": "dist",
   "headers": [
     {
@@ -90,7 +91,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' https://js.stripe.com; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self' https: wss:; img-src 'self' data: blob:; frame-src https://js.stripe.com https://hooks.stripe.com; frame-ancestors 'none'"
+          "value": "default-src 'self'; script-src 'self' https://js.stripe.com; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self' https://api.stripe.com https://*.upstash.io wss:; img-src 'self' data: blob:; media-src 'self' blob:; worker-src 'self'; manifest-src 'self'; frame-src https://js.stripe.com https://hooks.stripe.com; frame-ancestors 'none'"
         }
       ]
     }
