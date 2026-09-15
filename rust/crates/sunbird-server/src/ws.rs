@@ -508,7 +508,7 @@ mod reconnect_tests {
                 version: PROTOCOL_VERSION,
                 room_id: grant.room_id,
                 seat_id: grant.seat_id,
-                reconnect_token: token,
+                reconnect_token: token.clone(),
             },
             &issuer,
         )
