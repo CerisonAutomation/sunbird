@@ -72,6 +72,9 @@ jobs:
           } > /tmp/fmt-summary.txt
           gh api "repos/$GITHUB_REPOSITORY/check-runs" \
             -f name="rust-fmt-diff" \
+            -f head_sha="$GITHUB_SHA" \
+            -f status="completed" \
+            -f conclusion="neutral" \
             -F output_title="rustfmt diff (run ${GITHUB_RUN_ID})" \
             -F output_summary="$(cat /tmp/fmt-summary.txt)"
       - name: Clippy
