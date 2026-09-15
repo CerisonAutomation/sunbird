@@ -48,11 +48,11 @@
         }
         .boot-inner { display: grid; gap: 14px; justify-items: center; text-align: center; padding: 24px; }
         .boot-mark { position: relative; width: 212px; height: 190px; }
-        .boot-sun { position: absolute; left: 64px; top: 53px; filter: drop-shadow(0 5px 14px rgba(255, 190, 60, .45)); }
-        .boot-orbit { position: absolute; left: 77px; top: 66px; width: 58px; height: 58px; animation: boot-orbit 3s linear infinite; }
-        .boot-bird { display: block; animation: boot-upright 3s linear infinite; filter: drop-shadow(0 4px 5px rgba(83, 52, 31, .2)); }
-        .boot-wing { animation: boot-flap .3s ease-in-out infinite alternate; }
-        @keyframes boot-flap { from { transform: rotate(-12deg); } to { transform: rotate(24deg); } }
+        .boot-sun { position: absolute; left: 58px; top: 47px; filter: drop-shadow(0 5px 14px rgba(255, 190, 60, .45)); }
+        .boot-orbit { position: absolute; left: 77px; top: 66px; width: 58px; height: 58px; animation: boot-orbit 2.4s linear infinite; }
+        .boot-bird { display: block; animation: boot-upright 2.4s linear infinite; filter: drop-shadow(0 4px 8px rgba(83, 52, 31, .35)); }
+        .boot-wing { animation: boot-flap .28s ease-in-out infinite alternate; }
+        @keyframes boot-flap { from { transform: rotate(-16deg); } to { transform: rotate(28deg); } }
         .boot-title { font-size: 20px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; }
         .boot-copy { max-width: 280px; color: #356078; font-size: 13px; line-height: 1.45; }
         .boot-retry { display: none; border: 0; border-radius: 999px; padding: 11px 18px; background: #ff8a3a; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
@@ -60,12 +60,22 @@
         .boot.is-error .boot-copy, .boot.is-error .boot-retry { display: block; }
         .boot-bar { width: 132px; height: 6px; border-radius: 999px; background: rgba(22, 50, 74, 0.18); overflow: hidden; }
         .boot-bar i { display: block; width: 40%; height: 100%; border-radius: 999px; background: #ff8a3a; animation: boot-slide 1.1s ease-in-out infinite; }
-        @keyframes boot-orbit { from { transform: rotate(0deg) translateX(79px); } to { transform: rotate(360deg) translateX(79px); } }
-        @keyframes boot-upright { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
+        .boot-sun { animation: boot-sun-pulse 2.4s ease-in-out infinite; }
+        @keyframes boot-sun-pulse { 0%,100% { filter: drop-shadow(0 5px 14px rgba(255,190,60,.45)); } 50% { filter: drop-shadow(0 5px 28px rgba(255,190,60,.75)); } }
+        @keyframes boot-orbit { 0% { transform: rotate(0deg) translateX(88px); } 100% { transform: rotate(360deg) translateX(88px); } }
+        /* Bird faces forward in its direction of travel: 90° offset from counter-rotation,
+           plus ±10° bank that rocks through each quarter of the orbit. */
+        @keyframes boot-upright {
+          0%   { transform: rotate(100deg); }
+          25%  { transform: rotate(0deg);   }
+          50%  { transform: rotate(-80deg); }
+          75%  { transform: rotate(-180deg);}
+          100% { transform: rotate(-260deg);}
+        }
         @keyframes boot-slide { 0% { transform: translateX(-110%); } 100% { transform: translateX(330%); } }
         @media (prefers-reduced-motion: reduce) {
-          .boot-orbit, .boot-bird, .boot-wing, .boot-bar i { animation: none; }
-          .boot-orbit { transform: translateX(79px); }
+          .boot-orbit, .boot-bird, .boot-wing, .boot-bar i, .boot-sun { animation: none; }
+          .boot-orbit { transform: translateX(88px); }
         }
       </style>
       <div class="boot" id="boot">

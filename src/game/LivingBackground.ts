@@ -12,7 +12,8 @@ import * as THREE from "three";
  * with per-bird wingbeat phase so the flock never strobes in unison.
  */
 
-const FLOCKS = 2;
+// One tighter flock: enough life in the sky without cluttering the backdrop with dots.
+const FLOCKS = 1;
 const BIRDS_PER_FLOCK = 4;
 const TOTAL = FLOCKS * BIRDS_PER_FLOCK;
 
@@ -38,9 +39,6 @@ export class LivingBackground extends THREE.Group {
   private readonly bodyGeo: THREE.BufferGeometry;
   private readonly wingGeo: THREE.BufferGeometry;
   private readonly birdMat: THREE.MeshBasicMaterial;
-  // A small kite flock adds motion without decorative dots.
-  private readonly kiteMesh: THREE.InstancedMesh;
-  private readonly kites: { ox: number; oy: number; depth: number; speed: number; phase: number; scale: number; hue: number }[] = [];
   private readonly shooters: THREE.Sprite[] = [];
   private shootT = 5;
   private reducedMotion = false;
@@ -117,37 +115,15 @@ export class LivingBackground extends THREE.Group {
       this.add(sp);
     }
 
-    // Three flocks at different depths and drift speeds.
-    for (let f = 0; f < FLOCKS; f++) {
-      this.flocks.push({
-        x: f * 90 - 40,
-        y: 34 + f * 12,
-        speed: 2.2 + f * 0.7,
-        depth: f / (FLOCKS - 1),
-        phase: f * 2.1,
-        wobble: 0.6 + f * 0.3,
-      });
-    }
-
-    // Kites: fast darts with figure-eight wobble — sparse for visual clarity.
-    {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute("position", new THREE.Float32BufferAttribute([0, 0.9, 0, -0.7, -0.5, 0, 0.7, -0.5, 0], 3));
-      g.setIndex([0, 1, 2]);
-      g.computeVertexNormals();
-      const m = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
-      this.kiteMesh = new THREE.InstancedMesh(g, m, 4);
-      this.kiteMesh.frustumCulled = false;
-      this.kiteMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      this.add(this.kiteMesh);
-      for (let i = 0; i < 4; i++) {
-        this.kites.push({
-          ox: i * 37 - 60, oy: 26 + (i % 4) * 9, depth: 0.15 + (i % 3) * 0.09,
-          speed: 3.2 + (i % 3) * 1.1, phase: i * 2.17, scale: 0.8 + (i % 2) * 0.5,
-          hue: (0.02 + i * 0.11) % 1,
-        });
-      }
-    }
+    // One flock — single depth layer, keeps the sky clean.
+    this.flocks.push({
+      x: -40,
+      y: 34,
+      speed: 2.6,
+      depth: 0.5,
+      phase: 0,
+      wobble: 0.8,
+    });
     // Shooting-star streaks (pooled sprites)
     for (let i = 0; i < 3; i++) {
       const mat = new THREE.SpriteMaterial({ map: this.cloudTex, color: 0xfff6d8, transparent: true, opacity: 0, depthWrite: false, fog: false });
@@ -181,27 +157,8 @@ export class LivingBackground extends THREE.Group {
     this.writeTraffic(this.t, camX, camY, dt);
   }
 
-  private wrapX(ox: number, drift: number, span: number): number {
-    const wx = ox - drift;
-    return ((wx - this.anchorX + span * 0.5) % span + span) % span - span * 0.5;
-  }
-
-  private writeTraffic(time: number, camX: number, camY: number, dt: number): void {
+  private writeTraffic(_time: number, camX: number, camY: number, dt: number): void {
     const still = this.reducedMotion;
-    for (let i = 0; i < this.kites.length; i++) {
-      const k = this.kites[i]!;
-      const wx = this.wrapX(k.ox, still ? 0 : time * k.speed * 4.5, 240);
-      const wy = k.oy + Math.sin(time * 2.1 + k.phase) * 3.2 + Math.sin(time * 0.7 + k.phase * 2) * 1.5;
-      dummy.position.set(camX + wx, wy + camY * 0.08, -44 - k.depth * 30);
-      dummy.rotation.set(0.3, still ? 0 : time * 1.2 + k.phase, Math.sin(time * 3 + k.phase) * 0.5);
-      dummy.scale.setScalar(k.scale);
-      dummy.updateMatrix();
-      this.kiteMesh.setMatrixAt(i, dummy.matrix);
-      tmpColor.setHSL(k.hue, 0.85, 0.6);
-      this.kiteMesh.setColorAt(i, tmpColor);
-    }
-    this.kiteMesh.instanceMatrix.needsUpdate = true;
-    if (this.kiteMesh.instanceColor) this.kiteMesh.instanceColor.needsUpdate = true;
     if (!still) {
       this.shootT -= dt;
       if (this.shootT <= 0) {
@@ -294,9 +251,6 @@ export class LivingBackground extends THREE.Group {
     this.wingR.dispose();
     this.cloudTex.dispose();
     for (const sp of this.clouds) sp.material.dispose();
-    this.kiteMesh.geometry.dispose();
-    (this.kiteMesh.material as THREE.Material).dispose();
-    this.kiteMesh.dispose();
     for (const sp of this.shooters) sp.material.dispose();
   }
 }

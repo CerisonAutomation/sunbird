@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { ALT_CLOUDS, ALT_HIGH, ALT_SKY, CAMERA_BASE_Z, CAMERA_LOOKAHEAD, MAX_SPEED } from "./constants";
+import { ALT_CLOUDS, ALT_HIGH, ALT_SKY, ALT_STRATO, CAMERA_BASE_Z, CAMERA_LOOKAHEAD, MAX_SPEED } from "./constants";
 import { clamp, lerp, smoothstep } from "./math";
 import type { Bird } from "./Bird";
 
@@ -140,8 +140,11 @@ export class CameraRig {
     // while still leaving enough terrain visible ahead for timing landings.
     const ahead = attract ? 0.72 * visibleHalfWidth : Math.min(gameplayAhead, 0.32 * visibleHalfWidth);
     const targetLookX = bird.x + ahead;
-    // When very high, bias the look point downward so the landscape stays in frame.
-    const downBias = smoothstep(ALT_SKY, ALT_HIGH, alt) * 14;
+    // When very high, bias the look point downward so the landscape stays in frame
+    // and the player can time their descent to the next landing.
+    const downBias =
+      smoothstep(ALT_SKY, ALT_HIGH, alt) * 14 +
+      smoothstep(ALT_HIGH, ALT_STRATO, alt) * 24;
     // Slightly lower look point + higher camera = a gentle top-down tilt: the
     // bird frames against the ground (readable landings) instead of the sky.
     const targetLookY = lerp(bird.y + 3.2 - downBias, (bird.y + groundY) * 0.5, groundFrame);

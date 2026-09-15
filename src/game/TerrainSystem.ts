@@ -141,8 +141,10 @@ export class TerrainSystem {
     const lip = rampPeakFor(island) + 14;
     // One authored transfer per island: high shoulder -> huge clean descent
     // -> wide bowl -> launch lip. No noise bumps to steal downhill momentum.
-    const shoulder = lip + 30 + hash01(island, this.seedN) * 6;
-    const valley = 6;
+    // Deeper valley = more vertical drop = more speed arriving at the launch ramp.
+    // Shoulder raised slightly so the initial descent cliff feels dramatic.
+    const shoulder = lip + 38 + hash01(island, this.seedN) * 8;
+    const valley = 1.2; // skim just above water — the bird nearly touches the ocean
     if (lx >= GAP_START && lx < gapEnd) {
       // Start at the actual ramp height, NOT the unrelated procedural hills.
       // The old branch had a vertical discontinuity precisely at take-off.

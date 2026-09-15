@@ -40,14 +40,24 @@ const POOL: { kind: SurpriseKind; weight: number; toasts: string[]; coins: numbe
   {
     kind: "tailwind",
     weight: 5,
-    toasts: ["💨 Freak tailwind! The sky is on your side", "💨 The wind remembered it owes you one"],
+    toasts: [
+      "💨 Freak tailwind! The sky is on your side",
+      "💨 The wind remembered it owes you one",
+      "💨 The atmosphere decided to be helpful for once",
+      "💨 Unexpected wind. Your feathers: impressed",
+    ],
     coins: 0,
     fever: 0,
   },
   {
     kind: "sneeze",
     weight: 4,
-    toasts: ["🤧 The bird sneezed. Aerodynamics unaffected. Dignity: lost", "🤧 Achoo! Feathers everywhere"],
+    toasts: [
+      "🤧 The bird sneezed. Aerodynamics unaffected. Dignity: lost",
+      "🤧 Achoo! Feathers everywhere",
+      "🤧 Mid-flight sneeze. Zero regrets",
+      "🤧 That sneeze reached Mach 0.4. Impressive",
+    ],
     coins: 0,
     fever: 0,
   },
@@ -68,7 +78,12 @@ const POOL: { kind: SurpriseKind; weight: number; toasts: string[]; coins: numbe
   {
     kind: "encore",
     weight: 3,
-    toasts: ["🎶 The band plays an encore — free fever!", "🎶 Surprise encore! Ride the beat"],
+    toasts: [
+      "🎶 The band plays an encore — free fever!",
+      "🎶 Surprise encore! Ride the beat",
+      "🎶 The DJ looked at your speed and said 'yes'",
+      "🔥 Mystery heat detected. Fever granted by the universe",
+    ],
     coins: 0,
     fever: 8,
   },
@@ -133,7 +148,6 @@ export const SPLASH_QUIPS = [
   "Not a crash. A very enthusiastic bath",
   "The fish gave that landing a standing ovation",
   "New skill unlocked: damp",
-
   "The ocean: 1 · Bird: 0",
   "That was a swan dive. You are not a swan",
   "The fish demand an apology",
@@ -149,6 +163,17 @@ export const SPLASH_QUIPS = [
   "The ocean has added you to its contacts",
   "Congratulations: you are now 80% water",
   "The bird requested a towel and a lawyer",
+  // new — 2026 batch
+  "Plot twist: the bird can't swim. The fish are judging",
+  "Splashed so hard the mermaids filed a noise complaint",
+  "The crab gave it a 9.4 for artistic interpretation",
+  "Fully cooked. Like a bird nugget",
+  "That's not a landing — that's a baptism",
+  "The ocean politely declined your altitude",
+  "Somewhere a lifeguard sighed so hard they retired",
+  "The bird will not be signing autographs today",
+  "Physics said no. The ocean said yes",
+  "That splash echoed all the way to the leaderboard (downward)",
 ];
 
 export const SLEEP_QUIPS = [
@@ -167,6 +192,12 @@ export const SLEEP_QUIPS = [
   "The moon has taken over. Chaos follows",
   "Fell asleep like a professional. Fully certified",
   "The stars are just tucking you in now",
+  // new — 2026 batch
+  "The sun is not coming back. You've been ghosted by a star",
+  "Night mode: activated. Bird mode: offline",
+  "The darkness is just the sky's way of saying 'okay that's enough'",
+  "Wings folded. Dreams commencing. Do not disturb",
+  "The owls have taken over. You are not prepared",
 ];
 
 export const BIG_LAUNCH_QUIPS = [
@@ -176,7 +207,6 @@ export const BIG_LAUNCH_QUIPS = [
   "The sun did not order express delivery",
   "Next stop: probably not this island",
   "Wings: tiny. Confidence: unreasonable",
-
   "The hill said YEET",
   "FAA would like a word",
   "Gravity has filed a complaint",
@@ -193,6 +223,19 @@ export const BIG_LAUNCH_QUIPS = [
   "That flap violated several physics bylaws",
   "The sky wasn't ready for that. Rude of you",
   "Zero to hero in one flap. The worms gasped",
+  // new — 2026 batch
+  "The atmosphere just filed for overtime",
+  "Warning: bird is now a projectile",
+  "Aeronautically illegal in seven countries",
+  "The ramp peaked. So did the bird",
+  "Going up. Way up. Embarrassingly up",
+  "That hill was a slingshot in disguise",
+  "Scientists just updated their models",
+  "The birds in the distance said 'how'",
+  "SkyFlight™ has entered the chat",
+  "The clouds took a step back. Respect",
+  "You just graduated from bird to spacecraft",
+  "Control room: all nominal. All extremely nominal",
 ];
 
 /** Fresh pool: fever ignites. */
@@ -206,6 +249,14 @@ export const FEVER_QUIPS = [
   "The thermometer just gave up and left",
   "You're flying like you stole the wind",
   "Wings are now 100% afterburner, 0% regret",
+  // new — 2026 batch
+  "The bird discovered what 'fast' actually means",
+  "FEVER: activated. Common sense: on vacation",
+  "Sun goes brrrrr",
+  "The bird is no longer asking for permission",
+  "At this speed, the wind owes YOU an apology",
+  "The government is watching. Jealously",
+  "Feathers on fire. No notes",
 ];
 
 /** Fresh pool: sky-gem pickups. */
@@ -284,6 +335,12 @@ export const SURRENDER_QUIPS = [
   "The sun respects a graceful exit",
   "We'll call it a 'strategic sunset'",
   "The horizon accepts your surrender with dignity",
+  // new — 2026 batch
+  "Bravery: attempted. Results: pending",
+  "This landing was very much on purpose",
+  "The bird has opted for ground-based activities",
+  "Flight postponed. Weather: internal",
+  "Tactical de-altituding complete",
 ];
 
 /** Deterministic quip pick so tests can pin behaviour. */
