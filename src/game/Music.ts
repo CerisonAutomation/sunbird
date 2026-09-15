@@ -458,9 +458,11 @@ export class Music {
   private readonly tensionGain: GainNode;
   private readonly arpGain: GainNode;
   private readonly organGain: GainNode;
+  private readonly tronGain: GainNode;
   private readonly noise: AudioBuffer;
   private lullabyStep = 0;
   private baseLevel = 0;
+  private isTronTrack = false;
 
   constructor(
     private readonly ctx: AudioContext,
@@ -469,6 +471,13 @@ export class Music {
   ) {
     this.bus = ctx.createGain();
     this.bus.gain.value = 0;
+    // Master compressor: glues the mix, adds cinematic punch and loudness
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -18;
+    comp.knee.value = 10;
+    comp.ratio.value = 4;
+    comp.attack.value = 0.003;
+    comp.release.value = 0.25;
     this.filter = ctx.createBiquadFilter();
     this.filter.type = "lowpass";
     this.filter.frequency.value = 9000;
@@ -476,7 +485,8 @@ export class Music {
     this.duckGain = ctx.createGain();
     this.duckGain.gain.value = 1;
     this.bus.connect(this.filter);
-    this.filter.connect(this.duckGain);
+    this.filter.connect(comp);
+    comp.connect(this.duckGain);
     this.duckGain.connect(destination);
     // Post-fader send: music volume, mode and event ducking control the wet
     // signal too. Per-note sends used to bypass all three (even at volume 0).
@@ -501,6 +511,7 @@ export class Music {
     this.tensionGain = mk(0);
     this.arpGain = mk(0);
     this.organGain = mk(0);
+    this.tronGain = mk(0);
 
     const len = ctx.sampleRate;
     this.noise = ctx.createBuffer(1, len, ctx.sampleRate);
@@ -646,6 +657,8 @@ export class Music {
     this.organGain.gain.setTargetAtTime(m === "play" ? 0.10 : m === "fever" ? 0.18 : m === "menu" ? 0.06 : 0, t, 1.2);
     // Warm pad bed: strongest on the menu, subtle underneath play.
     this.padGain.gain.setTargetAtTime(m === "menu" ? 0.18 : m === "play" ? 0.06 : 0, t, 0.8);
+    // Tron synth: active only on Tron-progression tracks (replaces glock lead)
+    this.tronGain.gain.setTargetAtTime(this.isTronTrack && song ? (m === "fever" ? 0.36 : 0.28) : 0, t, 0.4);
     this.lullabyGain.gain.setTargetAtTime(m === "sleep" ? 0.3 : 0, t, 0.6);
     const cutoff = musicCutoff(style.cutoff, this.night, this.intensityTarget, this.ctx.sampleRate);
     this.filter.frequency.setTargetAtTime(cutoff, t, 0.55);
@@ -727,22 +740,28 @@ export class Music {
     const idx = this.bar * 8 + this.step;
     const beat = 60 / this.bpm;
 
-    // Chord pad: one swell per bar — two detuned triangles on root+fifth an
-    // octave down. ~6 oscillators/bar; negligible cost, huge warmth.
+    // Track whether this is a Tron-progression track (routes melody to tronSynth)
+    const wasTron = this.isTronTrack;
+    this.isTronTrack = sec.prog === PROG_TRON;
+    if (wasTron !== this.isTronTrack) this.apply();
+
+    // Chord pad: ensemble strings swell once per bar
     if (this.step === 0 && (this.mode === "menu" || this.mode === "play")) this.pad(t, chordName, beat * 4);
 
-    // Menu-only birdsong: an occasional far-away sparkle chirp, seeded by the
-    // bar so it stays sparse and never machine-guns.
+    // Menu-only birdsong: an occasional far-away sparkle chirp
     if (this.mode === "menu" && this.step === 6 && Math.random() < 0.3) {
       this.birdsong(t + Math.random() * beat * 0.5);
     }
 
-    // Ukulele strum
+    // Chord strum (non-Tron tracks) or Tron chord pulse
     const strum = STRUM[this.step]!;
-    if (strum) {
+    if (strum && !this.isTronTrack) {
       const accent = this.step === 0 ? 1 : this.step === 4 ? 0.85 : 0.65;
       const order = strum === 1 ? chord : [...chord].reverse();
       order.forEach((m, i) => this.pluck(t + i * 0.011 + Math.random() * 0.004, mtof(m + this.transpose + stormShift), accent * (0.7 + 0.3 * Math.random())));
+    } else if (strum && this.isTronTrack && this.step === 0) {
+      // Tron: staccato chord stab on beat 1 only
+      chord.forEach((m) => this.tronStab(t, mtof(m + this.transpose + stormShift), beat * 0.18));
     }
 
     // Bass: root on 1, fifth or root on 3, occasional walk-up on 8
@@ -750,11 +769,19 @@ export class Music {
     if (this.step === 4) this.bass(t, mtof(BASS_ROOT[chordName]! + (this.bar % 2 ? 7 : 0) + this.transpose + stormShift), beat * 0.8);
     if (this.step === 7 && this.bar % 4 === 3) this.bass(t, mtof(BASS_ROOT[chordName]! + 5 + this.transpose + stormShift), beat * 0.4);
 
-    // Glockenspiel melody
+    // Melody: FM bell/piano on normal tracks, Tron lead synth on Tron tracks
     const note = sec.mel[idx] ?? 0;
     if (note > 0) {
       const sparse = this.mode === "menu" && this.step % 2 === 1 && Math.random() < 0.5;
-      if (!sparse) this.glock(t, mtof(note + this.transpose + stormShift), this.step === 0 ? 1 : 0.8);
+      if (!sparse) {
+        const noteFreq = mtof(note + this.transpose + stormShift);
+        const vel = this.step === 0 ? 1 : 0.8;
+        if (this.isTronTrack) {
+          this.tronLead(t, noteFreq, beat * 0.85, vel);
+        } else {
+          this.glock(t, noteFreq, vel);
+        }
+      }
     }
 
     // Percussion
@@ -831,28 +858,35 @@ export class Music {
 
   /* ---------- instruments ---------- */
 
-  /** Bar-long chord swell: two detuned triangles + a fifth, lowpassed. */
+  /** Ensemble strings: 7 detuned sawtooth oscillators per chord note — the
+   *  same algorithm all hardware string synthesizers use. Slow attack (0.5s)
+   *  creates the characteristic swell; wide chorus detune = lushness. */
   private pad(t: number, chordName: string, dur: number): void {
     const root = (BASS_ROOT[chordName] ?? 48) + 12 + this.transpose;
-    const notes = [root, root + 7];
+    const notes = [root, root + 7, root + 12];
+    const detunes = [-14, -8, -3, 0, 3, 8, 14]; // 7 oscillators = chorus ensemble
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.5, t + dur * 0.3);
-    g.gain.setValueAtTime(0.5, t + dur * 0.7);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    g.gain.exponentialRampToValueAtTime(0.28, t + dur * 0.45); // slow string attack
+    g.gain.setValueAtTime(0.28, t + dur * 0.78);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur * 1.08);
     const f = this.ctx.createBiquadFilter();
     f.type = "lowpass";
-    f.frequency.value = 900;
+    f.frequency.value = 2200; // let harmonics through — real string quality
+    f.Q.value = 0.3;
     g.connect(f);
     f.connect(this.padGain);
     for (const m of notes) {
-      for (const det of [-4, 4]) {
+      for (const det of detunes) {
         const o = this.ctx.createOscillator();
-        o.type = "triangle";
+        const og = this.ctx.createGain();
+        o.type = "sawtooth";
         o.frequency.value = mtof(m) * Math.pow(2, det / 1200);
-        o.connect(g);
+        og.gain.value = 0.11 / detunes.length;
+        o.connect(og);
+        og.connect(g);
         o.start(t);
-        o.stop(t + dur + 0.05);
+        o.stop(t + dur * 1.12);
       }
     }
   }
@@ -908,33 +942,55 @@ export class Music {
     o2.stop(t + 0.6);
   }
 
+  /** FM bell/piano synthesis. A sine carrier is frequency-modulated by a sine
+   *  at carrier×3.5 — the classic DX7 bell algorithm. The modulation index
+   *  decays fast (attack transient) while carrier sustains, creating the sharp
+   *  attack + ringing tail of a piano or marimba. Sounds leagues above pure sines. */
   private glock(t: number, freq: number, vel: number): void {
+    const modRatio = 3.5;
+    const modFreq = freq * modRatio;
+    const modIdx = modFreq * 9 * vel; // high index = bright attack
+
+    // Modulator amplitude: fast exponential decay (attack brightness)
+    const modEnv = this.ctx.createGain();
+    modEnv.gain.setValueAtTime(modIdx, t);
+    modEnv.gain.exponentialRampToValueAtTime(modIdx * 0.05, t + 0.35);
+    modEnv.gain.exponentialRampToValueAtTime(0.0001, t + 2.0);
+
+    const mod = this.ctx.createOscillator();
+    mod.type = "sine";
+    mod.frequency.value = modFreq;
+    mod.connect(modEnv);
+    modEnv.connect(mod.frequency); // FM: modulator drives carrier frequency
+
+    const carrier = this.ctx.createOscillator();
+    carrier.type = "sine";
+    carrier.frequency.value = freq;
+
+    // Second partial for warmth (3rd harmonic, low amplitude)
+    const partialMod = this.ctx.createOscillator();
+    const partialEnv = this.ctx.createGain();
+    partialMod.type = "sine";
+    partialMod.frequency.value = freq * 2;
+    partialEnv.gain.setValueAtTime(freq * 2 * vel, t);
+    partialEnv.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+    partialMod.connect(partialEnv);
+    partialEnv.connect(carrier.frequency);
+
+    // Carrier amplitude envelope
     const g = this.ctx.createGain();
-    // Brighter peak, longer ring (like a real glockenspiel bar or celesta)
-    const peak = 0.44 * vel;
+    const peak = 0.52 * vel;
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(peak, t + 0.002);
-    g.gain.exponentialRampToValueAtTime(peak * 0.3, t + 0.12);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.6);
-    // 4 partials (real marimba/glock harmonic series)
-    const partials: [number, number][] = [
-      [1,    1    ],
-      [2.76, 0.42 ],
-      [5.4,  0.15 ],
-      [8.93, 0.06 ],
-    ];
-    for (const [ratio, amp] of partials) {
-      const o = this.ctx.createOscillator();
-      const pg = this.ctx.createGain();
-      o.type = "sine";
-      o.frequency.value = freq * ratio;
-      pg.gain.value = amp;
-      o.connect(pg);
-      pg.connect(g);
-      o.start(t);
-      o.stop(t + 1.7);
-    }
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.003);
+    g.gain.exponentialRampToValueAtTime(peak * 0.45, t + 0.1);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 2.2);
+
+    carrier.connect(g);
     g.connect(this.glockGain);
+
+    mod.start(t); mod.stop(t + 2.3);
+    partialMod.start(t); partialMod.stop(t + 0.15);
+    carrier.start(t); carrier.stop(t + 2.3);
   }
 
   private whistle(t: number, freq: number, dur: number): void {
@@ -975,32 +1031,49 @@ export class Music {
     breath.stop(t + dur + 0.1);
   }
 
+  /** Deep bass: sub sine one octave down + fundamental sine + harmonic triangle.
+   *  The sub-octave adds the chest-punch felt in Zimmer/Tron scores. */
   private bass(t: number, freq: number, dur: number): void {
-    const o = this.ctx.createOscillator();
-    const o2 = this.ctx.createOscillator();
     const g = this.ctx.createGain();
     const f = this.ctx.createBiquadFilter();
-    o.type = "sine";
-    o2.type = "triangle";
-    o.frequency.value = freq;
-    o2.frequency.value = freq;
     f.type = "lowpass";
-    f.frequency.value = 420;
+    f.frequency.value = 580;
+    f.Q.value = 0.6;
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.5, t + 0.012);
-    g.gain.exponentialRampToValueAtTime(0.28, t + dur * 0.5);
+    g.gain.exponentialRampToValueAtTime(0.55, t + 0.014);
+    g.gain.exponentialRampToValueAtTime(0.32, t + dur * 0.5);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    const m2 = this.ctx.createGain();
-    m2.gain.value = 0.35;
-    o.connect(f);
-    o2.connect(m2);
-    m2.connect(f);
+
+    // Sub: one octave down (the Zimmer low-end weight)
+    const sub = this.ctx.createOscillator();
+    const subG = this.ctx.createGain();
+    sub.type = "sine";
+    sub.frequency.value = freq * 0.5;
+    subG.gain.value = 0.55;
+    sub.connect(subG);
+    subG.connect(f);
+
+    // Fundamental
+    const fund = this.ctx.createOscillator();
+    fund.type = "sine";
+    fund.frequency.value = freq;
+
+    // Harmonic layer for definition
+    const harm = this.ctx.createOscillator();
+    const harmG = this.ctx.createGain();
+    harm.type = "triangle";
+    harm.frequency.value = freq;
+    harmG.gain.value = 0.28;
+    harm.connect(harmG);
+    harmG.connect(f);
+
+    fund.connect(f);
     f.connect(g);
     g.connect(this.bassGain);
-    o.start(t);
-    o2.start(t);
-    o.stop(t + dur + 0.02);
-    o2.stop(t + dur + 0.02);
+
+    sub.start(t);   sub.stop(t + dur + 0.03);
+    fund.start(t);  fund.stop(t + dur + 0.03);
+    harm.start(t);  harm.stop(t + dur + 0.03);
   }
 
   private shaker(t: number, vel: number): void {
@@ -1147,6 +1220,59 @@ export class Music {
     }
     lfo.start(t);
     lfo.stop(t + dur + 0.15);
+  }
+
+  /** Tron lead synth: Daft Punk / Tron Legacy sound.
+   *  Sawtooth carrier through a sharp resonant lowpass that opens on attack,
+   *  creating the classic "electronic filter sweep" sound of the Grid. */
+  private tronLead(t: number, freq: number, dur: number, vel: number): void {
+    const o = this.ctx.createOscillator();
+    const o2 = this.ctx.createOscillator();
+    const f = this.ctx.createBiquadFilter();
+    const g = this.ctx.createGain();
+    o.type = "sawtooth";
+    o2.type = "square";
+    o.frequency.value = freq;
+    o2.frequency.value = freq * 1.005; // slight detune for width
+    f.type = "lowpass";
+    f.frequency.setValueAtTime(freq * 12, t);     // bright attack
+    f.frequency.exponentialRampToValueAtTime(freq * 2.5, t + 0.08); // filter closes
+    f.Q.value = 3.5; // resonant peak = electronic character
+    const peak = 0.46 * vel;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.005); // hard attack
+    g.gain.exponentialRampToValueAtTime(peak * 0.65, t + 0.04);
+    g.gain.setValueAtTime(peak * 0.65, t + Math.max(0.05, dur - 0.04));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    const mix2 = this.ctx.createGain();
+    mix2.gain.value = 0.3;
+    o.connect(f);
+    o2.connect(mix2);
+    mix2.connect(f);
+    f.connect(g);
+    g.connect(this.tronGain);
+    o.start(t);  o.stop(t + dur + 0.02);
+    o2.start(t); o2.stop(t + dur + 0.02);
+  }
+
+  /** Tron chord stab: short percussive hit used on beat 1 of Tron tracks. */
+  private tronStab(t: number, freq: number, dur: number): void {
+    const o = this.ctx.createOscillator();
+    const f = this.ctx.createBiquadFilter();
+    const g = this.ctx.createGain();
+    o.type = "sawtooth";
+    o.frequency.value = freq;
+    f.type = "lowpass";
+    f.frequency.setValueAtTime(freq * 8, t);
+    f.frequency.exponentialRampToValueAtTime(freq * 1.8, t + 0.04);
+    f.Q.value = 2;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.18, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(f);
+    f.connect(g);
+    g.connect(this.tronGain);
+    o.start(t); o.stop(t + dur + 0.01);
   }
 
   private clap(t: number): void {
