@@ -45,15 +45,16 @@ export function clampSequencerTime(
 
 // Ukulele GCEA voicings (midi)
 const UKE: Record<string, Voicing> = {
-  C: [67, 60, 64, 72],
-  G: [67, 62, 67, 71],
+  C:  [67, 60, 64, 72],
+  G:  [67, 62, 67, 71],
   Am: [69, 60, 64, 69],
-  F: [69, 60, 65, 69],
+  F:  [69, 60, 65, 69],
   Em: [67, 59, 64, 67],
   Dm: [69, 62, 65, 69],
+  Gm: [67, 62, 63, 70], // G–D–Eb–Bb, used in PROG_TRON
 };
 
-const BASS_ROOT: Record<string, number> = { C: 48, G: 43, Am: 45, F: 41, Em: 40, Dm: 38 };
+const BASS_ROOT: Record<string, number> = { C: 48, G: 43, Am: 45, F: 41, Em: 40, Dm: 38, Gm: 43 };
 
 const PROG_A = ["C", "G", "Am", "F", "C", "G", "F", "G"];
 // PROG_K: Zimmer-style cinematic minor. Am → F → C → G mirrors "Time" / Inception.
@@ -635,6 +636,7 @@ export class Music {
     this.filter.disconnect();
     this.duckGain.disconnect();
     this.wetGain.disconnect();
+    this.tronGain.disconnect();
   }
 
   private apply(): void {
@@ -681,6 +683,7 @@ export class Music {
     this.buildOrder();
     this.orderPos = 0;
     this.section = this.order[0] ?? 0;
+    this.isTronTrack = TRACKS[this.section]!.prog === PROG_TRON;
     this.lullabyStep = 0;
     if (this.mode !== "sleep") this.onTrackChange?.(TRACKS[this.section]!.name);
     this.timer = window.setInterval(() => this.tick(), TICK_MS);
@@ -723,6 +726,12 @@ export class Music {
         // repeat the same sequence.
         if (this.orderPos === 0 && this.trackSel === "shuffle") this.buildOrder();
         this.section = this.order[this.orderPos]!;
+        // Update Tron-track flag when the section changes; only adjust gains if it flipped.
+        const nowTron = TRACKS[this.section]!.prog === PROG_TRON;
+        if (nowTron !== this.isTronTrack) {
+          this.isTronTrack = nowTron;
+          this.apply();
+        }
         // Sleep mode plays the lullaby, not the track — don't announce a
         // "now playing" title for music the player can't hear.
         if (this.mode !== "sleep") this.onTrackChange?.(TRACKS[this.section]!.name);
@@ -739,11 +748,6 @@ export class Music {
     const chord = UKE[chordName]!;
     const idx = this.bar * 8 + this.step;
     const beat = 60 / this.bpm;
-
-    // Track whether this is a Tron-progression track (routes melody to tronSynth)
-    const wasTron = this.isTronTrack;
-    this.isTronTrack = sec.prog === PROG_TRON;
-    if (wasTron !== this.isTronTrack) this.apply();
 
     // Chord pad: ensemble strings swell once per bar
     if (this.step === 0 && (this.mode === "menu" || this.mode === "play")) this.pad(t, chordName, beat * 4);
@@ -949,31 +953,33 @@ export class Music {
   private glock(t: number, freq: number, vel: number): void {
     const modRatio = 3.5;
     const modFreq = freq * modRatio;
-    const modIdx = modFreq * 9 * vel; // high index = bright attack
+    // Modulation index in Hz: deviation = modulation_index × carrier_freq.
+    // DX7 bell uses index ~3–5. In Web Audio the gain value IS the Hz deviation.
+    const modIdx = freq * 4.5 * vel;
 
-    // Modulator amplitude: fast exponential decay (attack brightness)
+    // Modulator amplitude envelope: fast decay creates the bright attack click
     const modEnv = this.ctx.createGain();
     modEnv.gain.setValueAtTime(modIdx, t);
     modEnv.gain.exponentialRampToValueAtTime(modIdx * 0.05, t + 0.35);
     modEnv.gain.exponentialRampToValueAtTime(0.0001, t + 2.0);
 
-    const mod = this.ctx.createOscillator();
-    mod.type = "sine";
-    mod.frequency.value = modFreq;
-    mod.connect(modEnv);
-    modEnv.connect(mod.frequency); // FM: modulator drives carrier frequency
-
     const carrier = this.ctx.createOscillator();
     carrier.type = "sine";
     carrier.frequency.value = freq;
 
-    // Second partial for warmth (3rd harmonic, low amplitude)
+    const mod = this.ctx.createOscillator();
+    mod.type = "sine";
+    mod.frequency.value = modFreq;
+    mod.connect(modEnv);
+    modEnv.connect(carrier.frequency); // FM: mod output → carrier frequency input
+
+    // Second partial: shallow FM from 2× oscillator for warmth on attack
     const partialMod = this.ctx.createOscillator();
     const partialEnv = this.ctx.createGain();
     partialMod.type = "sine";
     partialMod.frequency.value = freq * 2;
-    partialEnv.gain.setValueAtTime(freq * 2 * vel, t);
-    partialEnv.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+    partialEnv.gain.setValueAtTime(freq * 1.2 * vel, t); // reasonable deviation
+    partialEnv.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
     partialMod.connect(partialEnv);
     partialEnv.connect(carrier.frequency);
 

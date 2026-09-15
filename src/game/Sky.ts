@@ -73,36 +73,37 @@ const STOPS: { t: number; s: SkyStop }[] = [
   {
     t: 0.7,
     s: {
-      top: 0x4aa4ea,
-      // Keep midday contrast clear instead of washing the playfield in white.
-      horizon: 0x80c6e2,
-      bottom: 0x70b8d5,
-      fog: 0x78b8d2,
+      top: 0x2e90e0,
+      // Deeper saturated blue — no more white-sky wash.
+      horizon: 0x50a8d8,
+      bottom: 0x58a8cc,
+      fog: 0x48a0c4,
       sun: 0xfff6c8,
-      farA: 0x6bb87a,
-      farB: 0x4d8aaa,
-      farC: 0x4a68a0,
-      water: 0x3a98c8,
-      waterDeep: 0x1a5888,
-      hemiSky: 0xb0e0ff,
-      hemiGround: 0x5a8a50,
+      farA: 0x5aac6e,
+      farB: 0x3e7a9a,
+      farC: 0x3a5a90,
+      water: 0x2a88c0,
+      waterDeep: 0x144e7e,
+      hemiSky: 0x78c4f8,
+      hemiGround: 0x4e7e44,
     },
   },
   {
     t: 1,
     s: {
-      top: 0x7ec8f5,
-      horizon: 0xffe0b8,
-      bottom: 0xf0c8a0,
-      fog: 0xe8d8c4,
-      sun: 0xfff2b8,
-      farA: 0x8ed89a,
-      farB: 0x78b0c8,
-      farC: 0x7a90c0,
-      water: 0x48b0d8,
-      waterDeep: 0x2a7098,
-      hemiSky: 0xffe0c8,
-      hemiGround: 0x80b060,
+      top: 0x58b8f0,
+      // Warm late-afternoon but no cream haze — clear golden light.
+      horizon: 0xf0c080,
+      bottom: 0xe0a870,
+      fog: 0x90c8e0,   // clear sky blue instead of the smoggy cream
+      sun: 0xfff0a8,
+      farA: 0x78c884,
+      farB: 0x60a0bc,
+      farC: 0x6080b0,
+      water: 0x38a0cc,
+      waterDeep: 0x1e6088,
+      hemiSky: 0xf0d8a0,
+      hemiGround: 0x70a050,
     },
   },
 ];
@@ -445,17 +446,16 @@ export class Sky {
     this.hemi.color.copy(this.mixHex(a.hemiSky, b.hemiSky, u));
     this.hemi.groundColor.copy(this.mixHex(a.hemiGround, b.hemiGround, u));
     this.sunLight.color.copy(this.mixHex(a.sun, b.sun, u));
-    // Brighter key + richer fill so terrain reads crisp and defined.
-    // Day grade lifted ~15% for a premium well-lit look under ACES.
-    this.sunLight.intensity = 0.46 + t * 0.86;
-    this.hemi.intensity = 0.8 + t * 0.46;
+    // Balanced key light: bright enough for crisp terrain, not so hot it blows out.
+    this.sunLight.intensity = 0.38 + t * 0.60;
+    this.hemi.intensity = 0.72 + t * 0.40;
 
     // Keep the full daylight disc in the upper sky instead of clipping its crown.
     const elev = 22 + t * 64;
     this.sun.position.set(36 + (1 - t) * 28, elev, -110);
     this.sunGlow.position.copy(this.sun.position);
     (this.sun.material as THREE.SpriteMaterial).color.copy(this.mixHex(a.sun, b.sun, u));
-    this.sun.scale.setScalar((0.85 + t * 0.4) * 26);
+    this.sun.scale.setScalar((0.7 + t * 0.3) * 20);
 
     this.moon.position.set(-8, 20 + (1 - t) * 68, -120);
     this.moonGlow.position.copy(this.moon.position);
@@ -505,7 +505,7 @@ export class Sky {
     // clouds in Collectibles are untouched — these are atmosphere only.
     // Haze stays a very faint depth cue. Keep the horizon open so the bird,
     // terrain silhouette, and daylight meter remain readable on small screens.
-    const hazeAlpha = (0.001 + this.hazeDensity * 0.0025) * (1 - this.altT * 0.8) * (0.5 + t * 0.5);
+    const hazeAlpha = (0.0004 + this.hazeDensity * 0.001) * (1 - this.altT * 0.8) * (0.5 + t * 0.5);
     for (const sprite of this.haze) {
       const mat = sprite.material as THREE.SpriteMaterial;
       const phase = sprite.userData.phase as number;
