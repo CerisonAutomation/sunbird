@@ -63,6 +63,11 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: string |
 export default function App() {
   const ref = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  // Portal ad-banner host: the CrazyGames adapter mounts its 320x50 banner
+  // into this container once the SDK is ready. Rendered only when a banner
+  // placement id is configured (portal builds), so direct/PWA builds carry
+  // no extra node.
+  const bannerId = import.meta.env.VITE_CRAZY_BANNER_ID ?? "";
 
   useEffect(() => {
     const el = ref.current;
@@ -158,6 +163,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <div ref={ref} className="game-root" />
+      {bannerId ? <div id={bannerId} className="portal-banner" aria-hidden="true" /> : null}
     </ErrorBoundary>
   );
 }

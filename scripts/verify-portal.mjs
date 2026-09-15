@@ -14,6 +14,10 @@
  *      no bundle statically loads anything remote (dynamic SDK injection is
  *      target-gated in code); generic exposes no reachable SDK loader path.
  *   6. icons/ + fonts/ ship inside the zip (self-contained, offline-safe).
+ *   7. No third-party backend markers anywhere in the bundle: portals ship
+ *      local/coin-only editions, so Stripe endpoints, live/test publishable
+ *      keys, the Upstash-backed leaderboard Worker, and the social server
+ *      must not survive into any portal zip.
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
@@ -81,6 +85,25 @@ for (const portal of PORTALS) {
   // Generic obeys the same static rule: ensureSdk() returns before touching
   // scriptFor() for "generic"/"none", so the SDK loader is unreachable there
   // by construction (see the note on the URL constants in src/sdk/platform.ts).
+  // Third-party backend markers: the portal editions are local/coin-only, so
+  // the Upstash-backed leaderboard Worker, Stripe endpoints and keys, and
+  // their dev fallbacks must not survive into the bundle. The build blanks
+  // VITE_STRIPE_STARTER_LINK / VITE_SOCIAL_URL / multiplayer URLs, and this
+  // check is the regression tripwire for that (the bundle is inlined into
+  // index.html, so the html string IS the full bundle).
+  const FORBIDDEN_MARKERS = [
+    "upstash",
+    "api.stripe.com",
+    "hooks.stripe.com",
+    "js.stripe.com",
+    "pk_live_",
+    "pk_test_",
+  ];
+  for (const marker of FORBIDDEN_MARKERS) {
+    if (new RegExp(marker, "i").test(html)) {
+      failures.push(`${portal}: third-party backend marker "${marker}" in bundle (portals are self-contained).`);
+    }
+  }
   console.log(`✓ sunbird-${portal}.zip  ${(zipBytes / 1024).toFixed(0)} KB  ${(Buffer.byteLength(html) / 1024).toFixed(0)} KB html`);
 }
 

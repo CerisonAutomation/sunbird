@@ -61,6 +61,10 @@ fn register_descriptions() {
         "Reconnect seat tokens issued by the service"
     );
     describe_counter!(
+        "sunbird_ws_rate_limited_total",
+        "WebSocket sockets disconnected for exceeding the per-seat message rate"
+    );
+    describe_counter!(
         "sunbird_connections_open_total",
         "HTTP requests handled by the main service"
     );
@@ -95,6 +99,10 @@ pub fn note_join_intent() {
 
 pub fn note_reconnect_token_issued() {
     counter!("sunbird_reconnect_tokens_issued_total").increment(1);
+}
+
+pub fn note_ws_rate_limited() {
+    counter!("sunbird_ws_rate_limited_total").increment(1);
 }
 
 #[cfg(test)]

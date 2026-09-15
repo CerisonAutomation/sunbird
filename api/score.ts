@@ -74,6 +74,10 @@ export default async function handler(request: Request): Promise<Response> {
   if (process.env.VERCEL_ENV === "production") {
     const storage = await storageHealth();
     if (!storage.persistent || !storage.ok) return json({ error: "leaderboard storage unavailable" }, 503);
+    // Production is fail-closed: LEADERBOARD_SALT is part of the deployment.
+    // An unset salt would make every submission unsigned, so a live board
+    // must refuse to run open rather than accept unsigned scores.
+    if (!SALT) return json({ error: "leaderboard signing not configured" }, 503);
   }
 
   let body: unknown;
@@ -108,8 +112,10 @@ export default async function handler(request: Request): Promise<Response> {
   if (row.distance > 60_000) return json({ error: "implausible distance" }, 422);
   if (row.score > row.distance * 40 + 50_000) return json({ error: "implausible score" }, 422);
 
-  // Signing (v1.1): when LEADERBOARD_SALT is set, an unsigned/badly-signed
-  // post is rejected.
+  // Signing (v1.1): REQUIRED in production (fail-closed check above); in
+  // every environment where a salt is configured, an unsigned/badly-signed
+  // post is rejected. Previews without a salt stay lenient by design —
+  // their boards are memory-only and never rank globally.
   if (SALT) {
     const provided = sanitize(p.sig, 128);
     const expected = await sign(row.deviceId, row.distance, row.score);

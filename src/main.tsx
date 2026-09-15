@@ -4,6 +4,11 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import "./game/menu-polish.css";
 import App from "./App";
+import { preloadPortalSdk } from "./sdk/platform";
+
+// The portal SDK script starts loading NOW (before first paint) so it is
+// ready by the first interactive frame — target-gated and failure-tolerant.
+preloadPortalSdk();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

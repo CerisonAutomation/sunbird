@@ -24,6 +24,7 @@ jobs:
         with:
           workspaces: rust
       - name: Format (check)
+        id: fmt
         # rustfmt is a gate, not an autofix. This step used to run `cargo fmt`
         # and push the result back as github-actions[bot], which caused two
         # failures observed on this repo:
@@ -36,6 +37,46 @@ jobs:
         # Failing the build instead keeps branch history human-authored and
         # every run approvable by whoever pushed it.
         run: cargo fmt --all --check
+      # The Actions log bundle is not always retrievable (results-receiver is
+      # unreachable from some sandboxes), so the fmt diff — the only thing
+      # that says WHAT to reformat — is also published where it survives.
+      # Self-checking (runs its own cargo fmt --check) instead of branching
+      # on the previous step's outcome, which the runner skips when the
+      # gate has already failed. continue-on-error keeps this purely
+      # informational — the Format (check) step above remains the gate.
+      - name: Publish fmt diff as a check
+        # Explicit if conditions are AND-ed with success(), so this only
+        # runs after the gate has failed — hence the failure() head. The
+        # results-receiver log bundle is unreachable from some sandboxes,
+        # so the diff — the only artifact that says what to reformat — is
+        # published as a check run, which comes back over api.github.com.
+        # continue-on-error keeps this informational; Format (check) above
+        # remains the gate.
+        if: failure() && steps.fmt.outcome == 'failure'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd rust 2>/dev/null || cd .
+          report=/tmp/fmt-report.txt
+          echo "pwd: $(pwd)" > "$report"
+          echo "cargo: $(cargo --version 2>&1)" >> "$report"
+          cargo fmt --all --check >> "$report" 2>&1
+          echo "fmt-check-exit: $?" >> "$report"
+          cargo fmt --all
+          git diff > /tmp/fmt.diff
+          {
+            cat "$report"
+            echo "--- diff ($(wc -l < /tmp/fmt.diff) lines) ---"
+            head -c 58000 /tmp/fmt.diff
+          } > /tmp/fmt-summary.txt
+          gh api "repos/$GITHUB_REPOSITORY/check-runs" \
+            -f name="rust-fmt-diff" \
+            -f head_sha="$GITHUB_SHA" \
+            -f status="completed" \
+            -f conclusion="neutral" \
+            -F output_title="rustfmt diff (run ${GITHUB_RUN_ID})" \
+            -F output_summary="$(cat /tmp/fmt-summary.txt)"
       - name: Clippy
         id: clippy
         run: |

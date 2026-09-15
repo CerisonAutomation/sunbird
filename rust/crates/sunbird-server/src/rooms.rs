@@ -282,6 +282,20 @@ impl RoomManager {
         Ok(())
     }
 
+    /// The seat's current generation, when the seat still exists.
+    /// Reconnect tokens are single-generation: a token issued for
+    /// generation N stops authorising once the seat is reattached (N+1),
+    /// so a captured token goes stale on first reuse.
+    pub fn seat_generation(&self, room_id: Uuid, seat_id: Uuid) -> Option<u64> {
+        let reg = self.inner.read();
+        reg.rooms
+            .get(&room_id)?
+            .seats
+            .iter()
+            .find(|s| s.seat_id == seat_id)
+            .map(|s| s.generation)
+    }
+
     /// Reattach to an existing seat after a dropped socket. Bumps the seat
     /// generation (invalidating older tokens) and returns a fresh grant.
     pub fn reconnect(&self, room_id: Uuid, seat_id: Uuid) -> Result<JoinOutcome, ProtocolError> {

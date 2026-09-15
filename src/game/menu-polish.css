@@ -218,16 +218,20 @@
 .flock-loading { position:relative; display:inline-block; width:88px; height:88px; }
 .flock-loading > svg { position:absolute; left:12px; top:12px; }
 .flock-loading-orbit { position:absolute; inset:0; animation:flock-orbit 3s linear infinite; }
-.flock-loading-orbit svg { position:absolute; left:29px; top:-3px; }
+/* The ring carries the bird around the sun; the equal-and-opposite spin keeps
+   the bird itself upright at every point of the orbit instead of letting it
+   tumble end-over-end while loading. */
+.flock-loading-orbit svg { position:absolute; left:29px; top:-3px; animation:flock-orbit-keep 3s linear infinite; }
 @keyframes flock-orbit { to { transform:rotate(360deg); } }
+@keyframes flock-orbit-keep { to { transform:rotate(-360deg); } }
 .room-connecting { display:flex; flex-direction:column; align-items:center; gap:10px; margin:16px 0; font-size:13px; }
 .room-flock { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px 6px; margin:16px 0; padding:14px 8px; background:#f1ead9; border-radius:14px; }
 .room-bird { min-width:0; display:flex; flex-direction:column; align-items:center; gap:7px; animation:flock-arrive .24s ease-out; }
 .room-bird b { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10px; }
 @keyframes flock-arrive { from { opacity:0; transform:translateY(6px); } }
 .practice-formats { margin-top:22px; border-top:1px solid #ddcfba; padding-top:16px; }
-@media(prefers-reduced-motion:reduce) { .flock-loading-orbit, .room-bird { animation:none; } }
-.sb-reduce-motion .flock-loading-orbit, .sb-reduce-motion .room-bird { animation:none; }
+@media(prefers-reduced-motion:reduce) { .flock-loading-orbit, .flock-loading-orbit svg, .room-bird { animation:none; } }
+.sb-reduce-motion .flock-loading-orbit, .sb-reduce-motion .flock-loading-orbit svg, .sb-reduce-motion .room-bird { animation:none; }
 .squad-fields { border:0; padding:0; margin:0; min-width:0; }
 .squad-fields[disabled] { opacity:.7; }
 .squad-fields .friend-row { flex-wrap:wrap; }

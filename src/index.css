@@ -81,6 +81,20 @@ textarea {
   background: radial-gradient(ellipse at center, transparent 52%, rgba(18, 10, 28, 0.28) 100%);
 }
 
+/* Portal ad-banner host (CrazyGames 320x50). Sits above the game canvas
+   but below toasts/modals, and stays clickable — a banner that can't be
+   tapped can't pay. */
+.portal-banner {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  width: 320px;
+  max-width: calc(100vw - 24px);
+  height: 50px;
+  z-index: 30;
+  pointer-events: auto;
+}
+
 .game-canvas {
   position: absolute;
   inset: 0;

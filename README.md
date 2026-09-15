@@ -123,7 +123,7 @@ public/         PWA manifest, service worker, icons, self-hosted fonts
 
 - **Frontend** — Vercel: `vercel deploy --prod` (config in `vercel.json`). See [DEPLOY.md](./DEPLOY.md).
 - **Leaderboard** — Vercel Functions in `api/`, persisted in Upstash Redis (required for production; in-memory fallback for previews).
-- **Multiplayer** — Self-hosted Rust: `cargo build --release -p sunbird-server`. In-memory rooms cost nothing while empty. See [rust/README.md](./rust/README.md).
+- **Multiplayer** — Self-hosted Rust: `docker compose up -d --build` (Rust server + TS social backend, see [DEPLOY.md](./DEPLOY.md)) or `cargo build --release -p sunbird-server`. In-memory rooms cost nothing while empty. See [rust/README.md](./rust/README.md).
 - **Portals** — `npm run build:portals` produces submission-ready zips for Poki, CrazyGames, and 10+ generic HTML5 portals.
 
 ## Game systems
