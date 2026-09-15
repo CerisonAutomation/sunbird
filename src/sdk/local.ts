@@ -171,13 +171,17 @@ export class LocalAdapter implements PlatformAdapter {
   }
   updateRoom(_opts: { roomId?: string; isJoinable?: boolean; inviteParams?: InviteParams }): void {}
   leftRoom(): void {}
-  async share(message: string): Promise<boolean> {
+  /** No portal analytics behind a direct build — measurement is a no-op. */
+  measure(_category: string, _label: string, _action: "start" | "complete" | "fail"): void {}
+  async share(message: string, _params?: InviteParams): Promise<boolean> {
     if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
       try {
         await navigator.share({ text: message });
         return true;
-      } catch {
-        return false;
+      } catch (error) {
+        // Dismissed sheet = the share surface was shown; a fallback retry
+        // would just nag the user with a second sheet.
+        return error instanceof DOMException && (error.name === "AbortError" || error.name === "NotAllowedError");
       }
     }
     return false;

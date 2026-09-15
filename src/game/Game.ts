@@ -103,7 +103,7 @@ import { buildChallengeUrl, readChallengeFromUrl, type RivalChallenge } from "./
 import { flag } from "./Flags";
 import { variant } from "./Experiments";
 import { buildRoomInviteUrl, normalizeRoomCode, readRoomInviteFromUrl } from "./RoomInvite";
-import { initPlatform, isPortalBuild, portalTarget, type PlatformAdapter } from "../sdk/platform";
+import { CRAZY_BANNER_ID, initPlatform, isPortalBuild, portalTarget, type PlatformAdapter } from "../sdk/platform";
 import { LivingBackground } from "./LivingBackground";
 import { Sky } from "./Sky";
 import { Telemetry } from "./Telemetry";
@@ -456,6 +456,12 @@ export class Game {
     const canvas = document.createElement("canvas");
     canvas.className = "game-canvas";
     host.appendChild(canvas);
+    if (isPortalBuild()) {
+      // Portal pages are long (the game sits in an iframe on a scrollable
+      // host page): a wheel over the canvas must not scroll the page.
+      // In-game HTML panels keep their own scroll behavior untouched.
+      canvas.addEventListener("wheel", (ev) => ev.preventDefault(), { passive: false });
+    }
 
     // Embedded portal browsers often expose a desktop UA at a phone-sized
     // viewport. Treat the narrow viewport as mobile too, otherwise we keep a
@@ -724,6 +730,37 @@ export class Game {
       adapter.signalGameReady();
       if (this.state === "playing") adapter.gameplayStart();
       this.telemetry.track("portal_ready", { portal: adapter.name, caps: adapter.capabilities().join(",") });
+
+      // Portal-native room invite (CrazyGames instant multiplayer): the
+      // platform can deep-link a room through invite params instead of the
+      // #room= URL hash the direct build uses.
+      const portalInvite = normalizeRoomCode(adapter.getInviteParam("room") ?? "");
+      if (portalInvite && !this.pendingRoomInvite) {
+        this.roomCode = portalInvite;
+        this.pendingRoomInvite = portalInvite;
+        this.telemetry.track("portal_invite", { code: portalInvite });
+        this.hud.toast(`🕊 Invited to room ${portalInvite}`, "quest");
+      }
+
+      // Portal identity → pilot name. The portal user's handle is their
+      // public name; honor it unless the player already picked their own.
+      void adapter.getIdentity().then((identity) => {
+        if (this.disposed || !identity?.name) return;
+        if (this.save.state.pilotNameCustomized) return;
+        const next = savePilotName(identity.name);
+        if (!next || next === this.pilotName) return;
+        this.pilotName = next;
+        this.save.state.pilotName = next;
+        this.save.persist();
+        this.telemetry.track("portal_identity", { linked: 1 });
+        this.bump();
+      });
+
+      // Portal ad banner: the host div is rendered by App for portal builds.
+      if (CRAZY_BANNER_ID) {
+        const host = document.getElementById(CRAZY_BANNER_ID);
+        if (host) adapter.mountBanner(host);
+      }
       this.bump();
     });
     if (seasonEnd) this.hud.toast(`⚔ Ranked season over · ${seasonEnd.division} reward +${seasonEnd.coins} coins`, "gold");
@@ -2168,6 +2205,8 @@ export class Game {
   private startRun(opts?: RunOptions): void {
     this.exitVersus();
     this.mode = modeById(this.modeId);
+    // Portal game events: open this attempt's measurement span.
+    this.platform?.measure("run", this.modeId, "start");
     // Snapshot the record to beat BEFORE this run writes anything, so the
     // mid-run "new record" moment and the results "NEW BEST" banner compare
     // against the genuinely previous best.
@@ -2389,6 +2428,8 @@ export class Game {
     if (this.runRecorded) return;
     this.runRecorded = true;
     this.bird.asleep = true;
+    // Portal game events: one outcome per attempt — the flight is complete.
+    this.platform?.measure("run", this.modeId, "complete");
     const stats = this.runStats();
     this.newBest = this.bestAtStart > 0 && stats.distance > this.bestAtStart;
     // A personal best is the one moment CrazyGames wants celebrated site-wide.
@@ -2953,6 +2994,7 @@ export class Game {
         const next = savePilotName(this.hud.readValue("pilotName") || this.pilotName);
         this.pilotName = next;
         this.save.state.pilotName = next;
+        this.save.state.pilotNameCustomized = true;
         this.save.persist();
         this.hud.toast(`Flying as ${next}`, "info");
         void this.refreshBoard(true);
@@ -2964,6 +3006,7 @@ export class Game {
         const next = savePilotName(gen);
         this.pilotName = next;
         this.save.state.pilotName = next;
+        this.save.state.pilotNameCustomized = true;
         this.save.persist();
         this.hud.toast(`Generated Pilot Name: ${next}`, "info");
         void this.refreshBoard(true);
@@ -3834,6 +3877,19 @@ export class Game {
         flightPath: this.flightPath,
         challengeUrl,
       });
+      // Portal-native share sheet first: the platform owns the link
+      // formatting (and, on CrazyGames, appends its multiplayer invite
+      // params). A dismissed sheet counts as handled — the fallback below
+      // would just show the user a second sheet.
+      const platform = this.platform;
+      if (platform && platform.name !== "none") {
+        const handled = await platform.share(card.text);
+        if (handled) {
+          this.telemetry.track("share_run", { result: "shared" });
+          if (!this.disposed) this.hud.toast("Shared!", "gold");
+          return;
+        }
+      }
       const result = await shareOrDownload(card, undefined, !this.portalEnabled());
       this.telemetry.track("share_run", { result });
       if (this.disposed) return;
@@ -4594,6 +4650,18 @@ export class Game {
   private copyRoomInvite(code: string): void {
     const url = buildRoomInviteUrl(code);
     const text = `Join my Sunbird race room ${code}: ${url}`;
+    // Portal share first: on CrazyGames the native sheet carries its own
+    // multiplayer invite params, and on Poki the shareable URL embeds
+    // `room=CODE` (read back via getInviteParam) so friends land in the room.
+    const platform = this.platform;
+    if (platform && platform.name !== "none") {
+      void platform.share(text, { room: code }).then((handled) => {
+        if (this.disposed) return;
+        if (handled) this.hud.toast("Invite shared — send it to friends", "gold");
+        else this.shareText(text, `Invite link copied — send it to friends`);
+      });
+      return;
+    }
     this.shareText(text, `Invite link copied — send it to friends`);
   }
 

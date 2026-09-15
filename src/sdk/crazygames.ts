@@ -84,6 +84,10 @@ export type CrazyGamesSdk = {
     getXsollaUserToken?: () => Promise<string>;
     showAccountLinkPrompt?: () => Promise<unknown>;
   };
+  analytics?: {
+    logEvent?: (params: Record<string, unknown>) => void;
+    setUserId?: (userId: string) => void;
+  };
   ad?: {
     /**
      * v3 positional form: (type, onStart, onFinished, onError). Older builds
@@ -203,6 +207,7 @@ export class CrazyGamesAdapter implements PlatformAdapter {
     if (this.game?.showInviteButton || this.game?.inviteLink) caps.push("invites");
     if (this.game?.addJoinRoomListener) caps.push("instantMultiplayer");
     if (this.game?.share) caps.push("share");
+    if (this.sdk?.analytics?.logEvent) caps.push("measure");
     if (this.onPortal) caps.push("cloudSave");
     else caps.push("cloudSaveLocal");
     return caps;
@@ -417,6 +422,12 @@ export class CrazyGamesAdapter implements PlatformAdapter {
     try {
       const u = await user.getUser();
       if (!u || !u.username) return null;
+      // Bind the analytics stream to this user (best-effort, per SDK docs).
+      try {
+        this.sdk?.analytics?.setUserId?.(u.username);
+      } catch {
+        /* ignore */
+      }
       const info = this.getSystemInfo();
       return {
         id: u.username,
@@ -555,7 +566,23 @@ export class CrazyGamesAdapter implements PlatformAdapter {
     }
   }
 
-  async share(message: string): Promise<boolean> {
+  /**
+   * Gameplay event measurement via the SDK analytics module
+   * (start → complete|fail, one outcome per attempt).
+   */
+  measure(category: string, label: string, action: "start" | "complete" | "fail"): void {
+    const analytics = this.sdk?.analytics;
+    if (!analytics?.logEvent) return;
+    try {
+      analytics.logEvent({ category, label, action, event: `${category}.${label}.${action}` });
+    } catch {
+      /* measurement must never break gameplay */
+    }
+  }
+
+  async share(message: string, _params?: InviteParams): Promise<boolean> {
+    // CrazyGames injects its own multiplayer invite params into shared
+    // links; caller-supplied params are not part of its share API.
     const g = this.game;
     try {
       if (g?.share) {
@@ -570,8 +597,10 @@ export class CrazyGamesAdapter implements PlatformAdapter {
       try {
         await navigator.share({ text: message });
         return true;
-      } catch {
-        return false; // user dismissed the share sheet
+      } catch (error) {
+        // Dismissed sheet: the platform DID show the user the share
+        // surface — report it as handled so callers don't show a second one.
+        return error instanceof DOMException && (error.name === "AbortError" || error.name === "NotAllowedError");
       }
     }
     return false;

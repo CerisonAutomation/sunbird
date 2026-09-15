@@ -111,6 +111,9 @@ export type SaveState = {
   /** Cosmetic trail currently equipped ("" = skin default). */
   activeTrail: string;
   pilotName: string;
+  /** True once the player picked/generated a name — stops the portal from
+    overwriting it with their platform handle on a later boot. */
+  pilotNameCustomized: boolean;
   bestPlace: number;
   racesRun: number;
   /** On-device Rival rating for the simulated 40-bird field. Local only —
@@ -225,6 +228,7 @@ function defaults(): SaveState {
     tournaments: emptyTournamentState(),
     activeTrail: "",
     pilotName: "",
+    pilotNameCustomized: false,
     bestPlace: 0,
     racesRun: 0,
     rival: defaultRival(),
@@ -441,6 +445,7 @@ export class SaveData {
             : emptyTournamentState(),
         activeTrail: typeof p.activeTrail === "string" ? p.activeTrail : "",
         pilotName: typeof p.pilotName === "string" ? p.pilotName : "",
+        pilotNameCustomized: p.pilotNameCustomized === true,
         bestPlace: num(p.bestPlace),
         racesRun: num(p.racesRun),
         rival: parseRival(p.rival),

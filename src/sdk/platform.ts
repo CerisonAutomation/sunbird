@@ -111,7 +111,11 @@ export interface PlatformAdapter {
   submitPlatformScore(score: number): Promise<void>;
   /** Account linking prompt (identity upgrade flow). True when completed. */
   requestAccountLink(): Promise<boolean>;
-  /** IAP token (Xsolla user token, falling back to the generic user token). */
+  /**
+   * Portal user token for backend verification: the Xsolla/IAP user token on
+   * CrazyGames, the short-lived (1-minute) JWT on Poki. Never store it —
+   * verify it server-side immediately.
+   */
   getIapToken(): Promise<string | null>;
 
   /* ------------------------------------------------- invites / rooms */
@@ -130,8 +134,18 @@ export interface PlatformAdapter {
   /** Push room state to the portal (joinable flag, room id, invite params). */
   updateRoom(opts: { roomId?: string; isJoinable?: boolean; inviteParams?: InviteParams }): void;
   leftRoom(): void;
-  /** Share via the portal (best-effort). True on success. */
-  share(message: string): Promise<boolean>;
+  /**
+   * Gameplay event measurement — one `start` per attempt, then exactly one
+   * `complete` or `fail` outcome (Poki game-events contract).
+   */
+  measure(category: string, label: string, action: "start" | "complete" | "fail"): void;
+/** Share via the portal (best-effort). True on success.
+ *
+ * `params` is portal share data (Poki appends it to a signed shareable URL,
+ * readable again with `getInviteParam`; CrazyGames injects its own
+ * multiplayer params and ignores extras).
+ */
+  share(message: string, params?: InviteParams): Promise<boolean>;
 
   /* --------------------------------------------------------- settings */
   /** Push the portal's current mute state into `PlatformEvents.onPortalMute`. */
@@ -165,6 +179,29 @@ export function portalTarget(): PlatformName {
 
 export function isPortalBuild(): boolean {
   return portalTarget() !== "none";
+}
+
+/** Touch/pointer-coarse device (portal mobile + real phones). */
+function isCoarsePointer(): boolean {
+  try {
+    return (
+      window.matchMedia?.("(pointer: coarse)").matches === true ||
+      "ontouchstart" in window
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Start the portal SDK script at app entry, before React renders. The CDN
+ * fetch then overlaps the game's own load instead of waiting for the first
+ * interactive frame — `initPlatform` awaits the same singleton promise, so
+ * this only moves the work earlier and changes nothing else (target-gated
+ * injection and the never-fail boot are untouched).
+ */
+export function preloadPortalSdk(): void {
+  void bootstrapSdk(portalTarget());
 }
 
 export { CRAZY_BANNER_ID };
@@ -236,9 +273,22 @@ function bootstrapSdk(target: PlatformName): Promise<{ name: PlatformName; crazy
   const boot = ensureSdk(target).then(async (loaded) => {
     if (loaded === "poki") {
       try {
+        // Debug mode in local development only — the SDK docs are explicit:
+        // never ship `setDebug(true)` in a production build.
+        if (import.meta.env.DEV) window.PokiSDK?.setDebug?.(true);
         await window.PokiSDK?.init?.();
       } catch {
         // Poki's local sandbox can reject init; preserve a playable build.
+      }
+      // On mobile the pill is 46x62 at the top-left by default; lift it to
+      // the docs' "fits the game" position (100px above center) where it
+      // clears Sunbird's HUD. Desktop keeps the SDK default.
+      if (isCoarsePointer()) {
+        try {
+          window.PokiSDK?.movePill?.(50, -100);
+        } catch {
+          /* cosmetic only */
+        }
       }
       return { name: "poki" as PlatformName, crazyEnvironment: null };
     }
