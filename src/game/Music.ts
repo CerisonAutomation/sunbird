@@ -56,6 +56,8 @@ const UKE: Record<string, Voicing> = {
 const BASS_ROOT: Record<string, number> = { C: 48, G: 43, Am: 45, F: 41, Em: 40, Dm: 38 };
 
 const PROG_A = ["C", "G", "Am", "F", "C", "G", "F", "G"];
+// PROG_K: Zimmer-style cinematic minor. Am → F → C → G mirrors "Time" / Inception.
+const PROG_K = ["Am", "F", "C", "G", "Am", "F", "C", "G"];
 const PROG_B = ["Am", "F", "C", "G", "Am", "F", "C", "G"];
 const PROG_C = ["F", "G", "Em", "Am", "F", "G", "C", "C"];
 const PROG_D = ["Dm", "G", "C", "Am", "F", "G", "C", "G"];
@@ -221,30 +223,56 @@ const MEL_M = [
   67, -1, -1,  0,  0,  0,  0,  0,
 ];
 
-// Track 14 — Time's Light: Interstellar-style soaring — slow, wide intervals,
-// descends then launches skyward. Perfect for high-altitude moments.
+// Track 14 — Time's Light: Zimmer/Interstellar. High held note → slow descent →
+// silent breath → octave-leap ascent to triumphant peak. Epic architecture.
 const MEL_N = [
-  72, -1, -1, -1, 79, -1, -1,  0,
-  77, -1,  0,  0, 74, -1,  0,  0,
-  72,  0, 69,  0, 72,  0, 76,  0,
-  79, -1, -1, -1,  0,  0,  0,  0,
-  81, -1, -1, -1, 84, -1, -1,  0,
-  83, -1,  0,  0, 81, -1,  0,  0,
-  79,  0, 76,  0, 74, -1,  0,  0,
+  84, -1, -1, -1,  0,  0, 81, -1,
+  -1, -1,  0,  0, 79, -1, -1, -1,
+   0,  0,  0,  0, 76, -1, -1,  0,
   72, -1, -1, -1,  0,  0,  0,  0,
+  72,  0, 76,  0, 79,  0, 84,  0,
+  88, -1, -1, -1, -1, -1,  0,  0,
+  84, -1,  0,  0, 81,  0, 79,  0,
+  76, -1, -1, -1,  0,  0,  0,  0,
 ];
 
-// Track 15 — Horizon Chase: Journey-style hero theme — calls, answers, resolves.
-// Uplifting, memorable, built to echo in your head after you close the tab.
+// Track 15 — Horizon Chase: Journey/hero theme. Call-and-answer phrases, each
+// answer reaching higher, resolving in a noble descending phrase.
 const MEL_O = [
-  76,  0, 79, 0, 81, -1,  0,  0,
-  79,  0, 76, 0, 74,  0, 72,  0,
-  74,  0, 72, 0, 69,  0, 72,  0,
-  74, -1,  0, 0,  0,  0,  0,  0,
-  76,  0, 79, 0, 84,  0, 86,  0,
-  84,  0, 81, 0, 79, -1,  0,  0,
-  76,  0, 74, 0, 72,  0, 74,  0,
-  76, -1, 74,-1, 72, -1,  0,  0,
+  76, -1,  0,  0, 81, -1,  0,  0,
+  79,  0, 76,  0, 74, -1,  0,  0,
+  72,  0, 74,  0, 76,  0, 79,  0,
+  81, -1, -1, -1,  0,  0,  0,  0,
+  79, -1,  0,  0, 84, -1,  0,  0,
+  86, -1, -1,  0, 84,  0, 81,  0,
+  79,  0, 76,  0, 74,  0, 72,  0,
+  74, -1, -1, -1,  0,  0,  0,  0,
+];
+
+// Track 17 — Inception Drop: Zimmer-style "Braaam" build. Slow minor chords,
+// ticking 8ths, then the iconic descending power phrase.
+const MEL_Q = [
+  69, -1, -1, -1, 69, -1, -1, -1,
+  65, -1, -1, -1, 65, -1, -1, -1,
+  72, -1,  0,  0, 69, -1,  0,  0,
+  67, -1, -1, -1,  0,  0,  0,  0,
+  72, 74, 76, 79, 81, 79, 76, 72,
+  69, -1, -1,  0, 67,  0, 65,  0,
+  64,  0, 67,  0, 69,  0, 72,  0,
+  76, -1, -1, -1,  0,  0,  0,  0,
+];
+
+// Track 18 — Dunkirk Clock: ticking urgency. Relentless 8th pulse, rising
+// chromatic line, sudden silence, then the resolve. Pure Zimmer tension.
+const MEL_R = [
+  72, 71, 72, 74, 72, 71, 72, 74,
+  76, 74, 76, 77, 76, 74, 76, 77,
+  79, 77, 79, 81, 79, 77, 79, 81,
+  84, -1, -1, -1,  0,  0,  0,  0,
+  76, -1,  0,  0, 72, -1,  0,  0,
+  69, -1,  0,  0, 67, -1,  0,  0,
+  72,  0, 76,  0, 79,  0, 84,  0,
+  88, -1, -1, -1,  0,  0,  0,  0,
 ];
 
 // Track 16 — Fever Dream: Celeste-style driving arpeggio figure.
@@ -309,9 +337,11 @@ export const TRACKS: Track[] = [
   { name: "Tide Runner",       prog: PROG_E, mel: MEL_K, mood: "reef"    },
   { name: "Magma Drift",       prog: PROG_F, mel: MEL_L, mood: "ember"   },
   { name: "Mesa Wind",         prog: PROG_I, mel: MEL_M, mood: "canyon"  },
-  { name: "Time's Light",      prog: PROG_B, mel: MEL_N, mood: "wide"    },
+  { name: "Time's Light",      prog: PROG_K, mel: MEL_N, mood: "wide"    },
   { name: "Horizon Chase",     prog: PROG_H, mel: MEL_O, mood: "bright"  },
   { name: "Fever Dream",       prog: PROG_E, mel: MEL_P, mood: "reef"    },
+  { name: "Inception Drop",    prog: PROG_K, mel: MEL_Q, mood: "night"   },
+  { name: "Dunkirk Clock",     prog: PROG_J, mel: MEL_R, mood: "ember"   },
 ];
 
 /** Track titles for the settings picker — keep in lockstep with TRACKS. */

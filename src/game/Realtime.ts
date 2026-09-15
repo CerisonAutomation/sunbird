@@ -69,7 +69,7 @@ export type PresenceEvent =
   | { type: "start" }
   | { type: "interrupted"; message: string };
 
-type Keyframe = { t: number; x: number; y: number; rot: number };
+type Keyframe = { t: number; x: number; y: number; rot: number; vx?: number; vy?: number };
 
 type Track = {
   id: string;
@@ -388,8 +388,13 @@ export class RealtimeClient implements NetTransport {
           const t = this.track(id);
           t.distance = Number.isFinite(dist) ? dist : t.distance;
           t.lastSeen = this.clock;
-          t.buffer.push({ t: msg.t, x, y, rot });
-          // Two keyframes are enough to interpolate; drop anything older.
+          // Derive velocity from the last keyframe for dead-reckoning.
+          const prev = t.buffer[t.buffer.length - 1];
+          const dt = prev ? Math.max(1e-4, msg.t - prev.t) : 1;
+          const vx = prev ? (x - prev.x) / dt : 0;
+          const vy = prev ? (y - prev.y) / dt : 0;
+          t.buffer.push({ t: msg.t, x, y, rot, vx, vy });
+          // Four keyframes: enough for smooth interpolation + 1 extra for dead-reckoning.
           while (t.buffer.length > 4) t.buffer.shift();
         }
         break;
@@ -536,14 +541,29 @@ export class RealtimeClient implements NetTransport {
           break;
         }
       }
-      const span = Math.max(1e-4, c.t - a.t);
-      const u = Math.max(0, Math.min(1, (renderAt - a.t) / span));
+      let rx: number;
+      let ry: number;
+      let rrot: number;
+      if (renderAt > c.t) {
+        // Dead reckoning: extrapolate from last keyframe using stored velocity.
+        // Cap at 200ms ahead so a stalled remote bird doesn't fly off to infinity.
+        const ahead = Math.min(0.2, renderAt - c.t);
+        rx = c.x + (c.vx ?? 0) * ahead;
+        ry = c.y + (c.vy ?? 0) * ahead;
+        rrot = c.rot;
+      } else {
+        const span = Math.max(1e-4, c.t - a.t);
+        const u = Math.max(0, Math.min(1, (renderAt - a.t) / span));
+        rx = a.x + (c.x - a.x) * u;
+        ry = a.y + (c.y - a.y) * u;
+        rrot = a.rot + (c.rot - a.rot) * u;
+      }
       out.push({
         id: t.id,
         name: t.name,
-        x: a.x + (c.x - a.x) * u,
-        y: a.y + (c.y - a.y) * u,
-        rotation: a.rot + (c.rot - a.rot) * u,
+        x: rx,
+        y: ry,
+        rotation: rrot,
         finished: t.finished,
       });
     }
