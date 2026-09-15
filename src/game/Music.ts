@@ -280,6 +280,11 @@ const BIOME_MIX: Record<BiomeMusicStyle, { bpm: number; fever: number; cutoff: n
   canyon:  { bpm: 108, fever: 122, cutoff: 7000,  uke: 0.8,  glock: 0.84, bass: 1.28, perc: 0.78, whistle: 1.18, transpose: -4 },
 };
 
+/** Keep every biome/night combination inside WebAudio's usable filter range. */
+export function musicCutoff(base: number, night: number, intensity: number, sampleRate = 44100): number {
+  return Math.max(700, Math.min(sampleRate * 0.45, base - night * 4200 + intensity * 2400));
+}
+
 function mtof(m: number): number {
   return 440 * Math.pow(2, (m - 69) / 12);
 }
@@ -311,6 +316,7 @@ export class Music {
   private readonly bus: GainNode;
   private readonly filter: BiquadFilterNode;
   private readonly duckGain: GainNode;
+  private readonly wetGain: GainNode;
   private readonly ukeGain: GainNode;
   private readonly glockGain: GainNode;
   private readonly bassGain: GainNode;
@@ -326,7 +332,7 @@ export class Music {
   constructor(
     private readonly ctx: AudioContext,
     destination: AudioNode,
-    private readonly reverbSend: AudioNode,
+    reverbSend: AudioNode,
   ) {
     this.bus = ctx.createGain();
     this.bus.gain.value = 0;
@@ -339,6 +345,12 @@ export class Music {
     this.bus.connect(this.filter);
     this.filter.connect(this.duckGain);
     this.duckGain.connect(destination);
+    // Post-fader send: music volume, mode and event ducking control the wet
+    // signal too. Per-note sends used to bypass all three (even at volume 0).
+    this.wetGain = ctx.createGain();
+    this.wetGain.gain.value = 0.22;
+    this.duckGain.connect(this.wetGain);
+    this.wetGain.connect(reverbSend);
 
     const mk = (v: number): GainNode => {
       const g = ctx.createGain();
@@ -384,12 +396,12 @@ export class Music {
     // The tension layer rides up quickly for responsiveness, decays a touch
     // slower so a big moment lingers after the peak.
     const style = BIOME_MIX[this.biome];
-    this.tensionGain.gain.setTargetAtTime(t * 0.5 * style.perc, now, t > this.intensity ? 0.1 : 0.4);
+    this.tensionGain.gain.setTargetAtTime(t * 0.24 * style.perc, now, t > this.intensity ? 0.1 : 0.4);
     this.recomputeCutoff(0.3);
   }
 
   private recomputeCutoff(ramp: number): void {
-    const cutoff = BIOME_MIX[this.biome].cutoff - this.night * 4200 + this.intensityTarget * 3200;
+    const cutoff = musicCutoff(BIOME_MIX[this.biome].cutoff, this.night, this.intensityTarget, this.ctx.sampleRate);
     if (Math.abs(cutoff - this.lastCutoff) < 12) return;
     this.lastCutoff = cutoff;
     this.filter.frequency.setTargetAtTime(cutoff, this.ctx.currentTime, ramp);
@@ -473,6 +485,10 @@ export class Music {
   dispose(): void {
     if (this.timer !== null) window.clearInterval(this.timer);
     this.timer = null;
+    this.bus.disconnect();
+    this.filter.disconnect();
+    this.duckGain.disconnect();
+    this.wetGain.disconnect();
   }
 
   private apply(): void {
@@ -485,21 +501,25 @@ export class Music {
     this.transpose = style.transpose;
     const song = m === "menu" || m === "play" || m === "fever" || m === "storm";
     this.ukeGain.gain.setTargetAtTime(song ? (m === "menu" ? 0.3 : 0.36) * style.uke : 0, t, 0.4);
-    this.glockGain.gain.setTargetAtTime(song ? (m === "menu" ? 0.24 : 0.32) * style.glock : 0, t, 0.4);
+    this.glockGain.gain.setTargetAtTime(song ? (m === "menu" ? 0.20 : 0.27) * style.glock : 0, t, 0.4);
     this.bassGain.gain.setTargetAtTime(song ? 0.42 * style.bass : 0, t, 0.4);
-    this.percGain.gain.setTargetAtTime((m === "play" ? 0.28 : m === "fever" ? 0.36 : m === "storm" ? 0.42 : 0) * style.perc, t, 0.3);
+    this.percGain.gain.setTargetAtTime((m === "play" ? 0.20 : m === "fever" ? 0.32 : m === "storm" ? 0.42 : 0) * style.perc, t, 0.3);
     this.whistleGain.gain.setTargetAtTime((m === "fever" ? 0.22 : 0) * style.whistle, t, 0.3);
     // Warm pad bed: strongest on the menu (it carries the screen alone),
     // subtle underneath play, gone in fever where percussion drives.
     this.padGain.gain.setTargetAtTime(m === "menu" ? 0.16 : m === "play" ? 0.08 : 0, t, 0.8);
     this.lullabyGain.gain.setTargetAtTime(m === "sleep" ? 0.3 : 0, t, 0.6);
-    const cutoff = style.cutoff - this.night * 4200 + this.intensityTarget * 3200;
+    const cutoff = musicCutoff(style.cutoff, this.night, this.intensityTarget, this.ctx.sampleRate);
     this.filter.frequency.setTargetAtTime(cutoff, t, 0.55);
     this.lastCutoff = cutoff;
     this.bpm = m === "fever" ? style.fever : style.bpm;
 
-    if (this.mode === "off" && m !== "off") this.start();
     this.mode = m;
+    if (on && this.timer === null) this.start();
+    if (!on && this.timer !== null) {
+      window.clearInterval(this.timer);
+      this.timer = null;
+    }
   }
 
   private start(): void {
@@ -571,7 +591,7 @@ export class Music {
 
     // Chord pad: one swell per bar — two detuned triangles on root+fifth an
     // octave down. ~6 oscillators/bar; negligible cost, huge warmth.
-    if (this.step === 0) this.pad(t, chordName, beat * 8);
+    if (this.step === 0 && (this.mode === "menu" || this.mode === "play")) this.pad(t, chordName, beat * 4);
 
     // Menu-only birdsong: an occasional far-away sparkle chirp, seeded by the
     // bar so it stays sparse and never machine-guns.
@@ -601,7 +621,10 @@ export class Music {
 
     // Percussion
     if (this.mode === "play" || this.mode === "fever" || this.mode === "storm") {
-      this.shaker(t, this.step % 2 === 0 ? 0.55 : 0.32);
+      // Leave breathing space in normal flight; fever earns the busy groove.
+      if (this.mode !== "play" || this.step % 2 === 0 || this.intensity > 0.65) {
+        this.shaker(t, this.step % 2 === 0 ? 0.48 : 0.24);
+      }
       if (this.step === 0 || this.step === 4) this.kick(t, this.step === 0 ? 1 : 0.8);
       if (this.mode === "fever" && (this.step === 2 || this.step === 6)) this.clap(t);
       // Storm: relentless — kicks on every other eighth, like weather that won't quit.
@@ -613,7 +636,7 @@ export class Music {
       if (this.intensity > 0.05 && this.step % 2 === 1) {
         this.hat(t, 0.1 + this.intensity * 0.28, 6400 + this.intensity * 2600);
       }
-      if (this.intensity > 0.6 && (this.step === 2 || this.step === 6)) {
+      if (this.mode === "fever" && this.intensity > 0.6 && (this.step === 2 || this.step === 6)) {
         this.hat(t + beat * 0.5, 0.08 + (this.intensity - 0.6) * 0.3, 8200);
       }
     }
@@ -642,7 +665,7 @@ export class Music {
     g.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
     o.connect(g);
     g.connect(this.lullabyGain);
-    g.connect(this.reverbSend);
+
     o.start(t);
     o.stop(t + 1.5);
   }
@@ -663,10 +686,6 @@ export class Music {
     f.frequency.value = 900;
     g.connect(f);
     f.connect(this.padGain);
-    const send = this.ctx.createGain();
-    send.gain.value = 0.35;
-    f.connect(send);
-    send.connect(this.reverbSend);
     for (const m of notes) {
       for (const det of [-4, 4]) {
         const o = this.ctx.createOscillator();
@@ -693,7 +712,7 @@ export class Music {
     g.gain.exponentialRampToValueAtTime(0.05, t + 0.02);
     g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
     o.connect(g);
-    g.connect(this.reverbSend);
+    g.connect(this.glockGain);
     o.start(t);
     o.stop(t + 0.25);
   }
@@ -754,10 +773,6 @@ export class Music {
       o.stop(t + 1.2);
     }
     g.connect(this.glockGain);
-    const send = this.ctx.createGain();
-    send.gain.value = 0.5;
-    g.connect(send);
-    send.connect(this.reverbSend);
   }
 
   private whistle(t: number, freq: number, dur: number): void {
@@ -790,10 +805,6 @@ export class Music {
     bg.connect(g);
     o.connect(g);
     g.connect(this.whistleGain);
-    const send = this.ctx.createGain();
-    send.gain.value = 0.4;
-    g.connect(send);
-    send.connect(this.reverbSend);
     o.start(t);
     lfo.start(t);
     breath.start(t);
@@ -898,10 +909,6 @@ export class Music {
       src.connect(f);
       f.connect(g);
       g.connect(this.percGain);
-      const send = this.ctx.createGain();
-      send.gain.value = 0.3;
-      g.connect(send);
-      send.connect(this.reverbSend);
       src.start(tt);
       src.stop(tt + 0.2);
     }

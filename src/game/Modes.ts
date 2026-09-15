@@ -28,8 +28,8 @@ export const MODES: ModeDef[] = [
   },
   {
     id: "race",
-    name: "Race",
-    blurb: "First to the finish line 4,000 m out. Every second counts.",
+    name: "Time Trial",
+    blurb: "Solo against the clock. Finish 4,000 m as quickly as you can.",
     icon: "🏁",
     clock: 0,
     finish: 4000,
@@ -79,7 +79,7 @@ export const MODES: ModeDef[] = [
   {
     id: "endless",
     name: "Endless",
-    blurb: "No clock. The hills just keep getting faster.",
+    blurb: "No clock. The challenge grows gradually as you travel.",
     icon: "∞",
     clock: 0,
     finish: 0,
@@ -88,8 +88,8 @@ export const MODES: ModeDef[] = [
   },
   {
     id: "massrace",
-    name: "Mass Race · 40",
-    blurb: "A full 40-bird field on identical hills. Out-fly the pack to the line.",
+    name: "Flock Race",
+    blurb: "Open Race Lobby for online pilots, private rooms or AI practice.",
     icon: "🐦",
     clock: 0,
     finish: 4000,

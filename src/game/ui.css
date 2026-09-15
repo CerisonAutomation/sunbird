@@ -2535,7 +2535,7 @@ button {
   letter-spacing: 0.06em;
   position: relative;
   overflow: hidden;
-  animation: playPulse 2s ease-in-out infinite;
+  animation: none; /* Keep primary hit targets still and avoid idle repaints. */
 }
 .fly-cta .fly-label {
   display: block;
@@ -2622,7 +2622,7 @@ button {
   cursor: pointer;
   box-shadow: 0 6px 0 #d44528;
   transition: transform 0.12s, box-shadow 0.12s;
-  animation: playPulse 2s ease-in-out infinite;
+  animation: none; /* Keep primary hit targets still and avoid idle repaints. */
 }
 .play-again-btn:active { transform: translateY(3px); box-shadow: 0 3px 0 #d44528; }
 /* Results cards scroll on small screens — keep the restart action pinned to
@@ -4053,7 +4053,8 @@ button:focus-visible, .toggle:focus-visible {
 }
 .endless-inf .endless-mark { width: 44px; height: 44px; display: block; margin: 0 auto; color: #5f58c8; filter: drop-shadow(0 2px 3px rgba(60, 30, 20, 0.18)); }
 .mode-card-main.primary {
-  flex-direction: row;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 12px;
   padding: 16px 14px;
   text-align: left;
@@ -4061,7 +4062,7 @@ button:focus-visible, .toggle:focus-visible {
   background: linear-gradient(180deg, #fff8ea, rgba(255, 255, 255, 0.85));
   box-shadow: 0 6px 0 rgba(216, 90, 40, 0.25), 0 14px 28px -10px rgba(216, 90, 40, 0.4);
   min-height: 76px;
-  animation: playPulse 2.4s ease-in-out infinite;
+  animation: none; /* Keep primary hit targets still and avoid idle repaints. */
 }
 .mode-card-main.primary .mode-name { font-size: 18px; }
 .mode-card-main.primary .mode-desc { font-size: 12px; }

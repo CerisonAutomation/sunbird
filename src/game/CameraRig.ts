@@ -85,6 +85,8 @@ export class CameraRig {
     this.shake = 0;
     this.punchZ = 0;
     this.intro = 0;
+    this.dolly = this.dollyVel = this.orbit = this.orbitTarget = this.rollTilt = 0;
+    this.shakeX = this.shakeY = 0;
     this.apply();
   }
 
@@ -116,7 +118,11 @@ export class CameraRig {
     // distance. Pull back gently on narrow aspects so the bird and the next
     // landing both stay readable instead of crowding the edges.
     const portraitPull = clamp((0.9 - this.camera.aspect) * 18, 0, 10);
-    const zoom = CAMERA_BASE_Z + sNorm * 14 + altPull + portraitPull - this.punchZ + this.dolly * 5 + (attract ? 12 : 0);
+    const flightHeight = Math.max(0, bird.y - groundY);
+    const groundFrame = attract ? 0 : smoothstep(15, 55, flightHeight);
+    const horizontalFit = clamp(bird.vx * 0.8, 28, 72) / (2 * Math.tan(this.baseFov * Math.PI / 360) * this.camera.aspect * 0.6);
+    const fitZoom = (flightHeight + 16) / (2 * Math.tan(this.baseFov * Math.PI / 360) * 0.70);
+    const zoom = Math.max(attract ? 0 : Math.max(fitZoom, horizontalFit) * groundFrame + portraitPull, CAMERA_BASE_Z + sNorm * 14 + altPull + portraitPull - this.punchZ + this.dolly * 5 + (attract ? 12 : 0));
 
     // A touch more lookahead keeps the bird in the left third of the frame so
     // the player reads the hills ahead, not the bird's back. In attract the
@@ -138,10 +144,10 @@ export class CameraRig {
     const downBias = smoothstep(ALT_SKY, ALT_HIGH, alt) * 14;
     // Slightly lower look point + higher camera = a gentle top-down tilt: the
     // bird frames against the ground (readable landings) instead of the sky.
-    const targetLookY = bird.y + 3.2 - downBias;
+    const targetLookY = lerp(bird.y + 3.2 - downBias, (bird.y + groundY) * 0.5, groundFrame);
 
     // Rising fast? Lead the climb. Falling from height? Lead the descent.
-    const vLead = clamp(bird.vy * 0.12, -14, 18) * smoothstep(6, 40, alt);
+    const vLead = clamp(bird.vy * 0.12, -14, 18) * smoothstep(6, 40, alt) * (1 - groundFrame);
 
     // Attract tracks snappily: at demo speed the lazy menu damping lags the
     // look point ~25 units behind, which eats the margin and slides the bird
@@ -154,7 +160,7 @@ export class CameraRig {
     // Keep the ground on screen when we are miles up, but never below it.
     // Camera rides a little higher so the bird frames against the terrain
     // rather than tree canopies at low altitude.
-    const wantY = bird.y + 8.5 + altPull * 0.16 + vLead;
+    const wantY = lerp(bird.y + 8.5 + altPull * 0.16, targetLookY + 8.5, groundFrame) + vLead;
     const floorY = groundY + 6.5;
 
     // Attract bypasses the intro sweep (it never decays in the menu, so it
@@ -163,13 +169,13 @@ export class CameraRig {
     const introK = attract ? 0 : this.intro;
     this.camX = lerp(this.camX, bird.x - 1.5 + introK * 6, k);
     this.camY = lerp(this.camY, Math.max(floorY, wantY) + introK * 4, kSlow);
-    this.camZ = lerp(this.camZ, zoom + introK * 10, Math.min(1, kSlow * 1.4));
+    this.camZ = lerp(this.camZ, zoom + introK * 10, Math.min(1, kSlow * (zoom > this.camZ ? 2.8 : 1.4)));
 
     // Banked roll settles back to level so the horizon never stays crooked.
     this.orbitTarget = lerp(this.orbitTarget, 0, 1 - Math.pow(0.08, dt));
     this.orbit = lerp(this.orbit, this.orbitTarget, 1 - Math.pow(0.02, dt));
     // Airborne pitch reads as the bird "hanging" at apex.
-    this.rollTilt = lerp(this.rollTilt, clamp(-bird.vy * 0.004, -0.09, 0.09), 1 - Math.pow(0.05, dt));
+    this.rollTilt = lerp(this.rollTilt, this.reduceMotion ? 0 : clamp(-bird.vy * 0.004, -0.09, 0.09) * (1 - groundFrame), 1 - Math.pow(0.05, dt));
 
     // Dynamic FOV: widens with speed, kicks +8 in fever (spec: FOV+8 fever),
     // and counter-narrows during a dolly-zoom so the subject holds size
@@ -191,6 +197,7 @@ export class CameraRig {
   }
 
   resize(aspect: number): void {
+    if (this.camera.aspect === aspect) return;
     this.camera.aspect = aspect;
     this.camera.updateProjectionMatrix();
   }

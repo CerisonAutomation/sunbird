@@ -118,8 +118,6 @@ export class Sky {
   private readonly sunGlow: THREE.Sprite;
   private readonly moon: THREE.Mesh;
   private readonly moonGlow: THREE.Sprite;
-  private readonly stars: THREE.Points;
-  private readonly starMat: THREE.ShaderMaterial;
   private readonly milkyWay: THREE.Sprite;
   private readonly milkyWayTex: THREE.CanvasTexture;
   private readonly nebulas: THREE.Sprite[] = [];
@@ -227,9 +225,6 @@ export class Sky {
     this.moonGlow = makeGlow(0xb8c8ff, 32);
     this.group.add(this.moonGlow);
 
-    this.stars = this.makeStars();
-    this.starMat = this.stars.material as THREE.ShaderMaterial;
-    this.group.add(this.stars);
 
     // Deep-space scenery: a milky way band, drifting nebulae, a few planets
     // and a passing satellite. All of it stays dim at sea level and fades in
@@ -394,7 +389,7 @@ export class Sky {
     this.tintMix = mix;
   }
 
-  /** 0..1 how far into space the bird is — deepens the blue and shows stars. */
+  /** 0..1 how far into space the bird is — deepens the blue and reveals the nebula. */
   setAltitude(t: number): void {
     this.altT = t;
   }
@@ -455,7 +450,8 @@ export class Sky {
     this.sunLight.intensity = 0.46 + t * 0.86;
     this.hemi.intensity = 0.8 + t * 0.46;
 
-    const elev = 22 + t * 78;
+    // Keep the full daylight disc in the upper sky instead of clipping its crown.
+    const elev = 22 + t * 64;
     this.sun.position.set(36 + (1 - t) * 28, elev, -110);
     this.sunGlow.position.copy(this.sun.position);
     (this.sun.material as THREE.SpriteMaterial).color.copy(this.mixHex(a.sun, b.sun, u));
@@ -466,11 +462,6 @@ export class Sky {
     const night = 1 - t;
     this.moon.visible = night > 0.15;
     this.moonGlow.material.opacity = night * 0.55;
-    this.starMat.uniforms.time!.value = time;
-    const starOpacity = Math.max(saturate((0.35 - t) / 0.35), this.altT * 0.9);
-    this.starMat.uniforms.uOpacity!.value = starOpacity;
-    this.stars.visible = starOpacity > 0.005;
-    this.stars.position.set(0, 0, 0);
 
     // Space scenery fades in with altitude (the stratosphere opens out) and is
     // also present at night, so a midnight coast shows the full deep sky.
@@ -600,78 +591,7 @@ export class Sky {
     return { mesh, ring, glow };
   }
 
-  private makeStars(): THREE.Points {
-    // Stars are atmosphere, not gameplay. Keeping the field lean avoids a
-    // large transparent point cloud on phones while preserving the altitude
-    // cue when the bird climbs into the night.
-    const n = 140;
-    const pos = new Float32Array(n * 3);
-    const size = new Float32Array(n);
-    const col = new Float32Array(n * 3);
-    const phase = new Float32Array(n);
-    const tmp = new THREE.Color();
-    for (let i = 0; i < n; i++) {
-      pos[i * 3] = (Math.random() - 0.5) * 420;
-      pos[i * 3 + 1] = 15 + Math.random() * 210;
-      pos[i * 3 + 2] = -150 - Math.random() * 190;
-      size[i] = 0.5 + Math.random() * 1.7;
-      // Mostly white/blue-white, with a scatter of warm and cool giants.
-      const roll = Math.random();
-      if (roll < 0.08) tmp.setHex(0xffd9a0);
-      else if (roll < 0.16) tmp.setHex(0xa8ccff);
-      else if (roll < 0.2) tmp.setHex(0xffb0a0);
-      else tmp.setHex(0xf2f6ff);
-      col[i * 3] = tmp.r;
-      col[i * 3 + 1] = tmp.g;
-      col[i * 3 + 2] = tmp.b;
-      phase[i] = Math.random();
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-    geo.setAttribute("size", new THREE.BufferAttribute(size, 1));
-    geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
-    geo.setAttribute("phase", new THREE.BufferAttribute(phase, 1));
-    const mat = new THREE.ShaderMaterial({
-      transparent: true,
-      depthWrite: false,
-      fog: false,
-      toneMapped: false,
-      uniforms: {
-        time: { value: 0 },
-        uOpacity: { value: 0 },
-      },
-      vertexShader: `
-        attribute float size;
-        attribute vec3 color;
-        attribute float phase;
-        varying vec3 vColor;
-        varying float vPhase;
-        void main() {
-          vColor = color;
-          vPhase = phase;
-          vec4 mv = modelViewMatrix * vec4(position, 1.0);
-          gl_PointSize = size * (320.0 / max(1.0, -mv.z));
-          gl_Position = projectionMatrix * mv;
-        }
-      `,
-      fragmentShader: `
-        uniform float time;
-        uniform float uOpacity;
-        varying vec3 vColor;
-        varying float vPhase;
-        void main() {
-          vec2 p = gl_PointCoord - 0.5;
-          float d = length(p);
-          if (d > 0.5) discard;
-          float a = smoothstep(0.5, 0.04, d);
-          // Gentle twinkle, de-phased per star so the field shimmers.
-          float tw = 0.7 + 0.3 * sin(time * 2.4 + vPhase * 6.28318);
-          gl_FragColor = vec4(vColor, a * tw * uOpacity);
-        }
-      `,
-    });
-    return new THREE.Points(geo, mat);
-  }
+
 }
 
 function sampleStops(daylight: number): { a: SkyStop; b: SkyStop; u: number } {
@@ -704,16 +624,7 @@ function makeMilkyWayTexture(): THREE.CanvasTexture {
   band.addColorStop(1, "rgba(150,170,220,0)");
   g.fillStyle = band;
   g.fillRect(-420, -110, 840, 220);
-  // Scattered dust motes along the band.
-  for (let i = 0; i < 1400; i++) {
-    const y = (Math.random() - 0.5) * 200;
-    const x = (Math.random() - 0.5) * 780;
-    const a = Math.random() * 0.45 * Math.max(0, 1 - Math.abs(y) / 120);
-    g.fillStyle = `rgba(255,255,255,${a.toFixed(3)})`;
-    g.beginPath();
-    g.arc(x, y, Math.random() * 1.5, 0, Math.PI * 2);
-    g.fill();
-  }
+  // A smooth atmospheric band, without the old 1,400 speckle dots.
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;

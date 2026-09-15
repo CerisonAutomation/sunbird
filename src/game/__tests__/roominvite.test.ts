@@ -18,6 +18,12 @@ describe("room invite deep links", () => {
     expect(normalizeRoomCode("!!")).toBe("");
   });
 
+  it("accepts a pasted invite without converting HTTPS into a room", () => {
+    expect(normalizeRoomCode("https://game.example/play#room=abc12")).toBe("ABC12");
+    expect(normalizeRoomCode("#room=ABC12&rival=other")).toBe("ABC12");
+    expect(normalizeRoomCode("https://game.example/play")).toBe("");
+    expect(normalizeRoomCode("https://game.example/#other=ABCDE")).toBe("");
+  });
   it("builds a shareable URL", () => {
     expect(buildRoomInviteUrl("abc12")).toMatch(/#room=ABC12$/);
     expect(buildRoomInviteUrl("bad")).toMatch(/#room=BAD$/);

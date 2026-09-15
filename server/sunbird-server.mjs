@@ -79,9 +79,12 @@ class Room {
       capacity: CAPACITY,
     });
     this.broadcastPeers();
-    // Do not launch people before they press Ready. This prevents a second
-    // tab or a late joiner from starting a private room while the host is
-    // still sharing the invite. Solo players still fly locally with zero wait.
+    this.maybeStart();
+  }
+
+  // Match the Rust legacy room's all-ready barrier. Checking only on join
+  // can never start a room: every newly joined pilot is unready.
+  maybeStart() {
     if (this.pilots.size >= 2 && [...this.pilots.values()].every((p) => p.ready) && !this.startedAt) {
       this.startedAt = Date.now() + 6000;
       this.broadcast({ type: "start", at: this.startedAt, seed: this.seed });
@@ -200,7 +203,7 @@ function findRoom(code, seed) {
   }
   // Public matchmaking: first room with space on the same seed.
   for (const room of rooms.values()) {
-    if (room.public && !room.full && room.seed === (seed || todayStr())) return room;
+    if (room.public && !room.startedAt && !room.full && room.seed === (seed || todayStr())) return room;
   }
   const created = new Room(newCode(), seed, true);
   rooms.set(created.code, created);
@@ -344,6 +347,7 @@ wss.on("connection", (ws, req) => {
       case "ready":
         pilot.ready = Boolean(msg.ready);
         room.broadcastPeers();
+        room.maybeStart();
         break;
       case "finish":
         room.finish(pilot, num(msg.time), num(msg.d));

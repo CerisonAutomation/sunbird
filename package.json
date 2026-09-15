@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "test:coverage": "vitest run --coverage",
     "verify": "pnpm typecheck && pnpm test && pnpm build",
     "verify:prod": "node scripts/verify-prod.mjs",
@@ -27,7 +28,8 @@
     "build:vercel": "vite build",
     "gen-icons": "node scripts/gen-icons.mjs",
     "physcheck": "tsx scripts/physcheck.ts",
-    "lint": "eslint src scripts api --max-warnings 0"
+    "lint": "eslint src scripts api --max-warnings 0",
+    "test:e2e:multiplayer": "playwright test --config playwright.multiplayer.config.ts"
   },
   "dependencies": {
     "@stripe/stripe-js": "^9.15.0",
@@ -39,6 +41,7 @@
     "three": "^0.186.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.58.2",
     "@tailwindcss/vite": "4.1.17",
     "@types/node": "22.19.17",
     "@types/react": "19.2.7",

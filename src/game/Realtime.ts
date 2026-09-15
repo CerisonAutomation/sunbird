@@ -66,7 +66,8 @@ export type PresenceEvent =
   | { type: "leave"; name: string }
   | { type: "ready"; name: string }
   | { type: "finish"; name: string; place: number }
-  | { type: "start" };
+  | { type: "start" }
+  | { type: "interrupted"; message: string };
 
 type Keyframe = { t: number; x: number; y: number; rot: number };
 
@@ -135,6 +136,9 @@ export class RealtimeClient implements NetTransport {
   errorText = "";
   startsAt = 0;
   private localReady = false;
+  private requestedCode = "";
+  private requestedSeed = "";
+  private heartbeat = 0;
 
   private ws: WebSocket | null = null;
   private readonly tracks = new Map<string, Track>();
@@ -144,6 +148,7 @@ export class RealtimeClient implements NetTransport {
   private serverClock = 0;
   private backoff = 500;
   private retryTimer: number | null = null;
+  private connectTimer: number | null = null;
   private closedByUs = false;
   private pendingEmotes: { id: string; emote: string }[] = [];
   private pendingEvents: PresenceEvent[] = [];
@@ -175,13 +180,16 @@ export class RealtimeClient implements NetTransport {
     // must reuse that live socket, not tear it down and rejoin (which looked
     // like "PvP never has anyone in it" — we kept leaving the room we'd
     // just matched into).
-    const sameRoom = this.roomCode === code.toUpperCase() && this.seed === seed;
+    const requested = code.toUpperCase();
+    const sameRoom = requested === this.requestedCode && (requested !== "" || seed === this.requestedSeed);
     if (sameRoom && this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       return;
     }
     this.disconnect();
     this.closedByUs = false;
-    this.roomCode = code.toUpperCase();
+    this.requestedCode = code.toUpperCase();
+    this.requestedSeed = seed;
+    this.roomCode = this.requestedCode;
     this.seed = seed;
     this.myPlace = 0;
     this.localReady = false;
@@ -193,40 +201,68 @@ export class RealtimeClient implements NetTransport {
   private open(): void {
     // URL_BASE may be absolute (wss://host) or relative (/mp behind the dev
     // proxy / same-origin edge). Resolve against the page and force ws(s).
-    const url = new URL(URL_BASE, typeof location !== "undefined" ? location.href : "http://localhost/");
-    url.protocol = url.protocol === "https:" ? "wss:" : url.protocol === "http:" ? "ws:" : url.protocol;
-    url.searchParams.set("device", this.deviceId);
-    url.searchParams.set("name", this.name);
-    url.searchParams.set("skin", this.skin);
-    url.searchParams.set("hue", this.hue.toFixed(3));
-    if (this.roomCode) url.searchParams.set("room", this.roomCode);
-    if (this.seed) url.searchParams.set("seed", this.seed);
-
     let socket: WebSocket;
     try {
+      const url = new URL(URL_BASE, typeof location !== "undefined" ? location.href : "http://localhost/");
+      url.protocol = url.protocol === "https:" ? "wss:" : url.protocol === "http:" ? "ws:" : url.protocol;
+      url.searchParams.set("device", this.deviceId);
+      url.searchParams.set("name", this.name);
+      url.searchParams.set("skin", this.skin);
+      url.searchParams.set("hue", this.hue.toFixed(3));
+      if (this.roomCode) url.searchParams.set("room", this.roomCode);
+      if (this.seed) url.searchParams.set("seed", this.seed);
+
       socket = new WebSocket(url.toString());
     } catch {
       this.fail("Could not reach the race server");
       return;
     }
     this.ws = socket;
+    this.clearConnectTimer();
+    this.connectTimer = window.setTimeout(() => {
+      if (this.ws !== socket) return;
+      this.connectTimer = null;
+      this.ws = null; // stale callbacks cannot revive a timed-out attempt
+      socket.close();
+      this.fail("Connection timed out. Leave the room and try again.");
+    }, 10000);
 
     socket.onopen = () => {
+      if (this.ws !== socket) return;
+      this.clearConnectTimer();
       this.backoff = 500;
       this.state = "lobby";
+      this.errorText = "";
     };
-    socket.onmessage = (ev) => this.onMessage(ev);
+    socket.onmessage = (ev) => { if (this.ws === socket) this.onMessage(ev); };
     socket.onerror = () => {
       // `onclose` always follows; keep the retry logic in one place.
       this.errorText = "Connection problem";
     };
     socket.onclose = () => {
+      if (this.ws !== socket) return;
+      this.clearConnectTimer();
+      const interrupted = this.state === "racing";
+      const refused = this.state === "error";
       this.ws = null;
+      this.localReady = false;
+      this.startsAt = 0;
       this.tracks.clear();
+      this.pendingEvents = [];
+      this.pendingEmotes = [];
       if (this.closedByUs) {
         this.state = "offline";
         return;
       }
+      if (interrupted) {
+        // Protocol v0 cannot resume a race fairly. Never rejoin a new round
+        // while the old simulation continues and pretend it is still live.
+        this.myPlace = 0;
+        this.fail("Race connection lost. Return to the lobby to race again.");
+        this.pendingEvents.push({ type: "interrupted", message: this.errorText });
+        return;
+      }
+      if (refused) return; // a rejected room is not a transient network outage
       this.state = "connecting";
       this.scheduleRetry();
     };
@@ -247,7 +283,13 @@ export class RealtimeClient implements NetTransport {
     this.errorText = message;
   }
 
+  private clearConnectTimer(): void {
+    if (this.connectTimer !== null) window.clearTimeout(this.connectTimer);
+    this.connectTimer = null;
+  }
+
   disconnect(): void {
+    this.clearConnectTimer();
     this.closedByUs = true;
     if (this.retryTimer !== null) {
       window.clearTimeout(this.retryTimer);
@@ -263,6 +305,13 @@ export class RealtimeClient implements NetTransport {
       this.ws = null;
     }
     this.tracks.clear();
+    this.pendingEvents = [];
+    this.pendingEmotes = [];
+    this.localReady = false;
+    this.startsAt = 0;
+    this.myPlace = 0;
+    this.heartbeat = 0;
+    this.roomCode = "";
     this.state = "offline";
   }
 
@@ -368,7 +417,7 @@ export class RealtimeClient implements NetTransport {
         break;
       }
       case "start":
-        if (!Number.isFinite(msg.at)) break;
+        if (!Number.isFinite(msg.at) || this.state === "racing") break;
         this.myPlace = 0;
         this.startsAt = msg.at;
         this.seed = msg.seed || this.seed;
@@ -409,8 +458,16 @@ export class RealtimeClient implements NetTransport {
   tick(dt: number): void {
     this.clock += dt;
     this.sendAcc += dt;
-    for (const [id, t] of this.tracks) {
+    // Lobby pilots do not send movement frames. Presence is removed by the
+    // server's explicit left frame, not by a six-second movement timeout.
+    if (this.state === "racing") for (const [id, t] of this.tracks) {
       if (this.clock - t.lastSeen > STALE_AFTER) this.tracks.delete(id);
+    }
+    this.heartbeat += dt;
+    if (this.connected && this.heartbeat >= 15) {
+      this.heartbeat = 0;
+      // Ready is also the legacy server's supported liveness message.
+      this.push({ type: "ready", ready: this.localReady });
     }
   }
 

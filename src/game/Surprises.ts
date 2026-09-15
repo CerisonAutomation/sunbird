@@ -130,6 +130,10 @@ export function pickSurprise(rng: () => number = Math.random): Surprise {
 /* ------------------------------------------------------------------ */
 
 export const SPLASH_QUIPS = [
+  "Not a crash. A very enthusiastic bath",
+  "The fish gave that landing a standing ovation",
+  "New skill unlocked: damp",
+
   "The ocean: 1 · Bird: 0",
   "That was a swan dive. You are not a swan",
   "The fish demand an apology",
@@ -166,6 +170,13 @@ export const SLEEP_QUIPS = [
 ];
 
 export const BIG_LAUNCH_QUIPS = [
+  "Local bird forgets to be flightless",
+  "Cabin crew: prepare for absolutely nothing",
+  "Your shadow would like you to slow down",
+  "The sun did not order express delivery",
+  "Next stop: probably not this island",
+  "Wings: tiny. Confidence: unreasonable",
+
   "The hill said YEET",
   "FAA would like a word",
   "Gravity has filed a complaint",

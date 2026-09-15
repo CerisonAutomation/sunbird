@@ -41,3 +41,15 @@ export function nextDpr(current: number, target: number, frameEma: number, coold
   }
   return clamped;
 }
+
+export type BloomBudget = { enabled: boolean; goodWindows: number; cooldown: number };
+
+/** Bloom is optional. Earn it with 3 healthy windows; shed it immediately on
+ * sustained overload, and wait 10 seconds before attempting it again. */
+export function nextBloomBudget(state: BloomBudget, frameSeconds: number, eligible: boolean): BloomBudget {
+  if (!eligible) return { enabled: false, goodWindows: 0, cooldown: 0 };
+  const cooldown = Math.max(0, state.cooldown - QUALITY_WINDOW_SECONDS);
+  if (frameSeconds > STEP_DOWN_FRAME_SECONDS) return { enabled: false, goodWindows: 0, cooldown: state.enabled ? 10 : cooldown };
+  const goodWindows = frameSeconds < 1 / 58 ? Math.min(3, state.goodWindows + 1) : 0;
+  return { enabled: state.enabled || (goodWindows >= 3 && cooldown === 0), goodWindows, cooldown };
+}

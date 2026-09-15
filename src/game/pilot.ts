@@ -139,3 +139,26 @@ function predictLanding(bird: Bird, terrain: TerrainSystem, diving: boolean): { 
   restore(bird, s);
   return { q, endX };
 }
+
+/** Expensive airborne planning is cached for at most 1/15 s while high up.
+ * Close to the surface (or after a reset) replan immediately so landing timing
+ * retains the exact policy. This is menu-only; player physics stays at 120 Hz. */
+export class AttractPilot {
+  private remaining = 0;
+  private hold = false;
+  private lastX = -Infinity;
+  constructor(private readonly decide = decideHold) {}
+
+  reset(): void { this.remaining = 0; this.lastX = -Infinity; }
+
+  update(dt: number, bird: Bird, terrain: TerrainSystem): boolean {
+    this.remaining -= dt;
+    const nearGround = bird.y - terrain.heightAt(bird.x + Math.max(0, bird.vx) * 0.12) < 14;
+    if (bird.grounded || nearGround || this.remaining <= 0 || Math.abs(bird.x - this.lastX) > 20) {
+      this.hold = this.decide(bird, terrain);
+      this.remaining = 1 / 15;
+      this.lastX = bird.x;
+    }
+    return this.hold;
+  }
+}

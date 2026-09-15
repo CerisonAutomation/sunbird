@@ -8,6 +8,8 @@ export class Input {
   p2Key = false;
   p2Touch = false;
   private space = false;
+  private readonly keys = new Set<string>();
+  private readonly boundBlur = () => this.resetHeld();
   private padP1 = false;
   private padP2 = false;
   /** In versus mode a tap is routed to a player by which half of the screen it lands on. */
@@ -29,7 +31,7 @@ export class Input {
     this.onFirstGesture = onFirstGesture;
     this.boundPointerDown = (e) => this.onPointerDown(e);
     this.boundPointerUp = (e) => this.onPointerUp(e);
-    this.boundPointerCancel = () => this.onPointerEnd();
+    this.boundPointerCancel = (e: PointerEvent) => this.onPointerUp(e);
     this.boundKeyDown = (e) => this.onKeyDown(e);
     this.boundKeyUp = (e) => this.onKeyUp(e);
     this.boundContext = (e) => e.preventDefault();
@@ -37,6 +39,7 @@ export class Input {
     el.addEventListener("pointerdown", this.boundPointerDown);
     window.addEventListener("pointerup", this.boundPointerUp);
     window.addEventListener("pointercancel", this.boundPointerCancel);
+    window.addEventListener("blur", this.boundBlur);
     window.addEventListener("keydown", this.boundKeyDown);
     window.addEventListener("keyup", this.boundKeyUp);
     el.addEventListener("contextmenu", this.boundContext);
@@ -53,7 +56,7 @@ export class Input {
 
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
-    if (!enabled) this.onPointerEnd();
+    if (!enabled) this.resetHeld();
   }
 
   /** Poll gamepads once per frame: pad 0 drives P1, pad 1 drives P2. */
@@ -96,6 +99,7 @@ export class Input {
     this.el.removeEventListener("pointerdown", this.boundPointerDown);
     window.removeEventListener("pointerup", this.boundPointerUp);
     window.removeEventListener("pointercancel", this.boundPointerCancel);
+    window.removeEventListener("blur", this.boundBlur);
     window.removeEventListener("keydown", this.boundKeyDown);
     window.removeEventListener("keyup", this.boundKeyUp);
     this.el.removeEventListener("contextmenu", this.boundContext);
@@ -113,18 +117,14 @@ export class Input {
     // non-interactive made the input layer pointer-capture the event and
     // swallow the tap.
     if (!(target instanceof Element)) return false;
-    if (target.matches("input, textarea, select, a")) return true;
-    const btn = target.closest<HTMLElement>("button, [data-action]");
-    if (btn) {
-      const act = btn.dataset.action;
-      if (act === "start" || act === "retry") return false;
-      return true;
-    }
-    return false;
+    if (target.closest("input, textarea, select, a, summary, label, [contenteditable=true]")) return true;
+    // Every DOM action, including Start/Retry, owns its pointer sequence.
+    // Capturing Retry's pointer used to retarget its click away from the button.
+    return Boolean(target.closest("button, [data-action]"));
   }
 
   private isTyping(target: EventTarget | null): boolean {
-    return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+    return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || (target instanceof Element && !!target.closest("[contenteditable=true]"));
   }
 
   private onPointerDown(e: PointerEvent): void {
@@ -170,16 +170,26 @@ export class Input {
     this.p2Touch = false;
   }
 
+  private resetHeld(): void {
+    this.onPointerEnd();
+    this.keys.clear();
+    this.space = this.p2Key = this.padP1 = this.padP2 = false;
+  }
+
   private onKeyDown(e: KeyboardEvent): void {
     if (!this.enabled) return;
     if (e.repeat || this.isTyping(e.target)) return;
-    if (e.code === "Space") {
+    // Enter/Space must activate native menu controls, not hold a bird down.
+    if (e.code !== "Escape" && e.target instanceof Element && e.target.closest("button, a, summary, [role=button]")) return;
+    if (e.code === "Space" || e.code === "KeyA") {
       e.preventDefault();
       this.markFirst();
+      this.keys.add(e.code);
       this.space = true;
-    } else if (e.code === "Enter" || e.code === "NumpadEnter" || e.code === "ShiftRight") {
+    } else if (e.code === "Enter" || e.code === "NumpadEnter" || e.code === "ShiftRight" || e.code === "KeyL") {
       e.preventDefault();
       this.markFirst();
+      this.keys.add(e.code);
       this.p2Key = true;
     } else if (e.code === "KeyP" || e.code === "Escape") {
       this.pausePressed = true;
@@ -189,12 +199,10 @@ export class Input {
   }
 
   private onKeyUp(e: KeyboardEvent): void {
-    if (this.isTyping(e.target)) return;
-    if (e.code === "Space") {
-      e.preventDefault();
-      this.space = false;
-    } else if (e.code === "Enter" || e.code === "NumpadEnter" || e.code === "ShiftRight") {
-      this.p2Key = false;
-    }
+    // Releasing one alias must not release the player's other held key.
+    if (this.keys.has(e.code)) e.preventDefault();
+    this.keys.delete(e.code);
+    this.space = this.keys.has("Space") || this.keys.has("KeyA");
+    this.p2Key = ["Enter", "NumpadEnter", "ShiftRight", "KeyL"].some(code => this.keys.has(code));
   }
 }

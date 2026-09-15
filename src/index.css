@@ -1074,3 +1074,174 @@ h2 {
     right: 68px;
   }
 }
+
+/* Flight HUD lanes: one header, one priority message, one footer. Keep these
+   after legacy responsive rules so touch controls never return over the fever
+   meter. Heights are observed only when their flow content changes. */
+.hud-header { display: flex; flex-direction: column; gap: 6px; }
+.hud-header .top-bar {
+  grid-template-columns: minmax(0, 1fr) minmax(80px, 280px) minmax(0, 1fr) auto;
+  align-items: center;
+}
+.hud-header .stat-block { min-width: 0; }
+.hud-header .stat-block.right { padding-right: 0; }
+.hud-header .stat-value { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.hud-header .sun-meter { width: 100%; min-width: 0; }
+.hud-controls { display: flex; gap: 8px; }
+.hud-controls .icon-btn { position: static; width: 44px; height: 44px; min-width: 44px; }
+.hud-header .mid-meta { margin: 0; flex-wrap: wrap; gap: 5px; }
+.hud-header .power-chips,
+.hud-header .power-strip {
+  position: static; transform: none; margin: 0;
+  flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px;
+}
+.hud-header .power-chips:empty,
+.hud-header .power-strip:empty { display: none; }
+.hud-header .roster-bar { position: static; transform: none; width: min(620px, 100%); align-self: center; margin-top: 6px; }
+.play-hud .standings { top: calc(var(--hud-header-height, 110px) + 30px + env(safe-area-inset-top)); }
+.flight-messages {
+  position: absolute;
+  top: calc(var(--hud-header-height, 110px) + 24px + env(safe-area-inset-top));
+  left: 50%; transform: translateX(-50%);
+  width: min(520px, calc(100% - 100px));
+  text-align: center;
+  pointer-events: none;
+}
+.flight-messages > .launch-banner,
+.flight-messages > .hint,
+.flight-messages > .goal-pop,
+.flight-messages > .finish-countdown {
+  position: static; transform: none; width: auto; max-width: 100%;
+  margin: 0; white-space: normal; overflow-wrap: anywhere;
+  font-size: clamp(17px, 3vw, 28px);
+  animation: none;
+}
+.hud-root:not([data-feedback="launch"]) .launch-banner,
+.hud-root:not([data-feedback="hint"]) .hint,
+.hud-root:not([data-feedback="goal"]) .goal-pop,
+.hud-root:not([data-feedback="finish"]) .finish-countdown { display: none; }
+.flight-footer {
+  position: absolute; bottom: calc(14px + env(safe-area-inset-bottom));
+  left: 50%; transform: translateX(-50%);
+  width: min(400px, calc(100% - 32px));
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+.flight-footer .goal-strip,
+.flight-footer .fever-wrap,
+.flight-footer .draft-meter,
+.flight-footer .emote-wheel { position: static; transform: none; width: 100%; margin: 0; }
+.flight-footer .goal-strip:empty,
+.flight-footer .fever-wrap:not(.on) { display: none; }
+.flight-footer .emote-wheel { overflow-x: auto; pointer-events: auto; touch-action: pan-x; padding: 2px; }
+.flight-footer .emote-wheel button { flex: 0 0 44px; height: 44px; }
+.hud-root[data-flying="true"] .toasts {
+  top: auto; bottom: calc(var(--hud-footer-height, 65px) + 28px + env(safe-area-inset-bottom));
+  width: min(400px, calc(100% - 100px));
+}
+.toasts .toast { max-width: 100%; overflow-wrap: anywhere; text-align: center; }
+.hud-root[data-flying="true"] .toast:not(:last-child) { display: none; }
+.hud-root[data-feedback="countdown"] .toasts,
+.hud-root[data-feedback="launch"] .toasts,
+.hud-root[data-feedback="finish"] .toasts { visibility: hidden; }
+/* Split-screen keeps its score bar but shares the same accessible controls. */
+.play-hud.versus .top-bar { display: flex; justify-content: flex-end; }
+.play-hud.versus .top-bar > :not(.hud-controls) { display: none; }
+.play-hud.versus .versus-bar { width: calc(100% - 150px); left: 16px; transform: none; }
+@media (max-width: 900px) {
+  /* The compact roster already carries position. Don't cover the flight with
+     a redundant second leaderboard on narrow screens. */
+  .play-hud .standings { display: none; }
+}
+@media (max-width: 640px) {
+  .hud-header .top-bar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; }
+  .hud-header .sun-meter { grid-row: 2; grid-column: 1 / -1; }
+  .hud-header .sun-caption { display: none; }
+  .hud-header .stat-value { font-size: 20px; }
+  .hud-header .mid-meta { font-size: 10px; }
+  .hud-header .mid-meta > * { font-size: 10px; padding: 3px 6px; }
+  .flight-footer .goal-strip { font-size: 11px; }
+}
+@media (max-height: 500px) and (min-width: 641px) {
+  .hud-header .stat-sub, .hud-header .sun-caption { display: none; }
+  .hud-header .stat-value { font-size: 20px; }
+  .hud-header .mid-meta > * { font-size: 10px; padding: 2px 6px; }
+  .hud-header { gap: 4px; }
+  .flight-footer .goal-strip { display: none; }
+  .flight-footer { gap: 4px; bottom: calc(8px + env(safe-area-inset-bottom)); }
+  .flight-messages { top: calc(var(--hud-header-height, 90px) + 18px + env(safe-area-inset-top)); }
+  .flight-messages > .hint, .flight-messages > .launch-banner { font-size: 19px; }
+  .hud-root[data-flying="true"] .toast { font-size: 12px; padding: 5px 10px; }
+}
+/* Preserve containing blocks for absolutely positioned meter labels. */
+.flight-footer .draft-meter { position: relative; inset: auto; }
+.flight-messages > .show { opacity: 1; }
+.flight-messages > .countdown {
+  position: static; transform: none; animation: none;
+  font-size: clamp(32px, 7vh, 60px); line-height: 1.1;
+}
+.hud-root:not([data-feedback="countdown"]) .countdown { display: none; }
+.hud-header .combo {
+  position: static; transform: none; animation: none;
+  font-size: 14px; line-height: 1.2; padding: 3px 6px;
+}
+.hud-header .combo:not(.show) { display: none; }
+.play-hud .alt-gauge {
+  top: calc(var(--hud-header-height, 110px) + 28px + env(safe-area-inset-top));
+  height: clamp(44px, calc(100% - var(--hud-header-height, 110px) - var(--hud-footer-height, 65px) - 72px - env(safe-area-inset-top) - env(safe-area-inset-bottom)), 240px);
+}
+.play-hud .hand { top: calc(var(--hud-header-height, 110px) + 92px + env(safe-area-inset-top)); font-size: 38px; }
+.hud-root:not([data-feedback="hint"]) .hand { display: none; }
+@media (max-height: 500px) { .play-hud .hand { display: none; } }
+@media (max-height: 500px) {
+  .hud-header { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4px; }
+  .hud-header .top-bar, .hud-header .roster-bar { grid-column: 1 / -1; }
+  .hud-header .roster-bar { justify-self: center; margin-top: 2px; }
+  .hud-header .stat-sub, .hud-header .sun-caption { display: none; }
+  .hud-header .mid-meta .biome-chip, .hud-header .gold-chip, .hud-header .vip-chip, .hud-header .ghost-chip { display: none; }
+  .hud-header .power-strip { justify-content: flex-end; flex-wrap: nowrap; }
+  .hud-header .pu { padding: 3px 5px; gap: 3px; min-width: 0; }
+  .hud-header .pu u { max-width: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; }
+  .hud-header .pu i { font-size: 12px; }
+  .flight-footer .goal-strip { display: none; }
+  .flight-messages > .hint, .flight-messages > .launch-banner { font-size: 18px; }
+}
+@media (max-height: 600px) {
+  /* Rewards still have sound and the goal/launch slot. A second transient pill
+     is not worth covering the landing corridor on short embedded players. */
+  .hud-root[data-flying="true"] .toasts { display: none; }
+}
+@media (max-height: 360px) {
+  .flight-footer .fever-wrap { display: flex; align-items: center; gap: 8px; }
+  .flight-footer .fever-wrap:not(.on) { display: none; }
+  .flight-footer .fever-label { font-size: 10px; line-height: 12px; margin: 0; }
+  .flight-footer .fever-bar { flex: 1; }
+  .flight-footer .draft-meter { height: 12px; }
+  .flight-footer { gap: 4px; }
+  .flight-messages > .hint, .flight-messages > .launch-banner { font-size: 16px; }
+}
+
+/* Full-session audit: split-screen's scores must participate in measured flow.
+   The old absolute bar was invisible to the header's ResizeObserver. */
+.play-hud.versus .hud-header { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; }
+.play-hud.versus .hud-header .top-bar { grid-column:2; grid-row:1; }
+.play-hud.versus .hud-header .versus-bar { position:static; transform:none; width:100%; grid-column:1; grid-row:1; }
+.play-hud.versus .hud-header > :not(.top-bar):not(.versus-bar) { display:none; }
+.play-hud.versus .vs-row { grid-template-columns:42px minmax(0,1fr) 56px; }
+/* Impact text is secondary: never paint it over a header, replay dialog,
+   landing instruction or mobile touch controls. */
+.hud-root .impact-popups {
+  top:calc(var(--hud-header-height,110px) + 94px + env(safe-area-inset-top));
+  bottom:calc(var(--hud-footer-height,65px) + 90px + env(safe-area-inset-bottom));
+  left:50px; right:50px; overflow:hidden; contain:paint;
+}
+.hud-root .impact-popup { max-width:min(180px,100%); font-size:clamp(14px,2.5vw,22px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.hud-root:not([data-ui-state="playing"]) .impact-popups,
+.hud-root:not([data-feedback="hint"]) .impact-popups { display:none; }
+@media(max-height:500px) { .hud-root .impact-popups { display:none; } }
+/* Keep optional social controls secondary and readable without emoji fonts. */
+.flight-footer .emote-wheel { justify-content:flex-end; }
+.flight-footer .emote-wheel button { flex:0 0 auto; width:auto; min-width:44px; padding:0 12px; border-radius:14px; color:#302b28; background:#fff6e5; border:1px solid #ddcfb9; backdrop-filter:none; font:600 12px/1 system-ui,sans-serif; }
+.flight-footer .emote-options { display:flex; gap:6px; }
+.flight-footer .emote-options.hidden { display:none; }
+.versus-guide { display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px 10px; font:600 11px/1.5 system-ui,sans-serif; padding:5px 8px; border-radius:9px; color:#263446; background:#fff6e9; text-shadow:none; }
+.versus-guide span { white-space:nowrap; }

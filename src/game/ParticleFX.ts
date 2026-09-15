@@ -1,3 +1,4 @@
+import { uploadDensePrefix } from "./bufferUpdates";
 import * as THREE from "three";
 import { clamp, lerp } from "./math";
 
@@ -33,6 +34,7 @@ export class ParticleFX {
   private readonly size: Float32Array;
   private readonly rings: THREE.Mesh[] = [];
   private budget = 1;
+  private recycleSlot = 0;
 
   constructor() {
     this.pos = new Float32Array(MAX * 3);
@@ -278,69 +280,6 @@ export class ParticleFX {
     }
   }
 
-  emitBiomeAtmosphere(x: number, y: number, biomeId: string): void {
-    if (Math.random() > 0.45 * this.budget) return;
-    let r = 0.8, g = 0.9, b = 0.8;
-    let sz = 0.4;
-    let vx = (Math.random() - 0.5) * 4 - 3;
-    let vy = (Math.random() - 0.5) * 3 - 0.5;
-
-    if (biomeId === "sunset") {
-      r = 1.0; g = 0.65; b = 0.45;
-      sz = 0.55;
-    } else if (biomeId === "tropical") {
-      r = 0.4; g = 0.95; b = 0.85;
-      sz = 0.45;
-    } else if (biomeId === "desert") {
-      r = 0.95; g = 0.82; b = 0.45;
-      vx = -12 - Math.random() * 8;
-      sz = 0.35;
-    } else if (biomeId === "night") {
-      r = 0.65; g = 0.75; b = 1.0;
-      vy = (Math.random() - 0.5) * 1.5;
-      sz = 0.4;
-    } else if (biomeId === "aurora") {
-      const cy = Math.random() < 0.5;
-      r = cy ? 0.2 : 0.85;
-      g = cy ? 0.95 : 0.35;
-      b = 0.85;
-      sz = 0.5;
-    } else if (biomeId === "reef") {
-      const pink = Math.random() < 0.5;
-      r = pink ? 1.0 : 0.45;
-      g = pink ? 0.75 : 0.95;
-      b = pink ? 0.85 : 0.9;
-      vy = (Math.random() - 0.5) * 2 + 1.2; // bubbles drift upward
-      sz = 0.42;
-    } else if (biomeId === "volcano") {
-      const ember = Math.random() < 0.6;
-      r = 1.0;
-      g = ember ? 0.45 : 0.25;
-      b = ember ? 0.15 : 0.2;
-      vy = 1.5 + Math.random() * 2.5; // embers rise
-      sz = ember ? 0.34 : 0.5;
-    } else if (biomeId === "canyon") {
-      r = 0.95; g = 0.62; b = 0.4;
-      vx = -9 - Math.random() * 6; // red dust on the wind
-      sz = 0.38;
-    }
-
-    this.spawn({
-      x: x + 15 + Math.random() * 25,
-      y: y + (Math.random() - 0.5) * 18,
-      z: (Math.random() - 0.5) * 6,
-      vx,
-      vy,
-      vz: (Math.random() - 0.5) * 2,
-      life: 0.9 + Math.random() * 0.7,
-      max: 1.6,
-      size: sz,
-      r,
-      g,
-      b,
-      type: "wake",
-    });
-  }
 
   emitWingTrails(x: number, y: number, speed: number): void {
     if (this.budget < 0.5) return;
@@ -583,8 +522,9 @@ export class ParticleFX {
       p.z += p.vz * dt;
       if (p.type === "dust" || p.type === "confetti" || p.type === "splash") p.vy -= 18 * dt;
       if (p.type === "spark") {
-        p.vx *= 0.92;
-        p.vy *= 0.92;
+        const drag = Math.pow(0.92, dt * 60);
+        p.vx *= drag;
+        p.vy *= drag;
       }
     }
 
@@ -611,12 +551,9 @@ export class ParticleFX {
       const posAttr = geo.getAttribute("position") as THREE.BufferAttribute;
       const colAttr = geo.getAttribute("color") as THREE.BufferAttribute;
       const sizeAttr = geo.getAttribute("size") as THREE.BufferAttribute;
-      posAttr.addUpdateRange(0, n * 3);
-      colAttr.addUpdateRange(0, n * 4);
-      sizeAttr.addUpdateRange(0, n);
-      posAttr.needsUpdate = true;
-      colAttr.needsUpdate = true;
-      sizeAttr.needsUpdate = true;
+      uploadDensePrefix(posAttr, n);
+      uploadDensePrefix(colAttr, n);
+      uploadDensePrefix(sizeAttr, n);
     }
     this.points.visible = n > 0;
 
@@ -663,7 +600,7 @@ export class ParticleFX {
     // from being promoted to and churning the old generation.
     let p: Particle;
     if (this.particles.length >= MAX) {
-      p = this.particles.shift()!; // at hard cap, recycle the oldest slot
+      p = this.particles[this.recycleSlot++ % MAX]!; // O(1) ring replacement at capacity
     } else {
       p = this.pool.pop() ?? {
         x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, life: 0, max: 0, size: 0, r: 1, g: 1, b: 1, type: "dust",
@@ -682,6 +619,6 @@ export class ParticleFX {
     p.g = fields.g;
     p.b = fields.b;
     p.type = fields.type;
-    this.particles.push(p);
+    if (this.particles.length < MAX) this.particles.push(p);
   }
 }

@@ -1,3 +1,5 @@
+const COIN_SCALE = [1046.5, 1174.66, 1318.51, 1567.98, 1760.0, 2093.0, 2349.32, 2637.02, 3135.96, 3520.0];
+
 import { Music, type BiomeMusicStyle, type MusicMode } from "./Music";
 
 /**
@@ -86,7 +88,7 @@ export class GameAudio {
     this.sfxBus.connect(this.master);
 
     // Pre-allocate noise buffer for reuse (avoids per-call allocation)
-    const noiseLen = Math.floor(this.ctx.sampleRate * 0.5);
+    const noiseLen = Math.floor(this.ctx.sampleRate * 1);
     this.noiseBuffer = this.ctx.createBuffer(1, noiseLen, this.ctx.sampleRate);
     const noiseData = this.noiseBuffer.getChannelData(0);
     for (let i = 0; i < noiseLen; i++) noiseData[i] = (Math.random() * 2 - 1) * (1 - i / noiseLen);
@@ -153,6 +155,7 @@ export class GameAudio {
     this.music?.dispose();
     if (this.ctx) void this.ctx.close();
     this.ctx = null;
+    this.noiseBuffer = null;
     this.master = null;
     this.sfxBus = null;
     this.reverbSend = null;
@@ -332,8 +335,7 @@ export class GameAudio {
     this.lastCoinTime = now;
 
     // Pentatonic scale: C6, D6, E6, G6, A6, C7, D7, E7, G7, A7
-    const scale = [1046.5, 1174.66, 1318.51, 1567.98, 1760.0, 2093.0, 2349.32, 2637.02, 3135.96, 3520.0];
-    const pitch = scale[Math.min(this.coinStreak - 1, scale.length - 1)]!;
+    const pitch = COIN_SCALE[Math.min(this.coinStreak - 1, COIN_SCALE.length - 1)]!;
     const freq = gem ? pitch * 1.5 : pitch;
 
     this.tone(freq, 0.12, "sine", 0.14, freq * 1.04);
@@ -484,6 +486,20 @@ export class GameAudio {
     this.tone(330, 0.22, "triangle", 0.06, 880);
   }
 
+  /** Ring chains climb through a bounded major pentatonic chord, not a
+   * full fanfare on every gate. Two short tones leave timing sounds audible. */
+  ringPass(chain: number): void {
+    const pitch = COIN_SCALE[Math.min(4, Math.max(0, Math.floor(chain) - 1))]! / 2;
+    this.tone(pitch, 0.10, "sine", 0.09, pitch * 1.25);
+    this.tone(pitch * 1.5, 0.09, "triangle", 0.04);
+  }
+
+  /** A soft brush/whistle distinguishes a ridge skim from a butter landing. */
+  ridgeSkim(): void {
+    this.noiseBurst(0.08, 2200, 0.025);
+    this.tone(784, 0.10, "sine", 0.055, 1046.5);
+  }
+
   /** Balloon bounce: a taut rubber pop + a springy upward slide. */
   balloon(): void {
     this.noiseBurst(0.06, 2600, 0.16);
@@ -511,6 +527,25 @@ export class GameAudio {
     const baseFreq = rating === "perfect" ? 784 : rating === "great" ? 587 : 440;
     this.tone(baseFreq, 0.18, "sine", 0.12 * speedRatio, baseFreq * 1.6);
     this.noiseBurst(0.2, 800 + speed * 12, 0.07 * speedRatio);
+  }
+
+  /** Momentum building: a short low-to-high rubbery scoop, once per big drop. */
+  runup(): void {
+    this.tone(130.81, 0.32, "triangle", 0.07, 261.63);
+    this.noiseBurst(0.18, 650, 0.035);
+  }
+
+  /** A wider upward whistle for the island-transfer ramp. */
+  rampLaunch(speed: number): void {
+    this.tone(392, 0.30, "sine", 0.09, 1174.66);
+    this.tone(587.33, 0.24, "triangle", 0.045, 1567.98);
+    this.noiseBurst(0.2, 800 + Math.min(128, speed) * 10, 0.045);
+  }
+
+  /** A quiet apex bell tells the player the climb has become a descent. */
+  apexChime(): void {
+    this.tone(1046.5, 0.32, "sine", 0.045);
+    this.tone(1567.98, 0.4, "sine", 0.025);
   }
 
   countdownBeep(isGo = false): void {
@@ -555,7 +590,7 @@ export class GameAudio {
   /* ---------- synth primitives ---------- */
 
   private tone(freq: number, dur: number, type: OscillatorType, gain: number, slideTo?: number): void {
-    if (!this.ctx || !this.sfxBus || !this.reverbSend || this.muted || !this.started) return;
+    if (!this.ctx || !this.sfxBus || !this.reverbSend || this.muted || this.sfxVol <= 0 || this.adMuted || this.hiddenMuted || this.portalMuted || !this.started) return;
     if (this.activeOneShots >= this.maxOneShots) return;
     this.activeOneShots++;
     const t = this.ctx.currentTime;
@@ -572,6 +607,7 @@ export class GameAudio {
     send.connect(this.reverbSend);
 
     let ended = 0;
+    const voices = dur < 0.12 ? 1 : 2;
     const voice = (detune: number, vol: number): void => {
       const o = this.ctx!.createOscillator();
       o.type = type;
@@ -588,24 +624,31 @@ export class GameAudio {
         o.disconnect();
         vg.disconnect();
         ended++;
-        if (ended === 2) this.activeOneShots = Math.max(0, this.activeOneShots - 1);
+        if (ended === voices) {
+          g.disconnect();
+          send.disconnect();
+          this.activeOneShots = Math.max(0, this.activeOneShots - 1);
+        }
       });
     };
-    // A gently detuned second voice thickens every sound into a small chorus
-    // without raising the overall level (0.8 + 0.4 ≈ the single voice).
-    voice(0, 0.8);
-    voice(6, 0.4);
+    // Longer accents get a chorus; short ticks use one oscillator/gain pair.
+    // Preserve the envelope while avoiding a doubled node graph for tiny cues.
+    voice(0, voices === 1 ? 1 : 0.8);
+    if (voices === 2) voice(6, 0.4);
   }
 
   private noiseBurst(dur: number, freq: number, gain: number): void {
-    if (!this.ctx || !this.sfxBus || this.muted || !this.started) return;
+    if (!this.ctx || !this.sfxBus || this.muted || this.sfxVol <= 0 || this.adMuted || this.hiddenMuted || this.portalMuted || !this.started) return;
     if (this.activeOneShots >= this.maxOneShots) return;
     this.activeOneShots++;
     const len = Math.floor(this.ctx.sampleRate * dur);
     // Reuse pre-allocated noise buffer when duration fits, otherwise create new
-    const buffer = (this.noiseBuffer && len <= this.noiseBuffer.length)
-      ? this.noiseBuffer
-      : this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+    if (!this.noiseBuffer || len > this.noiseBuffer.length) {
+      this.noiseBuffer = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noiseBuffer.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    }
+    const buffer = this.noiseBuffer;
     const src = this.ctx.createBufferSource();
     src.buffer = buffer;
     const filter = this.ctx.createBiquadFilter();

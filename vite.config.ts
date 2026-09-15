@@ -1,9 +1,9 @@
-import { readFileSync, writeFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
+import { sunbirdSVG, sunSVG } from "./src/game/Sunbird";
 import { viteSingleFile } from "vite-plugin-singlefile";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -45,38 +45,23 @@ function copyrightBanner(): Plugin {
   };
 }
 
-/** public/ files are copied verbatim — define() can't reach them. This plugin
- * rewrites the __SW_BUILD_ID__ token inside the emitted dist/sw.js for real. */
-function swBuildId(): Plugin {
-  let outDir = "dist";
-  return {
-    name: "sunbird-sw-build-id",
-    apply: "build",
-    configResolved(config) {
-      outDir = config.build.outDir;
-    },
-    closeBundle() {
-      try {
-        const p = path.resolve(__dirname, outDir, "sw.js");
-        const src = readFileSync(p, "utf8");
-        writeFileSync(p, src.replace(/__SW_BUILD_ID__/g, BUILD_ID));
-      } catch {
-        /* single-file/portal builds strip the SW — nothing to stamp */
-      }
-    },
-  };
-}
-
 // https://vite.dev/config/
 export default defineConfig({
   // Relative base: portals (Poki GDN, CrazyGames CDN) serve builds from deep
   // subpaths — any absolute /asset URL 404s there. "./" works everywhere.
   base: "./",
   plugins: [
+    {
+      name: "sunbird-boot-mark",
+      transformIndexHtml(html) {
+        // Inline the SAME artwork as the menu before any JS or assets arrive.
+        return html.replace("<!-- BOOT_SUN -->", sunSVG({ size: 84, className: "boot-sun" }))
+          .replace("<!-- BOOT_BIRD -->", sunbirdSVG({ width: 58, className: "boot-bird", animateWings: true }));
+      },
+    },
     react(),
     tailwindcss(),
     ...(singleFile ? [viteSingleFile()] : []),
-    swBuildId(),
     ...(singleFile ? [] : [copyrightBanner()]),
   ],
   server: {
@@ -87,7 +72,7 @@ export default defineConfig({
     // legacy `/ws` socket. No hardcoded hosts anywhere.
     proxy: {
       "/mp": {
-        target: "http://localhost:8080",
+        target: process.env.MULTIPLAYER_PROXY_TARGET || "http://127.0.0.1:8080",
         ws: true,
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/mp/, "/ws"),
@@ -95,7 +80,7 @@ export default defineConfig({
       // Social server (friends/clubs/chat) — same pattern as /mp: the browser
       // talks same-origin, vite tunnels to the PGlite server on :8788.
       "/social": {
-        target: "http://localhost:8788",
+        target: process.env.SOCIAL_PROXY_TARGET || "http://127.0.0.1:8788",
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/social/, ""),
       },
