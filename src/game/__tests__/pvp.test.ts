@@ -53,6 +53,13 @@ describe("ratingDelta", () => {
     expect(ratingDelta(0, 40)).toBe(ratingDelta(1, 40));
     expect(ratingDelta(99, 40)).toBe(ratingDelta(40, 40));
   });
+
+  it("live fields scale the same math up, symmetrically", () => {
+    expect(ratingDelta(1, 41, true)).toBe(Math.round(ratingDelta(1, 41) * 1.5));
+    expect(ratingDelta(1, 41, true)).toBe(-ratingDelta(41, 41, true));
+    expect(ratingDelta(1, 41, true)).toBeGreaterThan(ratingDelta(1, 41));
+    expect(ratingDelta(41, 41, true)).toBeLessThan(ratingDelta(41, 41));
+  });
 });
 
 describe("streakBonus", () => {

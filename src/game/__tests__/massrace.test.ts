@@ -44,4 +44,19 @@ describe("mass race network boundary", () => {
     expect(mr.rivals[0]!.id).toMatch(/^ai-/);
     terrain.dispose();
   });
+
+  it("counts live humans: zero offline, one per promoted slot online", () => {
+    const terrain = new TerrainSystem("2026-09-12");
+    const mr = new MassRace();
+    mr.spawn(2, "2026-09-12", terrain, 0);
+    expect(mr.remoteCount).toBe(0);
+    mr.attachTransport({
+      connected: true,
+      send: () => undefined,
+      poll: () => [{ id: "human-1", name: "Human", x: 500, y: 20, rotation: 0 }],
+    });
+    mr.step(1 / 60, terrain, 4000, 1);
+    expect(mr.remoteCount).toBe(1);
+    terrain.dispose();
+  });
 });

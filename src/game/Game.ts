@@ -1454,11 +1454,12 @@ export class Game {
           if (won && this.save.ownTrail("trail_duelist")) this.hud.toast("✨ Duelist trail unlocked!", "gold");
           this.audio.purchase();
         } else if (this.rankedRace) {
-          const res = this.save.recordRivalResult(s.place, s.total, "massrace", this.today);
+          const live = this.massRace.remoteCount > 0;
+          const res = this.save.recordRivalResult(s.place, s.total, live ? "massrace-live" : "massrace", this.today, live);
           this.lastRatingDelta = res.delta;
           this.lastRatingBonus = res.bonus;
           this.hud.toast(
-            `Rival rating ${res.delta >= 0 ? "+" : ""}${res.delta} → ${this.save.state.rival.rating}${res.bonus > 0 ? ` · +${res.bonus}● streak` : ""}`,
+            `Rival rating ${res.delta >= 0 ? "+" : ""}${res.delta} → ${this.save.state.rival.rating}${res.bonus > 0 ? ` · +${res.bonus}● streak` : ""}${live ? " · live field" : ""}`,
             res.delta >= 0 ? "gold" : "warn",
           );
           this.audio.purchase();

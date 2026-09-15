@@ -295,6 +295,9 @@ textarea {
 }
 
 .icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 42px;
   height: 42px;
   border: none;
@@ -304,6 +307,8 @@ textarea {
   font-size: 14px;
   box-shadow: 0 4px 0 rgba(42, 28, 40, 0.16);
   cursor: pointer;
+  padding: 0;
+  line-height: 1;
 }
 
 .icon-btn:active {

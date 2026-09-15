@@ -13,6 +13,11 @@ class Param {
 class Node {
   gain = new Param();
   frequency = new Param();
+  threshold = new Param();
+  knee = new Param();
+  ratio = new Param();
+  attack = new Param();
+  release = new Param();
   playbackRate = new Param();
   Q = new Param();
   type = "";
@@ -33,6 +38,7 @@ function fixture() {
     sampleRate: 44100,
     createGain: create,
     createBiquadFilter: create,
+    createDynamicsCompressor: create,
     createOscillator: create,
     createBufferSource: create,
     createBuffer: (_channels: number, length: number) => ({ getChannelData: () => new Float32Array(length) }),

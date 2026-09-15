@@ -567,11 +567,11 @@ export class SaveData {
    * Returns the rating delta and any streak bonus actually granted.
    * Local only — never synced, never a server rank.
    */
-  recordRivalResult(place: number, field: number, mode: string, date: string): { delta: number; bonus: number; streak: number } {
+  recordRivalResult(place: number, field: number, mode: string, date: string, live = false): { delta: number; bonus: number; streak: number } {
     const r = this.state.rival;
     const p = Math.max(1, Math.min(Math.max(2, field), Math.floor(place)));
     const f = Math.max(2, Math.floor(field));
-    const delta = ratingDelta(p, f);
+    const delta = ratingDelta(p, f, live);
     const won = p <= Math.max(1, Math.ceil(f * 0.25));
     r.rating = Math.max(0, r.rating + delta);
     this.state.rankSeason.peak = Math.max(this.state.rankSeason.peak, r.rating);

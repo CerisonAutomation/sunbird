@@ -263,6 +263,13 @@ export class MassRace {
     return seated;
   }
 
+  /** How many field slots are driven by real humans right now. */
+  get remoteCount(): number {
+    let n = 0;
+    for (const r of this.rivals) if (r.kind === "remote") n++;
+    return n;
+  }
+
   /** Room admin: scale whole-field skill (0.5 chill … 1.4 ace). */
   setFieldSkill(mult: number): void {
     for (const r of this.rivals) {

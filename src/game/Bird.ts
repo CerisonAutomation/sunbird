@@ -176,7 +176,7 @@ export class Bird {
     this.root.add(this.glow);
     this.root.scale.setScalar(1.18);
 
-    const shadowGeo = new THREE.CircleGeometry(1.1, 16);
+    const shadowGeo = Bird.makeShadowGeometry();
     const shadowMat = new THREE.MeshBasicMaterial({
       color: 0x1a1020,
       transparent: true,
@@ -202,6 +202,28 @@ export class Bird {
       if (o instanceof THREE.Mesh) o.renderOrder = 50;
     });
     this.shadow.renderOrder = 10;
+  }
+
+  /**
+   * Top-down gull silhouette (x = flight direction, y = wingspan) drawn as a
+   * flat shape: swept wings, fanned tail with a notch. Replaces the old blob
+   * disc so the ground shadow reads as the actual bird. Kept the same overall
+   * extent (~2.6 wingspan) so the altitude fade logic below is untouched.
+   */
+  private static makeShadowGeometry(): THREE.BufferGeometry {
+    const s = new THREE.Shape();
+    s.moveTo(1.0, 0); // beak
+    s.quadraticCurveTo(0.55, 0.55, 0.05, 1.3); // right leading edge → wingtip
+    s.lineTo(-0.28, 1.26); // wingtip trailing corner
+    s.quadraticCurveTo(-0.45, 0.6, -0.6, 0.18); // right trailing edge
+    s.lineTo(-0.95, 0.12); // tail fan, right
+    s.lineTo(-0.8, 0); // tail notch
+    s.lineTo(-0.95, -0.12); // tail fan, left
+    s.lineTo(-0.6, -0.18);
+    s.quadraticCurveTo(-0.45, -0.6, -0.28, -1.26);
+    s.lineTo(0.05, -1.3);
+    s.quadraticCurveTo(0.55, -0.55, 1.0, 0);
+    return new THREE.ShapeGeometry(s);
   }
 
   addTo(scene: THREE.Scene): void {
@@ -495,7 +517,11 @@ export class Bird {
     const alt = Math.max(0, py - h);
     this.shadow.position.set(px, h + 0.08, 0);
     const s = clamp(1.3 - alt * 0.045, 0.25, 1.3);
-    this.shadow.scale.setScalar(s);
+    // The silhouette breathes with the wings: span narrows at the top of each
+    // stroke and folds to a dart when tucked (dive/sleep). Local y maps to
+    // world wingspan after the flat rotation, so only y is modulated.
+    const span = s * (1 - 0.45 * this.wingTuck) * (1 - 0.14 * (flap / 0.55));
+    this.shadow.scale.set(s, span, 1);
     (this.shadow.material as THREE.MeshBasicMaterial).opacity = 0.28 * s * (this.inWater ? 0.15 : 1);
   }
 
