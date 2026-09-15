@@ -475,9 +475,9 @@ mod tests {
             }),
         )
         .await;
-        let (status, body) = unknown.into_response().into_parts();
-        assert_eq!(status, StatusCode::NOT_FOUND);
-        let body = axum::body::to_bytes(body, 4096).await.unwrap();
+        let response = unknown.into_response();
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        let body = axum::body::to_bytes(response.into_body(), 4096).await.unwrap();
         assert!(String::from_utf8_lossy(&body).contains("seatNotFound"));
 
         // A real seat: join, then mint for its current generation.
@@ -525,8 +525,7 @@ mod tests {
             }),
         )
         .await;
-        let (status, _) = stale.into_response().into_parts();
-        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(stale.into_response().status(), StatusCode::CONFLICT);
     }
 
     #[test]

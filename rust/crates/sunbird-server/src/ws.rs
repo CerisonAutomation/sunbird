@@ -266,6 +266,7 @@ fn to_server_message(event: RoomEvent) -> ServerMessage {
     }
 }
 
+#[derive(Debug)]
 struct Handled {
     replies: Vec<ServerMessage>,
     events: Option<broadcast::Receiver<RoomEvent>>,
