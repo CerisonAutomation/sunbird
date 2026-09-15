@@ -142,9 +142,16 @@ When both sides configure a shared salt, `POST /score` requires a `sig` field:
 sig = hex(HMAC-SHA256(salt, `${deviceId}|${distance}|${score}`))
 ```
 
-- **Server:** set `LEADERBOARD_SALT` in the Vercel Function environment (or a secret store).
+- **Server:** set `LEADERBOARD_SALT` in the Vercel Function environment (or a secret store); the self-hosted TS backend uses `SUNBIRD_LEADERBOARD_SALT`.
 - **Client:** set `VITE_LEADERBOARD_SALT` at build time.
-- Unsigned posts are rejected with `403` when the server salt is set; when unset, the endpoint stays open (dev mode).
+- **Production is fail-closed:** with `VERCEL_ENV=production` (or
+  `NODE_ENV=production` on the TS backend) and no salt configured, the
+  endpoint refuses all submissions with `503 leaderboard signing not
+  configured` — a live board never runs unsigned. `GET /api/health`
+  reports `signing: "enabled" | "absent"` so deployments can gate on it.
+- **Previews/dev without a salt stay lenient** by design: those boards are
+  memory-only and never rank globally. Whenever a salt IS configured — in
+  any environment — unsigned or badly-signed posts are rejected with `403`.
 
 Honest scope: the salt ships inside the client bundle, so signing deters
 casual curl-spoofing, not determined reverse-engineering. The server also

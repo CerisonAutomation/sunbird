@@ -63,6 +63,29 @@ cargo build --release -p sunbird-server
 ./target/release/sunbird-server   # serves GET /ws on :8080
 ```
 
+**Docker Compose (multiplayer + social backend):** the repo root ships a
+two-service self-hosted stack — the Rust authoritative server and the
+TypeScript social backend (`server/`), each with its own multi-stage
+Dockerfile:
+
+```bash
+cp .env.example .env   # then set the two secrets:
+#   SUNBIRD_RECONNECT_HMAC_SECRET="$(openssl rand -hex 32)"
+#   SUNBIRD_TOKEN_SECRET="$(openssl rand -hex 32)"
+docker compose up -d --build
+```
+
+- `multiplayer` — `sunbird-server` on `:8080` (`/v1/ws`, `/ws` legacy,
+  `/v1/reconnect-token`, `/healthz`, `/readyz`), Prometheus metrics on
+  `:9090` when `SUNBIRD_METRICS_BIND_ADDR` is set.
+- `social` — the TS social backend on `:8791` (`/mp/v1/…`, `/health`),
+  JSON persistence in the `social-data` volume (`SUNBIRD_PERSIST=1`).
+
+Point a browser build at the services with `VITE_MULTIPLAYER_URL` /
+`VITE_SOCIAL_URL`, and list the page origin in `SUNBIRD_PUBLIC_ORIGINS`
+(the Rust server refuses `*` outside development and requires `https`
+origins in production — `SUNBIRD_ENV=production`).
+
 ## 2. Poki
 
 ```bash
