@@ -704,12 +704,26 @@ export class Game {
       onAdOpened: () => this.beginPortalAd(),
       onAdClosed: () => this.endPortalAd(),
       onPortalMute: (muted) => this.audio.setPortalMuted(muted),
+      onPause: () => {
+        // Portal-side pause (in addition to visibilitychange): freeze the
+        // same way a hidden tab does — paused state + silenced audio.
+        if (this.state === "playing") this.setState("paused");
+        this.audio.setHiddenMuted(true);
+        void this.audio.suspend();
+      },
+      onResume: () => {
+        this.last = performance.now();
+        this.acc = 0;
+        this.audio.setHiddenMuted(false);
+        void this.audio.resumeExisting();
+      },
     }).then((adapter) => {
       if (this.disposed) return;
       this.platform = adapter;
       adapter.loadingFinished();
+      adapter.signalGameReady();
       if (this.state === "playing") adapter.gameplayStart();
-      this.telemetry.track("portal_ready", { portal: adapter.name });
+      this.telemetry.track("portal_ready", { portal: adapter.name, caps: adapter.capabilities().join(",") });
       this.bump();
     });
     if (seasonEnd) this.hud.toast(`⚔ Ranked season over · ${seasonEnd.division} reward +${seasonEnd.coins} coins`, "gold");
