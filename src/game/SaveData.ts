@@ -309,6 +309,8 @@ export class SaveData {
   /** Invoked (throttled) when a persist fails — lets the game observe data-
    *  loss risk instead of swallowing it silently. */
   onPersistError: (() => void) | null = null;
+  /** Optional platform SDK adapter for cloud save syncing (e.g. CrazyGames data.setItem). */
+  platformAdapter: { saveData?: (key: string, data: string) => Promise<void> } | null = null;
   private lastPersistErrorAt = 0;
 
   constructor() {
@@ -512,8 +514,12 @@ export class SaveData {
   }
 
   private persistNow(state: SaveState): void {
+    const raw = JSON.stringify(state);
     try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+      localStorage.setItem(SAVE_KEY, raw);
+      if (this.platformAdapter?.saveData) {
+        void this.platformAdapter.saveData(SAVE_KEY, raw);
+      }
     } catch {
       // A write that silently no-ops loses player progress with no signal. Call
       // the observer (if any) — throttled here so a full/blocked store can't

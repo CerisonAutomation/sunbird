@@ -19,6 +19,8 @@ export interface PlatformAdapter {
   commercialBreak(): Promise<void>;
   rewardedBreak(): Promise<boolean>;
   mountBanner(container: HTMLElement): void;
+  saveData?(key: string, data: string): Promise<void>;
+  loadData?(key: string): Promise<string | null>;
 }
 
 type PokiSdk = {
@@ -255,6 +257,30 @@ class CrazyAdapter implements PlatformAdapter {
       .requestBanner({ id: CRAZY_BANNER_ID, width: 320, height: 50 })
       .then((element) => container.appendChild(element))
       .catch(() => undefined);
+  }
+
+  async saveData(key: string, data: string): Promise<void> {
+    try {
+      const sdk = this.sdk as unknown as { data?: { setItem?: (k: string, v: string) => Promise<void> | void } };
+      if (sdk?.data?.setItem) {
+        await sdk.data.setItem(key, data);
+      }
+    } catch {
+      /* ignore cloud save failures */
+    }
+  }
+
+  async loadData(key: string): Promise<string | null> {
+    try {
+      const sdk = this.sdk as unknown as { data?: { getItem?: (k: string) => Promise<string | null> } };
+      if (sdk?.data?.getItem) {
+        const val = await sdk.data.getItem(key);
+        return typeof val === "string" ? val : null;
+      }
+    } catch {
+      /* ignore cloud load failures */
+    }
+    return null;
   }
 }
 
