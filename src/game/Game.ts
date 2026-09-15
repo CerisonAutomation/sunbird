@@ -22,6 +22,8 @@ import { MassRace } from "./MassRace";
 import { FinishGate } from "./FinishGate";
 import { isMultiplayerConfigured, makeRoomCode, RealtimeClient } from "./Realtime";
 import { Leaderboard, loadPilotName, savePilotName, isLeaderboardOnline, type BoardMetric, type BoardPage, type BoardScope } from "./Leaderboard";
+import { generatePilotName } from "./pilotNameGenerator";
+import { setLocale, type SupportedLocale } from "../i18n";
 import { Tournaments, TRAILS, weekKey, type PrizeGrant } from "./Tournaments";
 import {
   dailyChallenge,
@@ -75,7 +77,7 @@ import {
   ZENITH_DURATION,
   ZENITH_SLOWMO,
 } from "./constants";
-import { BOOSTS, COLLECTIONS, GOLD, PROMO_CODES, SHOP_TRAILS, SKINS, STARTER_PACK, VIP, dailyDealBoost, skinById, type BoostView, type ShopTrailView, type SkinDef, type SkinView } from "./Economy";
+import { BOOSTS, COLLECTIONS, GOLD, PROMO_CODES, SHOP_TRAILS, SKINS, STARTER_PACK, VIP, WHEEL_SECTORS, dailyDealBoost, skinById, type BoostView, type ShopTrailDef, type ShopTrailView, type SkinDef, type SkinView } from "./Economy";
 import { nextWings, wingsFor, wingsProgress, wingsPromotion } from "./Career";
 import { GhostPlayer, GhostRecorder } from "./Ghost";
 import { fetchRivalGhost, publishGhost } from "./GhostNet";
@@ -87,16 +89,13 @@ import { Missions, type MissionView, type QuestReward, type QuestView, type RunS
 import { ParticleFX } from "./ParticleFX";
 import { TrailRibbon } from "./Trail";
 import { fetchServerEntitlements,
-  consumeStripeReturn,
-  ensureStripeJs,
   MockAdProvider,
   MockPaymentProvider,
-  stripeConfigured,
-  stripeLinkFor,
   type AdProvider,
   type Sku,
 } from "./Payments";
 import { SaveData } from "./SaveData";
+import { SocialSystem } from "./SocialSystem";
 import { SeasonPass, seasonId, seasonLabel, XP_RULES } from "./SeasonPass";
 import { FlightCues } from "./FlightCues";
 import { endlessSpeedScale } from "./FlightProgression";
@@ -127,6 +126,7 @@ export class Game {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene: THREE.Scene;
   private readonly save: SaveData;
+  private readonly social: SocialSystem;
   private readonly missions: Missions;
   private readonly achievements: Achievements;
   private readonly seasonPass: SeasonPass;
@@ -402,6 +402,8 @@ export class Game {
   private hueT = 0;
   private lastBiomeId = "";
   private readonly onFocus: () => void;
+  private readonly onBlur: () => void;
+  private readonly onOrientationChange: () => void;
 
   private checkoutSku: Sku = "sunbird_gold";
   private checkoutBusy = false;
@@ -425,6 +427,7 @@ export class Game {
 
   constructor(private readonly host: HTMLElement) {
     this.save = new SaveData();
+    this.social = new SocialSystem(this.save);
     // Corruption recovery is a data-loss event worth knowing about: the blob is
     // parked (not destroyed), but the player is silently starting fresh unless
     // we say so. Track it once, and toast it below once the HUD exists.
@@ -615,12 +618,27 @@ export class Game {
     }
 
     this.onFocus = () => {
+      if (!this.hidden) {
+        this.audio.setHiddenMuted(false);
+        void this.audio.resumeExisting();
+      }
       if (this.checkoutWaiting && this.screen === "checkout") {
         this.telemetry.track("stripe_return_focus", { sku: this.checkoutSku });
         this.hud.toast("Welcome back — confirm below if you finished paying", "info");
       }
     };
+    this.onBlur = () => {
+      this.audio.setHiddenMuted(true);
+      void this.audio.suspend();
+    };
+    this.onOrientationChange = () => {
+      this.resize();
+      window.setTimeout(() => this.resize(), 100);
+      window.setTimeout(() => this.resize(), 300);
+    };
     window.addEventListener("focus", this.onFocus);
+    window.addEventListener("blur", this.onBlur);
+    window.addEventListener("orientationchange", this.onOrientationChange);
 
     this.hud.onAction((action, id) => this.handleAction(action, id));
     this.onResize = () => this.resize();
@@ -661,9 +679,6 @@ export class Game {
     this.raf = requestAnimationFrame(this.loop);
 
     this.goals.reset(this.today);
-    // Stripe.js is only fetched when the paywall actually opens — no third-
-    // party network chatter (or console noise) during normal play.
-    this.handleStripeReturn();
     // monthly VIP really lapses — surface it once per session
     this.vipActive = this.save.isVipActive();
     if (this.save.state.vip === false && this.save.state.vipUntil > 0) this.vipExpiredNotice = true;
@@ -717,6 +732,8 @@ export class Game {
     window.removeEventListener("beforeinstallprompt", this.onBeforeInstall);
     window.removeEventListener("appinstalled", this.onInstalled);
     window.removeEventListener("focus", this.onFocus);
+    window.removeEventListener("blur", this.onBlur);
+    window.removeEventListener("orientationchange", this.onOrientationChange);
     this.telemetry.flush();
     this.squad?.dispose();
     this.telemetry.dispose();
@@ -2000,6 +2017,12 @@ export class Game {
     const visY = lerp(this.prevBirdY, this.bird.y, interp);
     this.bird.syncVisual(visDt, diving, glow, this.elapsed, this.terrain, visX, visY);
     this.massRace.syncVisual(visDt, this.bird.x, interp);
+    if (this.massRace.active && this.state === "playing") {
+      const tags = this.massRace.getVisibleNameTags(this.camera.camera.position.x, this.bird.x, this.bird.y, this.startX);
+      this.hud.updateNameTags(tags, this.camera.camera, window.innerWidth, window.innerHeight);
+    } else {
+      this.hud.updateNameTags([], this.camera.camera, window.innerWidth, window.innerHeight);
+    }
     this.finishRemaining = this.finishGate.update(visDt, this.bird.x);
     this.updateTrailRibbon(visDt);
     this.particles.update(visDt);
@@ -2763,6 +2786,61 @@ export class Game {
   private handleAction(action: string, id: string): void {
     void this.audio.resume();
     switch (action) {
+      case "spin-wheel": {
+        if (!this.save.canFreeWheelSpin(this.today)) {
+          this.hud.toast("Wheel spin on cooldown until tomorrow", "info");
+          break;
+        }
+        const sectorIndex = Math.floor(Math.random() * WHEEL_SECTORS.length);
+        const sector = WHEEL_SECTORS[sectorIndex]!;
+        this.save.recordWheelSpin(this.today);
+        if (sector.kind === "coins" && typeof sector.value === "number") {
+          this.save.addCoins(sector.value);
+          this.hud.toast(`🎡 Wheel landed on ${sector.label}! +● ${sector.value}`, "gold");
+        } else if (sector.kind === "boost") {
+          this.save.armBoost("sunflask");
+          this.hud.toast(`🎡 Wheel landed on ${sector.label}! Sun Flask Armed!`, "gold");
+        } else if (sector.kind === "vault") {
+          this.buyMysteryVault();
+          this.hud.toast(`🎰 Wheel landed on Vault Key!`, "gold");
+        }
+        this.audio.fanfare();
+        this.bump();
+        break;
+      }
+      case "smash-piggy": {
+        const smashed = this.save.smashPiggyBank();
+        if (smashed > 0) {
+          this.audio.fanfare();
+          this.hud.toast(`🐷 Smashed Piggy Bank! +● ${smashed} coins!`, "gold");
+        } else {
+          this.hud.toast("Piggy Bank is empty!", "info");
+        }
+        this.bump();
+        break;
+      }
+      case "perform-prestige": {
+        if (this.save.performPrestige()) {
+          this.audio.chapterFanfare();
+          const p = this.save.state.prestige?.multiplier ?? 1.0;
+          this.hud.toast(`👑 Reborn with Solar Crown! Permanent ×${p.toFixed(1)} Coin Multiplier!`, "gold");
+        } else {
+          this.hud.toast("Need ● 50,000 coins to ascend Solar Crown prestige!", "warn");
+        }
+        this.bump();
+        break;
+      }
+      case "multiply-run-coins": {
+        if (this.runCoins > 0) {
+          const bonus = this.runCoins * 2;
+          this.save.addCoins(bonus);
+          this.runCoins *= 3;
+          this.audio.chapterFanfare();
+          this.hud.toast(`🎬 Ad Multiplier! 3x End-of-Run Coins (+● ${bonus})!`, "gold");
+        }
+        this.bump();
+        break;
+      }
       case "mode-select":
         this.setScreen("modes");
         break;
@@ -2810,11 +2888,6 @@ export class Game {
         this.setScreen("shop");
         break;
       case "open-paywall":
-        ensureStripeJs();
-        if (this.portalEnabled()) {
-          this.hud.toast("This portal edition uses only portal rewards", "info");
-          break;
-        }
         this.restoreMessage = "";
         this.setScreen("paywall");
         this.telemetry.track("paywall_open", { from: this.state });
@@ -2869,6 +2942,33 @@ export class Game {
         this.save.persist();
         this.hud.toast(`Flying as ${next}`, "info");
         void this.refreshBoard(true);
+        break;
+      }
+      case "autogen-pilot": {
+        const gen = generatePilotName();
+        this.hud.setValue("pilotName", gen);
+        const next = savePilotName(gen);
+        this.pilotName = next;
+        this.save.state.pilotName = next;
+        this.save.persist();
+        this.hud.toast(`Generated Pilot Name: ${next}`, "info");
+        void this.refreshBoard(true);
+        break;
+      }
+      case "set-language": {
+        if (id) {
+          setLocale(id as SupportedLocale);
+          this.hud.toast(`Language updated`, "info");
+          this.bump();
+        }
+        break;
+      }
+      case "claim-rank-prize": {
+        const reward = seasonReward(this.save.state.rival.rating);
+        this.save.addCoins(reward.coins);
+        this.hud.toast(`Claimed ${reward.coins} Coins for ${reward.division.name} Rank! 🏆`, "achievement");
+        this.audio.fanfare();
+        this.bump();
         break;
       }
       case "claim-cup": {
@@ -3207,31 +3307,22 @@ export class Game {
         this.buyTrail(id);
         break;
       case "starter-buy":
-        if (this.portalEnabled() || this.save.state.starterPack) break;
-        this.openCheckout("sunbird_starter");
+        this.buyCoinStarter();
         break;
       case "gold-buy":
-        if (this.portalEnabled()) break;
-        this.openCheckout("sunbird_gold");
+        this.buyCoinGold();
         break;
       case "vip-buy":
-        if (this.portalEnabled()) this.buyPortalVip();
-        else this.openCheckout("sunbird_vip");
+        this.buyPortalVip();
+        break;
+      case "buy-vault":
+        this.buyMysteryVault();
         break;
       case "portal-vip-ad":
         void this.earnPortalVipCoins();
         break;
-      case "checkout-pay":
-        this.payDemo();
-        break;
       case "checkout-cancel":
         if (!this.checkoutBusy) this.backScreen();
-        break;
-      case "stripe-open":
-        this.openStripeTab();
-        break;
-      case "stripe-confirm":
-        this.confirmStripeManually();
         break;
       case "restore":
         this.restore();
@@ -3571,59 +3662,8 @@ export class Game {
 
   /* ----------------------------------------------------------- checkout */
 
-  private openCheckout(sku: Sku): void {
-    if (this.portalEnabled()) return;
-    this.checkoutSku = sku;
-    this.checkoutError = "";
-    this.checkoutOk = false;
-    this.checkoutWaiting = false;
-    this.setScreen("checkout");
-    this.telemetry.track("checkout_open", { sku, mode: this.checkoutMode() });
-  }
-
   private checkoutMode(): CheckoutMode {
-    return stripeConfigured(this.checkoutSku) ? "stripe" : "demo";
-  }
-
-  private payDemo(): void {
-    if (this.checkoutBusy) return;
-    this.checkoutBusy = true;
-    this.checkoutError = "";
-    this.bump();
-    this.telemetry.track("checkout_start", { sku: this.checkoutSku, mode: "demo" });
-    void this.mockPayments.purchase(this.checkoutSku).then((res) => {
-      if (this.disposed) return;
-      this.checkoutBusy = false;
-      if (res.ok) {
-        this.checkoutOk = true;
-        this.grantSku(this.checkoutSku, "demo_purchase");
-      } else {
-        this.checkoutError = res.error;
-        this.telemetry.track("purchase_fail", { error: res.error });
-      }
-      this.bump();
-    });
-  }
-
-  private openStripeTab(): void {
-    // Portals forbid external payment links, full stop. The entry actions are
-    // gated too, but this is the hard backstop for any future code path.
-    if (this.portalEnabled()) return;
-    const link = stripeLinkFor(this.checkoutSku, this.save.state.deviceId);
-    if (!link) return;
-    window.open(link, "_blank", "noopener,noreferrer");
-    this.checkoutWaiting = true;
-    this.telemetry.track("checkout_start", { sku: this.checkoutSku, mode: "stripe" });
-    this.bump();
-  }
-
-  private confirmStripeManually(): void {
-    const res = this.mockPayments.confirmManual(this.checkoutSku);
-    if (res.ok) {
-      this.checkoutOk = true;
-      this.grantSku(this.checkoutSku, "stripe_selfserve");
-    }
-    this.bump();
+    return "demo";
   }
 
   /** The one honest upsell moment: after the player proves they like the
@@ -3631,27 +3671,13 @@ export class Game {
    * screen — never mid-run, never modal, never repeated. */
   private starterNudged = false;
   private maybeNudgeStarter(): void {
-    if (this.starterNudged || this.portalEnabled()) return;
+    if (this.starterNudged) return;
     if (this.save.state.starterPack || this.save.state.gold) return;
     const runs = this.save.state.runsPlayed;
     if (runs < 3 || runs > 12) return;
     this.starterNudged = true;
     this.hud.toast(`🎁 First Flight Pack · ${STARTER_PACK.price} — 1,200 coins + Goldleaf trail`, "gold");
     this.telemetry.track("starter_nudge", { runs });
-  }
-
-  private handleStripeReturn(): void {
-    const sku = consumeStripeReturn();
-    if (!sku) return;
-    this.grantSku(sku, "stripe_redirect");
-    this.checkoutSku = sku;
-    this.checkoutOk = true;
-    this.setScreen("checkout");
-    this.setState("menu");
-    // Upgrade the receipt to server-verified once the webhook lands (webhooks
-    // typically beat the redirect, but poll once more after a short grace).
-    void this.syncServerEntitlements();
-    window.setTimeout(() => void this.syncServerEntitlements(), 5000);
   }
 
   /** Pull webhook-verified purchases from the backend and grant any missing.
@@ -3840,6 +3866,26 @@ export class Game {
   /** Portal editions convert VIP into an in-game coin sink, with a rewarded
    * ad route for players who are short. This keeps checkout out of iframe
    * portals while giving the portal a clear, opt-in monetisation moment. */
+  private buyCoinGold(): void {
+    if (this.save.state.gold) return;
+    const price = GOLD.coinPrice;
+    if (!this.save.spend(price)) {
+      this.hud.toast(`Need ● ${(price - this.save.state.wallet).toLocaleString()} more coins`, "info");
+      return;
+    }
+    this.grantGold("coin_purchase");
+  }
+
+  private buyCoinStarter(): void {
+    if (this.save.state.starterPack) return;
+    const price = STARTER_PACK.coinPrice;
+    if (!this.save.spend(price)) {
+      this.hud.toast(`Need ● ${(price - this.save.state.wallet).toLocaleString()} more coins`, "info");
+      return;
+    }
+    this.grantStarter("coin_purchase");
+  }
+
   private buyPortalVip(): void {
     const price = VIP.coinPrice;
     if (!this.save.spend(price)) {
@@ -3877,6 +3923,36 @@ export class Game {
     }
   }
 
+  private buyMysteryVault(): void {
+    const price = 150;
+    if (!this.save.spend(price)) {
+      this.hud.toast(`Need ● ${(price - this.save.state.wallet).toLocaleString()} more coins`, "info");
+      return;
+    }
+    const rng = Math.random();
+    this.audio.fanfare();
+    this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
+
+    const unownedSkins = SKINS.map((s: SkinDef) => s.id).filter((id: string) => !this.save.state.ownedSkins.includes(id));
+    const unownedTrails = SHOP_TRAILS.map((t: ShopTrailDef) => t.id).filter((id: string) => !this.save.state.ownedUpgrades.includes(id));
+
+    if (rng < 0.35 && unownedSkins.length > 0) {
+      const pick = unownedSkins[Math.floor(Math.random() * unownedSkins.length)]!;
+      this.save.ownSkin(pick);
+      const skinDef = skinById(pick);
+      this.hud.toast(`🥚 Vault Hatched: ${skinDef.name} Bird Skin!`, "gold");
+    } else if (rng < 0.70 && unownedTrails.length > 0) {
+      const pick = unownedTrails[Math.floor(Math.random() * unownedTrails.length)]!;
+      this.save.ownTrail(pick);
+      this.hud.toast(`🥚 Vault Hatched: ${pick.replace("trail_", "").toUpperCase()} Trail!`, "gold");
+    } else {
+      const reward = 300 + Math.floor(Math.random() * 300);
+      this.save.addCoins(reward);
+      this.hud.toast(`🥚 Vault Jackpot: +● ${reward} bonus coins!`, "gold");
+    }
+    this.bump();
+  }
+
   private setSeedMode(mode: SeedMode): void {
     if (!this.save.state.gold && mode !== "today") {
       this.setScreen("paywall");
@@ -3908,6 +3984,10 @@ export class Game {
   }
 
   /* --------------------------------------------------------------- helpers */
+
+  get socialSystem(): SocialSystem {
+    return this.social;
+  }
 
   private get skin(): SkinDef {
     return skinById(this.save.state.activeSkin);
@@ -4788,6 +4868,10 @@ export class Game {
       rivalBanner: this.rival && this.rivalResult === "" ? `${this.rival.name}|${this.rival.distance}` : "",
       seedMode: this.seedMode,
       wallet: st.wallet,
+      piggyCoins: st.piggyBank?.coins ?? 0,
+      prestigeLevel: st.prestige?.level ?? 0,
+      prestigeMult: st.prestige?.multiplier ?? 1.0,
+      canFreeSpin: this.save.canFreeWheelSpin(this.today),
       streakDays: st.streak.days,
       nestLevel: st.nestLevel,
       nestMult: this.save.nestMultiplier(),
@@ -4812,7 +4896,7 @@ export class Game {
       vipPrice: VIP.price,
       vipFeatures: VIP.features,
       checkoutMode: this.checkoutMode(),
-      checkoutUrl: stripeLinkFor(this.checkoutSku, st.deviceId) ?? "",
+      checkoutUrl: "",
       checkoutBusy: this.checkoutBusy,
       checkoutError: this.checkoutError,
       checkoutOk: this.checkoutOk,

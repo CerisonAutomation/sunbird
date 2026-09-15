@@ -6,6 +6,7 @@ import { flockLoadingMark } from "./FlockLoading";
 import { PLAY_DESTINATIONS, COLLECTION_DESTINATIONS, PROGRESS_DESTINATIONS, type MenuDestination } from "./MenuCatalog";
 import { OverlayNavigation } from "./OverlayNavigation";
 import { MenuContinuity } from "./MenuContinuity";
+import { MenuSky } from "./MenuSky";
 import { feedbackSlot } from "./HudFeedback";
 import type { AchievementView } from "./Achievements";
 import type { ActivePower } from "./PowerUps";
@@ -14,9 +15,11 @@ import type { ModeDef } from "./Modes";
 import type { RacerStats } from "./Racer";
 import type { BoardMetric, BoardPage, BoardScope } from "./Leaderboard";
 import type { TournamentView } from "./Tournaments";
-import type { RosterBird, Standing } from "./MassRace";
+import type { RosterBird, Standing, RivalNameTag } from "./MassRace";
+import { SUPPORTED_LOCALES, getLocale, t } from "../i18n";
+import * as THREE from "three";
 import { VIP_DAILY_GIFT } from "./constants";
-import { COLLECTIONS, VIP, type BoostView, type ShopTrailView, type SkinView } from "./Economy";
+import { COLLECTIONS, GOLD, STARTER_PACK, VIP, type BoostView, type ShopTrailView, type SkinView } from "./Economy";
 import { rivalPalette, skinPalette, sunSVG, sunbirdSVG } from "./Sunbird";
 import { formatDistance } from "./math";
 import type { MissionView, QuestReward, QuestView } from "./Missions";
@@ -280,6 +283,11 @@ export type HudSnapshot = {
   campaignTotal: number;
   squad: SquadState;
   squadNotice: string;
+  /* --- monetization max value & portal loops --- */
+  piggyCoins: number;
+  prestigeLevel: number;
+  prestigeMult: number;
+  canFreeSpin: boolean;
 };
 
 export type DailyCard = {
@@ -330,6 +338,7 @@ type ActionHandler = (action: string, id: string) => void;
 
 export class HUD {
   readonly root: HTMLDivElement;
+  private readonly menuSky: MenuSky;
   private playHud!: HTMLElement;
   private distanceEl!: HTMLElement;
   private coinsEl!: HTMLElement;
@@ -440,15 +449,18 @@ export class HUD {
   private readonly shopBrowse = newShopBrowse();
   private shopSnapshot: HudSnapshot | null = null;
   private lastChips = "";
+  private readonly tmpNameTagVec = new THREE.Vector3();
 
   constructor(parent: HTMLElement) {
+    this.menuSky = new MenuSky();
     this.root = document.createElement("div");
     this.root.className = "hud-root";
+    this.root.appendChild(this.menuSky.host);
     this.root.innerHTML = `
       <div class="play-hud hidden" data-ref="playHud">
         <div class="top-bar">
           <div class="stat-block">
-            <div class="stat-label">Distance</div>
+            <div class="stat-label">${t("hud.stat.distance", undefined, "Distance")}</div>
             <div class="stat-value" data-ref="distance">0 m</div>
             <div class="stat-sub">best <span data-ref="best">0</span></div>
           </div>
@@ -457,10 +469,10 @@ export class HUD {
               <div class="sun-fill" data-ref="sunFill"></div>
               <div class="sun-knob" data-ref="sunKnob">☀</div>
             </div>
-            <div class="sun-caption">daylight</div>
+            <div class="sun-caption">${t("hud.stat.daylight", undefined, "daylight")}</div>
           </div>
           <div class="stat-block right">
-            <div class="stat-label">Coins</div>
+            <div class="stat-label">${t("hud.stat.coins", undefined, "Coins")}</div>
             <div class="stat-value coin" data-ref="coins">0</div>
           </div>
         </div>
@@ -482,6 +494,7 @@ export class HUD {
         <div class="versus-bar hidden" data-ref="versusBar"></div>
         <div class="standings hidden" data-ref="standings"></div>
         <div class="roster-bar hidden" data-ref="rosterBar"></div>
+        <div class="rival-nametag-container" data-ref="nametags"></div>
         <div class="draft-meter hidden" data-ref="draftMeter"><i></i><span>SLIPSTREAM</span></div>
         <div class="finish-countdown hidden" data-ref="finishCd"></div>
         <div class="emote-wheel hidden" data-ref="emoteWheel">
@@ -700,6 +713,36 @@ export class HUD {
     return el?.value ?? "";
   }
 
+  setValue(ref: string, val: string): void {
+    const el = this.root.querySelector(`[data-ref="${CSS.escape(ref)}"]`) as HTMLInputElement | HTMLTextAreaElement | null;
+    if (el) el.value = val;
+  }
+
+  updateNameTags(tags: RivalNameTag[], camera: THREE.Camera, width: number, height: number): void {
+    const container = this.root.querySelector<HTMLElement>('[data-ref="nametags"]');
+    if (!container) return;
+    if (!tags || !tags.length) {
+      container.innerHTML = "";
+      return;
+    }
+    let html = "";
+    for (const tag of tags) {
+      this.tmpNameTagVec.set(tag.worldX, tag.worldY, -3.5);
+      this.tmpNameTagVec.project(camera);
+      if (this.tmpNameTagVec.z > 1) continue;
+      const px = ((this.tmpNameTagVec.x + 1) * width) / 2;
+      const py = ((-this.tmpNameTagVec.y + 1) * height) / 2;
+      if (px < -60 || px > width + 60 || py < -60 || py > height + 60) continue;
+
+      const draftClass = tag.drafting ? "drafting" : "";
+      html += `<div class="rival-nametag ${draftClass}" style="left:${px.toFixed(1)}px; top:${py.toFixed(1)}px;">
+        <span class="rank-badge">#${tag.place}</span>
+        <span>${escapeHtml(tag.name)}</span>
+      </div>`;
+    }
+    container.innerHTML = html;
+  }
+
   update(s: HudSnapshot): void {
     if (s.state === "playing" && !this.wasInFlight) this.resultsContinuity.reset();
     this.wasInFlight = s.state === "playing";
@@ -728,6 +771,8 @@ export class HUD {
     if (this.root.dataset.feedback !== feedback) this.root.dataset.feedback = feedback;
     const menuVisible = s.state === "menu" || (s.state === "gameover" && s.screen !== "main");
     this.menuEl.classList.toggle("hidden", !menuVisible);
+    this.menuSky.setActive(menuVisible);
+    if (menuVisible) this.menuSky.resize(window.innerWidth || 800, window.innerHeight || 600);
     this.pauseEl.classList.toggle("hidden", s.state !== "paused");
     // The pause control only makes sense in live flight — hide it while the
     // crash "second wind" card is up so it can't read as a dead button.
@@ -1077,6 +1122,7 @@ export class HUD {
 
   dispose(): void {
     this.resizeObs?.disconnect();
+    this.menuSky.dispose();
     this.overlayNavigation.dispose();
     for (const timer of this.timers) window.clearTimeout(timer);
     this.timers.clear();
@@ -1335,9 +1381,19 @@ function renderBoard(s: HudSnapshot): string {
       .join("")}</div>
     <div class="board-list">${rows}</div>
     ${page && page.yourRank > 0 ? `<div class="board-rank">Your rank · <b>#${page.yourRank}</b> of ${page.total}</div>` : ""}
-    <div class="redeem">
+    <div class="redeem pilot-name-row">
       <input data-ui data-ref="pilotName" aria-label="Pilot name" maxlength="14" placeholder="Pilot name" value="${escapeHtml(s.pilotName)}" />
-      <button class="mini-btn" data-ui data-action="rename-pilot">Save</button>
+      <button class="mini-btn autogen-btn" data-ui data-action="autogen-pilot" title="Autogenerate random pilot name">🎲 Random</button>
+      <button class="mini-btn primary" data-ui data-action="rename-pilot">Save</button>
+    </div>
+    <div class="prize-card">
+      <div class="section-title">🏆 Tournament Rank Prizes</div>
+      <div class="prize-grid">
+        <div class="prize-tier gold"><span>🥇 1st Place</span><b>500 Coins + Crown</b></div>
+        <div class="prize-tier silver"><span>🥈 2nd Place</span><b>250 Coins + 10 Gems</b></div>
+        <div class="prize-tier bronze"><span>🥉 3rd Place</span><b>100 Coins</b></div>
+      </div>
+      <button class="primary-btn gold wide" data-ui data-action="claim-rank-prize">Claim Rank Prize 🏆</button>
     </div>
     <button class="soft-btn wide" data-ui data-action="board-refresh">${s.boardLoading ? "Refreshing…" : "↻ Refresh"}</button>
     <p class="fineprint">${
@@ -1809,14 +1865,14 @@ function renderMain(s: HudSnapshot): string {
       </div>
     </header>
 
-    <button class="primary-btn home-launch" data-ui data-action="pvp-practice" aria-label="Play free flight now"><span class="launch-art">${menuIcon("flight")}</span><span class="launch-copy"><small>THE SKY IS YOURS</small><b>Fly now</b><span>Hold to dive · release to glide</span></span><span class="launch-arrow" aria-hidden="true">→</span></button>
-    <div class="home-section-title"><span>Choose your adventure</span><small>01 — PLAY</small></div>
+    <button class="primary-btn home-launch" data-ui data-action="pvp-practice" aria-label="Play free flight now"><span class="launch-art">${menuIcon("flight")}</span><span class="launch-copy"><small>${t("onboarding.skyIsYours", undefined, "THE SKY IS YOURS")}</small><b>Fly now</b><span>${t("onboarding.launchSub", undefined, "Hold to dive · release to glide")}</span></span><span class="launch-arrow" aria-hidden="true">→</span></button>
+    <div class="home-section-title"><span>${t("hud.menu.chooseAdventure", undefined, "Choose your adventure")}</span><small>01 — PLAY</small></div>
     <nav class="destination-grid play-destinations" aria-label="Choose how to play">${menuLinks(PLAY_DESTINATIONS)}</nav>
-    <div class="home-section-title"><span>Make it yours</span><small>02 — HANGAR</small></div>
+    <div class="home-section-title"><span>${t("hud.menu.makeItYours", undefined, "Make it yours")}</span><small>02 — HANGAR</small></div>
     <nav class="destination-grid utility-destinations" aria-label="Your hangar">${menuLinks(COLLECTION_DESTINATIONS)}</nav>
-    <div class="home-section-title"><span>Every flight counts</span><small>03 — DISCOVER</small></div>
+    <div class="home-section-title"><span>${t("hud.menu.everyFlightCounts", undefined, "Every flight counts")}</span><small>03 — DISCOVER</small></div>
     <nav class="destination-grid progress-destinations" aria-label="Challenges and progress">${menuLinks(PROGRESS_DESTINATIONS)}</nav>
-    <div class="home-record"><span class="record-art">${menuIcon("medal")}</span><span>Personal best <b>${formatDistance(s.bestDistance)}</b></span><span class="record-wallet">${s.wallet.toLocaleString()} <small>coin balance</small></span></div>
+    <div class="home-record"><span class="record-art">${menuIcon("medal")}</span><span>${t("hud.menu.personalBest", undefined, "Personal best")} <b>${formatDistance(s.bestDistance)}</b></span><span class="record-wallet">${s.wallet.toLocaleString()} <small>${t("hud.menu.coinBalance", undefined, "coin balance")}</small></span></div>
   `;
 }
 
@@ -1834,8 +1890,8 @@ function renderProgress(s: HudSnapshot): string {
     : portal
       ? `<p class="portal-note">${s.portalName === "poki" ? "Poki edition · portal rewards enabled" : s.portalName === "crazy" ? "CrazyGames edition · portal rewards enabled" : "Portal edition"}</p>`
       : `<button class="lock-chip" data-ui data-action="open-paywall">✦ Pick your hills with Gold</button>`;
-  return `${head("Your progress")}
-    <p class="tagline">Missions and rewards from all your flights, in one place.</p>
+  return `${head(t("hud.progress.title", undefined, "Your progress"))}
+    <p class="tagline">${t("hud.progress.tagline", undefined, "Missions and rewards from all your flights, in one place.")}</p>
     <div class="hero-meta">
       <span class="pill seed-pill">${s.seedLabel}</span>
       <span class="pill wings-pill" title="${formatDistance(s.wings.lifetime)} lifetime">${s.wings.icon} ${s.wings.name}</span>
@@ -1848,6 +1904,38 @@ function renderProgress(s: HudSnapshot): string {
     ${s.rivalBanner ? renderRivalBanner(s.rivalBanner) : ""}
     ${seedPicker}
 
+    <div class="wheel-card" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb); border:1px solid #90caf9; border-radius:16px; padding:12px 14px; margin:12px 0; display:flex; align-items:center; gap:12px;">
+      <span style="font-size:32px; flex:0 0 36px;">🎡</span>
+      <div style="flex:1; min-width:0;">
+        <b style="font:600 15px var(--display); color:#0d47a1; display:block;">Daily Lucky Wheel</b>
+        <span style="font-size:11px; color:#1565c0; display:block;">Spin to win up to ● 1,000 Coins & Mystery Vault Keys!</span>
+      </div>
+      ${s.canFreeSpin
+        ? `<button class="primary-btn gold" data-ui data-action="spin-wheel" style="padding:8px 12px; font-size:13px;">Free Spin! 🎡</button>`
+        : `<button class="soft-btn" data-ui data-action="spin-wheel" style="padding:8px 12px; font-size:12px;">Spin · ● 100 / 📺</button>`}
+    </div>
+
+    <div class="piggy-card" style="background:linear-gradient(135deg,#fff0f5,#ffd1dc); border:1px solid #f8a5c2; border-radius:16px; padding:12px 14px; margin:12px 0; display:flex; align-items:center; gap:12px;">
+      <span style="font-size:32px; flex:0 0 36px;">🐷</span>
+      <div style="flex:1; min-width:0;">
+        <b style="font:600 15px var(--display); color:#8c1145; display:block;">Coin Piggy Bank</b>
+        <span style="font-size:11px; color:#ad2d5f; display:block;">+20% flight bonus accumulated: ● ${s.piggyCoins} / 1,000</span>
+      </div>
+      ${s.piggyCoins >= 50
+        ? `<button class="primary-btn gold" data-ui data-action="smash-piggy" style="padding:8px 12px; font-size:13px;">Smash 🔨</button>`
+        : `<span class="tag need">Fly to fill</span>`}
+    </div>
+
+    ${s.nestLevel >= 5 || s.prestigeLevel > 0
+      ? `<div class="prestige-card" style="background:linear-gradient(135deg,#f3e5f5,#e1bee7); border:1px solid #ce93d8; border-radius:16px; padding:12px 14px; margin:12px 0; display:flex; align-items:center; gap:12px;">
+          <span style="font-size:32px; flex:0 0 36px;">👑</span>
+          <div style="flex:1; min-width:0;">
+            <b style="font:600 15px var(--display); color:#4a148c; display:block;">Solar Crown Prestige ${s.prestigeLevel > 0 ? `Rank ${s.prestigeLevel}` : ""}</b>
+            <span style="font-size:11px; color:#6a1b9a; display:block;">Permanent coin boost: +${Math.round((s.prestigeMult - 1) * 100)}%</span>
+          </div>
+          <button class="primary-btn gold" data-ui data-action="perform-prestige" style="padding:8px 12px; font-size:12px;">Rebirth 👑</button>
+        </div>`
+      : ""}
 
     <div class="section-title">Local rank <small>practice field · not global</small></div>
     <button class="rank-card" data-ui data-action="open-rank" aria-label="View local Rival rank (practice field)">
@@ -2016,6 +2104,18 @@ function renderShop(s: HudSnapshot, browse: ShopBrowse): string {
       </div>
     </div>
     <p class="shop-rules">Bird perks are for solo play. Live races use equal flight equipment; your appearance stays yours.</p>
+    <div class="mystery-vault-card" style="background:linear-gradient(135deg,#fff8dc,#ffe8a0); border:1px solid #e2c070; border-radius:16px; padding:14px; margin:12px 0 16px; display:flex; align-items:center; gap:12px; box-shadow:0 3px 0 #d0a44840;">
+      <span style="font-size:32px; flex:0 0 40px; text-align:center;">🥚</span>
+      <div style="flex:1; min-width:0;">
+        <b style="font:600 16px var(--display); color:#5d3d0f; display:block;">Golden Mystery Vault</b>
+        <span style="font-size:11px; color:#78531e; display:block;">Hatch for a rare bird, trail, or coin jackpot!</span>
+      </div>
+      ${
+        s.wallet >= 150
+          ? `<button class="primary-btn gold" data-ui data-action="buy-vault" style="min-height:42px; padding:8px 14px;">Open · ● 150</button>`
+          : `<span class="tag need">Need ● ${150 - s.wallet}</span>`
+      }
+    </div>
     <nav class="shop-jumps" aria-label="Shop sections">${[["shopBirds", "bird", "Birds"], ["shopBoosts", "boost", "Boosts"], ["shopTrails", "trail", "Trails"]].map(([id, icon, label]) => `<button class="soft-btn" data-ui data-action="shop-section" data-id="${id}">${menuIcon(icon as "bird" | "boost" | "trail")}<span>${label}</span></button>`).join("")}</nav>
     <section class="shop-browser" data-ref="shopBirds" aria-label="Browse birds">
     <div class="section-title shop-section-birds">Bird collection <small>${owned}/${s.skins.length} owned</small></div>
@@ -2049,62 +2149,48 @@ function renderShop(s: HudSnapshot, browse: ShopBrowse): string {
 }
 
 function renderPaywall(s: HudSnapshot): string {
-  if (s.portalName !== "none") {
-    return `
-      ${head("Portal Rewards")}
-      <div class="portal-card">
-        <div class="logo-mark">✦</div>
-        <h2>Make your own VIP flight</h2>
-        <p class="tagline">Use coins earned in this game. No external checkout, account, or payment page is required.</p>
-        <ul class="feature-list tight">${VIP.features.map((f) => `<li>${f}</li>`).join("")}</ul>
-        ${s.vip
-          ? s.wallet >= VIP.coinPrice
-            ? `<div class="owned-banner vip">VIP active — ${s.vipDaysLeft} day${s.vipDaysLeft === 1 ? "" : "s"} left</div>
-               <button class="primary-btn vip" data-ui data-action="vip-buy">Extend 30 days · ● ${VIP.coinPrice.toLocaleString()}</button>`
-            : `<div class="owned-banner vip">VIP active — ${s.vipDaysLeft} day${s.vipDaysLeft === 1 ? "" : "s"} left</div>
-               <p class="fineprint">Need ● ${(VIP.coinPrice - s.wallet).toLocaleString()} more coins to extend.</p>
-               <button class="soft-btn wide" data-ui data-action="portal-vip-ad">Watch a rewarded flight · +● ${VIP.coinAdReward}</button>`
-          : s.wallet >= VIP.coinPrice
-            ? `<button class="primary-btn vip" data-ui data-action="vip-buy">Unlock 30 days · ● ${VIP.coinPrice.toLocaleString()}</button>`
-            : `<div class="owned-banner">Need ● ${(VIP.coinPrice - s.wallet).toLocaleString()} more coins</div>
-               <button class="soft-btn wide" data-ui data-action="portal-vip-ad">Watch a rewarded flight · +● ${VIP.coinAdReward}</button>`}
-        <p class="fineprint">${s.portalName === "poki" || s.portalName === "crazy" ? "Rewarded flights are supplied by the portal." : "Earn coins from flights, quests, streaks, and challenges."}</p>
-      </div>
-    `;
-  }
-  const stripeGold = s.checkoutMode === "stripe";
   const starter = !s.starterOwned
     ? `
     <div class="starter-card">
       <div class="starter-flag">ONE-TIME OFFER</div>
-      <h3>🎁 First Flight Pack · ${s.starterPrice}</h3>
+      <h3>🎁 First Flight Pack · ${STARTER_PACK.price}</h3>
       <ul class="feature-list tight">${s.starterFeatures.map((f) => `<li>${f}</li>`).join("")}</ul>
-      <button class="primary-btn starter" data-ui data-action="starter-buy">Claim the pack · ${s.starterPrice}</button>
+      ${
+        s.wallet >= STARTER_PACK.coinPrice
+          ? `<button class="primary-btn starter" data-ui data-action="starter-buy">Claim Pack · ${STARTER_PACK.price}</button>`
+          : `<button class="primary-btn starter off" data-ui data-action="starter-buy">Need ● ${STARTER_PACK.coinPrice - s.wallet} more coins</button>`
+      }
     </div>`
     : "";
   return `
-    ${head("Gold &amp; VIP")}
+    ${head("Coin Store")}
+    <div class="wallet-row" style="margin-bottom:12px"><span class="pill coin">Your Balance: ● ${s.wallet.toLocaleString()}</span></div>
     ${starter}
-    <div class="gold-hero"><div class="gold-badge">✦</div><div class="gold-price">${s.goldPrice}<small> one-time</small></div></div>
+    <div class="gold-hero"><div class="gold-badge">✦</div><div class="gold-price">${GOLD.price}<small> lifetime</small></div></div>
     <ul class="feature-list">${s.goldFeatures.map((f) => `<li>${f}</li>`).join("")}</ul>
     ${
       s.gold
-        ? `<div class="owned-banner">You own Gold. Thank you, sunbird ✦</div>`
-        : `<button class="primary-btn gold" data-ui data-action="gold-buy">Unlock Gold · ${s.goldPrice}</button>`
+        ? `<div class="owned-banner">You own Sunbird Gold ✦</div>`
+        : s.wallet >= GOLD.coinPrice
+          ? `<button class="primary-btn gold" data-ui data-action="gold-buy">Unlock Gold · ${GOLD.price}</button>`
+          : `<button class="primary-btn gold off" data-ui data-action="gold-buy">Need ● ${GOLD.coinPrice - s.wallet} more coins</button>`
     }
-      <div class="gold-hero vip"><div class="gold-badge vip">♛</div><div class="gold-price">${s.vipPrice}<small> per month</small></div></div>
+    <div class="gold-hero vip"><div class="gold-badge vip">♛</div><div class="gold-price">${VIP.price}<small> 30 days</small></div></div>
     <ul class="feature-list">${s.vipFeatures.map((f) => `<li>${f}</li>`).join("")}</ul>
     ${
       s.vip
-        ? `<div class="owned-banner vip">VIP active — ${s.vipDaysLeft} day${s.vipDaysLeft === 1 ? "" : "s"} left${
-            s.vipDaysLeft <= 5 ? " · renew soon to keep the perks" : ""
-          }</div><button class="soft-btn wide vip" data-ui data-action="vip-buy">Extend by 30 days · ${s.vipPrice}</button>`
-        : `<button class="primary-btn vip" data-ui data-action="vip-buy">Subscribe · ${s.vipPrice}</button>`
+        ? `<div class="owned-banner vip">VIP active — ${s.vipDaysLeft} day${s.vipDaysLeft === 1 ? "" : "s"} left</div>
+           ${s.wallet >= VIP.coinPrice
+             ? `<button class="soft-btn wide vip" data-ui data-action="vip-buy">Extend 30 Days · ${VIP.price}</button>`
+             : `<p class="fineprint">Need ● ${VIP.coinPrice - s.wallet} more coins to extend.</p>`}`
+        : s.wallet >= VIP.coinPrice
+          ? `<button class="primary-btn vip" data-ui data-action="vip-buy">Unlock VIP · ${VIP.price}</button>`
+          : `<button class="primary-btn vip off" data-ui data-action="vip-buy">Need ● ${VIP.coinPrice - s.wallet} more coins</button>`
     }
     <div class="redeem"><input data-ui data-ref="redeem" aria-label="Promo code" placeholder="Promo code" maxlength="16" autocomplete="off" /><button class="mini-btn" data-ui data-action="redeem">Redeem</button></div>
-    <button class="ghost-btn" data-ui data-action="restore">Restore purchase</button>
+    <button class="ghost-btn" data-ui data-action="restore">Restore passes</button>
     ${s.restoreMessage ? `<p class="note">${s.restoreMessage}</p>` : ""}
-    <p class="fineprint">${stripeGold ? "Payments are processed securely by Stripe." : "Unlock premium features to enhance your flights!"}</p>
+    <p class="fineprint">All passes &amp; packs are earnable 100% through in-game flight coins!</p>
   `;
 }
 
@@ -2115,36 +2201,23 @@ function renderCheckout(s: HudSnapshot): string {
   }
   const item =
     s.checkoutSku === "sunbird_vip"
-      ? { name: "Sunbird VIP · monthly", price: s.vipPrice }
+      ? { name: "Sunbird VIP", price: VIP.price, coinPrice: VIP.coinPrice, action: "vip-buy" }
       : s.checkoutSku === "sunbird_starter"
-        ? { name: "First Flight Pack · one-time", price: s.starterPrice }
-        : { name: "Sunbird Gold · lifetime", price: s.goldPrice };
-  if (s.checkoutMode === "stripe") {
-    return `
-      ${head("Stripe Checkout", "checkout-cancel")}
-      <div class="sheet stripe">
-        <div class="sheet-row"><span>${item.name}</span><b>${item.price}</b></div>
-        <p class="tagline">You'll continue to Stripe's secure checkout in a new tab.</p>
-        <button class="primary-btn gold" data-ui data-action="stripe-open">Continue to Stripe ↗</button>
-        ${
-          s.checkoutWaiting
-            ? `<div class="stripe-wait"><div class="spinner"></div><p>Finished paying?</p><button class="mini-btn" data-ui data-action="stripe-confirm">I've completed payment</button></div>`
-            : ""
-        }
-        <p class="fineprint">Stripe-hosted Payment Link · card, wallet &amp; local payment methods supported.</p>
-      </div>
-    `;
-  }
+        ? { name: "First Flight Pack", price: STARTER_PACK.price, coinPrice: STARTER_PACK.coinPrice, action: "starter-buy" }
+        : { name: "Sunbird Gold Pass", price: GOLD.price, coinPrice: GOLD.coinPrice, action: "gold-buy" };
+
+  const canAfford = s.wallet >= item.coinPrice;
   return `
-    ${head("Demo Checkout", "checkout-cancel")}
+    ${head("Confirm Unlock", "checkout-cancel")}
     <div class="sheet">
       <div class="sheet-row"><span>${item.name}</span><b>${item.price}</b></div>
-      <label>Card number<input data-ui value="4242 4242 4242 4242" readonly /></label>
-      <div class="two"><label>Expiry<input data-ui value="12 / 29" readonly /></label><label>CVC<input data-ui value="123" readonly /></label></div>
-      <label>Name on card<input data-ui value="Sunbird Tester" readonly /></label>
-      ${s.checkoutError ? `<p class="error">${escapeHtml(s.checkoutError)}</p>` : ""}
-      <button class="primary-btn gold ${s.checkoutBusy ? "busy" : ""}" data-ui data-action="checkout-pay" ${s.checkoutBusy ? "disabled" : ""}>${s.checkoutBusy ? "Processing…" : `Pay ${item.price}`}</button>
-      <p class="fineprint">Sandbox card · no real charge. Connect Stripe in .env to go live.</p>
+      <p class="tagline">Wallet: ● ${s.wallet.toLocaleString()}</p>
+      ${
+        canAfford
+          ? `<button class="primary-btn gold" data-ui data-action="${item.action}">Confirm Unlock · ${item.price}</button>`
+          : `<p class="error">Need ● ${item.coinPrice - s.wallet} more coins to unlock.</p>
+             <button class="primary-btn" data-ui data-action="pvp-practice">Fly &amp; Earn Coins</button>`
+      }
     </div>
   `;
 }
@@ -2159,7 +2232,7 @@ function renderSettings(s: HudSnapshot): string {
   const mPct = Math.round((s.settings.musicVolume ?? 0.8) * 100);
   const sPct = Math.round((s.settings.sfxVolume ?? 0.9) * 100);
   return `
-    ${head("Settings")}
+    ${head(t("hud.settings.title", undefined, "Settings"))}
     <p class="settings-intro">Make the flight feel right for you. Changes save automatically.</p>
     <div class="section-title">Sound</div>
     ${toggle("Mute all sound", "mute", s.settings.mute)}
@@ -2167,6 +2240,7 @@ function renderSettings(s: HudSnapshot): string {
     ${toggle("Music", "music", s.settings.music)}
     ${volumeControl("Music volume", "music-vol", mPct)}
     <div class="setting-row setting-select"><label for="music-track">Music track</label><select id="music-track" data-ui data-action="set-track"><option value="shuffle" ${s.settings.musicTrack === "shuffle" ? "selected" : ""}>Shuffle all tracks</option>${TRACK_NAMES.map((name, i) => `<option value="${i}" ${s.settings.musicTrack === i ? "selected" : ""}>${i + 1}. ${name}</option>`).join("")}</select></div>
+    <div class="setting-row setting-select"><label for="language-select">Language / Idioma</label><select id="language-select" data-ui data-action="set-language">${SUPPORTED_LOCALES.map(loc => `<option value="${loc.code}" ${getLocale() === loc.code ? "selected" : ""}>${loc.flag} ${loc.name}</option>`).join("")}</select></div>
     <div class="section-title">Comfort &amp; controls</div>
     ${toggle("Haptics", "haptics", s.settings.haptics)}
     ${s.boosts.some((b) => b.def.id === "doubletap" && b.armed) ? toggle("Double-tap boost", "doubletap", s.settings.doubleTapBoost) : ""}
@@ -2377,18 +2451,30 @@ function renderGameOver(s: HudSnapshot): string {
       : "";
   return `
     <div class="results-kicker">${escapeHtml(s.modeName)} · flight recap</div>
-    <h2>Flight complete</h2>
+    <h2>${t("hud.gameover.title", undefined, "Flight completed")}</h2>
     <p class="tagline">${s.massRace ? "Your place, your progress, your next race." : "A little farther. A little smoother. One more flight?"}</p>
-    <div class="result-actions"><button class="play-again-btn" data-ui data-action="${s.massRace && s.racePlace > 0 && !s.duelWas ? "rematch" : "retry"}">${s.massRace && s.roomCode ? "Back to race lobby" : s.massRace && s.racePlace > 0 ? "Race again · same stakes" : "Fly again"}</button><button class="soft-btn" data-ui data-action="menu">Home</button></div>
+    <div class="result-actions"><button class="play-again-btn" data-ui data-action="${s.massRace && s.racePlace > 0 && !s.duelWas ? "rematch" : "retry"}">${s.massRace && s.roomCode ? "Back to race lobby" : s.massRace && s.racePlace > 0 ? "Race again · same stakes" : t("hud.gameover.flyAgain", undefined, "Fly Again")}</button><button class="soft-btn" data-ui data-action="menu">${t("hud.gameover.mainMenu", undefined, "Main Menu")}</button></div>
     ${s.newBest ? `<div class="new-best">👑 NEW BEST · ${formatDistance(s.distance)}<small>your farthest flight yet</small></div>` : ""}
     ${s.boardScope === "global" && s.boardMetric === "distance" && s.board && s.board.yourRank > 0 ? `<div class="reward-strip rank-strip">Leaderboard rank · <b>#${s.board.yourRank}</b> of ${s.board.total}</div>` : ""}
 
     ${renderFlightRecap(s.flightPath)}
     <div class="over-stats result-summary">
-      <div><span>Distance</span><b>${formatDistance(s.distance)}</b></div>
+      <div><span>${t("hud.stat.distance", undefined, "Distance")}</span><b>${formatDistance(s.distance)}</b></div>
       <div><span>Score</span><b>${Math.floor(s.score).toLocaleString()}</b></div>
-      <div><span>Coins</span><b>${s.coins}</b></div>
+      <div><span>${t("hud.stat.coins", undefined, "Coins")}</span><b>${s.coins}</b></div>
     </div>
+
+    ${s.coins > 0
+      ? `<div class="multiplier-cta-card" style="background:linear-gradient(135deg,#e8f5e9,#c8e6c9); border:1px solid #a5d6a7; border-radius:16px; padding:12px 14px; margin:14px 0; display:flex; align-items:center; gap:12px; box-shadow:0 3px 0 #81c78440;">
+          <span style="font-size:32px; flex:0 0 36px;">📺</span>
+          <div style="flex:1; min-width:0;">
+            <b style="font:600 15px var(--display); color:#1b5e20; display:block;">3× Flight Coin Bonus</b>
+            <span style="font-size:11px; color:#2e7d32; display:block;">Triple run earnings from ● ${s.coins} to ● ${s.coins * 3}!</span>
+          </div>
+          <button class="primary-btn gold" data-ui data-action="multiply-run-coins" style="padding:8px 14px; font-size:13px;">Claim 3× (● +${s.coins * 2})</button>
+        </div>`
+      : ""}
+
     ${renderNextFlight(s)}
     <details class="result-details" data-ref="flightDetails"><summary>Flight details <span>Landmarks &amp; skill</span></summary><div class="over-stats">
       <div><span>Perfects</span><b>${s.perfects}</b></div>

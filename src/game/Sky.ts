@@ -143,6 +143,9 @@ export class Sky {
   private hazeDensity = 1;
   private hazeGlow = false;
   private shadowSpan = 80;
+  private readonly topC = new THREE.Color();
+  private readonly horizonC = new THREE.Color();
+  private readonly bottomC = new THREE.Color();
 
   constructor() {
     this.skyMat = new THREE.ShaderMaterial({
@@ -424,9 +427,9 @@ export class Sky {
     (this.skyMat.uniforms.aurora!.value as number) = this.auroraIntensity;
     const t = saturate(daylight);
     const { a, b, u } = sampleStops(t);
-    const top = this.mixHex(a.top, b.top, u).clone();
-    const horizon = this.mixHex(a.horizon, b.horizon, u).clone();
-    const bottom = this.mixHex(a.bottom, b.bottom, u).clone();
+    const top = this.topC.copy(this.mixHex(a.top, b.top, u));
+    const horizon = this.horizonC.copy(this.mixHex(a.horizon, b.horizon, u));
+    const bottom = this.bottomC.copy(this.mixHex(a.bottom, b.bottom, u));
     if (this.tintMix > 0) {
       top.lerp(this.tmpC.setHex(this.tintTop), this.tintMix);
       horizon.lerp(this.tmpC.setHex(this.tintHorizon), this.tintMix * 0.85);

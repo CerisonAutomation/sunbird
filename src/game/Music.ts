@@ -534,7 +534,7 @@ export class Music {
     this.recomputeCutoff(0.6);
   }
 
-  /** Continuous intensity — opens the filter and adds a tension hat layer. */
+  /** Continuous intensity — opens the filter, speeds up tempo, and adds a tension hat layer. */
   setIntensity(v: number): void {
     const t = Math.max(0, Math.min(1, v));
     if (Math.abs(t - this.intensityTarget) < 0.01) return;
@@ -543,8 +543,50 @@ export class Music {
     // The tension layer rides up quickly for responsiveness, decays a touch
     // slower so a big moment lingers after the peak.
     const style = BIOME_MIX[this.biome];
+    const baseBpm = this.mode === "fever" ? style.fever : style.bpm;
+    this.bpm = Math.round(baseBpm * (1 + t * 0.10));
     this.tensionGain.gain.setTargetAtTime(t * 0.24 * style.perc, now, t > this.intensity ? 0.1 : 0.4);
     this.recomputeCutoff(0.3);
+  }
+
+  /** Sidechain compressor pumping effect for viral EDM rhythm bounce. */
+  sidechainPump(duckAmount = 0.35, duration = 0.12): void {
+    if (this.baseLevel <= 0) return;
+    const t = this.ctx.currentTime;
+    this.duckGain.gain.cancelScheduledValues(t);
+    this.duckGain.gain.setValueAtTime(1 - duckAmount, t);
+    this.duckGain.gain.exponentialRampToValueAtTime(1, t + duration);
+  }
+
+  /** Viral beat drop & sub-bass impact for high combo launches and fever triggers. */
+  triggerBeatDrop(intensityMult = 1.0): void {
+    if (this.baseLevel <= 0) return;
+    const t = this.ctx.currentTime;
+    // 1. Sub-bass drop sweep
+    const sub = this.ctx.createOscillator();
+    const subG = this.ctx.createGain();
+    sub.type = "sine";
+    sub.frequency.setValueAtTime(130 * intensityMult, t);
+    sub.frequency.exponentialRampToValueAtTime(28, t + 0.5);
+    subG.gain.setValueAtTime(0.0001, t);
+    subG.gain.exponentialRampToValueAtTime(0.65, t + 0.008);
+    subG.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+    sub.connect(subG);
+    subG.connect(this.bus);
+    sub.start(t);
+    sub.stop(t + 0.6);
+
+    // 2. Rhythmic sidechain pump
+    this.sidechainPump(0.45, 0.22);
+  }
+
+  /** Viral pitch glissando / star-power glide during boost or fever onset. */
+  triggerViralGlissando(): void {
+    const originalTranspose = this.transpose;
+    this.transpose += 2;
+    setTimeout(() => {
+      this.transpose = originalTranspose;
+    }, 1400);
   }
 
   private recomputeCutoff(ramp: number): void {
@@ -794,7 +836,12 @@ export class Music {
       if (this.mode !== "play" || this.step % 2 === 0 || this.intensity > 0.65) {
         this.shaker(t, this.step % 2 === 0 ? 0.48 : 0.24);
       }
-      if (this.step === 0 || this.step === 4) this.kick(t, this.step === 0 ? 1 : 0.82);
+      if (this.step === 0 || this.step === 4) {
+        this.kick(t, this.step === 0 ? 1 : 0.82);
+        if (this.mode === "fever" || this.intensity > 0.5) {
+          this.sidechainPump(0.20 + this.intensity * 0.18, 0.11);
+        }
+      }
       // Snare on 2&4 (steps 2 and 6) in fever — the heartbeat that locks the groove.
       if (this.mode === "fever" && (this.step === 2 || this.step === 6)) {
         this.clap(t);

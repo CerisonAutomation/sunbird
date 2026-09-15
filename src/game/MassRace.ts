@@ -5,27 +5,8 @@ import { LaunchSystem } from "./LaunchSystem";
 import { clamp, lerp, SeededRandom, truncate } from "./math";
 import type { TerrainSystem } from "./TerrainSystem";
 
-/**
- * Mass race field (up to 40 rivals + you).
- *
- * Honesty note, reflected in the UI: every rival below is a *local pilot*
- * running the exact same `Bird.step()` physics you do on the exact same
- * terrain — not a scripted path and not a position lerp. They win or lose on
- * their own timing. Because the field is seeded, a given race is identical for
- * everyone who flies that seed, which is what makes the result comparable.
- *
- * When `VITE_MULTIPLAYER_URL` is configured, `MassRace` accepts authoritative
- * remote snapshots and those slots are driven by real people instead. Anything
- * still simulated locally is badged as a squadron pilot in the standings.
- */
-
 export const MAX_RIVALS = 40;
 
-/**
- * Measured optimum for this physics model: releasing ~70 world units before a
- * crest produces the best chained distance. Verified by sweeping the policy
- * against the real `Bird.step()` integrator (see scripts/sweep.ts).
- */
 const OPTIMAL_LEAD = 70;
 
 export type RivalKind = "local" | "remote";
@@ -36,17 +17,12 @@ export type Rival = {
   kind: RivalKind;
   bird: Bird;
   launch: LaunchSystem;
-  /** Bird position at the start of the last physics step (or the last remote
-   *  snapshot) — the "from" end of render interpolation. */
   prevX: number;
   prevY: number;
-  /** how far ahead of a crest this pilot releases — their whole personality */
   lead: number;
-  /** slow wobble in their crest judgement (amplitude, rate, phase) */
   wobbleAmp: number;
   wobbleRate: number;
   wobblePhase: number;
-  /** reaction jitter in seconds */
   reaction: number;
   reactionT: number;
   diving: boolean;
@@ -55,8 +31,6 @@ export type Rival = {
   finished: boolean;
   finishTime: number;
   alive: boolean;
-  /** True when this pilot is a time-shifted double of a real player (name +
-   *  skill taken from a live leaderboard row — the Real Racing 3 pattern). */
   ghost: boolean;
 };
 
@@ -70,29 +44,34 @@ export type Standing = {
   finished: boolean;
 };
 
-/** One entry in the live bird roster rendered across the top of the screen. */
 export type RosterBird = {
   id: string;
   name: string;
   hue: number;
-  /** 0..1 progress along the race */
   progress: number;
   place: number;
   you: boolean;
   remote: boolean;
-  /** Time-shifted double of a real player (leaderboard ghost). */
   ghost: boolean;
   finished: boolean;
   emote: string;
 };
 
-/** Draft zone: how far behind a bird you must be to catch their slipstream. */
+export type RivalNameTag = {
+  id: string;
+  name: string;
+  worldX: number;
+  worldY: number;
+  distance: number;
+  place: number;
+  remote: boolean;
+  drafting: boolean;
+};
+
 const DRAFT_BEHIND = 26;
 const DRAFT_LATERAL = 6;
-/** Peak drag reduction while perfectly tucked in behind someone. */
 const DRAFT_MAX = 0.55;
 
-/** Snapshot pushed by a real server when live multiplayer is configured. */
 export type RemoteSnapshot = { id: string; name: string; x: number; y: number; rotation: number; finished?: boolean };
 
 export interface NetTransport {
@@ -110,33 +89,62 @@ const NAMES = [
 
 const tmpObj = new THREE.Object3D();
 const tmpColor = new THREE.Color();
+const tmpBellyColor = new THREE.Color();
+const tmpWingColor = new THREE.Color();
+const tmpTailColor = new THREE.Color();
 
 export class MassRace {
   readonly group = new THREE.Group();
   rivals: Rival[] = [];
+
+  // Instanced multi-component 3D Bird renderer
   private bodyMesh: THREE.InstancedMesh;
-  private wingMesh: THREE.InstancedMesh;
-  private readonly bodyGeo: THREE.SphereGeometry;
-  private readonly wingGeo: THREE.SphereGeometry;
-  private readonly bodyMat: THREE.MeshLambertMaterial;
-  private readonly wingMat: THREE.MeshLambertMaterial;
+  private bellyMesh: THREE.InstancedMesh;
+  private beakMesh: THREE.InstancedMesh;
+  private eyeMesh: THREE.InstancedMesh;
+  private wingLMesh: THREE.InstancedMesh;
+  private wingRMesh: THREE.InstancedMesh;
+  private tailMesh: THREE.InstancedMesh;
+
+  private readonly bodyGeo = new THREE.SphereGeometry(0.62, 8, 6);
+  private readonly bellyGeo = new THREE.SphereGeometry(0.42, 6, 5);
+  private readonly beakGeo = new THREE.ConeGeometry(0.16, 0.42, 6);
+  private readonly eyeGeo = new THREE.SphereGeometry(0.12, 6, 5);
+  private readonly wingGeo = new THREE.SphereGeometry(0.44, 6, 5);
+  private readonly tailGeo = new THREE.ConeGeometry(0.18, 0.55, 5);
+
+  private readonly bodyMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  private readonly bellyMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  private readonly beakMat = new THREE.MeshLambertMaterial({ color: 0xffc447, flatShading: true });
+  private readonly eyeMat = new THREE.MeshBasicMaterial({ color: 0x2a1c28 });
+  private readonly wingMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, transparent: true, opacity: 0.95 });
+  private readonly tailMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+
   private capacity = 0;
   private transport: NetTransport | null = null;
   private flapT = 0;
-  /** 0..1 how deep in someone's slipstream the player currently is. */
   draft = 0;
   private emotes = new Map<string, { text: string; at: number }>();
   private clock = 0;
 
   constructor() {
-    this.bodyGeo = new THREE.SphereGeometry(0.62, 8, 6);
-    this.wingGeo = new THREE.SphereGeometry(0.44, 6, 5);
-    // Vertex colours let 40 differently-tinted birds share one draw call.
-    this.bodyMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-    this.wingMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, transparent: true, opacity: 0.95 });
     this.bodyMesh = new THREE.InstancedMesh(this.bodyGeo, this.bodyMat, 1);
-    this.wingMesh = new THREE.InstancedMesh(this.wingGeo, this.wingMat, 1);
-    this.group.add(this.bodyMesh, this.wingMesh);
+    this.bellyMesh = new THREE.InstancedMesh(this.bellyGeo, this.bellyMat, 1);
+    this.beakMesh = new THREE.InstancedMesh(this.beakGeo, this.beakMat, 1);
+    this.eyeMesh = new THREE.InstancedMesh(this.eyeGeo, this.eyeMat, 1);
+    this.wingLMesh = new THREE.InstancedMesh(this.wingGeo, this.wingMat, 1);
+    this.wingRMesh = new THREE.InstancedMesh(this.wingGeo, this.wingMat, 1);
+    this.tailMesh = new THREE.InstancedMesh(this.tailGeo, this.tailMat, 1);
+
+    this.group.add(
+      this.bodyMesh,
+      this.bellyMesh,
+      this.beakMesh,
+      this.eyeMesh,
+      this.wingLMesh,
+      this.wingRMesh,
+      this.tailMesh
+    );
     this.group.visible = false;
   }
 
@@ -152,7 +160,6 @@ export class MassRace {
     return this.group.visible && this.rivals.length > 0;
   }
 
-  /** Builds a deterministic field for this seed. */
   spawn(count: number, seed: string, terrain: TerrainSystem, startX: number): void {
     const n = clamp(Math.floor(count), 0, MAX_RIVALS);
     this.ensureCapacity(n);
@@ -162,13 +169,8 @@ export class MassRace {
     for (let i = 0; i < n; i++) {
       const bird = new Bird();
       bird.reset(startX, terrain.heightAt(startX) + BIRD_RADIUS);
-      // Skill spread: a couple of aces, a thick middle, a few stragglers.
       const roll = rng.next();
       const skill = clamp(0.28 + Math.pow(roll, 1.6) * 0.72 + rng.range(-0.05, 0.05), 0.12, 1);
-      // Release lead is the pilot's whole skill expression. Measured on this
-      // physics model, the optimal anticipation is ~70 units before the crest;
-      // weaker pilots scatter to either side of that band, which is what makes
-      // the field spread out instead of flying as one clump.
       const errorSpread = (1 - skill) * 46;
       const lead = clamp(OPTIMAL_LEAD + rng.range(-errorSpread, errorSpread), 18, 132);
       this.rivals.push({
@@ -180,9 +182,6 @@ export class MassRace {
         prevX: bird.x,
         prevY: bird.y,
         lead,
-        // Nobody reads a crest perfectly every time. A slow per-pilot wobble
-        // keeps the field genuinely separated instead of collapsing onto a
-        // handful of identical discrete outcomes.
         wobbleAmp: (1 - skill) * 20 + 3,
         wobbleRate: rng.range(0.35, 1.25),
         wobblePhase: rng.range(0, Math.PI * 2),
@@ -198,18 +197,15 @@ export class MassRace {
       });
     }
     this.group.visible = n > 0;
-    this.writeInstances();
   }
 
   clear(): void {
     for (const r of this.rivals) r.bird.dispose();
     this.rivals = [];
     this.group.visible = false;
-    this.bodyMesh.count = 0;
-    this.wingMesh.count = 0;
+    this.resetCounts(0);
   }
 
-  /** Room admin: remove one pilot by id. Returns true if removed. */
   kick(id: string): boolean {
     const i = this.rivals.findIndex((r) => r.id === id);
     if (i < 0) return false;
@@ -218,7 +214,6 @@ export class MassRace {
     return true;
   }
 
-  /** Room admin: re-roll names/skills for a fresh grid without leaving. */
   shuffle(seed: string): void {
     const n = this.rivals.length;
     if (!n) return;
@@ -234,13 +229,6 @@ export class MassRace {
     }
   }
 
-  /**
-   * Time-shifted multiplayer (the Real Racing 3 pattern): overlay real players
-   * from the leaderboard onto local slots. Each ghost keeps the real pilot's
-   * name and gets a skill derived from their submitted best distance, so a
-   * player who flew 4,000 m produces a genuinely hard double while a 600 m
-   * newbie sits at the back. Returns how many ghosts were seated.
-   */
   applyGhosts(rows: { name: string; distance: number }[], gate: number): number {
     const span = gate > 0 ? gate : 4000;
     const locals = this.rivals.filter((r) => r.kind === "local");
@@ -254,8 +242,6 @@ export class MassRace {
       slot.name = name;
       slot.ghost = true;
       slot.skill = skill;
-      // Better pilots read the crest closer to the optimum; alternate the
-      // error sign so ghosts spread instead of stacking on one line.
       slot.lead = clamp(OPTIMAL_LEAD + (1 - skill) * 40 * (seated % 2 === 0 ? 1 : -1), 18, 132);
       slot.wobbleAmp = (1 - skill) * 16 + 3;
       seated++;
@@ -263,14 +249,12 @@ export class MassRace {
     return seated;
   }
 
-  /** How many field slots are driven by real humans right now. */
   get remoteCount(): number {
     let n = 0;
     for (const r of this.rivals) if (r.kind === "remote") n++;
     return n;
   }
 
-  /** Room admin: scale whole-field skill (0.5 chill … 1.4 ace). */
   setFieldSkill(mult: number): void {
     for (const r of this.rivals) {
       r.skill = Math.min(1, Math.max(0.1, r.skill * mult));
@@ -282,25 +266,19 @@ export class MassRace {
     return this.rivals.length;
   }
 
-  /** Fixed-step update. Rivals use the identical physics contract as the player. */
   step(dt: number, terrain: TerrainSystem, finishLine: number, time: number): void {
     if (!this.group.visible) return;
     this.clock += dt;
 
     for (const r of this.rivals) {
-      // Snapshot before any motion this step (or before a remote snapshot
-      // overwrites the position below), so the render can interpolate.
       r.prevX = r.bird.x;
       r.prevY = r.bird.y;
       if (r.kind === "remote" || r.finished) continue;
 
-      // Policy: hold through the descent and the climb, release just before the
-      // crest. `lead` is the pilot's personal anticipation distance.
       r.reactionT -= dt;
       if (r.reactionT <= 0) {
         r.reactionT = r.reaction;
         const judged = r.lead + Math.sin(time * r.wobbleRate + r.wobblePhase) * r.wobbleAmp;
-        // Cached crest index — a binary search, not a per-pilot ray march.
         r.diving = terrain.distanceToCrest(r.bird.x) > judged;
       }
 
@@ -321,15 +299,10 @@ export class MassRace {
 
   private applyRemote(snapshots: RemoteSnapshot[]): void {
     for (const snap of snapshots) {
-      // Boundary validation: a snapshot is untrusted network data. A missing
-      // id or a non-finite coordinate must be dropped, not applied — a NaN
-      // here would corrupt the rival's sim state and its rendered transform.
       if (typeof snap.id !== "string" || !snap.id) continue;
       if (!Number.isFinite(snap.x) || !Number.isFinite(snap.y) || !Number.isFinite(snap.rotation)) continue;
       let rival = this.rivals.find((r) => r.id === snap.id);
       if (!rival) {
-        // Promote a local slot so the field size stays constant when a real
-        // player joins mid-race.
         rival =
           this.rivals.find((r) => r.kind === "local" && !r.ghost) ??
           this.rivals.find((r) => r.kind === "local");
@@ -346,14 +319,6 @@ export class MassRace {
     }
   }
 
-  /**
-   * Slipstream drafting.
-   *
-   * Tucking in just behind another bird cuts your air drag, exactly like a
-   * peloton. This turns a crowded 40-bird field from visual noise into a real
-   * tactic: hunt a leader, sit in their wake to close the gap, then break out.
-   * @returns a drag multiplier to feed into the player's next `Bird.step()`.
-   */
   draftFor(x: number, y: number): number {
     if (!this.group.visible) {
       this.draft = 0;
@@ -361,21 +326,18 @@ export class MassRace {
     }
     let best = 0;
     for (const r of this.rivals) {
-      const dx = r.bird.x - x; // positive => they are ahead of us
+      const dx = r.bird.x - x;
       if (dx <= 0 || dx > DRAFT_BEHIND) continue;
       const dy = Math.abs(r.bird.y - y);
       if (dy > DRAFT_LATERAL) continue;
-      // Strongest right behind them, fading with both distance and offset.
       const along = 1 - dx / DRAFT_BEHIND;
       const lateral = 1 - dy / DRAFT_LATERAL;
       best = Math.max(best, along * lateral);
     }
-    // Smooth so the boost never pops on and off between frames.
     this.draft += (best - this.draft) * 0.12;
     return 1 - this.draft * DRAFT_MAX;
   }
 
-  /** Live roster for the top-of-screen bird bar. */
   roster(playerX: number, startX: number, finishDistance: number, playerName: string, playerHue = 0.06): RosterBird[] {
     const span = finishDistance > 0 ? finishDistance : 4000;
     const list: RosterBird[] = this.rivals.map((r) => ({
@@ -407,7 +369,33 @@ export class MassRace {
     return list;
   }
 
-  /** Shows a peer's emote for a couple of seconds above their bird. */
+  /** Visible rival name tag positions near the player for floating HUD badges */
+  getVisibleNameTags(cameraX: number, playerX: number, playerY: number, startX: number): RivalNameTag[] {
+    if (!this.group.visible) return [];
+    const standings = this.standings(playerX, startX, "you", 40);
+    const tags: RivalNameTag[] = [];
+
+    for (const r of this.rivals) {
+      if (Math.abs(r.bird.x - cameraX) > 120) continue;
+      const st = standings.rows.find((s) => s.id === r.id);
+      const dx = r.bird.x - playerX;
+      const dy = Math.abs(r.bird.y - playerY);
+      const isDrafting = dx > 0 && dx <= DRAFT_BEHIND && dy <= DRAFT_LATERAL;
+
+      tags.push({
+        id: r.id,
+        name: r.name,
+        worldX: r.bird.x,
+        worldY: r.bird.y + 1.6,
+        distance: Math.round(Math.max(0, r.bird.x - startX)),
+        place: st?.place ?? 0,
+        remote: r.kind === "remote",
+        drafting: isDrafting,
+      });
+    }
+    return tags;
+  }
+
   showEmote(id: string, text: string): void {
     this.emotes.set(id, { text, at: this.clock });
   }
@@ -422,7 +410,6 @@ export class MassRace {
     return e.text;
   }
 
-  /** Live standings including the player, sorted by distance. */
   standings(playerX: number, playerStartX: number, playerName: string, limit = 8): { rows: Standing[]; place: number; total: number } {
     const rows: Standing[] = this.rivals.map((r) => ({
       id: r.id,
@@ -446,8 +433,6 @@ export class MassRace {
     rows.forEach((r, i) => (r.place = i + 1));
     const place = rows.findIndex((r) => r.you) + 1;
 
-    // Show the leaders plus a window around the player so the list is useful
-    // whether you are 1st or 31st.
     const youIdx = place - 1;
     const merged: Standing[] = [];
     const push = (r: Standing): void => {
@@ -456,84 +441,184 @@ export class MassRace {
     for (const r of rows.slice(0, Math.min(3, rows.length))) push(r);
     const from = clamp(youIdx - 1, 0, Math.max(0, rows.length - 1));
     for (const r of rows.slice(from)) push(r);
-    // Backfill from the top so the panel is always `limit` rows when possible.
     for (const r of rows) push(r);
     return { rows: merged, place, total: rows.length };
   }
 
+  /**
+   * Render actual 3D birds with body, belly, beak, eyes, left wing, right wing, and tail
+   * in single-pass instanced draw calls!
+   */
   syncVisual(dt: number, cameraX: number, interp = 1): void {
     if (!this.group.visible) return;
     this.flapT += dt;
 
     let n = 0;
     for (const r of this.rivals) {
-      // Cull hard: only birds near the camera cost anything to draw.
       if (Math.abs(r.bird.x - cameraX) > 260) continue;
-      const flap = Math.sin(this.flapT * 14 + r.hue * 9) * 0.4;
-      tmpColor.setHSL(r.hue, 0.62, r.kind === "remote" ? 0.68 : 0.55);
+      const flap = Math.sin(this.flapT * 14 + r.hue * 9) * 0.45;
+      tmpColor.setHSL(r.hue, 0.68, r.kind === "remote" ? 0.68 : 0.58);
 
       const x = lerp(r.prevX, r.bird.x, interp);
       const y = lerp(r.prevY, r.bird.y, interp);
-      tmpObj.position.set(x, y, -3.5 - (r.hue - 0.5) * 5);
-      tmpObj.rotation.set(0, 0, r.bird.rotation * 0.9);
-      tmpObj.scale.set(1.05, 0.9, 0.9);
+      const z = -3.5 - (r.hue - 0.5) * 5;
+      const rotZ = r.bird.rotation * 0.9;
+
+      // 1. Body
+      tmpObj.position.set(x, y, z);
+      tmpObj.rotation.set(0, 0, rotZ);
+      tmpObj.scale.set(1.1, 0.9, 0.9);
       tmpObj.updateMatrix();
       this.bodyMesh.setMatrixAt(n, tmpObj.matrix);
       this.bodyMesh.setColorAt(n, tmpColor);
 
-      tmpObj.position.y += 0.18;
-      tmpObj.rotation.z += flap;
+      // 2. Belly (lightened underbody)
+      tmpObj.position.set(x + 0.08, y - 0.15, z + 0.02);
+      tmpObj.scale.set(0.9, 0.65, 0.7);
+      tmpObj.updateMatrix();
+      this.bellyMesh.setMatrixAt(n, tmpObj.matrix);
+      tmpBellyColor.copy(tmpColor).offsetHSL(0, -0.1, 0.15);
+      this.bellyMesh.setColorAt(n, tmpBellyColor);
+
+      // 3. Beak (bright amber cone)
+      tmpObj.position.set(x + 0.72, y + 0.15, z);
+      tmpObj.rotation.set(0, 0, rotZ - Math.PI / 2);
+      tmpObj.scale.set(1, 1, 1);
+      tmpObj.updateMatrix();
+      this.beakMesh.setMatrixAt(n, tmpObj.matrix);
+
+      // 4. Eyes (dark focal point)
+      tmpObj.position.set(x + 0.4, y + 0.35, z + 0.35);
+      tmpObj.rotation.set(0, 0, rotZ);
+      tmpObj.scale.set(1, 1, 1);
+      tmpObj.updateMatrix();
+      this.eyeMesh.setMatrixAt(n, tmpObj.matrix);
+
+      // 5. Left Wing (flapping upwards)
+      tmpObj.position.set(x - 0.05, y + 0.15, z + 0.42);
+      tmpObj.rotation.set(0, 0, rotZ + flap);
       tmpObj.scale.set(0.95, 0.2, 0.6);
       tmpObj.updateMatrix();
-      this.wingMesh.setMatrixAt(n, tmpObj.matrix);
-      this.wingMesh.setColorAt(n, tmpColor.offsetHSL(0, 0, 0.12));
+      this.wingLMesh.setMatrixAt(n, tmpObj.matrix);
+      tmpWingColor.copy(tmpColor).offsetHSL(0, 0, 0.1);
+      this.wingLMesh.setColorAt(n, tmpWingColor);
+
+      // 6. Right Wing (flapping downwards)
+      tmpObj.position.set(x - 0.05, y + 0.15, z - 0.42);
+      tmpObj.rotation.set(0, 0, rotZ - flap);
+      tmpObj.scale.set(0.95, 0.2, 0.6);
+      tmpObj.updateMatrix();
+      this.wingRMesh.setMatrixAt(n, tmpObj.matrix);
+      this.wingRMesh.setColorAt(n, tmpWingColor);
+
+      // 7. Tail (fanned tail feathers)
+      tmpObj.position.set(x - 0.65, y + 0.05, z);
+      tmpObj.rotation.set(0, 0, rotZ + Math.PI / 2.5);
+      tmpObj.scale.set(1, 0.8, 1);
+      tmpObj.updateMatrix();
+      this.tailMesh.setMatrixAt(n, tmpObj.matrix);
+      tmpTailColor.copy(tmpColor).offsetHSL(0, 0, -0.08);
+      this.tailMesh.setColorAt(n, tmpTailColor);
+
       n++;
     }
 
+    this.resetCounts(n);
+    this.updateMatrixFlags();
+  }
+
+  private resetCounts(n: number): void {
     this.bodyMesh.count = n;
-    this.wingMesh.count = n;
+    this.bellyMesh.count = n;
+    this.beakMesh.count = n;
+    this.eyeMesh.count = n;
+    this.wingLMesh.count = n;
+    this.wingRMesh.count = n;
+    this.tailMesh.count = n;
+  }
+
+  private updateMatrixFlags(): void {
     this.bodyMesh.instanceMatrix.needsUpdate = true;
-    this.wingMesh.instanceMatrix.needsUpdate = true;
+    this.bellyMesh.instanceMatrix.needsUpdate = true;
+    this.beakMesh.instanceMatrix.needsUpdate = true;
+    this.eyeMesh.instanceMatrix.needsUpdate = true;
+    this.wingLMesh.instanceMatrix.needsUpdate = true;
+    this.wingRMesh.instanceMatrix.needsUpdate = true;
+    this.tailMesh.instanceMatrix.needsUpdate = true;
+
     if (this.bodyMesh.instanceColor) this.bodyMesh.instanceColor.needsUpdate = true;
-    if (this.wingMesh.instanceColor) this.wingMesh.instanceColor.needsUpdate = true;
+    if (this.bellyMesh.instanceColor) this.bellyMesh.instanceColor.needsUpdate = true;
+    if (this.wingLMesh.instanceColor) this.wingLMesh.instanceColor.needsUpdate = true;
+    if (this.wingRMesh.instanceColor) this.wingRMesh.instanceColor.needsUpdate = true;
+    if (this.tailMesh.instanceColor) this.tailMesh.instanceColor.needsUpdate = true;
   }
 
   dispose(): void {
     this.clear();
     this.bodyGeo.dispose();
+    this.bellyGeo.dispose();
+    this.beakGeo.dispose();
+    this.eyeGeo.dispose();
     this.wingGeo.dispose();
+    this.tailGeo.dispose();
+
     this.bodyMat.dispose();
+    this.bellyMat.dispose();
+    this.beakMat.dispose();
+    this.eyeMat.dispose();
     this.wingMat.dispose();
+    this.tailMat.dispose();
+
     this.bodyMesh.dispose();
-    this.wingMesh.dispose();
+    this.bellyMesh.dispose();
+    this.beakMesh.dispose();
+    this.eyeMesh.dispose();
+    this.wingLMesh.dispose();
+    this.wingRMesh.dispose();
+    this.tailMesh.dispose();
   }
 
   private ensureCapacity(n: number): void {
     if (n <= this.capacity) {
-      this.bodyMesh.count = n;
-      this.wingMesh.count = n;
+      this.resetCounts(n);
       return;
     }
-    this.group.remove(this.bodyMesh, this.wingMesh);
-    this.bodyMesh.dispose();
-    this.wingMesh.dispose();
-    this.bodyMesh = new THREE.InstancedMesh(this.bodyGeo, this.bodyMat, n);
-    this.wingMesh = new THREE.InstancedMesh(this.wingGeo, this.wingMat, n);
-    this.bodyMesh.frustumCulled = false;
-    this.wingMesh.frustumCulled = false;
-    this.bodyMesh.castShadow = true;
-    this.group.add(this.bodyMesh, this.wingMesh);
-    this.capacity = n;
-    this.writeInstances();
-  }
+    this.group.remove(
+      this.bodyMesh,
+      this.bellyMesh,
+      this.beakMesh,
+      this.eyeMesh,
+      this.wingLMesh,
+      this.wingRMesh,
+      this.tailMesh
+    );
 
-  private writeInstances(): void {
-    const white = new THREE.Color(1, 1, 1);
-    for (let i = 0; i < this.capacity; i++) {
-      this.bodyMesh.setColorAt(i, white);
-      this.wingMesh.setColorAt(i, white);
-    }
-    if (this.bodyMesh.instanceColor) this.bodyMesh.instanceColor.needsUpdate = true;
-    if (this.wingMesh.instanceColor) this.wingMesh.instanceColor.needsUpdate = true;
+    this.bodyMesh.dispose();
+    this.bellyMesh.dispose();
+    this.beakMesh.dispose();
+    this.eyeMesh.dispose();
+    this.wingLMesh.dispose();
+    this.wingRMesh.dispose();
+    this.tailMesh.dispose();
+
+    this.bodyMesh = new THREE.InstancedMesh(this.bodyGeo, this.bodyMat, n);
+    this.bellyMesh = new THREE.InstancedMesh(this.bellyGeo, this.bellyMat, n);
+    this.beakMesh = new THREE.InstancedMesh(this.beakGeo, this.beakMat, n);
+    this.eyeMesh = new THREE.InstancedMesh(this.eyeGeo, this.eyeMat, n);
+    this.wingLMesh = new THREE.InstancedMesh(this.wingGeo, this.wingMat, n);
+    this.wingRMesh = new THREE.InstancedMesh(this.wingGeo, this.wingMat, n);
+    this.tailMesh = new THREE.InstancedMesh(this.tailGeo, this.tailMat, n);
+
+    this.group.add(
+      this.bodyMesh,
+      this.bellyMesh,
+      this.beakMesh,
+      this.eyeMesh,
+      this.wingLMesh,
+      this.wingRMesh,
+      this.tailMesh
+    );
+
+    this.capacity = n;
   }
 }
