@@ -67,160 +67,178 @@ const PROG_G = ["C", "G", "Dm", "Am", "C", "G", "Dm", "Am"];
 const PROG_H = ["G", "C", "Am", "F", "G", "C", "Am", "F"];
 const PROG_I = ["F", "C", "Dm", "G", "F", "C", "Dm", "G"];
 const PROG_J = ["Am", "C", "G", "F", "Am", "C", "G", "F"];
+// PROG_TRON: Daft Punk / Tron Legacy dark electronic. Am → Dm → Gm → Em — all minor,
+// no major relief. Creates the claustrophobic Grid tension.
+const PROG_TRON = ["Am", "Dm", "Am", "Em", "Am", "Dm", "Gm", "Em"];
 
 // Melodies: one entry per eighth note (0 = rest, -1 = hold previous)
+// All rewritten in Hans Zimmer cinematic architecture: held notes, wide leaps,
+// silence as tension, simple motifs that build to a climax.
+
+// Track 1 — Ascent: daybreak fanfare. Single held note, breath, rise to peak.
 const MEL_A = [
-  76, 0, 79, 0, 76, 74, 72, 0,
-  74, 0, 0, 71, 74, 0, 67, 0,
-  69, 0, 72, 0, 76, 0, 74, 72,
-  69, -1, 0, 0, 72, 0, 74, 0,
-  76, 0, 79, 0, 81, 0, 79, 76,
-  74, -1, 0, 0, 71, 0, 74, 0,
-  72, 0, 69, 0, 65, 0, 69, 72,
-  74, -1, -1, -1, 0, 0, 0, 0,
+  72, -1, -1, -1,  0,  0,  0,  0,
+  76, -1, -1,  0,  0,  0, 74,  0,
+  72, -1, -1, -1,  0,  0,  0,  0,
+  69, -1, -1, -1,  0,  0,  0,  0,
+  72,  0, 76,  0, 79, -1, -1,  0,
+  84, -1, -1, -1, -1, -1,  0,  0,
+  81,  0, 79,  0, 76, -1, -1,  0,
+  72, -1, -1, -1,  0,  0,  0,  0,
 ];
 
+// Track 2 — Voyage: dark ocean crossing. Held low, vast silence, single soaring peak.
 const MEL_B = [
-  76, -1, 0, 0, 72, 0, 69, 0,
-  72, -1, 0, 0, 69, 0, 65, 0,
-  67, -1, 0, 0, 72, 0, 76, 0,
-  74, -1, -1, -1, 0, 0, 0, 0,
-  76, 0, 79, 0, 81, 0, 79, 76,
-  77, -1, 0, 0, 76, 0, 72, 0,
-  76, -1, 0, 0, 74, 0, 72, 0,
-  74, 0, 71, 0, 67, -1, 0, 0,
+  69, -1, -1, -1,  0,  0,  0,  0,
+   0,  0,  0,  0, 65, -1, -1, -1,
+  67, -1, -1,  0,  0,  0,  0,  0,
+  72, -1, -1, -1,  0,  0,  0,  0,
+  76,  0, 81,  0, 84, -1, -1, -1,
+   0,  0,  0,  0,  0,  0,  0,  0,
+  81, -1,  0,  0, 76, -1,  0,  0,
+  69, -1, -1, -1,  0,  0,  0,  0,
 ];
 
+// Track 3 — Cathedral: pipe-organ hymn. High held note, descend, full bar silence,
+// second phrase reaches a half-step higher — Zimmer's favorite asymmetric repeat.
 const MEL_C = [
-  81, 0, 0, 79, 77, 0, 0, 76,
-  74, 0, 0, 71, 74, 0, 79, 0,
-  76, 0, 0, 74, 71, 0, 0, 67,
-  69, -1, -1, 0, 72, 0, 76, 0,
-  77, 0, 0, 76, 74, 0, 0, 72,
-  74, 0, 0, 71, 74, 0, 79, 0,
-  84, -1, 0, 0, 79, 0, 76, 0,
-  72, -1, -1, -1, 0, 0, 0, 0,
+  81, -1, -1, -1, -1, -1,  0,  0,
+  79,  0, 76,  0, 74, -1, -1,  0,
+   0,  0,  0,  0, 72, -1, -1, -1,
+   0,  0,  0,  0,  0,  0,  0,  0,
+  84, -1, -1, -1, -1, -1,  0,  0,
+  81,  0, 79,  0, 76, -1, -1,  0,
+  74,  0, 72,  0, 69,  0, 67,  0,
+  65, -1, -1, -1,  0,  0,  0,  0,
 ];
 
-// A bridge with more space between phrases. It keeps longer sessions from
-// reading as a short loop and leaves room for the landscape/wind layers.
+// Track 4 — Pendulum: TARS/Interstellar. Violent low-to-high swings, silence, resolve.
 const MEL_D = [
-  74, 0, 77, 0, 81, -1, 0, 0,
-  79, 0, 74, 0, 71, -1, 0, 0,
-  72, 0, 76, 0, 79, 0, 76, 0,
-  72, -1, 0, 0, 69, 0, 72, 0,
-  77, 0, 81, 0, 84, -1, 0, 0,
-  79, 0, 76, 0, 74, -1, 0, 0,
-  72, 0, 76, 0, 79, 0, 84, 0,
-  79, -1, 76, -1, 72, -1, 0, 0,
-];
-
-// Track 5 — Coral Breeze: bright, rippling, climbs and settles like surf.
-const MEL_E = [
-  72, 0, 74, 0, 76, 0, 79, 0,
-  76, 0, 72, 0, 69, 0, 72, 0,
-  65, 0, 69, 0, 72, 0, 74, 0,
-  74, 0, 72, 0, 71, 0, 72, 0,
-  72, 0, 76, 0, 79, 0, 81, 0,
-  79, 0, 76, 0, 72, 0, 76, 0,
-  77, 0, 76, 0, 74, 0, 72, 0,
-  74, -1, -1, 0, 0, 0, 0, 0,
-];
-
-// Track 6 — Moonlight Flutter: sparse, descending, a night that breathes.
-const MEL_F = [
-  69, 0, 72, 0, 76, 0, 72, 0,
-  71, 0, 74, 0, 76, 0, 74, 0,
-  65, 0, 69, 0, 72, 0, 74, 0,
-  72, 0, 69, 0, 65, 0, 67, 0,
-  69, 0, 72, 0, 76, 0, 79, 0,
-  76, 0, 74, 0, 71, 0, 74, 0,
-  77, 0, 74, 0, 72, 0, 69, 0,
-  72, -1, -1, -1, 0, 0, 0, 0,
-];
-
-// Track 7 — Glass Ocean: crystalline high sparkle over calm harmony.
-const MEL_G = [
-  76, 0, 79, 0, 84, 0, 81, 0,
-  79, 0, 76, 0, 74, 0, 76, 0,
-  74, 0, 72, 0, 69, 0, 72, 0,
-  69, 0, 72, 0, 76, 0, 74, 0,
-  76, 0, 79, 0, 84, 0, 86, 0,
-  84, 0, 81, 0, 79, 0, 76, 0,
-  74, 0, 72, 0, 69, 0, 72, 0,
-  74, -1, 72, -1, 0, 0, 0, 0,
-];
-
-// Track 8 — Trade Winds: broad stepwise phrases that push and ease.
-const MEL_H = [
-  74, 0, 71, 0, 72, 0, 74, 0,
-  76, 0, 79, 0, 76, 0, 74, 0,
-  72, 0, 69, 0, 72, 0, 76, 0,
-  74, 0, 72, 0, 69, 0, 65, 0,
-  74, 0, 71, 0, 72, 0, 74, 0,
-  79, 0, 76, 0, 74, 0, 72, 0,
-  69, 0, 72, 0, 76, 0, 74, 0,
-  72, -1, -1, 0, 0, 0, 0, 0,
-];
-
-// Track 9 — Golden Hour: held, warm notes that stretch the last light.
-const MEL_I = [
-  77, -1, 0, 0, 76, 0, 74, 0,
-  72, -1, 0, 0, 69, 0, 72, 0,
-  74, -1, 0, 0, 72, 0, 69, 0,
-  71, 0, 72, 0, 74, -1, 0, 0,
-  77, -1, 0, 0, 79, 0, 77, 0,
-  76, -1, 0, 0, 74, 0, 72, 0,
-  74, -1, 0, 0, 72, 0, 74, 0,
-  76, -1, 74, -1, 72, -1, 0, 0,
-];
-
-// Track 10 — Starlight: twinkling wide leaps between a warm low register.
-const MEL_J = [
-  81, 0, 76, 0, 81, 0, 84, 0,
-  79, 0, 76, 0, 72, 0, 76, 0,
-  74, 0, 71, 0, 74, 0, 76, 0,
-  77, 0, 74, 0, 72, 0, 69, 0,
-  81, 0, 76, 0, 81, 0, 86, 0,
-  84, 0, 81, 0, 79, 0, 76, 0,
-  74, 0, 71, 0, 74, 0, 79, 0,
-  77, -1, 76, -1, 72, -1, 0, 0,
-];
-
-// Track 11 — Tide Runner: rippling ascents and cascading steps, playful surf-light.
-const MEL_K = [
-  72,  0, 74, 76, 79,  0, 76, 79,
-  81,  0, 79, 76, 74,  0, 72,  0,
-  69, 72, 74, 72, 77,  0, 74, 72,
-  71,  0, 74,  0, 76, 79, 76,  0,
-  79,  0, 81,  0, 84,  0, 81, 79,
-  76, 74, 72,  0, 69, 72, 74,  0,
-  77,  0, 74, 76, 79, 76, 74,  0,
-  72, -1,  0,  0, 74, -1,  0,  0,
-];
-
-// Track 12 — Magma Drift: sparse descending phrases, brooding volcanic weight.
-const MEL_L = [
-  69, -1,  0,  0, 65,  0, 64,  0,
-  62, -1,  0,  0, 64,  0, 65,  0,
-  65,  0, 69,  0, 72,  0, 69,  0,
-  67, -1,  0,  0, 65, -1,  0,  0,
-  69,  0, 67, 65, 64,  0, 62,  0,
-  60, -1,  0,  0, 62, 64, 65,  0,
-  65,  0,  0, 69, 72, -1,  0,  0,
+  62, -1, -1, -1,  0,  0,  0,  0,
+  81, -1, -1,  0,  0,  0,  0,  0,
+  65, -1, -1, -1,  0,  0,  0,  0,
+  84, -1, -1, -1,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,
+  79, -1,  0,  0, 74, -1,  0,  0,
+  72, -1, -1,  0, 69, -1, -1,  0,
   67, -1, -1, -1,  0,  0,  0,  0,
 ];
 
-// Track 13 — Mesa Wind: wide leaping phrases with canyon space between.
+// Track 5 — The Grid: Tron Legacy pulse. Daft Punk Am arpeggio, stark silence,
+// then Zimmer peak. Electronic precision meets orchestral weight.
+const MEL_E = [
+  69,  0, 72,  0, 76,  0, 79,  0,
+  69,  0, 72,  0, 76,  0, 81,  0,
+  69, -1,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,
+  72,  0, 76,  0, 79,  0, 84,  0,
+  84, -1, -1, -1,  0,  0,  0,  0,
+  81,  0, 76,  0, 72,  0, 69,  0,
+  65, -1, -1, -1,  0,  0,  0,  0,
+];
+
+// Track 6 — Eventide: night descends. Single note per bar — maximum space.
+// One long held note fills an entire bar; full bar silence = held breath.
+const MEL_F = [
+  69, -1, -1, -1, -1, -1, -1, -1,
+  65, -1, -1, -1,  0,  0,  0,  0,
+  67, -1, -1, -1,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,
+  72, -1, -1,  0, 76, -1, -1,  0,
+  77, -1, -1, -1, -1, -1,  0,  0,
+  74,  0, 72,  0, 69, -1, -1,  0,
+  65, -1, -1, -1,  0,  0,  0,  0,
+];
+
+// Track 7 — Glass & Stars: crystalline echo motif, then stratospheric leap.
+// C6 ping echoes → silence → C6 to E6 to G6 — pure Zimmer outer-space texture.
+const MEL_G = [
+  84, -1,  0,  0, 84, -1,  0,  0,
+  81, -1,  0,  0,  0,  0,  0,  0,
+  76, -1, -1, -1,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,
+  84, -1, -1,  0, 88, -1, -1,  0,
+  88, -1, -1, -1,  0,  0,  0,  0,
+  84, -1,  0,  0, 79, -1,  0,  0,
+  72, -1, -1, -1,  0,  0,  0,  0,
+];
+
+// Track 8 — Trade Winds: bold proclamation. G5 statement, silence, rise to C6 peak,
+// graceful descent. Modeled on the Inception "Non, je ne regrette rien" fanfare structure.
+const MEL_H = [
+  79, -1, -1,  0, 76, -1, -1,  0,
+  72, -1, -1, -1,  0,  0,  0,  0,
+  74,  0, 76,  0, 79, -1, -1, -1,
+   0,  0,  0,  0, 72,  0, 69,  0,
+  84, -1, -1, -1, -1, -1,  0,  0,
+  81,  0, 79,  0, 76,  0, 74,  0,
+  72, -1,  0,  0, 69, -1,  0,  0,
+  67, -1, -1, -1,  0,  0,  0,  0,
+];
+
+// Track 9 — Golden Hour: pure warmth. Every note held long — Zimmer's
+// "Interstellar docking scene" philosophy: space IS the music.
+const MEL_I = [
+  77, -1, -1, -1, -1, -1,  0,  0,
+  76, -1, -1,  0,  0,  0,  0,  0,
+  74, -1, -1, -1, -1, -1,  0,  0,
+  72, -1, -1, -1,  0,  0,  0,  0,
+  79, -1, -1, -1, -1, -1,  0,  0,
+  76, -1,  0,  0, 74, -1,  0,  0,
+  72, -1, -1, -1, -1, -1,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,
+];
+
+// Track 10 — Starfall: octave-leap motif — C4 → C6 → back → G5 → A5 → E6 peak.
+// Direct Zimmer octave displacement technique from "Cornfield Chase".
+const MEL_J = [
+  60, -1, -1, -1,  0,  0,  0,  0,
+  84, -1, -1, -1,  0,  0,  0,  0,
+  60, -1, -1, -1,  0,  0,  0,  0,
+  79, -1, -1, -1,  0,  0,  0,  0,
+  81, -1,  0,  0, 84, -1,  0,  0,
+  88, -1, -1, -1, -1, -1,  0,  0,
+  84,  0, 81,  0, 79,  0, 76,  0,
+  72, -1, -1, -1,  0,  0,  0,  0,
+];
+
+// Track 11 — Derezzed: Tron staccato pulse. Tight paired notes march upward,
+// cut to silence, then Daft Punk ascending arp meets Zimmer descent.
+const MEL_K = [
+  69,  0, 72,  0, 69,  0, 72,  0,
+  76,  0, 79,  0, 76,  0, 79,  0,
+  81,  0, 84,  0, 81,  0, 84,  0,
+  69, -1,  0,  0,  0,  0,  0,  0,
+  69,  0, 72,  0, 76,  0, 81,  0,
+  84,  0, 81,  0, 76,  0, 72,  0,
+  69,  0, 65,  0, 67,  0, 69,  0,
+  72, -1, -1, -1,  0,  0,  0,  0,
+];
+
+// Track 12 — Magma: tectonic weight. Whole-bar held note, deep drop, full silence,
+// slow chromatic crawl upward, then collapse. Zimmer "Earth" / "Interstellar" gravity.
+const MEL_L = [
+  65, -1, -1, -1, -1, -1, -1, -1,
+  62, -1, -1, -1,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,
+  60, -1, -1, -1, 62, -1, -1, -1,
+  65, -1, -1,  0, 69, -1, -1,  0,
+  72, -1, -1, -1,  0,  0,  0,  0,
+  70,  0, 69,  0, 67,  0, 65,  0,
+  62, -1, -1, -1,  0,  0,  0,  0,
+];
+
+// Track 13 — Mesa: canyon vastness. Huge register leaps, long held tones,
+// silence as echo — the canyon answers back nothing but wind.
 const MEL_M = [
-  65,  0,  0,  0, 72,  0, 77,  0,
-  76,  0,  0, 72, 69,  0,  0,  0,
-  69, 72, 74,  0, 72,  0, 69,  0,
-  67,  0, 71,  0, 74, -1,  0,  0,
-  65,  0,  0,  0, 77,  0, 81,  0,
-  79,  0, 76, 72, 69,  0, 72,  0,
-  74,  0, 72, 71, 69,  0, 65,  0,
-  67, -1, -1,  0,  0,  0,  0,  0,
+  60, -1, -1, -1,  0,  0,  0,  0,
+  84, -1, -1, -1,  0,  0,  0,  0,
+  60, -1, -1, -1,  0,  0,  0,  0,
+  79, -1, -1, -1,  0,  0,  0,  0,
+  62, -1, -1,  0, 81, -1, -1,  0,
+  84, -1, -1, -1, -1, -1,  0,  0,
+  79,  0, 76,  0, 72,  0, 69,  0,
+  65, -1, -1, -1,  0,  0,  0,  0,
 ];
 
 // Track 14 — Time's Light: Zimmer/Interstellar. High held note → slow descent →
@@ -288,6 +306,32 @@ const MEL_P = [
   74, -1, 72, -1,  0,  0,  0,  0,
 ];
 
+// Track 19 — End of Line: Tron Legacy haunting outro. Single notes echo into silence,
+// then a four-bar Zimmer swell that never fully resolves — you're still in the Grid.
+const MEL_S = [
+  69, -1, -1, -1,  0,  0,  0,  0,
+   0,  0,  0,  0, 69, -1,  0,  0,
+  65, -1, -1, -1,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,
+  69,  0, 72,  0, 76, -1, -1, -1,
+  79, -1, -1,  0, 76,  0, 74,  0,
+  72, -1, -1, -1, -1, -1,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,
+];
+
+// Track 20 — Rinzler: Tron's unstoppable enforcer. Driving 8th ostinato mounts
+// chromatic pressure to a Zimmer-style eruption, then the cold silence of victory.
+const MEL_T = [
+  69,  0, 69,  0, 69,  0, 69,  0,
+  70,  0, 70,  0, 70,  0, 70,  0,
+  71,  0, 71,  0, 72,  0, 72,  0,
+  74, -1, -1, -1,  0,  0,  0,  0,
+  72,  0, 69,  0, 67,  0, 65,  0,
+  64, -1, -1, -1,  0,  0,  0,  0,
+  69,  0, 72,  0, 76,  0, 81,  0,
+  84, -1, -1, -1,  0,  0,  0,  0,
+];
+
 // Whistle counter-melody used in fever (per eighth, section-agnostic)
 const WHISTLE = [
   0, 0, 84, 0, 83, 0, 81, 0,
@@ -324,24 +368,26 @@ export type Track = { name: string; prog: string[]; mel: number[]; mood: BiomeMu
  * the current island and time of day while still cycling all thirteen.
  */
 export const TRACKS: Track[] = [
-  { name: "Island Sunrise",    prog: PROG_A, mel: MEL_A, mood: "bright"  },
-  { name: "Lazy Current",      prog: PROG_B, mel: MEL_B, mood: "airy"    },
-  { name: "Hilltop Hop",       prog: PROG_C, mel: MEL_C, mood: "bright"  },
-  { name: "Sunset Glide",      prog: PROG_D, mel: MEL_D, mood: "warm"    },
-  { name: "Coral Breeze",      prog: PROG_E, mel: MEL_E, mood: "airy"    },
-  { name: "Moonlight Flutter", prog: PROG_F, mel: MEL_F, mood: "night"   },
-  { name: "Glass Ocean",       prog: PROG_G, mel: MEL_G, mood: "crystal" },
+  { name: "Ascent",            prog: PROG_A, mel: MEL_A, mood: "bright"  },
+  { name: "Voyage",            prog: PROG_B, mel: MEL_B, mood: "airy"    },
+  { name: "Cathedral",         prog: PROG_C, mel: MEL_C, mood: "bright"  },
+  { name: "Pendulum",          prog: PROG_D, mel: MEL_D, mood: "wide"    },
+  { name: "The Grid",          prog: PROG_TRON, mel: MEL_E, mood: "night" },
+  { name: "Eventide",          prog: PROG_F, mel: MEL_F, mood: "night"   },
+  { name: "Glass & Stars",     prog: PROG_G, mel: MEL_G, mood: "crystal" },
   { name: "Trade Winds",       prog: PROG_H, mel: MEL_H, mood: "wide"    },
   { name: "Golden Hour",       prog: PROG_I, mel: MEL_I, mood: "warm"    },
-  { name: "Starlight",         prog: PROG_J, mel: MEL_J, mood: "night"   },
-  { name: "Tide Runner",       prog: PROG_E, mel: MEL_K, mood: "reef"    },
-  { name: "Magma Drift",       prog: PROG_F, mel: MEL_L, mood: "ember"   },
-  { name: "Mesa Wind",         prog: PROG_I, mel: MEL_M, mood: "canyon"  },
+  { name: "Starfall",          prog: PROG_J, mel: MEL_J, mood: "night"   },
+  { name: "Derezzed",          prog: PROG_TRON, mel: MEL_K, mood: "ember" },
+  { name: "Magma",             prog: PROG_F, mel: MEL_L, mood: "ember"   },
+  { name: "Mesa",              prog: PROG_I, mel: MEL_M, mood: "canyon"  },
   { name: "Time's Light",      prog: PROG_K, mel: MEL_N, mood: "wide"    },
   { name: "Horizon Chase",     prog: PROG_H, mel: MEL_O, mood: "bright"  },
   { name: "Fever Dream",       prog: PROG_E, mel: MEL_P, mood: "reef"    },
   { name: "Inception Drop",    prog: PROG_K, mel: MEL_Q, mood: "night"   },
   { name: "Dunkirk Clock",     prog: PROG_J, mel: MEL_R, mood: "ember"   },
+  { name: "End of Line",       prog: PROG_TRON, mel: MEL_S, mood: "night" },
+  { name: "Rinzler",           prog: PROG_TRON, mel: MEL_T, mood: "ember" },
 ];
 
 /** Track titles for the settings picker — keep in lockstep with TRACKS. */
