@@ -67,22 +67,20 @@ export default defineConfig({
   server: {
     host: true,
     allowedHosts: true,
-    // Real multiplayer: the browser talks to the SAME origin (/mp) and vite
-    // tunnels it to the Rust room server (sunbird-server) listening on the
-    // legacy `/ws` socket. No hardcoded hosts anywhere.
+    // Real multiplayer + social: the browser talks to the SAME origin and
+    // vite tunnels to the Sunbird social server (server/, default :8791).
+    // Identity paths: that server mounts legacy + v1 under /mp and the
+    // legacy social REST under /social. No hardcoded hosts anywhere —
+    // MULTIPLAYER_PROXY_TARGET / SOCIAL_PROXY_TARGET override per machine.
     proxy: {
       "/mp": {
-        target: process.env.MULTIPLAYER_PROXY_TARGET || "http://127.0.0.1:8080",
+        target: process.env.MULTIPLAYER_PROXY_TARGET || "http://127.0.0.1:8791",
         ws: true,
         changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/mp/, "/ws"),
       },
-      // Social server (friends/clubs/chat) — same pattern as /mp: the browser
-      // talks same-origin, vite tunnels to the PGlite server on :8788.
       "/social": {
-        target: process.env.SOCIAL_PROXY_TARGET || "http://127.0.0.1:8788",
+        target: process.env.SOCIAL_PROXY_TARGET || "http://127.0.0.1:8791",
         changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/social/, ""),
       },
     },
   },
