@@ -550,7 +550,8 @@ mod reconnect_tests {
             &issuer,
         )
         .unwrap();
-        assert!(seat.is_some());
+        let socket_seat = seat;
+        assert!(socket_seat.is_some());
         // Now attempt to also reattach with the (valid) seat token: must
         // fail — one socket may hold one seat.
         let err = handle(
@@ -566,6 +567,7 @@ mod reconnect_tests {
         )
         .unwrap_err();
         assert!(matches!(err, ProtocolError::Rejected { .. }));
-        assert_eq!(seat, Some((grant.room_id, grant.seat_id)));
+        // Still seated in its own seat — the rejected reattach changed nothing.
+        assert_eq!(seat, socket_seat);
     }
 }
