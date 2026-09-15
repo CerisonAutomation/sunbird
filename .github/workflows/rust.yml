@@ -45,7 +45,9 @@ jobs:
       # gate has already failed. continue-on-error keeps this purely
       # informational — the Format (check) step above remains the gate.
       - name: Post fmt diff to the PR
-        if: github.event_name == 'pull_request'
+        # Explicit if conditions are AND-ed with success(), so this only
+        # runs after the gate has failed — hence the failure() head.
+        if: failure() && steps.fmt.outcome == 'failure' && github.event_name == 'pull_request'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
