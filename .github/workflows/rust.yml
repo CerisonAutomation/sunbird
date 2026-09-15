@@ -24,6 +24,7 @@ jobs:
         with:
           workspaces: rust
       - name: Format (check)
+        id: fmt
         # rustfmt is a gate, not an autofix. This step used to run `cargo fmt`
         # and push the result back as github-actions[bot], which caused two
         # failures observed on this repo:
@@ -36,6 +37,23 @@ jobs:
         # Failing the build instead keeps branch history human-authored and
         # every run approvable by whoever pushed it.
         run: cargo fmt --all --check
+      # The Actions log bundle is not always retrievable (results-receiver is
+      # unreachable from some sandboxes), so the fmt diff — the only thing
+      # that says WHAT to reformat — is also published where it survives.
+      - name: Post fmt diff to the PR
+        if: steps.fmt.outcome == 'failure' && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          (cd rust && cargo fmt --all && git diff) > /tmp/fmt-body.md
+          {
+            echo "### `cargo fmt` diff (run '"$GITHUB_RUN_ID"') — apply this, then rerun"
+            echo '```diff'
+            cat /tmp/fmt-body.md
+            echo '```'
+          } > /tmp/fmt-comment.md
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file /tmp/fmt-comment.md
       - name: Clippy
         id: clippy
         run: |
