@@ -12,15 +12,20 @@ export interface PlatformAdapter {
   gameplayStart(): void;
   gameplayStop(): void;
   loadingFinished(): void;
+  signalGameReady?(): void;
   /** Portal celebration (CrazyGames `happytime`) — best-effort, never throws. */
   happytime(): void;
   /** Re-apply portal settings (mute) to the current events — safe to repeat. */
   syncSettings(): void;
   commercialBreak(): Promise<void>;
   rewardedBreak(): Promise<boolean>;
+  showMidgameAd?(): Promise<void>;
+  showRewardedAd?(): Promise<boolean>;
   mountBanner(container: HTMLElement): void;
   saveData?(key: string, data: string): Promise<void>;
   loadData?(key: string): Promise<string | null>;
+  saveCloud?<T>(key: string, value: T): Promise<void>;
+  loadCloud?<T>(key: string): Promise<T | null>;
 }
 
 type PokiSdk = {
@@ -90,11 +95,20 @@ class NullAdapter implements PlatformAdapter {
   gameplayStart(): void {}
   gameplayStop(): void {}
   loadingFinished(): void {}
+  signalGameReady(): void {
+    this.loadingFinished();
+  }
   happytime(): void {}
   syncSettings(): void {}
   async commercialBreak(): Promise<void> {}
   async rewardedBreak(): Promise<boolean> {
     return false;
+  }
+  async showMidgameAd(): Promise<void> {
+    return this.commercialBreak();
+  }
+  async showRewardedAd(): Promise<boolean> {
+    return this.rewardedBreak();
   }
   mountBanner(_container: HTMLElement): void {}
 }
@@ -117,6 +131,10 @@ class PokiAdapter implements PlatformAdapter {
 
   loadingFinished(): void {
     this.sdk?.gameLoadingFinished?.();
+  }
+
+  signalGameReady(): void {
+    this.loadingFinished();
   }
 
   happytime(): void {
@@ -160,6 +178,14 @@ class PokiAdapter implements PlatformAdapter {
     }
   }
 
+  async showMidgameAd(): Promise<void> {
+    return this.commercialBreak();
+  }
+
+  async showRewardedAd(): Promise<boolean> {
+    return this.rewardedBreak();
+  }
+
   mountBanner(_container: HTMLElement): void {
     // Poki intentionally does not expose a banner placement API.
   }
@@ -183,6 +209,10 @@ class CrazyAdapter implements PlatformAdapter {
 
   loadingFinished(): void {
     this.sdk?.game?.loadingStop?.();
+  }
+
+  signalGameReady(): void {
+    this.loadingFinished();
   }
 
   /** Site-wide celebration for a special moment (personal best). Best-effort. */
@@ -281,6 +311,28 @@ class CrazyAdapter implements PlatformAdapter {
       /* ignore cloud load failures */
     }
     return null;
+  }
+
+  async showMidgameAd(): Promise<void> {
+    return this.commercialBreak();
+  }
+
+  async showRewardedAd(): Promise<boolean> {
+    return this.rewardedBreak();
+  }
+
+  async saveCloud<T>(key: string, value: T): Promise<void> {
+    await this.saveData(key, JSON.stringify(value));
+  }
+
+  async loadCloud<T>(key: string): Promise<T | null> {
+    const raw = await this.loadData(key);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      return null;
+    }
   }
 }
 
