@@ -116,6 +116,7 @@ export const LEGACY_ROUTES: Route[] = [
         coins: body.coins,
         score: body.score,
         date: body.date,
+        sig: body.sig,
       });
       return { ...out };
     },

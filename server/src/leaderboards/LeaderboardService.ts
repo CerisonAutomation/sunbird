@@ -8,6 +8,7 @@
  * immediately changes the next read. Season snapshots freeze a full ranking
  * at season end (or on demand) so historical ladders survive data growth.
  */
+import { createHmac, timingSafeEqual } from "node:crypto";
 import type { Ctx } from "../core/ctx.js";
 import { HttpError, cleanText, boundedNum } from "../util/http.js";
 import { seasonId as seasonIdOf } from "../util/id.js";
@@ -119,6 +120,7 @@ export class LeaderboardService {
     coins?: unknown;
     score?: unknown;
     date?: unknown;
+    sig?: unknown;
   }): { ok: boolean } {
     const deviceId = typeof input.deviceId === "string" ? input.deviceId.slice(0, 64) : "";
     if (!deviceId) throw new HttpError(400, "missing deviceId", "invalidDevice");
@@ -130,6 +132,22 @@ export class LeaderboardService {
     const perfects = Math.round(boundedNum(input.perfects, 5_000));
     const coins = Math.round(boundedNum(input.coins, 100_000));
     const score = Math.round(boundedNum(input.score, 5_000_000));
+    // HMAC signing (LEADERBOARD_API.md v1.1): when a salt is configured the
+    // submission must carry sig = HMAC-SHA256(salt, "deviceId|distance|score")
+    // in hex. Production is fail-closed — without a salt every legacy score
+    // would be unsigned, so the endpoint refuses to run open.
+    const salt = this.ctx.cfg.leaderboardSalt;
+    if (process.env.NODE_ENV === "production" && !salt) {
+      throw new HttpError(503, "leaderboard signing not configured", "signingNotConfigured");
+    }
+    if (salt) {
+      const provided = typeof input.sig === "string" ? input.sig.trim() : "";
+      const expected = createHmac("sha256", salt).update(`${deviceId}|${distance}|${score}`).digest("hex");
+      const valid =
+        /^[0-9a-f]{64}$/i.test(provided) &&
+        timingSafeEqual(Buffer.from(provided, "hex"), Buffer.from(expected, "hex"));
+      if (!valid) throw new HttpError(403, "invalid signature", "invalidSignature");
+    }
     // Legacy clients never sent a run duration, so assume the game's
     // typical cruise average (15 m/s) when gating plausibility. Storing
     // that assumption keeps the row self-consistent on the board too.
