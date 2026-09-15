@@ -40,15 +40,26 @@ jobs:
       # The Actions log bundle is not always retrievable (results-receiver is
       # unreachable from some sandboxes), so the fmt diff — the only thing
       # that says WHAT to reformat — is also published where it survives.
+      # Self-checking (runs its own cargo fmt --check) instead of branching
+      # on the previous step's outcome, which the runner skips when the
+      # gate has already failed. continue-on-error keeps this purely
+      # informational — the Format (check) step above remains the gate.
       - name: Post fmt diff to the PR
-        if: steps.fmt.outcome == 'failure' && github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          (cd rust && cargo fmt --all && git diff) > /tmp/fmt-body.md
+          cd rust
+          if cargo fmt --all --check; then
+            echo "fmt clean"; cd ..; exit 0
+          fi
+          cargo fmt --all
+          git diff > /tmp/fmt-body.md
+          cd ..
           {
-            echo "### `cargo fmt` diff (run '"$GITHUB_RUN_ID"') — apply this, then rerun"
+            echo "### \`cargo fmt\` diff (run '${GITHUB_RUN_ID}') — apply this, then rerun"
             echo '```diff'
             cat /tmp/fmt-body.md
             echo '```'
