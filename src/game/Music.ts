@@ -221,6 +221,45 @@ const MEL_M = [
   67, -1, -1,  0,  0,  0,  0,  0,
 ];
 
+// Track 14 — Time's Light: Interstellar-style soaring — slow, wide intervals,
+// descends then launches skyward. Perfect for high-altitude moments.
+const MEL_N = [
+  72, -1, -1, -1, 79, -1, -1,  0,
+  77, -1,  0,  0, 74, -1,  0,  0,
+  72,  0, 69,  0, 72,  0, 76,  0,
+  79, -1, -1, -1,  0,  0,  0,  0,
+  81, -1, -1, -1, 84, -1, -1,  0,
+  83, -1,  0,  0, 81, -1,  0,  0,
+  79,  0, 76,  0, 74, -1,  0,  0,
+  72, -1, -1, -1,  0,  0,  0,  0,
+];
+
+// Track 15 — Horizon Chase: Journey-style hero theme — calls, answers, resolves.
+// Uplifting, memorable, built to echo in your head after you close the tab.
+const MEL_O = [
+  76,  0, 79, 0, 81, -1,  0,  0,
+  79,  0, 76, 0, 74,  0, 72,  0,
+  74,  0, 72, 0, 69,  0, 72,  0,
+  74, -1,  0, 0,  0,  0,  0,  0,
+  76,  0, 79, 0, 84,  0, 86,  0,
+  84,  0, 81, 0, 79, -1,  0,  0,
+  76,  0, 74, 0, 72,  0, 74,  0,
+  76, -1, 74,-1, 72, -1,  0,  0,
+];
+
+// Track 16 — Fever Dream: Celeste-style driving arpeggio figure.
+// 16th-note scalar runs; designed for the fever/chase section.
+const MEL_P = [
+  72, 74, 76, 79, 81, 79, 76, 74,
+  72, 74, 76, 79, 84, 83, 81, 79,
+  76, 74, 72, 74, 76, 79, 76, 74,
+  72, 71, 72, 74, 76, -1, -1,  0,
+  79, 81, 83, 84, 86, 84, 83, 81,
+  79, 77, 76, 74, 76, 79, 81, 79,
+  77, 76, 74, 72, 74, 76, 79, 76,
+  74, -1, 72, -1,  0,  0,  0,  0,
+];
+
 // Whistle counter-melody used in fever (per eighth, section-agnostic)
 const WHISTLE = [
   0, 0, 84, 0, 83, 0, 81, 0,
@@ -231,6 +270,18 @@ const WHISTLE = [
   83, -1, 0, 0, 79, 0, 0, 0,
   81, 0, 79, 0, 76, 0, 74, 0,
   72, -1, -1, -1, 0, 0, 0, 0,
+];
+
+// High-drama fever whistle — wider leaps, more urgent. Used on intense sections.
+const WHISTLE_B = [
+  0, 0, 88, 0, 86, -1, 0, 0,
+  84, 0, 81, 0, 79, 0, 76, 0,
+  79, -1, 0, 0, 84, -1, 0, 0,
+  86, -1, -1, -1, 0, 0, 0, 0,
+  0, 0, 91, 0, 89, -1, 0, 0,
+  88, 0, 84, 0, 86, 0, 84, 0,
+  81, -1, 0, 0, 79, 0, 76, 0,
+  77, -1, -1, -1, 0, 0, 0, 0,
 ];
 
 // Strum pattern per eighth: 1 = down, 2 = up, 0 = none (island strum D _ D U _ U D U)
@@ -258,6 +309,9 @@ export const TRACKS: Track[] = [
   { name: "Tide Runner",       prog: PROG_E, mel: MEL_K, mood: "reef"    },
   { name: "Magma Drift",       prog: PROG_F, mel: MEL_L, mood: "ember"   },
   { name: "Mesa Wind",         prog: PROG_I, mel: MEL_M, mood: "canyon"  },
+  { name: "Time's Light",      prog: PROG_B, mel: MEL_N, mood: "wide"    },
+  { name: "Horizon Chase",     prog: PROG_H, mel: MEL_O, mood: "bright"  },
+  { name: "Fever Dream",       prog: PROG_E, mel: MEL_P, mood: "reef"    },
 ];
 
 /** Track titles for the settings picker — keep in lockstep with TRACKS. */
@@ -266,18 +320,19 @@ export const TRACK_NAMES: string[] = TRACKS.map((t) => t.name);
 // Per-biome orchestration keeps each island sonically distinct while all
 // variants share the same original melodic identity.
 const BIOME_MIX: Record<BiomeMusicStyle, { bpm: number; fever: number; cutoff: number; uke: number; glock: number; bass: number; perc: number; whistle: number; transpose: number }> = {
-  bright:  { bpm: 112, fever: 126, cutoff: 9000,  uke: 1,    glock: 1,    bass: 1,    perc: 1,    whistle: 1,    transpose: 0  },
-  warm:    { bpm: 106, fever: 122, cutoff: 6200,  uke: 1.18, glock: 0.82, bass: 1.12, perc: 0.9,  whistle: 0.9,  transpose: -2 },
-  airy:    { bpm: 116, fever: 130, cutoff: 9800,  uke: 0.88, glock: 1.18, bass: 0.9,  perc: 1.15, whistle: 1.08, transpose: 2  },
-  wide:    { bpm: 110, fever: 124, cutoff: 7500,  uke: 0.85, glock: 0.9,  bass: 1.22, perc: 0.95, whistle: 1.1,  transpose: -3 },
-  night:   { bpm: 104, fever: 120, cutoff: 4600,  uke: 0.68, glock: 1.3,  bass: 0.82, perc: 0.65, whistle: 0.85, transpose: -5 },
-  crystal: { bpm: 114, fever: 128, cutoff: 10500, uke: 0.78, glock: 1.36, bass: 0.92, perc: 1.04, whistle: 1.25, transpose: 4  },
-  // Coral Reach: flowing, liquid — faster glock, reduced perc, open high end
-  reef:    { bpm: 118, fever: 132, cutoff: 11200, uke: 0.82, glock: 1.28, bass: 0.86, perc: 0.88, whistle: 1.15, transpose: 3  },
+  // fever BPMs bumped +6 for maximum urgency (old max was +14, now up to +20)
+  bright:  { bpm: 112, fever: 132, cutoff: 9000,  uke: 0.9,  glock: 1.2,  bass: 1,    perc: 1,    whistle: 1.1,  transpose: 0  },
+  warm:    { bpm: 106, fever: 128, cutoff: 6200,  uke: 1.1,  glock: 0.95, bass: 1.12, perc: 0.9,  whistle: 0.95, transpose: -2 },
+  airy:    { bpm: 116, fever: 136, cutoff: 9800,  uke: 0.8,  glock: 1.35, bass: 0.9,  perc: 1.15, whistle: 1.15, transpose: 2  },
+  wide:    { bpm: 110, fever: 130, cutoff: 7500,  uke: 0.8,  glock: 1.05, bass: 1.22, perc: 0.95, whistle: 1.15, transpose: -3 },
+  night:   { bpm: 104, fever: 126, cutoff: 4600,  uke: 0.62, glock: 1.45, bass: 0.82, perc: 0.65, whistle: 0.88, transpose: -5 },
+  crystal: { bpm: 114, fever: 134, cutoff: 10500, uke: 0.72, glock: 1.55, bass: 0.92, perc: 1.04, whistle: 1.3,  transpose: 4  },
+  // Coral Reach: flowing, liquid — brighter glock sparkle, open high end
+  reef:    { bpm: 118, fever: 138, cutoff: 11200, uke: 0.75, glock: 1.45, bass: 0.86, perc: 0.88, whistle: 1.2,  transpose: 3  },
   // Cinder Forge: tense, volcanic — heavy bass, muted highs, dark register
-  ember:   { bpm: 100, fever: 116, cutoff: 3800,  uke: 0.72, glock: 0.76, bass: 1.38, perc: 1.12, whistle: 0.62, transpose: -7 },
+  ember:   { bpm: 100, fever: 122, cutoff: 3800,  uke: 0.68, glock: 0.88, bass: 1.38, perc: 1.12, whistle: 0.65, transpose: -7 },
   // Skyreach Canyon: dry, cavernous — sparse whistle, deep bass, wide dynamics
-  canyon:  { bpm: 108, fever: 122, cutoff: 7000,  uke: 0.8,  glock: 0.84, bass: 1.28, perc: 0.78, whistle: 1.18, transpose: -4 },
+  canyon:  { bpm: 108, fever: 128, cutoff: 7000,  uke: 0.75, glock: 0.98, bass: 1.28, perc: 0.78, whistle: 1.22, transpose: -4 },
 };
 
 /** Keep every biome/night combination inside WebAudio's usable filter range. */
@@ -325,6 +380,8 @@ export class Music {
   private readonly padGain: GainNode;
   private readonly lullabyGain: GainNode;
   private readonly tensionGain: GainNode;
+  private readonly arpGain: GainNode;
+  private readonly organGain: GainNode;
   private readonly noise: AudioBuffer;
   private lullabyStep = 0;
   private baseLevel = 0;
@@ -358,14 +415,16 @@ export class Music {
       g.connect(this.bus);
       return g;
     };
-    this.ukeGain = mk(0.34);
-    this.glockGain = mk(0.3);
-    this.bassGain = mk(0.42);
+    this.ukeGain = mk(0.30);
+    this.glockGain = mk(0.38);
+    this.bassGain = mk(0.44);
     this.percGain = mk(0);
     this.whistleGain = mk(0);
     this.padGain = mk(0);
     this.lullabyGain = mk(0);
     this.tensionGain = mk(0);
+    this.arpGain = mk(0);
+    this.organGain = mk(0);
 
     const len = ctx.sampleRate;
     this.noise = ctx.createBuffer(1, len, ctx.sampleRate);
@@ -500,14 +559,17 @@ export class Music {
     const style = BIOME_MIX[this.biome];
     this.transpose = style.transpose;
     const song = m === "menu" || m === "play" || m === "fever" || m === "storm";
-    this.ukeGain.gain.setTargetAtTime(song ? (m === "menu" ? 0.3 : 0.36) * style.uke : 0, t, 0.4);
-    this.glockGain.gain.setTargetAtTime(song ? (m === "menu" ? 0.20 : 0.27) * style.glock : 0, t, 0.4);
-    this.bassGain.gain.setTargetAtTime(song ? 0.42 * style.bass : 0, t, 0.4);
-    this.percGain.gain.setTargetAtTime((m === "play" ? 0.20 : m === "fever" ? 0.32 : m === "storm" ? 0.42 : 0) * style.perc, t, 0.3);
-    this.whistleGain.gain.setTargetAtTime((m === "fever" ? 0.22 : 0) * style.whistle, t, 0.3);
-    // Warm pad bed: strongest on the menu (it carries the screen alone),
-    // subtle underneath play, gone in fever where percussion drives.
-    this.padGain.gain.setTargetAtTime(m === "menu" ? 0.16 : m === "play" ? 0.08 : 0, t, 0.8);
+    // Fever: glock leads more prominently (it's the hook the ear remembers).
+    this.ukeGain.gain.setTargetAtTime(song ? (m === "menu" ? 0.28 : m === "fever" ? 0.26 : 0.32) * style.uke : 0, t, 0.4);
+    this.glockGain.gain.setTargetAtTime(song ? (m === "menu" ? 0.22 : m === "fever" ? 0.38 : 0.30) * style.glock : 0, t, 0.4);
+    this.bassGain.gain.setTargetAtTime(song ? (m === "fever" ? 0.48 : 0.42) * style.bass : 0, t, 0.4);
+    this.percGain.gain.setTargetAtTime((m === "play" ? 0.22 : m === "fever" ? 0.36 : m === "storm" ? 0.46 : 0) * style.perc, t, 0.3);
+    this.whistleGain.gain.setTargetAtTime((m === "fever" ? 0.30 : 0) * style.whistle, t, 0.3);
+    this.arpGain.gain.setTargetAtTime(m === "fever" ? 0.18 * style.glock : 0, t, 0.5);
+    // Organ: Interstellar-style deep pad. Swells in play and fever.
+    this.organGain.gain.setTargetAtTime(m === "play" ? 0.10 : m === "fever" ? 0.18 : m === "menu" ? 0.06 : 0, t, 1.2);
+    // Warm pad bed: strongest on the menu, subtle underneath play.
+    this.padGain.gain.setTargetAtTime(m === "menu" ? 0.18 : m === "play" ? 0.06 : 0, t, 0.8);
     this.lullabyGain.gain.setTargetAtTime(m === "sleep" ? 0.3 : 0, t, 0.6);
     const cutoff = musicCutoff(style.cutoff, this.night, this.intensityTarget, this.ctx.sampleRate);
     this.filter.frequency.setTargetAtTime(cutoff, t, 0.55);
@@ -625,28 +687,49 @@ export class Music {
       if (this.mode !== "play" || this.step % 2 === 0 || this.intensity > 0.65) {
         this.shaker(t, this.step % 2 === 0 ? 0.48 : 0.24);
       }
-      if (this.step === 0 || this.step === 4) this.kick(t, this.step === 0 ? 1 : 0.8);
-      if (this.mode === "fever" && (this.step === 2 || this.step === 6)) this.clap(t);
+      if (this.step === 0 || this.step === 4) this.kick(t, this.step === 0 ? 1 : 0.82);
+      // Snare on 2&4 (steps 2 and 6) in fever — the heartbeat that locks the groove.
+      if (this.mode === "fever" && (this.step === 2 || this.step === 6)) {
+        this.clap(t);
+        this.snare(t, 0.9);
+      }
+      // Open hi-hat on the "and" of 2 in fever (step 3) — the sizzle between beats.
+      if (this.mode === "fever" && this.step === 3) this.hat(t, 0.22, 5000);
+      // Snare accent in high-intensity play (not full fever yet — building tension).
+      if (this.mode === "play" && this.intensity > 0.7 && (this.step === 2 || this.step === 6)) {
+        this.snare(t, 0.4 + this.intensity * 0.3);
+      }
       // Storm: relentless — kicks on every other eighth, like weather that won't quit.
-      if (this.mode === "storm" && (this.step === 2 || this.step === 6)) this.kick(t, 0.55);
-      if (this.step === 7 && this.bar % 2 === 1) this.shaker(t + beat * 0.22, 0.4);
+      if (this.mode === "storm" && (this.step === 2 || this.step === 6)) this.kick(t, 0.58);
+      if (this.step === 7 && this.bar % 2 === 1) this.shaker(t + beat * 0.22, 0.42);
 
-      // Tension layer: offbeat hats that swell with intensity, so the music
-      // climbs with speed, altitude and fever (SSX-style adaptive scoring).
+      // Tension layer: offbeat hats that swell with intensity (SSX-style adaptive).
       if (this.intensity > 0.05 && this.step % 2 === 1) {
         this.hat(t, 0.1 + this.intensity * 0.28, 6400 + this.intensity * 2600);
       }
       if (this.mode === "fever" && this.intensity > 0.6 && (this.step === 2 || this.step === 6)) {
-        this.hat(t + beat * 0.5, 0.08 + (this.intensity - 0.6) * 0.3, 8200);
+        this.hat(t + beat * 0.5, 0.08 + (this.intensity - 0.6) * 0.3, 8400);
       }
     }
 
-    // Whistle (fever)
+    // Organ: Interstellar-style deep swell on bar starts in play/fever.
+    if ((this.mode === "play" || this.mode === "fever") && this.step === 0 && this.bar % 2 === 0) {
+      this.organ(t, chordName, beat * 8);
+    }
+
+    // Arp bursts in fever — Celeste-style fills on offbeats between melody notes.
+    if (this.mode === "fever" && (this.step === 1 || this.step === 5) && this.intensity > 0.3) {
+      const arpNote = (UKE[chordName]?.[1] ?? 60) + 24 + this.transpose + stormShift;
+      this.arp(t, mtof(arpNote), beat * 0.9);
+    }
+
+    // Whistle (fever) — alternate between WHISTLE and WHISTLE_B each 4-bar phrase.
     if (this.mode === "fever") {
-      const w = WHISTLE[idx] ?? 0;
+      const whistleSrc = this.bar < 4 ? WHISTLE : WHISTLE_B;
+      const w = whistleSrc[idx] ?? 0;
       if (w > 0) {
         let len = 1;
-        while (WHISTLE[idx + len] === -1) len++;
+        while ((whistleSrc[idx + len] ?? 0) === -1) len++;
         this.whistle(t, mtof(w + this.transpose), beat * 0.5 * len * 0.95);
       }
     }
@@ -751,15 +834,18 @@ export class Music {
 
   private glock(t: number, freq: number, vel: number): void {
     const g = this.ctx.createGain();
-    const peak = 0.36 * vel;
+    // Brighter peak, longer ring (like a real glockenspiel bar or celesta)
+    const peak = 0.44 * vel;
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(peak, t + 0.003);
-    g.gain.exponentialRampToValueAtTime(peak * 0.25, t + 0.18);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.1);
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.002);
+    g.gain.exponentialRampToValueAtTime(peak * 0.3, t + 0.12);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.6);
+    // 4 partials (real marimba/glock harmonic series)
     const partials: [number, number][] = [
-      [1, 1],
-      [2.76, 0.35],
-      [5.4, 0.12],
+      [1,    1    ],
+      [2.76, 0.42 ],
+      [5.4,  0.15 ],
+      [8.93, 0.06 ],
     ];
     for (const [ratio, amp] of partials) {
       const o = this.ctx.createOscillator();
@@ -770,7 +856,7 @@ export class Music {
       o.connect(pg);
       pg.connect(g);
       o.start(t);
-      o.stop(t + 1.2);
+      o.stop(t + 1.7);
     }
     g.connect(this.glockGain);
   }
@@ -882,15 +968,109 @@ export class Music {
     const o = this.ctx.createOscillator();
     const g = this.ctx.createGain();
     o.type = "sine";
-    o.frequency.setValueAtTime(150, t);
-    o.frequency.exponentialRampToValueAtTime(48, t + 0.11);
+    // Punchier: higher start (180Hz), deeper finish (32Hz), bigger peak
+    o.frequency.setValueAtTime(180, t);
+    o.frequency.exponentialRampToValueAtTime(32, t + 0.14);
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.55 * vel, t + 0.004);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+    g.gain.exponentialRampToValueAtTime(0.72 * vel, t + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
     o.connect(g);
     g.connect(this.percGain);
     o.start(t);
-    o.stop(t + 0.22);
+    o.stop(t + 0.26);
+  }
+
+  /** Snare: noise burst + short tone hit (adds crack on 2&4 in fever). */
+  private snare(t: number, vel: number): void {
+    const src = this.ctx.createBufferSource();
+    src.buffer = this.noise;
+    const bp = this.ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = 1800;
+    bp.Q.value = 0.7;
+    const hp = this.ctx.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.value = 800;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.28 * vel, t + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+    src.connect(bp);
+    bp.connect(hp);
+    hp.connect(g);
+    g.connect(this.percGain);
+    // Tone crack
+    const tone = this.ctx.createOscillator();
+    const tg = this.ctx.createGain();
+    tone.type = "sine";
+    tone.frequency.setValueAtTime(200, t);
+    tone.frequency.exponentialRampToValueAtTime(90, t + 0.05);
+    tg.gain.setValueAtTime(0.0001, t);
+    tg.gain.exponentialRampToValueAtTime(0.14 * vel, t + 0.002);
+    tg.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+    tone.connect(tg);
+    tg.connect(this.percGain);
+    src.start(t);
+    src.stop(t + 0.18);
+    tone.start(t);
+    tone.stop(t + 0.1);
+  }
+
+  /** Short arpeggio burst: 4 quick notes up from root. Celeste-style fill. */
+  private arp(t: number, baseFreq: number, dur: number): void {
+    const intervals = [0, 4, 7, 12]; // root, third, fifth, octave
+    const stepDur = dur * 0.22;
+    for (let i = 0; i < 4; i++) {
+      const freq = baseFreq * Math.pow(2, intervals[i]! / 12);
+      const nt = t + i * stepDur;
+      const o = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      o.type = "sine";
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, nt);
+      g.gain.exponentialRampToValueAtTime(0.38, nt + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, nt + stepDur * 0.85);
+      o.connect(g);
+      g.connect(this.arpGain);
+      o.start(nt);
+      o.stop(nt + stepDur + 0.01);
+    }
+  }
+
+  /** Interstellar-style organ drone: 3 detuned sines + soft tremolo. */
+  private organ(t: number, chordName: string, dur: number): void {
+    const root = (BASS_ROOT[chordName] ?? 48) + this.transpose;
+    // Root + major 2nd + fifth (open, cinematic voicing like Zimmer's pipe organ)
+    const pitches = [root, root + 7, root + 12, root + 19];
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.38, t + dur * 0.18);
+    g.gain.setValueAtTime(0.38, t + dur * 0.72);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur * 1.05);
+    // Slow tremolo (Zimmer's pipe organ breathes at ~3 Hz)
+    const lfo = this.ctx.createOscillator();
+    const lfoG = this.ctx.createGain();
+    lfo.frequency.value = 2.8;
+    lfoG.gain.value = 0.06;
+    lfo.connect(lfoG);
+    lfoG.connect(g.gain);
+    const filt = this.ctx.createBiquadFilter();
+    filt.type = "lowpass";
+    filt.frequency.value = 600;
+    g.connect(filt);
+    filt.connect(this.organGain);
+    for (const pitch of pitches) {
+      for (const det of [-2, 0, 2]) {
+        const o = this.ctx.createOscillator();
+        o.type = "sine";
+        o.frequency.value = mtof(pitch) * Math.pow(2, det / 1200);
+        o.connect(g);
+        o.start(t);
+        o.stop(t + dur + 0.15);
+      }
+    }
+    lfo.start(t);
+    lfo.stop(t + dur + 0.15);
   }
 
   private clap(t: number): void {
