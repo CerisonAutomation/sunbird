@@ -109,6 +109,12 @@ export class Bird {
   private wingTuck = 0;
   private blink = 0;
   private glowPulse = 0;
+  private currentSkin: BirdSkinColors = {
+    body: 0xff7a45,
+    wing: 0xff9a62,
+    belly: 0xffe6c4,
+    beak: 0xffc447,
+  };
 
   constructor() {
     this.bodyMat = new THREE.MeshLambertMaterial({ color: 0xff7a45, emissive: 0xff7a45, emissiveIntensity: 0.08 });
@@ -265,6 +271,7 @@ export class Bird {
   }
 
   applySkin(skin: BirdSkinColors): void {
+    this.currentSkin = skin;
     this.bodyMat.color.setHex(skin.body);
     this.bodyMat.emissive.setHex(skin.body);
     this.wingMat.color.setHex(skin.wing);
@@ -509,9 +516,15 @@ export class Bird {
     this.glowPulse += dt * 6;
     this.glow.intensity = fever ? 2.6 + Math.sin(this.glowPulse) * 0.9 : 0.55;
     this.glow.color.setHex(fever ? 0xffe08a : 0xfff4dc);
-    this.bodyMat.emissive.set(fever ? 0x552200 : 0x221108);
-    this.wingMat.emissive.set(fever ? 0x441800 : 0x000000);
-    this.bellyMat.emissive.set(fever ? 0x332200 : 0x000000);
+    if (fever) {
+      this.bodyMat.emissive.set(0x552200);
+      this.wingMat.emissive.set(0x441800);
+      this.bellyMat.emissive.set(0x332200);
+    } else {
+      this.bodyMat.emissive.setHex(this.currentSkin.body);
+      this.wingMat.emissive.set(0x000000);
+      this.bellyMat.emissive.set(0x000000);
+    }
 
     const h = terrain.heightAt(px);
     const alt = Math.max(0, py - h);
@@ -522,6 +535,7 @@ export class Bird {
     // world wingspan after the flat rotation, so only y is modulated.
     const span = s * (1 - 0.45 * this.wingTuck) * (1 - 0.14 * (flap / 0.55));
     this.shadow.scale.set(s, span, 1);
+    this.shadow.rotation.z = Math.atan(terrain.slopeAt(px));
     (this.shadow.material as THREE.MeshBasicMaterial).opacity = 0.28 * s * (this.inWater ? 0.15 : 1);
   }
 

@@ -45,6 +45,29 @@ export class GameAudio {
   private coinStreak = 0;
   private lastCoinTime = 0;
 
+  private unlockListener: (() => void) | null = null;
+
+  constructor() {
+    if (typeof window !== "undefined") {
+      const unlock = () => {
+        void this.resume();
+        this.removeUnlockListeners();
+      };
+      this.unlockListener = unlock;
+      window.addEventListener("pointerdown", unlock, { passive: true });
+      window.addEventListener("touchstart", unlock, { passive: true });
+      window.addEventListener("keydown", unlock, { passive: true });
+    }
+  }
+
+  private removeUnlockListeners(): void {
+    if (!this.unlockListener || typeof window === "undefined") return;
+    window.removeEventListener("pointerdown", this.unlockListener);
+    window.removeEventListener("touchstart", this.unlockListener);
+    window.removeEventListener("keydown", this.unlockListener);
+    this.unlockListener = null;
+  }
+
   private ensure(): AudioContext | null {
     if (this.ctx) return this.ctx;
     const AC =
@@ -119,6 +142,7 @@ export class GameAudio {
   }
 
   async resume(): Promise<void> {
+    this.removeUnlockListeners();
     const ctx = this.ensure();
     if (!ctx) return;
     if (ctx.state === "suspended") {
@@ -152,6 +176,7 @@ export class GameAudio {
   }
 
   dispose(): void {
+    this.removeUnlockListeners();
     this.music?.dispose();
     if (this.ctx) void this.ctx.close();
     this.ctx = null;
@@ -260,11 +285,11 @@ export class GameAudio {
     windStrength = 0,
   ): void {
     if (!this.ctx || !this.whooshGain || !this.whooshFilter || !this.windGain || this.adMuted) return;
-    // Fever swells the wind so the audio feels as hot as the visuals look.
-    const whoosh =
-      playing && grounded && speed > 8
-        ? Math.min(0.28, (speed / 90) * (diving ? 0.24 : 0.12) * (fever ? 1.35 : 1))
-        : 0.0008;
+    // Rushing air when carving down slopes OR slicing down through the sky in a dive.
+    const activeRush = playing && ((grounded && speed > 8) || (diving && speed > 10));
+    const whoosh = activeRush
+      ? Math.min(0.32, (speed / 90) * (diving ? 0.26 : 0.12) * (fever ? 1.35 : 1))
+      : 0.0008;
     // Only write a parameter when it has actually moved, and clear the pending
     // ramp first. The old code called setTargetAtTime on three params on EVERY
     // animation frame (~180 automation events/second, forever). That grows the
@@ -315,6 +340,12 @@ export class GameAudio {
   }
 
   /* ---------- one-shots with juicy feedback ---------- */
+
+  /** Tactile aerodynamic tuck cue when initiating a dive. */
+  diveCue(): void {
+    this.noiseBurst(0.12, 600, 0.05);
+    this.tone(280, 0.09, "sine", 0.03, 140);
+  }
 
   chirp(): void {
     this.tone(440, 0.14, "sine", 0.16, 980);

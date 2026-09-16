@@ -2289,6 +2289,8 @@ button {
 }
 .race-hero.podium { background: linear-gradient(135deg, #fff3cf, #ffe3a1); border-color: rgba(200,150,40,0.4); }
 .race-hero.win { background: linear-gradient(135deg, #ffe9a8, #ffc14a); border-color: #c98a10; box-shadow: 0 0 24px rgba(255,190,80,0.45); }
+.race-hero.dnf { background: linear-gradient(135deg, #fdf2f2, #fae0df); border-color: rgba(220,60,60,0.3); }
+.race-hero.dnf .race-place b { color: #b91c1c; }
 .race-medal { font-size: 40px; grid-row: span 2; text-align: center; }
 .race-place b { font-size: 26px; font-weight: 900; margin-right: 6px; }
 .race-place span { font-size: 12px; color: #6a5a62; font-weight: 600; }
@@ -2983,6 +2985,95 @@ button {
   .room-controls {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* ---------- PvP & Quick Match Lobby Upgrade ---------- */
+.lobby-selector-box {
+  background: rgba(255, 255, 255, 0.68);
+  border: 1px solid rgba(180, 150, 120, 0.28);
+  border-radius: 16px;
+  padding: 10px 12px;
+  margin: 12px 0 16px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.lobby-selector-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #7a6352;
+  margin: 6px 0 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.lobby-selector-label b {
+  color: #2b1d16;
+  font-weight: 800;
+}
+.pills-scroll {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+.pills-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+.pills-scroll::-webkit-scrollbar-thumb {
+  background: rgba(180, 150, 120, 0.35);
+  border-radius: 999px;
+}
+.pvp-pill, .world-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid rgba(180, 150, 120, 0.28);
+  color: #3b2c24;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+  flex-shrink: 0;
+}
+.pvp-pill small, .world-pill small {
+  font-size: 10px;
+  opacity: 0.65;
+}
+.pvp-pill:hover, .world-pill:hover {
+  background: #fdf5e9;
+  border-color: #d6984e;
+}
+.pvp-pill.on, .world-pill.on {
+  background: linear-gradient(135deg, #ff9431, #ff6b3d);
+  color: #ffffff;
+  border-color: #e85929;
+  box-shadow: 0 2px 8px rgba(255, 107, 61, 0.35);
+  transform: scale(1.03);
+}
+.pvp-pill.on small, .world-pill.on small {
+  opacity: 0.9;
+  color: #fff9e6;
+}
+.quick-match-btns, .room-actions-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0 8px;
+}
+.quick-match-btns .large-btn, .room-actions-bar .large-btn {
+  font-size: 15px;
+  padding: 13px 18px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
 }
 
 /* pixel-perfect guards: chip rows wrap, room code shrinks */
@@ -4298,10 +4389,13 @@ button:focus-visible, .toggle:focus-visible {
    readable; blur does the rest. */
 .overlay .paper-card:not(.menu-hero) {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0) 120px),
-    rgba(255, 244, 228, 0.88);
-  -webkit-backdrop-filter: blur(14px) saturate(1.12);
-  backdrop-filter: blur(14px) saturate(1.12);
+    linear-gradient(165deg, rgba(255, 252, 245, 0.62) 0%, rgba(255, 244, 230, 0.48) 50%, rgba(255, 236, 218, 0.58) 100%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.22) !important;
+  backdrop-filter: blur(20px) saturate(1.22) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.65) !important;
+  box-shadow:
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.85),
+    0 24px 50px -12px rgba(18, 12, 28, 0.25) !important;
 }
 
 /* ─── Impact popups ─────────────────────────────────────────────────────────

@@ -6,6 +6,11 @@ import "./game/menu-polish.css";
 import App from "./App";
 import { preloadPortalSdk } from "./sdk/platform";
 
+// Enables CSS :active styling and low-latency touch response on iOS WebKit
+if (typeof document !== "undefined") {
+  document.addEventListener("touchstart", () => {}, { passive: true });
+}
+
 // The portal SDK script starts loading NOW (before first paint) so it is
 // ready by the first interactive frame — target-gated and failure-tolerant.
 preloadPortalSdk();

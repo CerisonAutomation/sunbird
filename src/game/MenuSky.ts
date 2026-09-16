@@ -36,9 +36,9 @@ export class MenuSky {
   /** Transparent overlay canvas that draws the hero bird ABOVE the UI card. */
   readonly heroHost: HTMLDivElement;
   private readonly canvas: HTMLCanvasElement;
-  private readonly ctx: CanvasRenderingContext2D;
+  private readonly ctx: CanvasRenderingContext2D | null;
   private readonly heroCanvas: HTMLCanvasElement;
-  private readonly hctx: CanvasRenderingContext2D;
+  private readonly hctx: CanvasRenderingContext2D | null;
   private readonly birds: Flocker[] = [];
   private readonly reduceMotion: boolean;
   private raf = 0;
@@ -48,6 +48,7 @@ export class MenuSky {
   /** Independent slow clock for the hero bird (its own drift, not the flock's). */
   private heroT = Math.random() * 100;
   private active = false;
+  private heroActive = true;
   private width = 1;
   private height = 1;
   private dpr = 1;
@@ -71,7 +72,7 @@ export class MenuSky {
     this.canvas = document.createElement("canvas");
     this.canvas.className = "menu-sky-canvas";
     this.host.appendChild(this.canvas);
-    this.ctx = this.canvas.getContext("2d")!;
+    this.ctx = this.canvas.getContext("2d");
 
     this.heroHost = document.createElement("div");
     this.heroHost.className = "menu-hero-layer";
@@ -79,7 +80,7 @@ export class MenuSky {
     this.heroCanvas = document.createElement("canvas");
     this.heroCanvas.className = "menu-sky-canvas";
     this.heroHost.appendChild(this.heroCanvas);
-    this.hctx = this.heroCanvas.getContext("2d")!;
+    this.hctx = this.heroCanvas.getContext("2d");
 
     for (let i = 0; i < FLOCK_SIZE; i++) {
       const depth = i / (FLOCK_SIZE - 1);
@@ -109,12 +110,12 @@ export class MenuSky {
     this.canvas.height = Math.floor(height * dpr);
     this.canvas.style.width = `${width}px`;
     this.canvas.style.height = `${height}px`;
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (this.ctx) this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.heroCanvas.width = Math.floor(width * dpr);
     this.heroCanvas.height = Math.floor(height * dpr);
     this.heroCanvas.style.width = `${width}px`;
     this.heroCanvas.style.height = `${height}px`;
-    this.hctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (this.hctx) this.hctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.buildScenery();
     // Paint immediately so a resize never leaves a blank frame behind.
     this.draw(0);
@@ -124,10 +125,19 @@ export class MenuSky {
     if (active === this.active) return;
     this.active = active;
     this.host.classList.toggle("on", active);
-    this.heroHost.classList.toggle("on", active);
+    this.heroHost.classList.toggle("on", active && this.heroActive);
     if (active && !this.reduceMotion) this.start();
     else this.stop();
     if (active) this.draw(0);
+  }
+
+  setHeroActive(active: boolean): void {
+    if (this.heroActive === active) return;
+    this.heroActive = active;
+    this.heroHost.classList.toggle("on", this.active && active);
+    if (!active && this.hctx) {
+      this.hctx.clearRect(0, 0, this.width, this.height);
+    }
   }
 
   dispose(): void {
@@ -164,6 +174,7 @@ export class MenuSky {
   /** Gradients + hill silhouettes are rebuilt only on a real resize. */
   private buildScenery(): void {
     const { ctx, height: h } = this;
+    if (!ctx) return;
 
     const sky = ctx.createLinearGradient(0, 0, 0, h);
     sky.addColorStop(0, "#1d3f6b");
@@ -184,7 +195,8 @@ export class MenuSky {
     this.hillNear = this.buildHill(0.76, 0.8, 4.3);
   }
 
-  private buildHill(baseY: number, amp: number, freq: number): Path2D {
+  private buildHill(baseY: number, amp: number, freq: number): Path2D | null {
+    if (typeof Path2D === "undefined") return null;
     const { width: w, height: h } = this;
     const p = new Path2D();
     const y0 = h * baseY;
@@ -203,22 +215,31 @@ export class MenuSky {
     const w = this.width;
     const h = this.height;
     const ctx = this.ctx;
+    if (!ctx) return;
     if (!this.skyGrad) this.buildScenery();
 
-    ctx.fillStyle = this.skyGrad!;
-    ctx.fillRect(0, 0, w, h);
+    if (this.skyGrad) {
+      ctx.fillStyle = this.skyGrad;
+      ctx.fillRect(0, 0, w, h);
+    }
 
     this.band(ctx, w, h, 0.4, 0.16, "rgba(255,255,255,0.30)", 0.16);
     this.band(ctx, w, h, 0.3, 0.2, "rgba(255,255,255,0.22)", 0.3);
     this.band(ctx, w, h, 0.2, 0.24, "rgba(255,255,255,0.16)", 0.5);
 
-    ctx.fillStyle = "rgba(40,74,92,0.55)";
-    ctx.fill(this.hillFar!);
-    ctx.fillStyle = "rgba(24,48,64,0.78)";
-    ctx.fill(this.hillNear!);
+    if (this.hillFar) {
+      ctx.fillStyle = "rgba(40,74,92,0.55)";
+      ctx.fill(this.hillFar);
+    }
+    if (this.hillNear) {
+      ctx.fillStyle = "rgba(24,48,64,0.78)";
+      ctx.fill(this.hillNear);
+    }
 
-    ctx.fillStyle = this.hazeGrad!;
-    ctx.fillRect(0, h * 0.55, w, h * 0.45);
+    if (this.hazeGrad) {
+      ctx.fillStyle = this.hazeGrad;
+      ctx.fillRect(0, h * 0.55, w, h * 0.45);
+    }
 
     for (const bird of this.birds) {
       if (dt > 0) this.step(bird, dt);
@@ -244,17 +265,18 @@ export class MenuSky {
     const w = this.width;
     const h = this.height;
     const ctx = this.hctx;
+    if (!ctx) return;
     ctx.clearRect(0, 0, w, h);
-    if (w < 2 || h < 2) return;
+    if (!this.heroActive || w < 2 || h < 2) return;
     const t = this.heroT;
     const wide = w >= 840; // same breakpoint that docks the card to the right
     const cx = wide
       ? w * (0.27 + 0.15 * Math.sin(t * 0.11))
-      : w * (0.5 + 0.33 * Math.sin(t * 0.09));
+      : w * (0.5 + 0.28 * Math.sin(t * 0.09));
     const cy = wide
       ? h * (0.36 + 0.09 * Math.sin(t * 0.07 + 1.3))
-      : h * (0.15 + 0.045 * Math.sin(t * 0.13 + 2.1));
-    const size = Math.min(w, h) * (wide ? 0.17 : 0.12);
+      : h * (0.08 + 0.035 * Math.sin(t * 0.13 + 2.1));
+    const size = Math.min(w, h) * (wide ? 0.17 : 0.095);
     const flap = FLAP_NEUTRAL + Math.sin(t * 2.1) * 0.55;
     ctx.save();
     ctx.translate(cx, cy);

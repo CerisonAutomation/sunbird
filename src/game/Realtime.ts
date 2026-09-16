@@ -135,10 +135,12 @@ export class RealtimeClient implements NetTransport {
   capacity = 40;
   errorText = "";
   startsAt = 0;
+  isAutonomous = false;
   private localReady = false;
   private requestedCode = "";
   private requestedSeed = "";
   private heartbeat = 0;
+  private autoReadyTimer: number | null = null;
 
   private ws: WebSocket | null = null;
   private readonly tracks = new Map<string, Track>();
@@ -162,11 +164,40 @@ export class RealtimeClient implements NetTransport {
   ) {}
 
   get connected(): boolean {
-    return this.ws?.readyState === WebSocket.OPEN && this.state !== "error";
+    return (this.ws?.readyState === WebSocket.OPEN && this.state !== "error") || this.isAutonomous;
   }
 
   get id(): string {
     return this.selfId || this.deviceId;
+  }
+
+  activateAutonomousRoom(code?: string, seed?: string): void {
+    this.clearConnectTimer();
+    if (this.retryTimer !== null) {
+      window.clearTimeout(this.retryTimer);
+      this.retryTimer = null;
+    }
+    this.isAutonomous = true;
+    this.roomCode = (code || makeRoomCode()).toUpperCase();
+    this.seed = seed || `${Date.now()}`;
+    this.state = "lobby";
+    this.errorText = "";
+    this.tracks.clear();
+
+    const mockPeers: { id: string; name: string; skin: string; hue: number }[] = [
+      { id: "auto_1", name: "Zephyr Wing", skin: "phoenix", hue: 0.12 },
+      { id: "auto_2", name: "Echo Falcon", skin: "aurora", hue: 0.55 },
+      { id: "auto_3", name: "Solaris Ace", skin: "solstice", hue: 0.82 },
+      { id: "auto_4", name: "Cloud Swift", skin: "stormcrow", hue: 0.38 },
+    ];
+
+    for (const p of mockPeers) {
+      const t = this.track(p.id);
+      t.name = p.name;
+      t.skin = p.skin;
+      t.hue = p.hue;
+      t.ready = false;
+    }
   }
 
   /** Joins (or creates) a room. `code` empty = matchmake into a public room. */
@@ -225,7 +256,7 @@ export class RealtimeClient implements NetTransport {
     this.connectTimer = window.setTimeout(() => {
       if (this.ws !== socket) return;
       this.connectTimer = null;
-      this.ws = null; // stale callbacks cannot revive a timed-out attempt
+      this.ws = null;
       socket.close();
       this.fail("Connection timed out. Leave the room and try again.");
     }, 10000);
@@ -291,12 +322,26 @@ export class RealtimeClient implements NetTransport {
     this.connectTimer = null;
   }
 
+  startNow(): void {
+    if (this.isAutonomous || !this.connected) {
+      this.state = "racing";
+      this.startsAt = Date.now() + 100;
+      this.pendingEvents.push({ type: "start" });
+    } else {
+      this.push({ type: "ready", ready: true });
+    }
+  }
+
   disconnect(): void {
     this.clearConnectTimer();
     this.closedByUs = true;
     if (this.retryTimer !== null) {
       window.clearTimeout(this.retryTimer);
       this.retryTimer = null;
+    }
+    if (this.autoReadyTimer !== null) {
+      window.clearTimeout(this.autoReadyTimer);
+      this.autoReadyTimer = null;
     }
     if (this.ws) {
       this.ws.onclose = null;
@@ -316,6 +361,7 @@ export class RealtimeClient implements NetTransport {
     this.heartbeat = 0;
     this.roomCode = "";
     this.state = "offline";
+    this.isAutonomous = false;
   }
 
   setIdentity(name: string, skin: string, hue: number): void {
@@ -508,6 +554,39 @@ export class RealtimeClient implements NetTransport {
   }
 
   sendReady(ready: boolean): boolean {
+    if (this.isAutonomous) {
+      this.localReady = ready;
+      if (this.autoReadyTimer !== null) {
+        window.clearTimeout(this.autoReadyTimer);
+        this.autoReadyTimer = null;
+      }
+      if (ready) {
+        let delay = 350;
+        const peers = Array.from(this.tracks.values());
+        for (const peer of peers) {
+          window.setTimeout(() => {
+            if (!this.localReady) return;
+            peer.ready = true;
+            this.pendingEvents.push({ type: "ready", name: peer.name });
+            if (peers.every((p) => p.ready)) {
+              this.startsAt = Date.now() + 1000;
+              this.autoReadyTimer = window.setTimeout(() => {
+                if (this.localReady && this.state === "lobby") {
+                  this.state = "racing";
+                  this.pendingEvents.push({ type: "start" });
+                }
+              }, 1000);
+            }
+          }, delay);
+          delay += 400;
+        }
+      } else {
+        for (const peer of this.tracks.values()) {
+          peer.ready = false;
+        }
+      }
+      return true;
+    }
     if (!this.connected || this.state !== "lobby") return false;
     this.localReady = ready;
     this.push({ type: "ready", ready });
@@ -612,7 +691,7 @@ export class RealtimeClient implements NetTransport {
     return {
       code: this.roomCode,
       seed: this.seed,
-      count: this.tracks.size + (this.connected ? 1 : 0),
+      count: this.tracks.size + (this.connected || this.isAutonomous ? 1 : 0),
       capacity: this.capacity,
       state: this.state,
       startsInMs: this.startsAt > 0 ? Math.max(0, this.startsAt - Date.now()) : 0,

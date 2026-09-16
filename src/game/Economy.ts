@@ -615,6 +615,16 @@ export function dailyDealBoost(dateStr: string): { id: string; price: number } {
   return { id: def.id, price: Math.max(10, Math.floor(def.price / 2 / 5) * 5) };
 }
 
+/** Deterministic daily flash sale: one bird skin at 40% off, same for all pilots each day. */
+export function dailyFlashBird(dateStr: string): { id: string; price: number; originalPrice: number; discountPct: number } {
+  const candidates = SKINS.filter(s => s.price > 0 && !s.goldOnly && !s.vipOnly && !s.prizeOnly);
+  let h = 7919;
+  for (let i = 0; i < dateStr.length; i++) h = ((h << 5) + h + dateStr.charCodeAt(i)) >>> 0;
+  const def = candidates[h % candidates.length] || candidates[0]!;
+  const price = Math.max(50, Math.floor((def.price * 0.6) / 5) * 5);
+  return { id: def.id, price, originalPrice: def.price, discountPct: 40 };
+}
+
 export const GOLD = {
   sku: "sunbird_gold" as const,
   price: "● 500",
@@ -678,6 +688,7 @@ export type SkinView = {
   locked: boolean;
   lockReason: "gold" | "vip" | null;
   affordable: boolean;
+  dealPrice?: number;
 };
 
 export type BoostView = {

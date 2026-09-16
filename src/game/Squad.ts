@@ -9,11 +9,58 @@
  * offline UI rather than breaking the menu.
  */
 
-const API = (import.meta.env.VITE_SOCIAL_URL ?? (import.meta.env.DEV ? "/social" : "")).replace(/\/$/, "");
+const ENV: Record<string, string | undefined> = (import.meta as unknown as { env?: Record<string, string> }).env ?? {};
+const API = (ENV.VITE_SOCIAL_URL ?? (ENV.DEV ? "/social" : "")).replace(/\/$/, "");
 
 export type Friend = { name: string; code: string; club_id: number | null };
 export type Club = { id: number; name: string; motto: string; members: number };
 export type ChatMessage = { id: number; name: string; text: string; at: string };
+
+export type SquadQuest = {
+  id: string;
+  title: string;
+  desc: string;
+  target: number;
+  rewardCoins: number;
+};
+
+export const SQUAD_QUESTS: SquadQuest[] = [
+  { id: "migration", title: "🦅 Flock Migration", desc: "Glide 4,000 m across championship circuits", target: 4000, rewardCoins: 150 },
+  { id: "drafting", title: "🌪 Slipstream Drafting", desc: "Hold slipstream behind wingmates for 25s", target: 25, rewardCoins: 120 },
+  { id: "precision", title: "✦ Perfect Formations", desc: "Chain 8 perfect kinetic carve launches", target: 8, rewardCoins: 100 },
+];
+
+export const DEFAULT_LOCAL_CLUBS: Club[] = [
+  { id: 1, name: "Apex Falcons", motto: "High-speed diving & kinetic carving", members: 28 },
+  { id: 2, name: "Golden Horizon", motto: "Chasing sunsets & endless migrations", members: 19 },
+  { id: 3, name: "Thermal Drifters", motto: "Drafting experts & slipstream trains", members: 24 },
+  { id: 4, name: "Cloud Striders", motto: "Casual gliders & sky explorers", members: 15 },
+];
+
+export const DEFAULT_LOCAL_FRIENDS: Friend[] = [
+  { name: "Echo Falcon", code: "SUN-ECH001", club_id: 1 },
+  { name: "Zephyr Sky", code: "SUN-ZEP999", club_id: 1 },
+  { name: "Aurora Wing", code: "SUN-AUR777", club_id: 2 },
+  { name: "Shadow Swift", code: "SUN-SWF505", club_id: 3 },
+];
+
+export const INITIAL_CLUB_CHAT: Record<number, ChatMessage[]> = {
+  1: [
+    { id: 101, name: "Echo Falcon", text: "Welcome to Apex Falcons! Hit the downslopes hard for maximum kinetic boost 🚀", at: "10m ago" },
+    { id: 102, name: "Zephyr Sky", text: "Just completed a 3,800m run in Sprint GP! Who's ready to fly?", at: "5m ago" },
+    { id: 103, name: "Shadow Swift", text: "Remember to tuck into slipstreams on the Tempest Draft circuit 🌪️", at: "2m ago" },
+  ],
+  2: [
+    { id: 201, name: "Aurora Wing", text: "Golden Horizon pilots: today's sunset flight is crystal clear 🌅", at: "15m ago" },
+    { id: 202, name: "Solbird", text: "Saved daylight on island 14! Keep gliding!", at: "8m ago" },
+  ],
+  3: [
+    { id: 301, name: "Vortex", text: "Drafting trains give +35% speed when 3 birds align!", at: "20m ago" },
+  ],
+  4: [
+    { id: 401, name: "Breeze", text: "Enjoying the gentle winds over Island 4 🌴", at: "30m ago" },
+  ],
+};
 
 export type SquadState = {
   live: boolean;
@@ -29,11 +76,12 @@ export type SquadState = {
   clubs: Club[];
   myClubId: number | null;
   chat: ChatMessage[];
+  isAutonomous?: boolean;
 };
 
 export function emptySquadState(): SquadState {
   return {
-    live: Boolean(API),
+    live: true,
     loading: false,
     busy: false,
     friendPage: 0,
@@ -46,6 +94,7 @@ export function emptySquadState(): SquadState {
     clubs: [],
     myClubId: null,
     chat: [],
+    isAutonomous: false,
   };
 }
 
@@ -91,6 +140,7 @@ export class SquadClient {
   private readonly lifetime = new AbortController();
   private membershipEpoch = 0;
   private onChange: () => void = () => undefined;
+  isAutonomous = false;
 
   constructor(
     private deviceId: string,
@@ -105,6 +155,65 @@ export class SquadClient {
   }
 
   dispose(): void { this.onChange = () => undefined; this.lifetime.abort(); }
+
+  enableAutonomous(): void {
+    this.isAutonomous = true;
+    this.state.isAutonomous = true;
+    this.state.live = true;
+    this.state.registered = true;
+    this.state.credentialError = false;
+    this.state.error = "";
+
+    // Generate or load persistent friend code
+    let localCode = "";
+    try {
+      localCode = localStorage.getItem("sunbird.squad.local_code") || "";
+    } catch { /* memory only */ }
+    if (!localCode || !localCode.startsWith("SUN-")) {
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      let suffix = "";
+      for (let i = 0; i < 6; i++) suffix += chars[Math.floor(Math.random() * chars.length)];
+      localCode = `SUN-${suffix}`;
+      try { localStorage.setItem("sunbird.squad.local_code", localCode); } catch { /* ignore */ }
+    }
+    this.state.myCode = localCode;
+
+    // Load or set persistent clubs
+    let clubs: Club[] = DEFAULT_LOCAL_CLUBS;
+    try {
+      const savedClubs = localStorage.getItem("sunbird.squad.local_clubs");
+      if (savedClubs) clubs = JSON.parse(savedClubs);
+    } catch { /* use defaults */ }
+    this.state.clubs = clubs;
+
+    // Load or set persistent friends
+    let friends: Friend[] = DEFAULT_LOCAL_FRIENDS;
+    try {
+      const savedFriends = localStorage.getItem("sunbird.squad.local_friends");
+      if (savedFriends) friends = JSON.parse(savedFriends);
+    } catch { /* use defaults */ }
+    this.state.friends = friends;
+
+    // Load or set joined club
+    let clubId: number | null = 1;
+    try {
+      const savedClubId = localStorage.getItem("sunbird.squad.local_club_id");
+      if (savedClubId !== null) clubId = savedClubId === "" ? null : Number(savedClubId);
+    } catch { /* default to club 1 */ }
+    this.setMembership(clubId);
+
+    // Load chat for active club
+    if (clubId) {
+      let chat: ChatMessage[] = INITIAL_CLUB_CHAT[clubId] || [];
+      try {
+        const savedChat = localStorage.getItem(`sunbird.squad.local_chat.${clubId}`);
+        if (savedChat) chat = JSON.parse(savedChat);
+      } catch { /* use initial */ }
+      this.state.chat = chat;
+    }
+
+    this.onChange();
+  }
 
   /** Explicit re-enrollment, never an unauthenticated claim of an old profile. */
   async startNewProfile(confirmed: boolean): Promise<void> {
@@ -169,6 +278,10 @@ export class SquadClient {
 
   /** Register + load profile & clubs. Called when the Squad screen opens. */
   async refresh(): Promise<void> {
+    if (this.isAutonomous) {
+      this.enableAutonomous();
+      return;
+    }
     if (this.state.busy) return; // a mutation owns its reconciliation
     await this.load();
   }
@@ -205,6 +318,24 @@ export class SquadClient {
   }
 
   async addFriend(code: string): Promise<string> {
+    if (this.isAutonomous) {
+      const clean = code.trim().toUpperCase();
+      if (!clean.startsWith("SUN-") || clean.length < 7) {
+        this.state.error = "Friend code must start with SUN-";
+        this.onChange();
+        return "";
+      }
+      if (this.state.friends.some(f => f.code === clean)) {
+        this.state.error = "This pilot is already in your squadron";
+        this.onChange();
+        return "";
+      }
+      const newFriend: Friend = { name: `Wingman-${clean.slice(-4)}`, code: clean, club_id: null };
+      this.state.friends.push(newFriend);
+      try { localStorage.setItem("sunbird.squad.local_friends", JSON.stringify(this.state.friends)); } catch {}
+      this.onChange();
+      return `${newFriend.name} added!`;
+    }
     return this.mutate(async () => {
       try {
         const r = await this.call<{ friend: Friend }>("/friends/add", {
@@ -221,6 +352,12 @@ export class SquadClient {
   }
 
   async removeFriend(code: string): Promise<void> {
+    if (this.isAutonomous) {
+      this.state.friends = this.state.friends.filter(f => f.code !== code);
+      try { localStorage.setItem("sunbird.squad.local_friends", JSON.stringify(this.state.friends)); } catch {}
+      this.onChange();
+      return;
+    }
     return this.mutate(async () => {
       try {
         await this.call("/friends/remove", { method: "POST", body: JSON.stringify({ deviceId: this.deviceId, code }) });
@@ -233,6 +370,19 @@ export class SquadClient {
   }
 
   async createClub(name: string, motto: string): Promise<string> {
+    if (this.isAutonomous) {
+      const newClub: Club = { id: Date.now(), name, motto, members: 1 };
+      this.state.clubs.unshift(newClub);
+      this.setMembership(newClub.id);
+      this.state.chat = [{ id: 1, name: this.nameOf(), text: `Founded ${name}! Ready for formation flights.`, at: "just now" }];
+      try {
+        localStorage.setItem("sunbird.squad.local_clubs", JSON.stringify(this.state.clubs));
+        localStorage.setItem("sunbird.squad.local_club_id", String(newClub.id));
+        localStorage.setItem(`sunbird.squad.local_chat.${newClub.id}`, JSON.stringify(this.state.chat));
+      } catch {}
+      this.onChange();
+      return "Club founded!";
+    }
     return this.mutate(async () => {
       try {
         const result = await this.call<{ club: Club }>("/clubs/create", {
@@ -252,6 +402,18 @@ export class SquadClient {
   }
 
   async joinClub(clubId: number): Promise<string> {
+    if (this.isAutonomous) {
+      this.setMembership(clubId);
+      let chat: ChatMessage[] = INITIAL_CLUB_CHAT[clubId] || [];
+      try {
+        const savedChat = localStorage.getItem(`sunbird.squad.local_chat.${clubId}`);
+        if (savedChat) chat = JSON.parse(savedChat);
+        localStorage.setItem("sunbird.squad.local_club_id", String(clubId));
+      } catch {}
+      this.state.chat = chat;
+      this.onChange();
+      return "Joined!";
+    }
     return this.mutate(async () => {
       try {
         await this.call("/clubs/join", {
@@ -269,6 +431,13 @@ export class SquadClient {
   }
 
   async leaveClub(): Promise<void> {
+    if (this.isAutonomous) {
+      this.setMembership(null);
+      this.state.chat = [];
+      try { localStorage.setItem("sunbird.squad.local_club_id", ""); } catch {}
+      this.onChange();
+      return;
+    }
     return this.mutate(async () => {
       try {
         await this.call("/clubs/leave", { method: "POST", body: JSON.stringify({ deviceId: this.deviceId }) });
@@ -284,9 +453,41 @@ export class SquadClient {
   }
 
   async sendChat(text: string): Promise<boolean> {
+    const t = text.trim();
+    if (!t) return false;
+    if (this.isAutonomous) {
+      const userMsg: ChatMessage = { id: Date.now(), name: this.nameOf(), text: t, at: "just now" };
+      this.state.chat.push(userMsg);
+      const clubId = this.state.myClubId;
+      if (clubId) {
+        try { localStorage.setItem(`sunbird.squad.local_chat.${clubId}`, JSON.stringify(this.state.chat)); } catch {}
+      }
+      this.onChange();
+
+      // Wingmate simulated AI banter
+      setTimeout(() => {
+        if (!this.state.myClubId || this.state.myClubId !== clubId) return;
+        const WINGMATES = ["Echo Falcon", "Zephyr Sky", "Shadow Swift", "Aurora Wing"];
+        const REPLIES = [
+          "Let's fly formation in the next mass race! 🦅",
+          "Great aerodynamic carving on those downslopes!",
+          "Pro tip: dive right on the crest slope for maximum launch speed 🚀",
+          "Drafting behind the pack gives a huge boost on Tempest Draft!",
+          "See you on the podium! 👑",
+          "Clean wings, clear skies! Let's get that victory.",
+        ];
+        const wingmate = WINGMATES[Math.floor(Math.random() * WINGMATES.length)]!;
+        const replyText = REPLIES[Math.floor(Math.random() * REPLIES.length)]!;
+        const replyMsg: ChatMessage = { id: Date.now() + 1, name: wingmate, text: replyText, at: "just now" };
+        this.state.chat.push(replyMsg);
+        if (this.state.chat.length > 50) this.state.chat.shift();
+        try { localStorage.setItem(`sunbird.squad.local_chat.${clubId}`, JSON.stringify(this.state.chat)); } catch {}
+        this.onChange();
+      }, 700);
+
+      return true;
+    }
     return this.mutate(async () => {
-      const t = text.trim();
-      if (!t) return false;
       this.state.error = "";
       try {
         const club = this.state.myClubId, epoch = this.membershipEpoch;
@@ -308,6 +509,7 @@ export class SquadClient {
   }
 
   async pollChat(reset: boolean): Promise<void> {
+    if (this.isAutonomous) return;
     const club = this.state.myClubId;
     if (this.lifetime.signal.aborted || !club || this.polling) return;
     const epoch = this.membershipEpoch;

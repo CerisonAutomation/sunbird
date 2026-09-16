@@ -17,7 +17,7 @@ import { BIG_LAUNCH_QUIPS, BOP_QUIPS, FEVER_QUIPS, GEM_QUIPS, MILESTONE_QUIPS, S
 import type { Fx } from "./Fx";
 import { DPR_COOLDOWN_SECONDS, nextBloomBudget, nextDpr, QUALITY_WINDOW_SECONDS } from "./quality";
 import { LaunchSystem, ratingLabel, type LaunchResult } from "./LaunchSystem";
-import { MASS_RACE_FIELD, MODES, modeById, RACE_FINISH, type ModeDef, type ModeId } from "./Modes";
+import { isRaceMode, MASS_RACE_FIELD, MODES, modeById, PVP_MODES, PVP_WORLDS, RACE_FINISH, type ModeDef, type ModeId, type PvpWorldCourse } from "./Modes";
 import { MassRace } from "./MassRace";
 import { FinishGate } from "./FinishGate";
 import { isMultiplayerConfigured, makeRoomCode, RealtimeClient } from "./Realtime";
@@ -64,6 +64,7 @@ import {
   FEVER_DURATION,
   FEVER_NEED,
   HEADSTART_DISTANCE,
+  ISLAND_PERIOD,
   MAGNET_TIME,
   MANUAL_BOOST_COOLDOWN,
   MANUAL_BOOST_SPEED,
@@ -77,7 +78,7 @@ import {
   ZENITH_DURATION,
   ZENITH_SLOWMO,
 } from "./constants";
-import { BOOSTS, COLLECTIONS, GOLD, PROMO_CODES, SHOP_TRAILS, SKINS, STARTER_PACK, VIP, WHEEL_SECTORS, dailyDealBoost, skinById, type BoostView, type ShopTrailDef, type ShopTrailView, type SkinDef, type SkinView } from "./Economy";
+import { BOOSTS, COLLECTIONS, GOLD, PROMO_CODES, SHOP_TRAILS, SKINS, STARTER_PACK, VIP, WHEEL_SECTORS, dailyDealBoost, dailyFlashBird, skinById, type BoostView, type ShopTrailDef, type ShopTrailView, type SkinDef, type SkinView } from "./Economy";
 import { nextWings, wingsFor, wingsProgress, wingsPromotion } from "./Career";
 import { GhostPlayer, GhostRecorder } from "./Ghost";
 import { fetchRivalGhost, publishGhost } from "./GhostNet";
@@ -268,6 +269,7 @@ export class Game {
   private shield = 0;
   private boostTimer = 0;
   private manualBoostCooldown = 0;
+  private wasDiving = false;
   private continuesUsed = 0;
   private continueTimer = 0;
   private adTimer = 0;
@@ -314,6 +316,7 @@ export class Game {
   private roomMuted = false;
   private lastEmoteAt = 0;
   private draftBanner = 0;
+  private wasDrafting = false;
   /** Rival tracking: who beat you last time, for the revenge prompt. */
   private nemesis = "";
   private photoFinish = "";
@@ -322,6 +325,9 @@ export class Game {
   private lastRatingBonus = 0;
   private lastPlace = 0;
   private overtakeAcc = 0;
+  private closeCallAcc = 0;
+  private nextKnockoutDist = 500;
+  private knockoutWarned = false;
   /** Ranked 1v1 duel: one seeded opponent, flat ±16 rating swing. */
   private duelActive = false;
   /** Matchmaking search deadline (wall-clock ms; 0 = not searching). Wall
@@ -386,6 +392,9 @@ export class Game {
   private coach: FirstFlight | null = null;
   private mode: ModeDef = modeById("daytrip");
   private modeId: ModeId = "daytrip";
+  private selectedPvpMode: ModeId = "pvp_sprint";
+  private selectedPvpWorld = "emerald";
+  private selectedCourse: PvpWorldCourse = PVP_WORLDS[0]!;
   /** Permanent per-mode mastery perks (coin/daylight/fever/lift), refreshed each run. */
   private masteryPerk: MasteryPerks = NO_MASTERY_PERKS;
   private maxAltitude = 0;
@@ -416,6 +425,7 @@ export class Game {
   private readonly onFocus: () => void;
   private readonly onBlur: () => void;
   private readonly onOrientationChange: () => void;
+  private readonly onFullscreenChange: () => void;
 
   private checkoutSku: Sku = "sunbird_gold";
   private checkoutBusy = false;
@@ -654,19 +664,30 @@ export class Game {
       void this.audio.suspend();
     };
     this.onOrientationChange = () => {
+      try { window.scrollTo(0, 0); } catch { /* ignore */ }
       this.resize();
       window.setTimeout(() => this.resize(), 100);
       window.setTimeout(() => this.resize(), 300);
     };
+    this.onFullscreenChange = () => {
+      this.resize();
+      const doc = document as Document & { webkitFullscreenElement?: Element };
+      const isFull = Boolean(doc.fullscreenElement || doc.webkitFullscreenElement);
+      this.hud.setFullscreenActive(isFull);
+    };
     window.addEventListener("focus", this.onFocus);
     window.addEventListener("blur", this.onBlur);
     window.addEventListener("orientationchange", this.onOrientationChange);
+    document.addEventListener("fullscreenchange", this.onFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", this.onFullscreenChange);
 
     this.hud.onAction((action, id) => this.handleAction(action, id));
     this.onResize = () => this.resize();
     this.resizeObs = new ResizeObserver(() => this.resize());
     this.resizeObs.observe(host);
     window.addEventListener("resize", this.onResize);
+    window.visualViewport?.addEventListener("resize", this.onResize);
+    window.visualViewport?.addEventListener("scroll", this.onResize);
     this.onVis = () => {
       if (document.hidden) {
         this.hidden = true;
@@ -796,6 +817,10 @@ export class Game {
     cancelAnimationFrame(this.raf);
     this.resizeObs.disconnect();
     window.removeEventListener("resize", this.onResize);
+    window.visualViewport?.removeEventListener("resize", this.onResize);
+    window.visualViewport?.removeEventListener("scroll", this.onResize);
+    document.removeEventListener("fullscreenchange", this.onFullscreenChange);
+    document.removeEventListener("webkitfullscreenchange", this.onFullscreenChange);
     document.removeEventListener("visibilitychange", this.onVis);
     this.renderer.domElement.removeEventListener("webglcontextlost", this.onContextLost);
     this.renderer.domElement.removeEventListener("webglcontextrestored", this.onContextRestored);
@@ -1012,11 +1037,15 @@ export class Game {
     if (this.input.diving) {
       if (this.needRelease) return;
       this.menuHold += dt;
-      if (this.menuHold > threshold) {
+      if (this.menuHold >= Math.min(threshold, 0.05)) {
         if (this.state === "gameover") this.replayRun(true);
         else this.startRun();
       }
     } else {
+      if (this.menuHold > 0 && !this.needRelease) {
+        if (this.state === "gameover") this.replayRun(true);
+        else this.startRun();
+      }
       this.needRelease = false;
       this.menuHold = 0;
     }
@@ -1027,6 +1056,11 @@ export class Game {
     // bird remains visible, but store perks never decide a competitive result.
     const skin = this.gameplaySkin;
     const diving = this.input.diving && !this.bird.asleep;
+    if (diving && !this.wasDiving && !this.bird.grounded && this.state === "playing") {
+      this.audio.diveCue();
+      this.haptic(10);
+    }
+    this.wasDiving = diving;
     this.magnetTimer = Math.max(0, this.magnetTimer - dt);
     this.boostTimer = Math.max(0, this.boostTimer - dt);
     this.manualBoostCooldown = Math.max(0, this.manualBoostCooldown - dt);
@@ -1163,9 +1197,15 @@ export class Game {
 
     // The rival field runs the same fixed-step contract as the player.
     if (this.massRace.active) {
-      this.massRace.step(dt, this.terrain, this.startX + this.mode.finish, this.runTime);
+      this.massRace.step(dt, this.terrain, this.startX + this.mode.finish, this.runTime, this.bird.x, this.bird.y);
       // Reward the player for holding a draft: visible, audible, scoring.
-      if (this.massRace.draft > 0.35) {
+      if (this.massRace.draft > 0.3) {
+        if (!this.wasDrafting) {
+          this.wasDrafting = true;
+          this.audio.diveCue();
+          this.haptic([10, 15, 20]);
+          this.popupAtBird("SLIPSTREAM", "power");
+        }
         this.draftBanner = Math.min(1, this.draftBanner + dt * 2);
         this.bonus += 14 * dt * this.massRace.draft;
         if (this.draftBanner > 0.98) {
@@ -1173,7 +1213,91 @@ export class Game {
           this.particles.emitWind(this.bird.x, this.bird.y, 0.8);
         }
       } else {
+        if (this.wasDrafting && this.massRace.draft < 0.12) {
+          this.wasDrafting = false;
+          if (this.bird.speed() > 18) {
+            this.audio.chirp();
+            this.haptic([15, 10, 25]);
+            this.popupAtBird("SLINGSHOT! 🚀", "perfect");
+            this.bird.vx = Math.min(234, this.bird.vx + 6);
+            this.particles.emitWind(this.bird.x, this.bird.y + 0.5, 1.6);
+          }
+        }
         this.draftBanner = Math.max(0, this.draftBanner - dt);
+      }
+      // Wingtip buzz near-miss feedback
+      this.closeCallAcc += dt;
+      if (this.closeCallAcc >= 0.35 && !this.bird.asleep) {
+        const close = this.massRace.checkCloseCall(this.bird.x, this.bird.y, this.bird.speed());
+        if (close) {
+          this.closeCallAcc = 0;
+          this.audio.chirp();
+          this.haptic(10);
+          this.popupAtBird("WINGTIP BUZZ! +50", "splash");
+          this.bonus += 50;
+          this.particles.emitWind(this.bird.x, this.bird.y, 0.9);
+        }
+      }
+
+      // Typhoon blitz storm tailwinds
+      if (this.modeId === "pvp_typhoon" && !this.bird.asleep && !this.bird.grounded) {
+        this.bird.vx = Math.min(235, this.bird.vx + dt * 4.0);
+      }
+
+      // Sky Slalom launch surge
+      if (this.modeId === "pvp_slalom" && this.bird.justLaunched && this.lastLaunch?.rating === "perfect") {
+        this.bird.vx = Math.min(240, this.bird.vx + 6.5);
+        this.popupAtBird("WARP SLALOM! ⚡", "fever");
+        this.particles.emitWind(this.bird.x, this.bird.y, 1.4);
+      }
+
+      // Stratosphere ascent thermal super-lift
+      if (this.modeId === "pvp_zenith" && this.weather.inThermal) {
+        this.bird.vy = Math.min(180, this.bird.vy + dt * 25);
+      }
+
+      // Knockout mode elimination evaluation
+      if (this.modeId === "pvp_knockout" && !this.bird.asleep) {
+        const dist = this.bird.x - this.startX;
+        if (this.nextKnockoutDist <= 3500) {
+          if (dist >= this.nextKnockoutDist - 60 && dist < this.nextKnockoutDist - 15) {
+            if (!this.knockoutWarned) {
+              this.knockoutWarned = true;
+              this.hud.toast(`⚠️ ELIMINATION IN ${Math.round(this.nextKnockoutDist - dist)}m — OUTFLY THE PACK!`, "warn");
+              this.audio.chirp();
+              this.haptic([15, 15, 30]);
+            }
+          }
+          if (dist >= this.nextKnockoutDist) {
+            this.knockoutWarned = false;
+            const targetDist = this.nextKnockoutDist;
+            this.nextKnockoutDist += 500;
+            const standings = this.massRace.standings(this.bird.x, this.startX, this.pilotName, 40);
+            if (standings.place === standings.total) {
+              this.hud.toast(`💥 ELIMINATED at ${targetDist}m!`, "warn");
+              this.audio.rivalDown();
+              this.finishRun();
+            } else {
+            const victim = this.massRace.eliminateTrailing(targetDist);
+            if (victim) {
+              const remaining = standings.total - 1;
+              if (remaining === 1 && standings.place === 1) {
+                this.racePlace = 1;
+                this.raceField = standings.total;
+                this.raceFinishTime = this.runTime;
+                this.save.noteRacePlace(1, standings.total);
+                this.hud.toast(`👑 ROYALE VICTORY! SOLE SURVIVOR!`, "gold");
+                this.audio.fanfare();
+                this.finishRun();
+              } else {
+                this.hud.toast(`💥 ELIMINATED: ${victim.name}! ${remaining} remain`, "gold");
+                this.audio.ding();
+                this.haptic(10);
+              }
+            }
+            }
+          }
+        }
       }
       // Overtake / lead-change feedback, sampled at ~4 Hz so the 41-row
       // sort never runs per physics tick.
@@ -1186,11 +1310,21 @@ export class Game {
           this.hud.toast(place === 1 ? "👑 LEAD! Hold it!" : `P${this.lastPlace} → P${place}!`, "gold");
           if (place === 1) {
             this.flash("perfect");
+            this.popupAtBird("👑 P1 LEAD!", "fever");
+            this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
             this.audio.purchase();
+            this.haptic([25, 15, 45]);
+            if (this.elapsed - this.lastEmoteAt >= 2.0) {
+              this.sendEmote("👑");
+            }
           } else if (gain >= 3) {
             this.audio.ding();
+            this.haptic(10);
+            this.popupAtBird(`P${this.lastPlace} → P${place}`, "great");
+          } else {
+            this.audio.ding();
+            this.haptic(8);
           }
-          this.haptic(10);
         }
         this.lastPlace = place;
       }
@@ -1258,10 +1392,12 @@ export class Game {
       this.skimTime += dt;
       if (this.skimTime > 1.1 && this.skimCd <= 0) {
         this.skimCd = 1.4;
-        const pts = 6;
+        const pts = 15;
         this.bonus += pts;
         this.awardXp(XP_RULES.coin);
         this.audio.ridgeSkim();
+        this.haptic(8);
+        this.popupAtBird("RIDGE SKIM! +15", "power");
         this.hud.toast(`Ridge skim +${pts}`, "cloud");
         this.particles.emitDust(this.bird.x, this.terrain.heightAt(this.bird.x) + 0.4, this.bird.speed(), slope);
       }
@@ -1391,6 +1527,10 @@ export class Game {
         );
         this.runCoins += value;
         this.bonus += 4 * COIN_VALUE * value;
+        if (this.modeId === "pvp_coinrush") {
+          this.bird.vx = Math.min(225, this.bird.vx + 2.5);
+          this.popupAtBird("COIN TURBO! ⚡", "splash");
+        }
         this.awardXp(XP_RULES.coin);
         this.audio.ding(gem);
         this.particles.emitCollect(x, y);
@@ -1514,9 +1654,21 @@ export class Game {
           if (!won) this.nemesis = rival.name;
           this.hud.toast(this.photoFinish, won ? "gold" : "warn");
           this.flash("perfect");
+          if (won) {
+            this.popupAtBird("PHOTO FINISH WIN!", "fever");
+            this.haptic([30, 20, 50, 20, 80]);
+          }
         } else if (s.place > 1) {
           const ahead = s.rows.find((r) => r.place === s.place - 1);
           if (ahead) this.nemesis = ahead.name;
+        }
+
+        if (s.place <= 3) {
+          this.popupAtBird(s.place === 1 ? "🥇 VICTORY!" : s.place === 2 ? "🥈 2ND PLACE!" : "🥉 3RD PLACE!", "fever");
+          this.flash("perfect");
+          this.haptic([40, 20, 60, 20, 100]);
+          this.particles.emitConfetti(this.bird.x, this.bird.y + 4);
+          this.particles.emitConfetti(this.bird.x + 3, this.bird.y + 6);
         }
 
         this.hud.toast(`FINISH · P${s.place} of ${s.total}`, s.place <= 3 ? "gold" : "island");
@@ -2238,11 +2390,18 @@ export class Game {
     // daily/gauntlet runs plus shared-field races (duels, events, stormfront,
     // mass races) keep their fixed seed so the field stays fair/comparable.
     const casualRun =
-      this.seedMode === "today" && !opts?.duel && !opts?.challenge && !opts?.event && !opts?.storm && this.modeId !== "massrace";
+      this.seedMode === "today" && !opts?.duel && !opts?.challenge && !opts?.event && !opts?.storm && !isRaceMode(this.modeId);
     if (casualRun) {
       this.rebuildWorld(`fly-${Math.random().toString(36).slice(2, 10)}`);
     } else if (opts?.challenge && this.seed !== this.today) {
       this.rebuildWorld(this.today);
+    } else if (isRaceMode(this.modeId)) {
+      const course = this.selectedCourse ?? (this.selectedPvpWorld ? PVP_WORLDS.find((w) => w.id === this.selectedPvpWorld) : null) ?? PVP_WORLDS[0]!;
+      this.startX = course.island * ISLAND_PERIOD + 64;
+      const targetSeed = `${this.seed}:${course.id}`;
+      if (this.seed !== targetSeed) {
+        this.rebuildWorld(targetSeed);
+      }
     }
     // Duels and challenges only apply when their action explicitly asks for
     // them; every other launch path resets to a plain run.
@@ -2279,10 +2438,11 @@ export class Game {
     this.weather.windMult = (this.eventRun ? this.weeklyMods.windMult : 1) * (this.stormfront ? 1.7 : 1);
     this.weather.stormfront = this.stormfront;
     if (this.stormfront) this.hud.toast("⛈ STORMFRONT — same storm for every pilot. Survive and outfly.", "warn");
-    // Mass Race: build the 40-bird grid on the *same* seed so the field is
+    // Mass Race & PvP Variants: build the 40-bird grid on the *same* seed so the field is
     // identical for anyone flying this race. Real players take over slots as
     // they join; unfilled slots keep flying as local squadron pilots.
-    if (this.modeId === "massrace") {
+    if (isRaceMode(this.modeId)) {
+      this.massRace.configureMode(this.modeId);
       const livePeers = !this.duelActive && !this.localRace && this.net?.connected ? this.net.roster() : null;
       const fieldSize = this.duelActive ? 1 : livePeers ? Math.max(1, livePeers.length) : this.roomSize;
       this.massRace.spawn(fieldSize, `${this.seed}:${this.modeId}:${fieldSize}`, this.terrain, this.startX);
@@ -2320,6 +2480,7 @@ export class Game {
       this.lastRatingBonus = 0;
       this.lastPlace = 0;
       this.overtakeAcc = 0;
+      this.closeCallAcc = 0;
       // Duels are strictly 1v1 vs the seeded opponent — never let a stale
       // room connection promote remote pilots into the field.
       if (this.duelActive) this.disconnectRace();
@@ -2751,13 +2912,19 @@ export class Game {
     this.masteryPerk = this.fairRace ? NO_MASTERY_PERKS : masteryPerks(this.save, this.modeId);
     // Shared/daily/ranked seeds must not depend on an individual save's skill.
     // Apply adaptive calibration only to an unshared casual flight, before sampling spawn.
-    this.terrain.setDifficulty(this.modeId !== "massrace" && this.seed.startsWith("fly-") ? this.flow.difficulty() : 1);
-    this.startX = 64;
+    this.terrain.setDifficulty(!isRaceMode(this.modeId) && this.seed.startsWith("fly-") ? this.flow.difficulty() : 1);
+    const course = isRaceMode(this.modeId) ? (this.selectedCourse ?? (this.selectedPvpWorld ? PVP_WORLDS.find((w) => w.id === this.selectedPvpWorld) : null) ?? PVP_WORLDS[0]!) : null;
+    this.startX = course ? course.island * ISLAND_PERIOD + 64 : 64;
     const y = this.terrain.heightAt(this.startX) + BIRD_RADIUS;
     this.bird.reset(this.startX, y);
+    if (this.modeId === "pvp_sprint" || this.modeId === "pvp_typhoon") {
+      this.bird.vx = 42;
+    }
+    this.nextKnockoutDist = 500;
+    this.knockoutWarned = false;
     this.daylight = this.daylightMax();
-    this.island = 0;
-    this.lastIsland = 0;
+    this.island = course ? course.island : 0;
+    this.lastIsland = course ? course.island : 0;
     this.perfects = 0;
     this.perfectChain = 0;
     this.skimTime = 0;
@@ -2795,6 +2962,8 @@ export class Game {
     this.shield = 0;
     this.boostTimer = 0;
     this.manualBoostCooldown = 0;
+    this.wasDiving = false;
+    this.wasDrafting = false;
     this.continuesUsed = 0;
     this.continueTimer = 0;
     this.timeScale = 1;
@@ -2937,6 +3106,9 @@ export class Game {
       case "pause":
         if (this.state === "playing") this.setState("paused");
         break;
+      case "toggle-fullscreen":
+        this.toggleFullscreen();
+        break;
       case "resume":
         void this.resumeFromPause();
         break;
@@ -3068,20 +3240,19 @@ export class Game {
         this.sendEmote(id || "👋");
         break;
       case "host-room": {
-        if (!isMultiplayerConfigured()) { this.hud.toast("Private rooms are unavailable in this edition. Try a practice race.", "info"); break; }
         this.disconnectRace();
         this.localRace = false;
         this.roomCode = makeRoomCode();
-        this.modeId = "massrace";
-        this.mode = modeById("massrace");
+        this.modeId = this.selectedPvpMode;
+        this.mode = modeById(this.selectedPvpMode);
         this.rankedRace = false;
         this.setScreen("live");
         this.preseatLobby();
-        this.hud.toast("Connecting your room… Copy the invite once connected.", "info");
+        this.hud.toast(`Flock room ${this.roomCode} ready!`, "gold");
+        this.bump();
         break;
       }
       case "join-room": {
-        if (!isMultiplayerConfigured()) { this.hud.toast("Private rooms are unavailable in this edition. Try a practice race.", "info"); break; }
         const code = normalizeRoomCode(this.hud.readValue("roomCode"));
         if (!code) {
           this.hud.toast("Enter a 5-letter room code", "warn");
@@ -3090,14 +3261,45 @@ export class Game {
         this.disconnectRace();
         this.localRace = false;
         this.roomCode = code;
-        this.modeId = "massrace";
-        this.mode = modeById("massrace");
+        this.modeId = this.selectedPvpMode;
+        this.mode = modeById(this.selectedPvpMode);
         this.rankedRace = false;
         this.setScreen("live");
         this.preseatLobby();
-        this.hud.toast(`Connecting to room ${code}…`, "info");
+        this.hud.toast(`Joined room ${code}`, "gold");
+        this.bump();
         break;
       }
+      case "select-pvp-mode": {
+        const mId = (id as ModeId) || "pvp_sprint";
+        this.selectedPvpMode = mId;
+        this.modeId = mId;
+        this.mode = modeById(mId);
+        this.hud.toast(`${this.mode.icon} ${this.mode.name}`, "gold");
+        this.bump();
+        break;
+      }
+      case "select-pvp-world": {
+        const wId = id || "emerald";
+        this.selectedPvpWorld = wId;
+        this.selectedCourse = PVP_WORLDS.find((w) => w.id === wId) ?? PVP_WORLDS[0]!;
+        this.hud.toast(`${this.selectedCourse.emoji} ${this.selectedCourse.name}`, "gold");
+        this.bump();
+        break;
+      }
+      case "quick-match-instant":
+        this.cancelMatchmaking();
+        this.disconnectRace();
+        this.modeId = this.selectedPvpMode;
+        this.mode = modeById(this.selectedPvpMode);
+        this.launchMatch({ ranked: true, storm: this.modeId === "pvp_typhoon" }, true);
+        break;
+      case "start-room-now":
+        if (this.net) this.net.startNow();
+        this.modeId = this.selectedPvpMode;
+        this.mode = modeById(this.selectedPvpMode);
+        this.launchMatch({ ranked: false, storm: this.modeId === "pvp_typhoon" }, false);
+        break;
       case "copy-invite": {
         if (this.roomCode) this.copyRoomInvite(this.roomCode);
         else this.hud.toast("Host a room first to get an invite link", "warn");
@@ -3106,23 +3308,20 @@ export class Game {
       case "start-room":
       case "ready-room": {
         if (!this.roomCode) {
-          this.hud.toast("Host or join a room first", "warn");
-          break;
+          this.roomCode = makeRoomCode();
         }
-        this.modeId = "massrace";
-        this.mode = modeById("massrace");
+        this.modeId = this.selectedPvpMode;
+        this.mode = modeById(this.selectedPvpMode);
         this.rankedRace = false;
-        if (!isMultiplayerConfigured()) {
-          this.hud.toast("No live server configured — starting a local practice field", "info");
-          this.startRun();
-          break;
-        }
         this.preseatLobby();
-        if (!this.net?.sendReady(!this.net.info().ready)) {
-          this.hud.toast("Connecting to the room — try ready again in a moment", "info");
-          break;
+        if (this.net) {
+          const isReady = !this.net.info().ready;
+          this.net.sendReady(isReady);
+          this.hud.toast(isReady ? "You are ready! ✓" : "Ready cancelled", "gold");
+        } else {
+          this.hud.toast("Starting race flock…", "info");
+          this.launchMatch({ ranked: false, storm: this.modeId === "pvp_typhoon" }, true);
         }
-        this.hud.toast(this.net.info().ready ? "You are ready — waiting for the flock" : "Ready cancelled", "gold");
         this.bump();
         break;
       }
@@ -3220,10 +3419,78 @@ export class Game {
         this.bump();
         break;
       }
+      case "claim-daily-stipend": {
+        this.save.addCoins(250);
+        this.save.state.lastStipendClaimed = this.today;
+        this.audio.chapterFanfare();
+        this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
+        this.hud.toast("🪙 Daily Flight Stipend Claimed! +● 250 coins!", "gold");
+        this.bump();
+        break;
+      }
+      case "buy-bundle": {
+        if (!this.save.spend(240)) {
+          this.hud.toast("Need ● 240 coins to claim Ace Wingman Crate", "warn");
+          break;
+        }
+        this.save.armBoost("shield");
+        this.save.armBoost("sunflask");
+        this.save.armBoost("magnet");
+        this.save.ownTrail("trail_tide");
+        this.save.equipTrail("trail_tide");
+        this.save.addCoins(250);
+        this.audio.chapterFanfare();
+        this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
+        this.hud.toast("📦 Ace Wingman Crate Unlocked! 3 Boosts + Tideglass Trail + 250 Coins!", "gold");
+        this.bump();
+        break;
+      }
+      case "claim-squad-quest": {
+        const questId = id;
+        const rewards: Record<string, number> = {
+          migration: 150,
+          drafting: 120,
+          precision: 100,
+        };
+        const coins = rewards[questId] ?? 100;
+        if (!this.save.state.squadQuestsClaimed) this.save.state.squadQuestsClaimed = {};
+        if (this.save.state.squadQuestsClaimed[questId] === this.today) {
+          this.hud.toast("Already claimed today!", "info");
+          break;
+        }
+        this.save.state.squadQuestsClaimed[questId] = this.today;
+        this.save.addCoins(coins);
+        this.audio.chapterFanfare();
+        this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
+        this.hud.toast(`🎁 Squadron Goal Claimed! +● ${coins} coins!`, "gold");
+        this.bump();
+        break;
+      }
+      case "squad-autonomous": {
+        this.squad?.enableAutonomous();
+        this.squadNotice = "⚡ Autonomous Squadron Hub active!";
+        this.audio.chapterFanfare();
+        this.bump();
+        break;
+      }
       case "open-squad":
         this.setScreen("squad");
         this.squadNotice = "";
-        void this.squad?.refresh();
+        if (this.squad) {
+          if (!this.squad.live || this.squad.isAutonomous) {
+            this.squad.enableAutonomous();
+          } else {
+            void this.squad.refresh().then(() => {
+              if (!this.squad?.state.registered) {
+                this.squad?.enableAutonomous();
+                this.bump();
+              }
+            }).catch(() => {
+              this.squad?.enableAutonomous();
+              this.bump();
+            });
+          }
+        }
         break;
       case "squad-page": {
         const [kind, page] = id.split(":");
@@ -3660,8 +3927,10 @@ export class Game {
       this.bump();
       return;
     }
-    if (!this.save.spend(def.price)) {
-      this.hud.toast(`Need ${def.price - st.wallet} more coins`, "warn");
+    const flash = dailyFlashBird(this.today);
+    const price = def.id === flash.id ? flash.price : def.price;
+    if (!this.save.spend(price)) {
+      this.hud.toast(`Need ${price - st.wallet} more coins`, "warn");
       return;
     }
     this.save.ownSkin(id);
@@ -3669,7 +3938,7 @@ export class Game {
     this.applySkin();
     this.audio.purchase();
     this.hud.toast(`${def.name} is yours!`, "gold");
-    this.telemetry.track("skin_bought", { id, price: def.price });
+    this.telemetry.track("skin_bought", { id, price });
     this.bump();
   }
 
@@ -4338,20 +4607,19 @@ export class Game {
     this.lastMatchOpts = opts;
     this.localRace = local;
     if (local) this.disconnectRace();
-    this.modeId = "massrace";
-    this.mode = modeById("massrace");
+    if (!isRaceMode(this.modeId)) {
+      this.modeId = this.selectedPvpMode;
+      this.mode = modeById(this.selectedPvpMode);
+    }
     this.rankedRace = opts.ranked;
-    this.stormfront = opts.storm;
-    this.startRun({ storm: opts.storm });
+    this.stormfront = opts.storm || this.modeId === "pvp_typhoon";
+    this.startRun({ storm: this.stormfront });
   }
 
   /** Pre-seats the lobby so the Race screen shows live pilots immediately. */
   private preseatLobby(): void {
-    if (!isMultiplayerConfigured()) return;
     // Warm the ghost source too so the next grid can seat real names.
     void this.refreshBoard();
-    // Join with the massrace seed WITHOUT mutating the current mode — the
-    // player may still back out and start a plain 1P flight.
     if (!this.net) {
       this.net = new RealtimeClient(this.save.state.deviceId, this.pilotName, this.skin.id, 0.06);
       this.massRace.attachTransport(this.net);
@@ -4537,7 +4805,7 @@ export class Game {
   /** A portal-controlled commercial break at the natural death/restart seam. */
   private replayRun(allowPortalBreak: boolean): void {
     if (this.versus) { this.startVersus(); return; }
-    if (this.modeId === "massrace" && this.roomCode && !this.localRace) {
+    if (isRaceMode(this.modeId) && this.roomCode && !this.localRace) {
       this.disconnectRace();
       this.roomCode = "";
       this.setState("menu");
@@ -4899,14 +5167,20 @@ export class Game {
     const stats = this.state === "menu" ? null : this.runStats();
     this.missionViews = this.missions.view(stats);
     this.questViews = this.missions.questView(this.today, stats);
-    this.skinViews = SKINS.map((def) => ({
-      def,
-      owned: st.ownedSkins.includes(def.id),
-      equipped: st.activeSkin === def.id,
-      locked: (Boolean(def.goldOnly) && !st.gold) || (Boolean(def.vipOnly) && !st.vip),
-      lockReason: def.vipOnly && !this.save.isVipActive() ? "vip" : def.goldOnly && !st.gold ? "gold" : null,
-      affordable: st.wallet >= def.price,
-    }));
+    const flash = dailyFlashBird(this.today);
+    this.skinViews = SKINS.map((def) => {
+      const dealPrice = def.id === flash.id ? flash.price : undefined;
+      const price = dealPrice ?? def.price;
+      return {
+        def,
+        owned: st.ownedSkins.includes(def.id),
+        equipped: st.activeSkin === def.id,
+        locked: (Boolean(def.goldOnly) && !st.gold) || (Boolean(def.vipOnly) && !st.vip),
+        lockReason: def.vipOnly && !this.save.isVipActive() ? "vip" : def.goldOnly && !st.gold ? "gold" : null,
+        affordable: st.wallet >= price,
+        dealPrice,
+      };
+    });
     const deal = dailyDealBoost(this.today);
     this.boostViews = BOOSTS.map((def) => {
       const dealPrice = def.id === deal.id ? deal.price : undefined;
@@ -5093,7 +5367,7 @@ export class Game {
       raceFinishM: this.mode.finish,
       raceField: this.raceField,
       raceFinishTime: this.raceFinishTime,
-      massRace: this.modeId === "massrace",
+      massRace: isRaceMode(this.modeId),
       multiplayerLive: isMultiplayerConfigured() && !(this.state === "playing" && this.localRace),
       roster:
         this.massRace.active && this.state === "playing"
@@ -5155,7 +5429,13 @@ export class Game {
       campaignTotal: campaignProgress(st.campaignClaimed).total,
       squad: this.squad?.state ?? emptySquadState(),
       squadNotice: this.squadNotice,
+      dailyFlash: dailyFlashBird(this.today),
+      stipendClaimed: this.save.state.lastStipendClaimed === this.today,
       showTutorialHand: this.state === "playing" && st.tutorialRuns < 2 && this.hintTimer < 2.6 && !this.input.diving,
+      pvpModes: PVP_MODES,
+      pvpWorlds: PVP_WORLDS,
+      selectedPvpMode: this.selectedPvpMode,
+      selectedPvpWorld: this.selectedPvpWorld,
     };
     this.hud.update(snap);
   }
@@ -5274,9 +5554,70 @@ export class Game {
     if (this.p2) this.p2.bird.root.visible = false;
   }
 
+  private toggleFullscreen(): void {
+    const doc = document as Document & {
+      webkitFullscreenElement?: Element;
+      mozFullScreenElement?: Element;
+      msFullscreenElement?: Element;
+      webkitExitFullscreen?: () => Promise<void>;
+      webkitCancelFullScreen?: () => Promise<void>;
+      mozCancelFullScreen?: () => Promise<void>;
+      msExitFullscreen?: () => Promise<void>;
+    };
+    const docEl = (document.documentElement || document.body) as HTMLElement & {
+      webkitRequestFullscreen?: () => Promise<void>;
+      webkitRequestFullScreen?: () => Promise<void>;
+      mozRequestFullScreen?: () => Promise<void>;
+      msRequestFullscreen?: () => Promise<void>;
+    };
+    const isFull = Boolean(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
+    if (!isFull) {
+      const req = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.webkitRequestFullScreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
+      if (req) {
+        try {
+          const res = req.call(docEl);
+          if (res && typeof res.then === "function") {
+            res.then(() => {
+              this.hud.toast("Full screen mode", "gold");
+              this.resize();
+            }).catch(() => {
+              this.hud.toast("Full screen mode unavailable", "info");
+            });
+          } else {
+            this.hud.toast("Full screen mode", "gold");
+            this.resize();
+          }
+        } catch {
+          this.hud.toast("Full screen mode unavailable", "info");
+        }
+      } else {
+        this.hud.toast("Full screen not supported on this browser", "info");
+      }
+    } else {
+      const exit = doc.exitFullscreen || doc.webkitExitFullscreen || doc.webkitCancelFullScreen || doc.mozCancelFullScreen || doc.msExitFullscreen;
+      if (exit) {
+        try {
+          const res = exit.call(doc);
+          if (res && typeof res.then === "function") {
+            res.then(() => {
+              this.hud.toast("Exited full screen", "info");
+              this.resize();
+            }).catch(() => {});
+          } else {
+            this.hud.toast("Exited full screen", "info");
+            this.resize();
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+
   private resize(): void {
-    const w = this.host.clientWidth || window.innerWidth;
-    const h = this.host.clientHeight || window.innerHeight;
+    const vv = typeof window !== "undefined" ? window.visualViewport : null;
+    const w = Math.round(vv?.width ?? (this.host.clientWidth || window.innerWidth));
+    const h = Math.round(vv?.height ?? (this.host.clientHeight || window.innerHeight));
     // A ResizeObserver and window resize can report the same size. Avoid
     // resetting canvas storage / bloom targets twice (or on unchanged DPR).
     if (w !== this.renderWidth || h !== this.renderHeight || this.dpr !== this.renderDpr) {

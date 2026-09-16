@@ -86,6 +86,52 @@
 .volume-control { display: flex; gap: 12px; align-items: center; }
 .volume-control input { flex: 1; width: 0; height: 44px; cursor: pointer; }
 .volume-control output { width: 42px; text-align: right; font-size: 12px; color: #6e5144; font-variant-numeric: tabular-nums; }
+.volume-control input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  touch-action: pan-y;
+}
+.volume-control input[type="range"]::-webkit-slider-runnable-track {
+  height: 8px;
+  background: #e8dbc6;
+  border-radius: 999px;
+  border: 1px solid #d4c3ab;
+}
+.volume-control input[type="range"]::-moz-range-track {
+  height: 8px;
+  background: #e8dbc6;
+  border-radius: 999px;
+  border: 1px solid #d4c3ab;
+}
+.volume-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff9a62, #ff6b3d);
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(120, 60, 20, 0.35);
+  margin-top: -9px;
+  transition: transform 0.12s ease;
+}
+.volume-control input[type="range"]::-moz-range-thumb {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff9a62, #ff6b3d);
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(120, 60, 20, 0.35);
+  transition: transform 0.12s ease;
+}
+.volume-control input[type="range"]:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+.volume-control input[type="range"]:active::-moz-range-thumb {
+  transform: scale(1.15);
+}
 /* The track remains small; its actual touch target is 52×44px. */
 .overlay .toggle { position: relative; flex: 0 0 52px; width: 52px; height: 44px; border-radius: 12px; background: transparent; box-shadow: none; }
 .overlay .toggle::before { content: ""; position: absolute; width: 46px; height: 26px; top: 9px; left: 3px; background: #cfbdab; border-radius: 99px; }
@@ -494,6 +540,393 @@
 .squad-recovery input { flex:0 0 22px; width:22px; height:22px; }
 .squad-fields .club-card.mine { background:linear-gradient(#fff9e4,#fff0c9); border-color:#ddc397; }
 @media(max-width:360px) { .squad-invite { flex-wrap:wrap; } .squad-invite .mini-btn { margin-left:auto; } }
+
+/* Mobile touch ergonomics */
+.overlay button,
+.overlay a,
+.overlay summary,
+.overlay input,
+.overlay select,
+.hud-root button {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Ensure mobile interactive targets are at least 44px */
+.icon-btn,
+.back-btn,
+.btn-close,
+.hud-pause,
+.hud-mute {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* Landscape mobile viewports (e.g. phones in landscape) */
+@media (max-height: 520px) {
+  .hud-root .overlay {
+    padding-top: max(6px, env(safe-area-inset-top));
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+  .hud-root .overlay.menu,
+  .hud-root .overlay.gameover {
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+  }
+  .hud-root .overlay > .paper-card {
+    max-height: calc(100dvh - max(16px, env(safe-area-inset-top) + env(safe-area-inset-bottom)));
+  }
+  .screen-head {
+    padding: 6px 0 8px;
+    margin: -6px 0 8px;
+  }
+}
+
+/* Small mobile portrait (320px - 380px) */
+@media (max-width: 380px) {
+  .screen-head h2 {
+    font-size: 19px;
+  }
+  .destination-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .stat-block {
+    padding: 4px 6px;
+  }
+}
+
+/* Translucent frosted glass menu aesthetics */
+.menu-hero .hero {
+  background: rgba(255, 255, 255, 0.28) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.55) !important;
+}
+
+.destination-grid .destination {
+  background: linear-gradient(145deg, rgba(255, 253, 245, 0.62), rgba(245, 235, 218, 0.48)) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 3px 8px rgba(80, 50, 20, 0.06) !important;
+}
+
+.destination-grid .destination:hover,
+.destination-grid .destination:active {
+  background: linear-gradient(145deg, rgba(255, 255, 250, 0.76), rgba(250, 240, 222, 0.62)) !important;
+  border-color: rgba(255, 255, 255, 0.85) !important;
+}
+
+.home-record {
+  background: rgba(255, 255, 255, 0.35) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+}
+
+.pause-card {
+  background: linear-gradient(165deg, rgba(255, 252, 245, 0.62) 0%, rgba(255, 242, 228, 0.50) 100%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.2) !important;
+  backdrop-filter: blur(20px) saturate(1.2) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.7) !important;
+}
+
+.overlay.pause {
+  background: rgba(14, 18, 36, 0.22) !important;
+}
+
+/* Translucent frosted glass for all remaining screens and overlays */
+.overlay.continue,
+.overlay.gameover {
+  background:
+    radial-gradient(ellipse at 50% 18%, rgba(255, 214, 140, 0.12), transparent 55%),
+    rgba(14, 18, 32, 0.20) !important;
+}
+
+.overlay.ad {
+  background: rgba(10, 8, 20, 0.45) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  backdrop-filter: blur(16px) !important;
+}
+
+.ad-card {
+  background: rgba(20, 18, 38, 0.78) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  backdrop-filter: blur(20px) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Shop components */
+.skin-card,
+.boost-row,
+.trail-card {
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.65), rgba(255, 246, 232, 0.45)) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.65) !important;
+  border-radius: 16px;
+}
+
+.mystery-vault-card {
+  background: linear-gradient(135deg, rgba(255, 248, 220, 0.68), rgba(255, 232, 160, 0.52)) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.7) !important;
+}
+
+.shop-jumps button,
+.shop-filters button,
+.board-filters button,
+.board-scopes button {
+  -webkit-backdrop-filter: blur(8px) !important;
+  backdrop-filter: blur(8px) !important;
+  touch-action: manipulation;
+  min-height: 44px;
+}
+
+/* Settings components */
+.setting-row,
+.volume-control {
+  background: rgba(255, 255, 255, 0.38) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.55) !important;
+  border-radius: 14px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+}
+
+.danger-zone {
+  background: rgba(255, 240, 240, 0.42) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(255, 200, 200, 0.6) !important;
+  border-radius: 14px;
+  padding: 12px;
+}
+
+/* Leaderboard & high scores */
+.board-podium .podium-spot,
+.board-table,
+.score-table {
+  background: rgba(255, 255, 255, 0.38) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.55) !important;
+  border-radius: 16px;
+}
+
+.board-row.me {
+  background: rgba(255, 245, 200, 0.55) !important;
+}
+
+/* Nest pass */
+.tier-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.42)) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+}
+
+.tier-reward {
+  background: rgba(255, 255, 255, 0.55) !important;
+  border: 1px solid rgba(255, 255, 255, 0.65) !important;
+  touch-action: manipulation;
+  min-height: 44px;
+}
+
+.upsell {
+  background: linear-gradient(135deg, rgba(255, 248, 220, 0.68), rgba(255, 235, 170, 0.52)) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.7) !important;
+}
+
+/* Trophies & achievements */
+.trophy {
+  background: rgba(255, 255, 255, 0.45) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.55) !important;
+  border-radius: 16px;
+}
+
+.trophy.unlocked {
+  background: linear-gradient(145deg, rgba(255, 250, 230, 0.68), rgba(255, 238, 200, 0.52)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.75) !important;
+}
+
+/* Game modes */
+.mode-card {
+  background: linear-gradient(145deg, rgba(255, 253, 245, 0.65), rgba(245, 235, 218, 0.48)) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.65) !important;
+  border-radius: 16px;
+  touch-action: manipulation;
+  min-height: 64px;
+}
+
+.mode-card.on {
+  background: linear-gradient(145deg, rgba(255, 248, 225, 0.82), rgba(255, 235, 185, 0.68)) !important;
+  border-color: rgba(255, 190, 70, 0.85) !important;
+}
+
+/* Multiplayer & Race Lobby */
+.race-section {
+  background: rgba(255, 255, 255, 0.42) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  border-radius: 18px;
+}
+
+.room-flock {
+  background: rgba(255, 255, 255, 0.32) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  border-radius: 14px;
+}
+
+/* Results & game over */
+.results-grid .stat-tile {
+  background: rgba(255, 255, 255, 0.48) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  border-radius: 16px;
+}
+
+.race-hero {
+  background: linear-gradient(145deg, rgba(255, 250, 230, 0.68), rgba(255, 238, 200, 0.52)) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.72) !important;
+  border-radius: 18px;
+}
+
+.reward-strip,
+.vs-stat {
+  background: rgba(255, 255, 255, 0.42) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.55) !important;
+  border-radius: 12px;
+}
+
+.vs-hero {
+  background: linear-gradient(145deg, rgba(255, 248, 225, 0.75), rgba(255, 232, 180, 0.58)) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.7) !important;
+  border-radius: 18px;
+}
+
+/* Quests, challenges, campaign, squads */
+.quest-card,
+.challenge-card,
+.mission-card,
+.island-step,
+.squad-card,
+.club-card {
+  background: rgba(255, 255, 255, 0.45) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.58) !important;
+  border-radius: 14px;
+}
+
+/* Paywall & Checkout */
+.paywall-tier,
+.checkout-card {
+  background: linear-gradient(165deg, rgba(255, 252, 245, 0.68), rgba(255, 242, 228, 0.55)) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  backdrop-filter: blur(14px) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.7) !important;
+  border-radius: 20px;
+}
+
+/* Touch scrolling and interaction contracts */
+.paper-card,
+.shop-browser,
+.tier-track,
+.board-table,
+.mode-list,
+.cup-list {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+button,
+[data-ui] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Shimmering Animated Trail Swatches */
+.trail-swatch {
+  background-size: 200% 200% !important;
+  animation: trailShimmer 3.5s ease-in-out infinite !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+
+@keyframes trailShimmer {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Squadron Team Quests */
+.squad-quests {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0 16px;
+}
+
+.squad-quest-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(246, 248, 250, 0.85));
+  border: 1px solid rgba(220, 226, 235, 0.85);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.04);
+}
+
+.squad-quest-card .sq-info {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.squad-quest-card .sq-info b {
+  display: block;
+  font: 600 14px var(--display);
+  color: #2c3e50;
+}
+
+.squad-quest-card .sq-info span {
+  display: block;
+  font: 400 12px var(--body);
+  color: #7f8c8d;
+  margin-top: 2px;
+}
+
+.squad-quest-card .sq-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.squad-quest-card .sq-prog {
+  font: 600 12px var(--display);
+  color: #e67e22;
+  white-space: nowrap;
+}
 
 /* Mobile UX: strip effects for performance */
 @media(max-width:640px) {

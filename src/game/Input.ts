@@ -16,7 +16,11 @@ export class Input {
   splitMode: "off" | "vertical" | "horizontal" = "off";
   private readonly touches = new Map<number, 1 | 2>();
   private first = false;
-  private lastTapAt = 0;
+  private lastTapDownAt = 0;
+  private lastTapUpAt = 0;
+  private lastTapDuration = 0;
+  private lastTapX = 0;
+  private lastTapY = 0;
   private readonly onFirstGesture: () => void;
   private readonly el: HTMLElement;
   private readonly boundPointerDown: (e: PointerEvent) => void;
@@ -25,7 +29,9 @@ export class Input {
   private readonly boundKeyDown: (e: KeyboardEvent) => void;
   private readonly boundKeyUp: (e: KeyboardEvent) => void;
   private readonly boundContext: (e: Event) => void;
+  private readonly boundTouchStart: (e: TouchEvent) => void;
   private readonly boundTouchMove: (e: TouchEvent) => void;
+  private readonly boundWindowTouchMove: (e: TouchEvent) => void;
 
   constructor(el: HTMLElement, onFirstGesture: () => void) {
     this.el = el;
@@ -36,13 +42,27 @@ export class Input {
     this.boundKeyDown = (e) => this.onKeyDown(e);
     this.boundKeyUp = (e) => this.onKeyUp(e);
     this.boundContext = (e) => e.preventDefault();
-    this.boundTouchMove = (e) => {
+    this.boundTouchStart = (e: TouchEvent) => {
+      this.markFirst();
+      if (!this.isTyping(e.target) && !this.isInteractive(e.target)) {
+        if (e.cancelable) e.preventDefault();
+      }
+    };
+    this.boundTouchMove = (e: TouchEvent) => {
+      if (!this.isTyping(e.target) && !this.isInteractive(e.target)) {
+        if (e.cancelable) e.preventDefault();
+      }
+    };
+    this.boundWindowTouchMove = (e: TouchEvent) => {
       if (!this.isTyping(e.target) && !this.isInteractive(e.target)) {
         if (e.cancelable) e.preventDefault();
       }
     };
 
     el.addEventListener("pointerdown", this.boundPointerDown);
+    window.addEventListener("pointerdown", this.boundPointerDown);
+    el.addEventListener("touchstart", this.boundTouchStart, { passive: false });
+    window.addEventListener("touchstart", this.boundTouchStart, { passive: false });
     window.addEventListener("pointerup", this.boundPointerUp);
     window.addEventListener("pointercancel", this.boundPointerCancel);
     window.addEventListener("blur", this.boundBlur);
@@ -50,6 +70,7 @@ export class Input {
     window.addEventListener("keyup", this.boundKeyUp);
     el.addEventListener("contextmenu", this.boundContext);
     el.addEventListener("touchmove", this.boundTouchMove, { passive: false });
+    window.addEventListener("touchmove", this.boundWindowTouchMove, { passive: false });
   }
 
   get diving(): boolean {
@@ -104,6 +125,9 @@ export class Input {
 
   dispose(): void {
     this.el.removeEventListener("pointerdown", this.boundPointerDown);
+    window.removeEventListener("pointerdown", this.boundPointerDown);
+    this.el.removeEventListener("touchstart", this.boundTouchStart);
+    window.removeEventListener("touchstart", this.boundTouchStart);
     window.removeEventListener("pointerup", this.boundPointerUp);
     window.removeEventListener("pointercancel", this.boundPointerCancel);
     window.removeEventListener("blur", this.boundBlur);
@@ -111,6 +135,7 @@ export class Input {
     window.removeEventListener("keyup", this.boundKeyUp);
     this.el.removeEventListener("contextmenu", this.boundContext);
     this.el.removeEventListener("touchmove", this.boundTouchMove);
+    window.removeEventListener("touchmove", this.boundWindowTouchMove);
   }
 
   private markFirst(): void {
@@ -138,15 +163,32 @@ export class Input {
   private onPointerDown(e: PointerEvent): void {
     if (!this.enabled) return;
     if (this.isInteractive(e.target)) return;
+    if (this.touches.has(e.pointerId)) return;
     if (!this.isTyping(e.target)) e.preventDefault();
     this.markFirst();
+
     const now = performance.now();
-    if (now - this.lastTapAt <= 280) this.boostPressed = true;
-    this.lastTapAt = now;
+    const timeSinceLastUp = now - this.lastTapUpAt;
+    const dist = Math.hypot(e.clientX - this.lastTapX, e.clientY - this.lastTapY);
+
+    // Intentional double-tap boost:
+    // 1. Previous tap was a short tap (< 220ms duration)
+    // 2. Second tap follows quickly (< 280ms gap from release)
+    // 3. Second tap lands near first tap (< 80px radius)
+    if (timeSinceLastUp > 0 && timeSinceLastUp <= 280 && this.lastTapDuration > 0 && this.lastTapDuration <= 220 && dist <= 80) {
+      this.boostPressed = true;
+    }
+    this.lastTapDownAt = now;
+    this.lastTapX = e.clientX;
+    this.lastTapY = e.clientY;
+
     const who = this.whichPlayer(e);
     this.touches.set(e.pointerId, who);
     if (who === 2) this.p2Touch = true;
     else this.held = true;
+
+    this.spawnTouchRipple(e.clientX, e.clientY, who);
+
     try {
       this.el.setPointerCapture(e.pointerId);
     } catch {
@@ -162,6 +204,20 @@ export class Input {
   }
 
   private onPointerUp(e: PointerEvent): void {
+    const now = performance.now();
+    const duration = now - this.lastTapDownAt;
+    const dy = e.clientY - this.lastTapY;
+    const dx = e.clientX - this.lastTapX;
+
+    // Upward flick / swipe-up gesture for mobile rocket boost:
+    // dy <= -35px, duration < 320ms, vertical bias (|dy| > |dx| * 0.7)
+    if (dy <= -35 && duration < 320 && Math.abs(dy) > Math.abs(dx) * 0.7) {
+      this.boostPressed = true;
+    }
+
+    this.lastTapDuration = duration;
+    this.lastTapUpAt = now;
+
     const who = this.touches.get(e.pointerId);
     this.touches.delete(e.pointerId);
     if (who === 2) {
@@ -170,6 +226,20 @@ export class Input {
       this.held = [...this.touches.values()].includes(1);
     }
     if (this.splitMode === "off") this.held = this.touches.size > 0;
+  }
+
+  private spawnTouchRipple(x: number, y: number, player: 1 | 2 = 1): void {
+    if (typeof document === "undefined" || !x || !y) return;
+    try {
+      const ripple = document.createElement("span");
+      ripple.className = `touch-ripple p${player}`;
+      ripple.style.left = `${x}px`;
+      ripple.style.top = `${y}px`;
+      document.body.appendChild(ripple);
+      setTimeout(() => ripple.remove(), 400);
+    } catch {
+      /* ignore */
+    }
   }
 
   private onPointerEnd(): void {

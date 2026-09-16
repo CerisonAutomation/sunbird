@@ -1,6 +1,6 @@
 import type { SkinView } from "./Economy";
 
-export type ShopFilter = "all" | "owned" | "affordable";
+export type ShopFilter = "all" | "owned" | "affordable" | "nature" | "cosmic" | "elements" | "legendary";
 export type ShopBrowse = { query: string; filter: ShopFilter; preview: string };
 export const newShopBrowse = (): ShopBrowse => ({ query: "", filter: "all", preview: "" });
 
@@ -10,6 +10,10 @@ export function browseSkins(skins: readonly SkinView[], browse: ShopBrowse): Ski
   return skins.filter(v => {
     if (browse.filter === "owned" && !v.owned) return false;
     if (browse.filter === "affordable" && (v.owned || v.locked || v.def.prizeOnly || !v.affordable)) return false;
+    if (browse.filter === "nature" && v.def.collection !== "nature") return false;
+    if (browse.filter === "cosmic" && v.def.collection !== "cosmic") return false;
+    if (browse.filter === "elements" && v.def.collection !== "elements") return false;
+    if (browse.filter === "legendary" && v.def.rarity !== "legendary" && v.def.rarity !== "mythic") return false;
     const text = `${v.def.name} ${v.def.perk} ${v.def.collection ?? "starter"} ${v.def.rarity ?? ""}`.toLocaleLowerCase();
     return words.every(word => text.includes(word));
   });
