@@ -419,6 +419,7 @@ export class Game {
   private readonly onFocus: () => void;
   private readonly onBlur: () => void;
   private readonly onOrientationChange: () => void;
+  private readonly onFullscreenChange: () => void;
 
   private checkoutSku: Sku = "sunbird_gold";
   private checkoutBusy = false;
@@ -657,19 +658,30 @@ export class Game {
       void this.audio.suspend();
     };
     this.onOrientationChange = () => {
+      try { window.scrollTo(0, 0); } catch { /* ignore */ }
       this.resize();
       window.setTimeout(() => this.resize(), 100);
       window.setTimeout(() => this.resize(), 300);
     };
+    this.onFullscreenChange = () => {
+      this.resize();
+      const doc = document as any;
+      const isFull = Boolean(doc.fullscreenElement || doc.webkitFullscreenElement);
+      this.hud.setFullscreenActive(isFull);
+    };
     window.addEventListener("focus", this.onFocus);
     window.addEventListener("blur", this.onBlur);
     window.addEventListener("orientationchange", this.onOrientationChange);
+    document.addEventListener("fullscreenchange", this.onFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", this.onFullscreenChange);
 
     this.hud.onAction((action, id) => this.handleAction(action, id));
     this.onResize = () => this.resize();
     this.resizeObs = new ResizeObserver(() => this.resize());
     this.resizeObs.observe(host);
     window.addEventListener("resize", this.onResize);
+    window.visualViewport?.addEventListener("resize", this.onResize);
+    window.visualViewport?.addEventListener("scroll", this.onResize);
     this.onVis = () => {
       if (document.hidden) {
         this.hidden = true;
@@ -799,6 +811,10 @@ export class Game {
     cancelAnimationFrame(this.raf);
     this.resizeObs.disconnect();
     window.removeEventListener("resize", this.onResize);
+    window.visualViewport?.removeEventListener("resize", this.onResize);
+    window.visualViewport?.removeEventListener("scroll", this.onResize);
+    document.removeEventListener("fullscreenchange", this.onFullscreenChange);
+    document.removeEventListener("webkitfullscreenchange", this.onFullscreenChange);
     document.removeEventListener("visibilitychange", this.onVis);
     this.renderer.domElement.removeEventListener("webglcontextlost", this.onContextLost);
     this.renderer.domElement.removeEventListener("webglcontextrestored", this.onContextRestored);
@@ -3004,6 +3020,9 @@ export class Game {
         break;
       case "pause":
         if (this.state === "playing") this.setState("paused");
+        break;
+      case "toggle-fullscreen":
+        this.toggleFullscreen();
         break;
       case "resume":
         void this.resumeFromPause();
@@ -5342,9 +5361,57 @@ export class Game {
     if (this.p2) this.p2.bird.root.visible = false;
   }
 
+  private toggleFullscreen(): void {
+    const doc = document as any;
+    const docEl = (document.documentElement || document.body) as any;
+    const isFull = Boolean(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
+    if (!isFull) {
+      const req = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.webkitRequestFullScreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
+      if (req) {
+        try {
+          const res = req.call(docEl);
+          if (res && typeof res.then === "function") {
+            res.then(() => {
+              this.hud.toast("Full screen mode", "gold");
+              this.resize();
+            }).catch(() => {
+              this.hud.toast("Full screen mode unavailable", "info");
+            });
+          } else {
+            this.hud.toast("Full screen mode", "gold");
+            this.resize();
+          }
+        } catch {
+          this.hud.toast("Full screen mode unavailable", "info");
+        }
+      } else {
+        this.hud.toast("Full screen not supported on this browser", "info");
+      }
+    } else {
+      const exit = doc.exitFullscreen || doc.webkitExitFullscreen || doc.webkitCancelFullScreen || doc.mozCancelFullScreen || doc.msExitFullscreen;
+      if (exit) {
+        try {
+          const res = exit.call(doc);
+          if (res && typeof res.then === "function") {
+            res.then(() => {
+              this.hud.toast("Exited full screen", "info");
+              this.resize();
+            }).catch(() => {});
+          } else {
+            this.hud.toast("Exited full screen", "info");
+            this.resize();
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+
   private resize(): void {
-    const w = this.host.clientWidth || window.innerWidth;
-    const h = this.host.clientHeight || window.innerHeight;
+    const vv = typeof window !== "undefined" ? window.visualViewport : null;
+    const w = Math.round(vv?.width ?? (this.host.clientWidth || window.innerWidth));
+    const h = Math.round(vv?.height ?? (this.host.clientHeight || window.innerHeight));
     // A ResizeObserver and window resize can report the same size. Avoid
     // resetting canvas storage / bloom targets twice (or on unchanged DPR).
     if (w !== this.renderWidth || h !== this.renderHeight || this.dpr !== this.renderDpr) {

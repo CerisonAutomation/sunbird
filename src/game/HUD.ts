@@ -531,6 +531,7 @@ export class HUD {
           <p class="tagline">Your run is safe. Ready when you are.</p>
           <div class="pause-actions">
             <button class="primary-btn" data-ui data-action="resume">▶ Keep flying</button>
+            <button class="ghost-btn" data-ui data-action="toggle-fullscreen">⛶ Fullscreen mode</button>
             <button class="ghost-btn" data-ui data-action="restart-flight">↻ Restart flight</button>
             <button class="ghost-btn danger-btn" data-ui data-action="menu">✕ Exit flight</button>
           </div>
@@ -1283,6 +1284,18 @@ export class HUD {
     requestAnimationFrame(() => el.classList.add("rise"));
     this.after(() => el.remove(), 1100);
   }
+
+  setFullscreenActive(active: boolean): void {
+    const btns = this.root.querySelectorAll<HTMLButtonElement>('[data-action="toggle-fullscreen"]');
+    for (const b of btns) {
+      if (b.classList.contains("menu-fullscreen")) {
+        b.textContent = active ? "🗗" : "⛶";
+        b.title = active ? "Exit Fullscreen" : "Full Screen";
+      } else if (b.textContent?.includes("Fullscreen")) {
+        b.textContent = active ? "🗗 Exit Fullscreen" : "⛶ Fullscreen mode";
+      }
+    }
+  }
 }
 
 /* ---------- templates ---------- */
@@ -1867,6 +1880,13 @@ function renderMain(s: HudSnapshot): string {
       aria-label="${s.settings.mute ? "Unmute sound" : "Mute sound"}"
       title="${s.settings.mute ? "Unmute sound" : "Mute sound"}"
     >${s.settings.mute ? "\u{1F507}" : "\u{1F50A}"}</button>
+    <button
+      class="icon-btn menu-fullscreen"
+      data-ui
+      data-action="toggle-fullscreen"
+      aria-label="Toggle Fullscreen"
+      title="Toggle Fullscreen"
+    >⛶</button>
     <header class="hero">
       ${menuHorizon()}
       <!-- Sun and bird both come from Sunbird.ts, so the title screen, the
@@ -2265,6 +2285,7 @@ function renderSettings(s: HudSnapshot): string {
     ${toggle("Large text", "bigtext", s.settings.bigText)}
     <div class="setting-row setting-select"><label for="render-quality">Render quality</label><select id="render-quality" data-ui data-action="set-quality">${["auto", "high", "low"].map(q => `<option value="${q}" ${s.settings.quality === q ? "selected" : ""}>${q === "auto" ? "Auto · recommended" : q === "high" ? "High · more detail" : "Low · less GPU work"}</option>`).join("")}</select></div>
     <div class="setting-row"><span>Flights flown</span><b>${s.runsPlayed}</b></div>
+    <button class="soft-btn wide" data-ui data-action="toggle-fullscreen">⛶ Fullscreen mode</button>
     ${s.canInstall ? `<button class="soft-btn wide" data-ui data-action="install-app">⬇ Install Sunbird</button>` : ""}
     <details class="danger-zone" data-ref="resetOptions"><summary>Manage saved progress</summary><p class="fineprint">Reset deletes progress saved on this device. Export a save code from Account first.</p>
     <button class="ghost-btn danger" data-ui data-action="reset-progress">${s.resetArmed ? "Confirm: erase saved progress" : "Reset progress"}</button></details>
