@@ -1,6 +1,6 @@
 # Sunbird — Handoff Document
 
-_Last verified: 2026-09-16 · commit `arena/01a0a95f-sunbird` · full gate green · all 8 CI checks green_
+_Last verified: 2026-09-16 · branch `arena/01a0a95f-sunbird` · full gate green (949 tests, portal zips, production gate) · CI green_
 
 Sunbird is a one-button arcade glider (procedural islands, hold-to-dive). Single codebase,
 five build targets, one shared game core.
