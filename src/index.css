@@ -1307,3 +1307,44 @@ h2 {
     transform: none !important;
   }
 }
+
+/* ====== POLISH: Forms, Modals, States - Rest ====== */
+input, textarea, select { border: 1.5px solid #ddd; border-radius: 8px; font-size: 14px; font-family: inherit; }
+input:hover:not(:disabled), textarea:hover:not(:disabled), select:hover:not(:disabled) { border-color: #c0c0c0; }
+input:focus, textarea:focus, select:focus { outline: none; border-color: #ff7a45; box-shadow: 0 0 0 3px rgba(255,122,69,0.08); }
+
+label { font-size: 12px; font-weight: 600; color: #666; margin-bottom: 6px; }
+
+.badge { padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+.badge.success { background: #e8f5e9; color: #2e7d32; }
+.badge.error { background: #ffebee; color: #c62828; }
+
+.list-item { padding: 12px 16px; border-bottom: 1px solid #f0f0f0; cursor: pointer; }
+.list-item:hover { background: #fafafa; }
+
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.modal-content { animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+.toast { border-radius: 8px; padding: 12px 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 12px; }
+.toast.success { background: #4caf50; color: white; }
+.toast.error { background: #f44336; color: white; }
+
+.error-message { color: #d32f2f; font-size: 12px; margin-top: 4px; }
+.spinner { width: 16px; height: 16px; border: 2px solid #f3f3f3; border-top: 2px solid #ff7a45; border-radius: 50%; animation: spin 1s linear infinite; }
+
+.tab { padding: 12px 16px; border-bottom: 2px solid transparent; color: #666; font-weight: 600; cursor: pointer; }
+.tab:hover { color: #333; }
+.tab.active { color: #ff7a45; border-bottom-color: #ff7a45; }
+
+.dropdown-menu { background: white; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; }
+.dropdown-item { padding: 10px 16px; cursor: pointer; color: #333; display: flex; align-items: center; gap: 8px; }
+.dropdown-item:hover { background: #f5f5f5; color: #ff7a45; }
+
+.progress { height: 4px; background: #e0e0e0; border-radius: 2px; margin: 8px 0; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, #ff7a45, #ff5a36); transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: #f1f1f1; }
+::-webkit-scrollbar-thumb { background: #bbb; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #888; }
