@@ -578,9 +578,16 @@ export class HUD {
     const header = lane("hud-header", [".top-bar", ".mid-meta", ".power-chips", ".power-strip", ".roster-bar", ".versus-bar"]);
     lane("flight-messages", [".launch-banner", ".hint", ".goal-pop", ".finish-countdown", ".countdown"]);
     const footer = lane("flight-footer", [".goal-strip", ".draft-meter", ".fever-wrap", ".emote-wheel"]);
-    parent.appendChild(this.menuSky.host);
+    // The sky and hero layers must live INSIDE .hud-root for the z-order to
+    // work: sky canvas z0 behind the paper card (z1), hero sunbird z3 ABOVE
+    // the card. The 2D sky is prepended after innerHTML (innerHTML would
+    // otherwise destroy it), and the hero is appended last so it floats over
+    // the translucent card — the living part of the main-screen background.
+    // A merge once moved them to siblings of .hud-root (z4), which buried the
+    // hero bird behind the frosted card; keep them in here.
+    this.root.prepend(this.menuSky.host);
+    this.root.appendChild(this.menuSky.heroHost);
     parent.appendChild(this.root);
-    parent.appendChild(this.menuSky.heroHost);
     this.bind();
     this.overlayNavigation = new OverlayNavigation(this.root);
     // Observe only these small flow containers, not the full scene or per-frame

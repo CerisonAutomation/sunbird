@@ -111,6 +111,15 @@ test("the main-menu sky actually paints (no dead background)", async ({ page }) 
   await expect(skyHost).toHaveClass(/on/);
   await expect(heroHost).toHaveClass(/on/);
 
+  // Both layers must live INSIDE .hud-root: the hero layer (z3) only renders
+  // ABOVE the paper card (z1) while it shares the hud-root stacking context.
+  // If a merge moves them to siblings of .hud-root (z4), the hero sunbird is
+  // buried behind the frosted card and the main-screen background looks dead.
+  await expect(page.locator(".hud-root > .menu-sky")).toHaveCount(1);
+  await expect(page.locator(".hud-root > .menu-hero-layer")).toHaveCount(1);
+  await expect(page.locator(".game-root > .menu-sky")).toHaveCount(0);
+  await expect(page.locator(".game-root > .menu-hero-layer")).toHaveCount(0);
+
   // Count non-transparent pixels in the real raster: the sky gradient
   // covers 100% of the canvas, the hero bird is a solid silhouette.
   const skyPixels = await skyHost.locator(".menu-sky-canvas").evaluate(el => {
