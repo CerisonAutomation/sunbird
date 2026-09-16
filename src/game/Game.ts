@@ -254,6 +254,10 @@ export class Game {
   private hintTimer = 0;
   private hint = "";
   private runCoins = 0;
+  /** The end-of-run 3× coin bonus claims once per run — the results card
+   * re-renders every frame, so without this flag the bonus was re-claimable
+   * forever (each claim tripled runCoins and re-armed the card). */
+  private multiplierClaimed = false;
   private runClouds = 0;
   private zeniths = 0;
   private pickups = 0;
@@ -305,6 +309,8 @@ export class Game {
   private boardLoading = false;
   private lastPrize: PrizeGrant | null = null;
   private racePlace = 0;
+  /** Outcome of the in-flight run for the portal funnel (`complete` only when the goal was reached). */
+  private runOutcome: "complete" | "fail" = "fail";
   private raceField = 0;
   private raceFinishTime = 0;
   private net: RealtimeClient | null = null;
@@ -1102,7 +1108,7 @@ export class Game {
         boost: this.boostTimer > 0 || this.powers.boostOn(),
         liftMult: this.powers.liftMult() * this.masteryPerk.liftMult,
         // Slipstream: tucking behind a rival genuinely reduces your drag.
-        dragMult: this.powers.dragMult() * this.massRace.draftFor(this.bird.x, this.bird.y),
+        dragMult: this.powers.dragMult() * this.massRace.draftFor(this.bird.x, this.bird.y, dt),
         feather: this.powers.featherOn(),
         gravityMult: this.eventRun ? this.weeklyMods.gravityMult : 1,
       },
@@ -1643,6 +1649,7 @@ export class Game {
 
     // Finish line (Race / Mass Race) — reached by distance, not by clock.
     if (this.mode.finish > 0 && !this.runRecorded && this.bird.x - this.startX >= this.mode.finish) {
+      this.runOutcome = "complete";
       if (this.massRace.active) {
         // Placing is decided by who has actually crossed, not by a script.
         const s = this.massRace.standings(this.bird.x, this.startX, this.pilotName, 8);
@@ -2385,7 +2392,10 @@ export class Game {
   private startRun(opts?: RunOptions): void {
     this.exitVersus();
     this.mode = modeById(this.modeId);
-    // Portal game events: open this attempt's measurement span.
+    // Portal game events: open this attempt's measurement span. The run is a
+    // `fail` until the goal is actually reached (death/sun-out/elimination
+    // all keep it a fail).
+    this.runOutcome = "fail";
     this.platform?.measure("run", this.modeId, "start");
     // Snapshot the record to beat BEFORE this run writes anything, so the
     // mid-run "new record" moment and the results "NEW BEST" banner compare
@@ -2591,6 +2601,9 @@ export class Game {
     if (this.continuesUsed < maxContinues && (gold || canCoins || canAd)) {
       this.continueTimer = CONTINUE_TIMEOUT;
       this.setState("continue");
+      // Poki game-events: measure the rewarded offer's exposure (visible) so
+      // the dashboard can compare it against `interact` when tapped.
+      if (this.portalEnabled() && canAd) this.platform?.measure("button", "continue-ad", "visible");
     } else {
       this.finishRun();
     }
@@ -2623,8 +2636,11 @@ export class Game {
     // Rivals stay allocated — the next startRun() re-seeds the field, and
     // the server's official-place echo still needs the local finish times.
     if (this.massRace.active) this.massRace.group.visible = false;
-    // Portal game events: one outcome per attempt — the flight is complete.
-    this.platform?.measure("run", this.modeId, "complete");
+    // Portal game events: one outcome per attempt — `complete` when the run
+    // reached its goal, `fail` when it ended by death/elimination/sun-out.
+    // (Poki funnel contract: send complete OR fail, never both, and a start
+    // without an outcome would break the drop-off funnel.)
+    this.platform?.measure("run", this.modeId, this.runOutcome);
     const stats = this.runStats();
     this.newBest = this.bestAtStart > 0 && stats.distance > this.bestAtStart;
     // A personal best is the one moment CrazyGames wants celebrated site-wide.
@@ -2959,6 +2975,7 @@ export class Game {
     this.hintTimer = 0;
     this.hint = idle ? "" : "HOLD to dive";
     this.runCoins = 0;
+    this.multiplierClaimed = false;
     this.runClouds = 0;
     this.zeniths = 0;
     this.pickups = 0;
@@ -3089,12 +3106,16 @@ export class Game {
         break;
       }
       case "multiply-run-coins": {
-        if (this.runCoins > 0) {
+        // One claim per run. The old handler tripled runCoins on every click
+        // and the card re-armed from the live snapshot — an infinite 3× coin
+        // loop. Now it pays the bonus once and the card flips to a claimed
+        // chip (renderCoinMultiplierCard). No ad is shown, so no ad wording.
+        if (this.state === "gameover" && !this.multiplierClaimed && this.runCoins > 0) {
           const bonus = this.runCoins * 2;
+          this.multiplierClaimed = true;
           this.save.addCoins(bonus);
-          this.runCoins *= 3;
           this.audio.chapterFanfare();
-          this.hud.toast(`🎬 Ad Multiplier! 3x End-of-Run Coins (+● ${bonus})!`, "gold");
+          this.hud.toast(`3× flight bonus — +● ${bonus} coins`, "gold");
         }
         this.bump();
         break;
@@ -3731,6 +3752,8 @@ export class Game {
       case "continue-ad":
         if (this.state === "continue") {
           if (this.portalEnabled()) {
+            // Poki game-events: the player chose the rewarded option.
+            this.platform?.measure("button", "continue-ad", "interact");
             void this.continueWithPortalReward();
           } else {
             this.adReason = "continue";
@@ -5237,6 +5260,7 @@ export class Game {
       version: this.uiVersion,
       distance: stats.distance,
       coins: this.runCoins,
+      multiplierClaimed: this.multiplierClaimed,
       daylight: this.daylight,
       daylightMax: this.daylightMax(),
       fever: this.feverOn ? this.feverTimer / (FEVER_DURATION + this.gameplaySkin.feverBonus + this.masteryPerk.feverBonus) : this.perfectChain / FEVER_NEED,

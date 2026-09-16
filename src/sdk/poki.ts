@@ -323,7 +323,7 @@ export class PokiAdapter implements PlatformAdapter {
   }
 
   /* game events */
-  measure(category: string, label: string, action: "start" | "complete" | "fail"): void {
+  measure(category: string, label: string, action: string): void {
     try {
       this.sdk?.measure?.(category, label, action);
     } catch {

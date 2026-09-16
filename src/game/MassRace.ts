@@ -477,7 +477,7 @@ export class MassRace {
     }
   }
 
-  draftFor(x: number, y: number): number {
+  draftFor(x: number, y: number, dt: number): number {
     if (!this.group.visible) {
       this.draft = 0;
       return 1;
@@ -499,7 +499,10 @@ export class MassRace {
     // Flock drafting train: drafting behind multiple birds enhances the slipstream up to +35%!
     const packMultiplier = packCount > 1 ? Math.min(1.35, 1 + (packCount - 1) * 0.15) : 1;
     const targetDraft = Math.min(1, best * packMultiplier);
-    this.draft += (targetDraft - this.draft) * 0.15;
+    // Time-based exponential smoothing: a fixed per-frame factor would make the
+    // draft build and release ~2.4x faster on a 144 Hz display than at 60 Hz.
+    // Rate 9.75/s reproduces the old 0.15-per-frame feel exactly at 60 fps.
+    this.draft += (targetDraft - this.draft) * (1 - Math.exp(-dt * 9.75));
     return 1 - this.draft * this.draftMax;
   }
 
@@ -556,7 +559,9 @@ export class MassRace {
       if (Math.abs(r.bird.x - cameraX) > 120) continue;
       const dx = r.bird.x - playerX;
       const dy = Math.abs(r.bird.y - playerY);
-      const isDrafting = dx > 0 && dx <= DRAFT_BEHIND && dy <= DRAFT_LATERAL;
+      // Per-mode zone (Tempest Draft widens it to 38m) — the tag must match
+      // the physics zone, not the mode-default constant.
+      const isDrafting = dx > 0 && dx <= this.draftBehind && dy <= DRAFT_LATERAL;
 
       // Place by counting birds ahead (rivals + player). Same answer as the
       // 41-row standings sort this used to run EVERY frame, without the sort

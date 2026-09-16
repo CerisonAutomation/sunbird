@@ -95,6 +95,8 @@ export type HudSnapshot = {
   version: number;
   distance: number;
   coins: number;
+  /** True once this run's 3× coin bonus has been claimed (one claim per run). */
+  multiplierClaimed: boolean;
   daylight: number;
   daylightMax: number;
   fever: number;
@@ -2095,7 +2097,7 @@ function renderProgress(s: HudSnapshot): string {
       </div>
       ${s.canFreeSpin
         ? `<button class="primary-btn gold" data-ui data-action="spin-wheel" style="padding:8px 12px; font-size:13px;">Free Spin! 🎡</button>`
-        : `<button class="soft-btn" data-ui data-action="spin-wheel" style="padding:8px 12px; font-size:12px;">Spin · ● 100 / 📺</button>`}
+        : `<button class="soft-btn" disabled style="padding:8px 12px; font-size:12px; opacity:0.65;">🎡 Spins again tomorrow</button>`}
     </div>
 
     <div class="piggy-card" style="background:linear-gradient(135deg,#fff0f5,#ffd1dc); border:1px solid #f8a5c2; border-radius:16px; padding:12px 14px; margin:12px 0; display:flex; align-items:center; gap:12px;">
@@ -2686,6 +2688,26 @@ export function renderFlightRecap(path: [number, number][]): string {
     </div>`;
 }
 
+/**
+ * End-of-run 3× coin bonus card. Pure and exported so the claim contract is
+ * unit-testable: the bonus claims ONCE per run (Game.multiplierClaimed), the
+ * card carries no ad icon — it is a bonus, not an ad placement — and the
+ * title never wraps (nowrap) so narrow phones don't get a four-line header.
+ */
+export function renderCoinMultiplierCard(coins: number, claimed: boolean): string {
+  if (coins <= 0) return "";
+  if (claimed) {
+    return `<div class="multiplier-cta-card" style="background:#e8f5e9; border:1px solid #a5d6a7; border-radius:12px; padding:8px 12px; margin:14px 0; font-size:12px; font-weight:600; color:#2e7d32; text-align:center; white-space:nowrap;">✓ 3× flight bonus applied · +● ${coins * 2}</div>`;
+  }
+  return `<div class="multiplier-cta-card" style="background:linear-gradient(135deg,#e8f5e9,#c8e6c9); border:1px solid #a5d6a7; border-radius:16px; padding:12px 14px; margin:14px 0; display:flex; align-items:center; gap:12px; box-shadow:0 3px 0 #81c78440;">
+      <div style="flex:1; min-width:0;">
+        <b style="font:600 14px var(--display); color:#1b5e20; display:block; white-space:nowrap;">3× Flight Coin Bonus</b>
+        <span style="font-size:11px; color:#2e7d32; display:block;">Triple this run's ● ${coins} to ● ${coins * 3}!</span>
+      </div>
+      <button class="primary-btn gold" data-ui data-action="multiply-run-coins" style="padding:8px 14px; font-size:13px; white-space:nowrap;">Claim 3× (● +${coins * 2})</button>
+    </div>`;
+}
+
 function renderGameOver(s: HudSnapshot): string {
   if (s.versus && s.p1Stats && s.p2Stats) return renderVersusResult(s);
   const questTotal = s.claimedQuests.reduce((a, q) => a + q.reward, 0);
@@ -2747,16 +2769,7 @@ function renderGameOver(s: HudSnapshot): string {
       <div><span>${t("hud.stat.coins", undefined, "Coins")}</span><b>${s.coins}</b></div>
     </div>
 
-    ${s.coins > 0
-      ? `<div class="multiplier-cta-card" style="background:linear-gradient(135deg,#e8f5e9,#c8e6c9); border:1px solid #a5d6a7; border-radius:16px; padding:12px 14px; margin:14px 0; display:flex; align-items:center; gap:12px; box-shadow:0 3px 0 #81c78440;">
-          <span style="font-size:32px; flex:0 0 36px;">📺</span>
-          <div style="flex:1; min-width:0;">
-            <b style="font:600 15px var(--display); color:#1b5e20; display:block;">3× Flight Coin Bonus</b>
-            <span style="font-size:11px; color:#2e7d32; display:block;">Triple run earnings from ● ${s.coins} to ● ${s.coins * 3}!</span>
-          </div>
-          <button class="primary-btn gold" data-ui data-action="multiply-run-coins" style="padding:8px 14px; font-size:13px;">Claim 3× (● +${s.coins * 2})</button>
-        </div>`
-      : ""}
+    ${renderCoinMultiplierCard(s.coins, s.multiplierClaimed)}
 
     ${renderNextFlight(s)}
     <details class="result-details" data-ref="flightDetails"><summary>Flight details <span>Landmarks &amp; skill</span></summary><div class="over-stats">
