@@ -11,6 +11,8 @@ const OPTIMAL_LEAD = 70;
 
 export type RivalKind = "local" | "remote";
 
+export type AIArchetype = "apex" | "draft_hunter" | "soarer" | "daredevil" | "pacer";
+
 export type Rival = {
   id: string;
   name: string;
@@ -32,6 +34,10 @@ export type Rival = {
   finishTime: number;
   alive: boolean;
   ghost: boolean;
+  archetype: AIArchetype;
+  draftTime: number;
+  lastEmoteTime: number;
+  eliminated: boolean;
 };
 
 export type Standing = {
@@ -124,6 +130,8 @@ export class MassRace {
   private transport: NetTransport | null = null;
   private flapT = 0;
   draft = 0;
+  draftBehind = DRAFT_BEHIND;
+  draftMax = DRAFT_MAX;
   private emotes = new Map<string, { text: string; at: number }>();
   private clock = 0;
 
@@ -160,19 +168,45 @@ export class MassRace {
     return this.group.visible && this.rivals.length > 0;
   }
 
+  configureMode(modeId: string): void {
+    if (modeId === "pvp_draft") {
+      this.draftBehind = 38;
+      this.draftMax = 0.85;
+    } else {
+      this.draftBehind = DRAFT_BEHIND;
+      this.draftMax = DRAFT_MAX;
+    }
+  }
+
+  eliminateTrailing(thresholdDistance: number): Rival | null {
+    const active = this.rivals.filter(r => !r.eliminated && !r.finished && r.kind === "local");
+    if (active.length <= 3) return null; // keep top 3 for the podium
+    active.sort((a, b) => a.bird.x - b.bird.x);
+    const lowest = active[0];
+    if (lowest && lowest.bird.x < thresholdDistance) {
+      lowest.eliminated = true;
+      lowest.alive = false;
+      return lowest;
+    }
+    return null;
+  }
+
   spawn(count: number, seed: string, terrain: TerrainSystem, startX: number): void {
     const n = clamp(Math.floor(count), 0, MAX_RIVALS);
     this.ensureCapacity(n);
     const rng = new SeededRandom(`${seed}:field`);
     this.rivals = [];
+    const ARCHETYPES: AIArchetype[] = ["apex", "draft_hunter", "soarer", "daredevil", "pacer"];
 
     for (let i = 0; i < n; i++) {
       const bird = new Bird();
       bird.reset(startX, terrain.heightAt(startX) + BIRD_RADIUS);
-      const roll = rng.next();
-      const skill = clamp(0.28 + Math.pow(roll, 1.6) * 0.72 + rng.range(-0.05, 0.05), 0.12, 1);
-      const errorSpread = (1 - skill) * 46;
-      const lead = clamp(OPTIMAL_LEAD + rng.range(-errorSpread, errorSpread), 18, 132);
+      const tierRank = i / Math.max(1, n);
+      const baseSkill = tierRank < 0.15 ? 0.86 + rng.range(0, 0.12) : tierRank < 0.4 ? 0.68 + rng.range(0, 0.16) : 0.35 + rng.range(0, 0.3);
+      const skill = clamp(baseSkill, 0.22, 1);
+      const archetype = ARCHETYPES[i % ARCHETYPES.length]!;
+      const errorSpread = (1 - skill) * 36;
+      const lead = clamp(OPTIMAL_LEAD + rng.range(-errorSpread, errorSpread), 20, 120);
       this.rivals.push({
         id: `ai-${i}`,
         name: NAMES[i % NAMES.length]!,
@@ -182,11 +216,11 @@ export class MassRace {
         prevX: bird.x,
         prevY: bird.y,
         lead,
-        wobbleAmp: (1 - skill) * 20 + 3,
+        wobbleAmp: (1 - skill) * 16 + 2,
         wobbleRate: rng.range(0.35, 1.25),
         wobblePhase: rng.range(0, Math.PI * 2),
-        reaction: 0.16 - skill * 0.12 + rng.range(0, 0.05),
-        reactionT: rng.range(0, 0.16),
+        reaction: 0.14 - skill * 0.10 + rng.range(0, 0.04),
+        reactionT: rng.range(0, 0.14),
         diving: false,
         skill,
         hue: rng.next(),
@@ -194,6 +228,10 @@ export class MassRace {
         finishTime: 0,
         alive: true,
         ghost: false,
+        archetype,
+        draftTime: 0,
+        lastEmoteTime: 0,
+        eliminated: false,
       });
     }
     this.group.visible = n > 0;
@@ -266,25 +304,105 @@ export class MassRace {
     return this.rivals.length;
   }
 
-  step(dt: number, terrain: TerrainSystem, finishLine: number, time: number): void {
+  step(dt: number, terrain: TerrainSystem, finishLine: number, time: number, playerX?: number, playerY?: number): void {
     if (!this.group.visible) return;
     this.clock += dt;
 
     for (const r of this.rivals) {
       r.prevX = r.bird.x;
       r.prevY = r.bird.y;
-      if (r.kind === "remote" || r.finished) continue;
+      if (r.kind === "remote" || r.finished || r.eliminated) continue;
 
       r.reactionT -= dt;
       if (r.reactionT <= 0) {
         r.reactionT = r.reaction;
+        const slope = terrain.slopeAt(r.bird.x);
+        const distToCrest = terrain.distanceToCrest(r.bird.x);
         const judged = r.lead + Math.sin(time * r.wobbleRate + r.wobblePhase) * r.wobbleAmp;
-        r.diving = terrain.distanceToCrest(r.bird.x) > judged;
+
+        // Neural-level downslope & upslope awareness:
+        let wantDive = false;
+        if (slope < -0.05) {
+          // Entering downslope: dive to carve and build kinetic speed!
+          wantDive = true;
+        } else if (slope > 0.04) {
+          // On upslope: release to launch skyward!
+          wantDive = false;
+        } else {
+          // Transition / crest: approach-based decision
+          wantDive = distToCrest > judged;
+        }
+
+        // Archetype behavior tuning
+        if (r.archetype === "soarer" && r.bird.vy > 4) {
+          wantDive = false;
+        } else if (r.archetype === "daredevil" && r.bird.altitude > 24) {
+          wantDive = true;
+        } else if (r.archetype === "draft_hunter" && playerX !== undefined) {
+          const dx = playerX - r.bird.x;
+          if (dx > 0 && dx < this.draftBehind && Math.abs(r.bird.y - (playerY ?? 0)) < 8) {
+            wantDive = slope < 0 || distToCrest > 35;
+          }
+        }
+
+        r.diving = wantDive;
+      }
+
+      // Check slipstream drafting behind rivals or the player
+      let draftingBehind = false;
+      if (playerX !== undefined && playerY !== undefined) {
+        const dx = playerX - r.bird.x;
+        const dy = Math.abs((playerY ?? 0) - r.bird.y);
+        if (dx > 0 && dx <= this.draftBehind && dy <= DRAFT_LATERAL) {
+          draftingBehind = true;
+        }
+      }
+      if (!draftingBehind) {
+        for (const other of this.rivals) {
+          if (other.id === r.id || other.finished || other.eliminated) continue;
+          const dx = other.bird.x - r.bird.x;
+          const dy = Math.abs(other.bird.y - r.bird.y);
+          if (dx > 0 && dx <= this.draftBehind && dy <= DRAFT_LATERAL) {
+            draftingBehind = true;
+            break;
+          }
+        }
+      }
+
+      if (draftingBehind) {
+        r.draftTime = (r.draftTime || 0) + dt;
+        // Accelerate inside the slipstream!
+        r.bird.vx = Math.min(210, r.bird.vx + dt * 5 * (0.8 + r.skill * 0.4));
+        if (r.draftTime > 1.6 && r.bird.speed() > 22) {
+          // Slingshot breakout!
+          r.draftTime = 0;
+          r.bird.vx = Math.min(225, r.bird.vx + 4.8);
+          if (time - (r.lastEmoteTime || 0) > 8 && Math.random() < 0.28) {
+            r.lastEmoteTime = time;
+            this.showEmote(r.id, "🚀");
+          }
+        }
+      } else {
+        r.draftTime = Math.max(0, (r.draftTime || 0) - dt * 2);
+      }
+
+      // Dynamic pacer / pack drama:
+      if (playerX !== undefined) {
+        const lag = playerX - r.bird.x;
+        if ((r.archetype === "pacer" || lag > 150) && lag > 75 && lag < 450) {
+          r.bird.vx = Math.min(185, r.bird.vx + dt * (lag > 220 ? 4.5 : 2.2));
+        }
+      }
+
+      // AI emotes when overtaking into 1st place:
+      if (playerX !== undefined && r.bird.x > playerX && time - (r.lastEmoteTime || 0) > 12 && Math.random() < 0.18) {
+        r.lastEmoteTime = time;
+        this.showEmote(r.id, "👑");
       }
 
       r.launch.observeInput(r.diving, time);
       r.launch.tick(dt);
-      r.bird.step(dt, { diving: r.diving, fever: false, speedMult: 0.9 + r.skill * 0.2, boost: false }, terrain);
+      r.bird.step(dt, { diving: r.diving, fever: false, speedMult: 0.92 + r.skill * 0.22, boost: false }, terrain);
       if (r.bird.justLaunched) r.launch.evaluate(r.bird, terrain, time);
       if (r.bird.justLanded && r.bird.landingQuality < 0.8) r.launch.breakCombo();
 
@@ -327,11 +445,12 @@ export class MassRace {
     let best = 0;
     let packCount = 0;
     for (const r of this.rivals) {
+      if (r.eliminated) continue;
       const dx = r.bird.x - x;
-      if (dx <= 0 || dx > DRAFT_BEHIND) continue;
+      if (dx <= 0 || dx > this.draftBehind) continue;
       const dy = Math.abs(r.bird.y - y);
       if (dy > DRAFT_LATERAL) continue;
-      const along = 1 - dx / DRAFT_BEHIND;
+      const along = 1 - dx / this.draftBehind;
       const lateral = 1 - dy / DRAFT_LATERAL;
       const factor = along * lateral;
       best = Math.max(best, factor);
@@ -341,7 +460,7 @@ export class MassRace {
     const packMultiplier = packCount > 1 ? Math.min(1.35, 1 + (packCount - 1) * 0.15) : 1;
     const targetDraft = Math.min(1, best * packMultiplier);
     this.draft += (targetDraft - this.draft) * 0.15;
-    return 1 - this.draft * DRAFT_MAX;
+    return 1 - this.draft * this.draftMax;
   }
 
   checkCloseCall(x: number, y: number, speed: number): { name: string; id: string } | null {
@@ -358,7 +477,7 @@ export class MassRace {
 
   roster(playerX: number, startX: number, finishDistance: number, playerName: string, playerHue = 0.06): RosterBird[] {
     const span = finishDistance > 0 ? finishDistance : 4000;
-    const list: RosterBird[] = this.rivals.map((r) => ({
+    const list: RosterBird[] = this.rivals.filter(r => !r.eliminated).map((r) => ({
       id: r.id,
       name: r.name,
       hue: r.hue,
@@ -429,7 +548,7 @@ export class MassRace {
   }
 
   standings(playerX: number, playerStartX: number, playerName: string, limit = 8): { rows: Standing[]; place: number; total: number } {
-    const rows: Standing[] = this.rivals.map((r) => ({
+    const rows: Standing[] = this.rivals.filter(r => !r.eliminated).map((r) => ({
       id: r.id,
       name: r.name,
       distance: Math.max(0, r.bird.x - playerStartX),
@@ -473,6 +592,7 @@ export class MassRace {
 
     let n = 0;
     for (const r of this.rivals) {
+      if (r.eliminated) continue;
       if (Math.abs(r.bird.x - cameraX) > 260) continue;
       const flap = Math.sin(this.flapT * 14 + r.hue * 9) * 0.45;
       tmpColor.setHSL(r.hue, 0.68, r.kind === "remote" ? 0.68 : 0.58);

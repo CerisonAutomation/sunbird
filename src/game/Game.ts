@@ -17,7 +17,7 @@ import { BIG_LAUNCH_QUIPS, BOP_QUIPS, FEVER_QUIPS, GEM_QUIPS, MILESTONE_QUIPS, S
 import type { Fx } from "./Fx";
 import { DPR_COOLDOWN_SECONDS, nextBloomBudget, nextDpr, QUALITY_WINDOW_SECONDS } from "./quality";
 import { LaunchSystem, ratingLabel, type LaunchResult } from "./LaunchSystem";
-import { MASS_RACE_FIELD, MODES, modeById, RACE_FINISH, type ModeDef, type ModeId } from "./Modes";
+import { isRaceMode, MASS_RACE_FIELD, MODES, modeById, RACE_FINISH, type ModeDef, type ModeId } from "./Modes";
 import { MassRace } from "./MassRace";
 import { FinishGate } from "./FinishGate";
 import { isMultiplayerConfigured, makeRoomCode, RealtimeClient } from "./Realtime";
@@ -325,6 +325,8 @@ export class Game {
   private lastPlace = 0;
   private overtakeAcc = 0;
   private closeCallAcc = 0;
+  private nextKnockoutDist = 500;
+  private knockoutWarned = false;
   /** Ranked 1v1 duel: one seeded opponent, flat ±16 rating swing. */
   private duelActive = false;
   /** Matchmaking search deadline (wall-clock ms; 0 = not searching). Wall
@@ -665,7 +667,7 @@ export class Game {
     };
     this.onFullscreenChange = () => {
       this.resize();
-      const doc = document as any;
+      const doc = document as Document & { webkitFullscreenElement?: Element };
       const isFull = Boolean(doc.fullscreenElement || doc.webkitFullscreenElement);
       this.hud.setFullscreenActive(isFull);
     };
@@ -1191,7 +1193,7 @@ export class Game {
 
     // The rival field runs the same fixed-step contract as the player.
     if (this.massRace.active) {
-      this.massRace.step(dt, this.terrain, this.startX + this.mode.finish, this.runTime);
+      this.massRace.step(dt, this.terrain, this.startX + this.mode.finish, this.runTime, this.bird.x, this.bird.y);
       // Reward the player for holding a draft: visible, audible, scoring.
       if (this.massRace.draft > 0.3) {
         if (!this.wasDrafting) {
@@ -1230,6 +1232,39 @@ export class Game {
           this.popupAtBird("WINGTIP BUZZ! +50", "splash");
           this.bonus += 50;
           this.particles.emitWind(this.bird.x, this.bird.y, 0.9);
+        }
+      }
+
+      // Knockout mode elimination evaluation
+      if (this.modeId === "pvp_knockout" && !this.bird.asleep) {
+        const dist = this.bird.x - this.startX;
+        if (this.nextKnockoutDist <= 3500) {
+          if (dist >= this.nextKnockoutDist - 60 && dist < this.nextKnockoutDist - 15) {
+            if (!this.knockoutWarned) {
+              this.knockoutWarned = true;
+              this.hud.toast(`⚠️ ELIMINATION IN ${Math.round(this.nextKnockoutDist - dist)}m — OUTFLY THE PACK!`, "warn");
+              this.audio.chirp();
+              this.haptic([15, 15, 30]);
+            }
+          }
+          if (dist >= this.nextKnockoutDist) {
+            this.knockoutWarned = false;
+            const targetDist = this.nextKnockoutDist;
+            this.nextKnockoutDist += 500;
+            const standings = this.massRace.standings(this.bird.x, this.startX, this.pilotName, 40);
+            if (standings.place === standings.total) {
+              this.hud.toast(`💥 ELIMINATED at ${targetDist}m!`, "warn");
+              this.audio.rivalDown();
+              this.finishRun();
+            } else {
+              const victim = this.massRace.eliminateTrailing(targetDist);
+              if (victim) {
+                this.hud.toast(`💥 ELIMINATED: ${victim.name}! ${standings.total - 1} remain`, "gold");
+                this.audio.ding();
+                this.haptic(10);
+              }
+            }
+          }
         }
       }
       // Overtake / lead-change feedback, sampled at ~4 Hz so the 41-row
@@ -2319,7 +2354,7 @@ export class Game {
     // daily/gauntlet runs plus shared-field races (duels, events, stormfront,
     // mass races) keep their fixed seed so the field stays fair/comparable.
     const casualRun =
-      this.seedMode === "today" && !opts?.duel && !opts?.challenge && !opts?.event && !opts?.storm && this.modeId !== "massrace";
+      this.seedMode === "today" && !opts?.duel && !opts?.challenge && !opts?.event && !opts?.storm && !isRaceMode(this.modeId);
     if (casualRun) {
       this.rebuildWorld(`fly-${Math.random().toString(36).slice(2, 10)}`);
     } else if (opts?.challenge && this.seed !== this.today) {
@@ -2360,10 +2395,11 @@ export class Game {
     this.weather.windMult = (this.eventRun ? this.weeklyMods.windMult : 1) * (this.stormfront ? 1.7 : 1);
     this.weather.stormfront = this.stormfront;
     if (this.stormfront) this.hud.toast("⛈ STORMFRONT — same storm for every pilot. Survive and outfly.", "warn");
-    // Mass Race: build the 40-bird grid on the *same* seed so the field is
+    // Mass Race & PvP Variants: build the 40-bird grid on the *same* seed so the field is
     // identical for anyone flying this race. Real players take over slots as
     // they join; unfilled slots keep flying as local squadron pilots.
-    if (this.modeId === "massrace") {
+    if (isRaceMode(this.modeId)) {
+      this.massRace.configureMode(this.modeId);
       const livePeers = !this.duelActive && !this.localRace && this.net?.connected ? this.net.roster() : null;
       const fieldSize = this.duelActive ? 1 : livePeers ? Math.max(1, livePeers.length) : this.roomSize;
       this.massRace.spawn(fieldSize, `${this.seed}:${this.modeId}:${fieldSize}`, this.terrain, this.startX);
@@ -2833,10 +2869,15 @@ export class Game {
     this.masteryPerk = this.fairRace ? NO_MASTERY_PERKS : masteryPerks(this.save, this.modeId);
     // Shared/daily/ranked seeds must not depend on an individual save's skill.
     // Apply adaptive calibration only to an unshared casual flight, before sampling spawn.
-    this.terrain.setDifficulty(this.modeId !== "massrace" && this.seed.startsWith("fly-") ? this.flow.difficulty() : 1);
+    this.terrain.setDifficulty(!isRaceMode(this.modeId) && this.seed.startsWith("fly-") ? this.flow.difficulty() : 1);
     this.startX = 64;
     const y = this.terrain.heightAt(this.startX) + BIRD_RADIUS;
     this.bird.reset(this.startX, y);
+    if (this.modeId === "pvp_sprint") {
+      this.bird.vx = 42;
+    }
+    this.nextKnockoutDist = 500;
+    this.knockoutWarned = false;
     this.daylight = this.daylightMax();
     this.island = 0;
     this.lastIsland = 0;
@@ -4624,7 +4665,7 @@ export class Game {
   /** A portal-controlled commercial break at the natural death/restart seam. */
   private replayRun(allowPortalBreak: boolean): void {
     if (this.versus) { this.startVersus(); return; }
-    if (this.modeId === "massrace" && this.roomCode && !this.localRace) {
+    if (isRaceMode(this.modeId) && this.roomCode && !this.localRace) {
       this.disconnectRace();
       this.roomCode = "";
       this.setState("menu");
@@ -5180,7 +5221,7 @@ export class Game {
       raceFinishM: this.mode.finish,
       raceField: this.raceField,
       raceFinishTime: this.raceFinishTime,
-      massRace: this.modeId === "massrace",
+      massRace: isRaceMode(this.modeId),
       multiplayerLive: isMultiplayerConfigured() && !(this.state === "playing" && this.localRace),
       roster:
         this.massRace.active && this.state === "playing"
@@ -5362,8 +5403,21 @@ export class Game {
   }
 
   private toggleFullscreen(): void {
-    const doc = document as any;
-    const docEl = (document.documentElement || document.body) as any;
+    const doc = document as Document & {
+      webkitFullscreenElement?: Element;
+      mozFullScreenElement?: Element;
+      msFullscreenElement?: Element;
+      webkitExitFullscreen?: () => Promise<void>;
+      webkitCancelFullScreen?: () => Promise<void>;
+      mozCancelFullScreen?: () => Promise<void>;
+      msExitFullscreen?: () => Promise<void>;
+    };
+    const docEl = (document.documentElement || document.body) as HTMLElement & {
+      webkitRequestFullscreen?: () => Promise<void>;
+      webkitRequestFullScreen?: () => Promise<void>;
+      mozRequestFullScreen?: () => Promise<void>;
+      msRequestFullscreen?: () => Promise<void>;
+    };
     const isFull = Boolean(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
     if (!isFull) {
       const req = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.webkitRequestFullScreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;

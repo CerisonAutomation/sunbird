@@ -11,7 +11,7 @@ import { feedbackSlot } from "./HudFeedback";
 import type { AchievementView } from "./Achievements";
 import type { ActivePower } from "./PowerUps";
 import type { SessionGoal } from "./Engagement";
-import type { ModeDef } from "./Modes";
+import { PVP_MODES, type ModeDef } from "./Modes";
 import type { RacerStats } from "./Racer";
 import type { BoardMetric, BoardPage, BoardScope } from "./Leaderboard";
 import type { TournamentView } from "./Tournaments";
@@ -614,15 +614,15 @@ export class HUD {
     this.root.addEventListener("compositionend", () => this.menuContinuity.endComposition());
     this.root.addEventListener("click", (e) => {
       if (e.target === this.pauseEl) {
-        this.onAction("resume");
+        handler("resume", "");
         return;
       }
       if (e.target === this.overEl) {
-        this.onAction("restart-flight");
+        handler("restart-flight", "");
         return;
       }
       if (e.target === this.menuEl && this.currentSnapshot && this.currentSnapshot.screen !== "main") {
-        this.onAction("back");
+        handler("back", "");
         return;
       }
       const t = (e.target as HTMLElement).closest("[data-action]") as HTMLElement | null;
@@ -1482,11 +1482,15 @@ function renderPractice(s: HudSnapshot): string {
         <div class="room-ctl"><span class="room-ctl-label">AI skill</span><div class="seg" role="group" aria-label="AI skill">${(["chill", "sharp", "ace"] as const).map(k => `<button data-ui data-action="room-skill" data-id="${k}" aria-pressed="${s.roomSkill === k}" class="${s.roomSkill === k ? "on" : ""}">${k === "chill" ? "Chill" : k === "sharp" ? "Sharp" : "Ace"}</button>`).join("")}</div></div>
       </div>
       <button class="soft-btn wide" data-ui data-action="practice-race">Start AI practice · no rating change</button>
-      <div class="practice-formats"><h3>Other practice formats</h3>
-        <p class="fineprint">Rival rank is saved on this device; it is not a global competitive ladder. The duel opponent is AI. These formats use AI, not online opponents.</p>
-        <button class="soft-btn wide" data-ui data-action="practice-ranked">Race for local Rival rank</button>
-        <button class="soft-btn wide" data-ui data-action="practice-storm">Storm race · stronger weather</button>
-        <button class="soft-btn wide" data-ui data-action="pvp-duel">AI duel · one opponent</button>
+      <div class="practice-formats"><h3>Championship &amp; PvP Formats</h3>
+        <p class="fineprint">Dynamic AI pilots adapt locally with neural downslope timing, slipstream drafting, and slingshot attacks. No server connection required!</p>
+        <button class="soft-btn wide" data-ui data-action="pick-mode" data-id="pvp_sprint">⚡ Sprint GP · 1,500 m quick burst</button>
+        <button class="soft-btn wide" data-ui data-action="pick-mode" data-id="pvp_knockout">👑 Knockout Royale · elimination every 500 m</button>
+        <button class="soft-btn wide" data-ui data-action="pick-mode" data-id="pvp_draft">🌪 Tempest Draft · +100% slipstream power</button>
+        <button class="soft-btn wide" data-ui data-action="pick-mode" data-id="pvp_endurance">🦅 Grand Migration · 6,000 m marathon</button>
+        <button class="soft-btn wide" data-ui data-action="pvp-duel">⚔ 1v1 Seeded Rival Duel</button>
+        <button class="soft-btn wide" data-ui data-action="practice-storm">⛈ Stormfront Race · wild weather</button>
+        <button class="soft-btn wide" data-ui data-action="practice-ranked">🏆 40-Pilot Flock Grand Prix</button>
       </div>
     </section>
     <button class="soft-btn wide" data-ui data-action="open-shop">Change loadout</button>`;
@@ -1789,6 +1793,18 @@ function renderModes(s: HudSnapshot): string {
     <p class="tagline">Choose a solo flight below, or share this device in Split-screen. Race Lobby opens online and AI races. All modes share your unlocks.</p>
     <div class="mode-list">
       ${s.modes
+        .map(
+          (m) => `<button class="mode-card ${m.id === s.modeId ? "on" : ""}" data-ui data-action="pick-mode" data-id="${m.id}">
+            <span class="mode-icon">${m.icon}</span>
+            <span class="mode-body"><b>${m.name}</b><em>${m.blurb}</em></span>
+            <span class="mode-meta">${m.finish ? `${m.finish / 1000} km` : m.clock ? `${m.clock}s` : "∞"}</span>
+          </button>`,
+        )
+        .join("")}
+    </div>
+    <div class="section-title">Championship &amp; PvP Circuits</div>
+    <div class="mode-list">
+      ${PVP_MODES
         .map(
           (m) => `<button class="mode-card ${m.id === s.modeId ? "on" : ""}" data-ui data-action="pick-mode" data-id="${m.id}">
             <span class="mode-icon">${m.icon}</span>
