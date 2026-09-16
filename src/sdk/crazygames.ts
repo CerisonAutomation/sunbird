@@ -28,6 +28,7 @@ import type {
   PlatformIdentity,
   PlatformSystemInfo,
 } from "./platform";
+import { storage as storageFacade, type StorageLike } from "../game/Storage";
 
 /* ------------------------------------------------------------ SDK model */
 
@@ -125,12 +126,13 @@ const LOCAL_SAVE_PREFIX = "sunbird.cloud.";
  *  recognized — resolve instead of hanging the game's break flow. */
 const AD_CALLBACK_WATCHDOG_MS = 2_000;
 
-function storage(): Storage | null {
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
+/**
+ * Cross-safe storage backend: localStorage → sessionStorage → memory (see
+ * Storage.ts) — the raw localStorage accessor throws in sandboxed portal
+ * iframes, where this fallback previously no-opped.
+ */
+function storage(): StorageLike {
+  return storageFacade;
 }
 
 function localGet(key: string): string | null {

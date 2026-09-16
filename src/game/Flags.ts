@@ -12,6 +12,7 @@
  * implementation — an A/B holdout can flip `challengeShare` off from the URL
  * and every client honors it immediately.
  */
+import { storage } from "./Storage";
 
 export type FlagKey = "challengeShare" | "nativeShare" | "modeAwareChallenge";
 
@@ -41,7 +42,7 @@ function parse(raw: string | null): Partial<Record<FlagKey, boolean>> {
 function cachedLs(): Partial<Record<FlagKey, boolean>> {
   if (lsOverrides) return lsOverrides;
   try {
-    lsOverrides = parse(localStorage.getItem(LS_KEY));
+    lsOverrides = parse(storage.getItem(LS_KEY));
   } catch {
     lsOverrides = {};
   }
@@ -67,7 +68,7 @@ export function setFlag(key: FlagKey, value: boolean): void {
     const encoded = Object.entries(next)
       .map(([k, v]) => `${k}:${v ? "on" : "off"}`)
       .join(",");
-    localStorage.setItem(LS_KEY, encoded);
+    storage.setItem(LS_KEY, encoded);
     lsOverrides = next;
   } catch {
     /* private mode — the URL override still works */

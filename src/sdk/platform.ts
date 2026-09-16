@@ -182,7 +182,7 @@ export function isPortalBuild(): boolean {
 }
 
 /** Touch/pointer-coarse device (portal mobile + real phones). */
-function isCoarsePointer(): boolean {
+export function isCoarsePointer(): boolean {
   try {
     return (
       window.matchMedia?.("(pointer: coarse)").matches === true ||
@@ -277,6 +277,14 @@ function bootstrapSdk(target: PlatformName): Promise<{ name: PlatformName; crazy
         // never ship `setDebug(true)` in a production build.
         if (import.meta.env.DEV) window.PokiSDK?.setDebug?.(true);
         await window.PokiSDK?.init?.();
+        // Poki's loading pipeline is gameLoadingStart() →
+        // gameLoadingFinished(). The start signal must fire BEFORE the game
+        // reports ready (Game.ts calls loadingFinished() once the first
+        // frame is up), or the portal's loading screen mis-handles the
+        // transition. Firing it here — right after init, before any of the
+        // game's own asset work — mirrors the CrazyGames path below, which
+        // calls sdk.game.loadingStart().
+        window.PokiSDK?.gameLoadingStart?.();
       } catch {
         // Poki's local sandbox can reject init; preserve a playable build.
       }
@@ -337,7 +345,7 @@ export async function initPlatform(events: PlatformEvents): Promise<PlatformAdap
   if (name === "poki") {
     return new PokiAdapter(events);
   }
-    if (name === "crazy") {
+  if (name === "crazy") {
     if (crazyEnvironment === "disabled" || !window.CrazyGames?.SDK) {
       // Outside the portal: no ads/identity — a local adapter keeps saves
       // functional and every other call an honest no-op.

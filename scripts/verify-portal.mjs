@@ -98,6 +98,12 @@ for (const portal of PORTALS) {
     "js.stripe.com",
     "pk_live_",
     "pk_test_",
+    // External store link (index.html og:url) — stripped by package-portal.mjs;
+    // this is the regression tripwire if it ever survives into a zip.
+    "cerison.itch.io",
+    // Direct-build coin receipt storage must not ship in portal editions —
+    // the build-time alias swaps in Payments.portal.ts, which has none.
+    "sunbird\\.receipts",
   ];
   for (const marker of FORBIDDEN_MARKERS) {
     if (new RegExp(marker, "i").test(html)) {

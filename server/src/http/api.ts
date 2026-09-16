@@ -40,13 +40,22 @@ export const V1_ROUTES: Route[] = [
     re: /^\/health$/,
     rl: "read",
     auth: "optional",
-    handler: (ctx) => ({
-      ok: true,
-      service: "sunbird-social",
-      rooms: ctx.rooms.sessionCount(),
-      pilots: ctx.rooms.pilotCount(),
-      players: Object.keys(ctx.db.state.profiles).length,
-    }),
+    handler: (ctx) => {
+      const storage = ctx.db.storageStatus();
+      // The probe goes red (503) when the file backend is failing: a
+      // degraded store must be visible to the orchestrator, not absorbed.
+      if (!storage.ok) {
+        throw new HttpError(503, `persistence degraded: ${storage.detail ?? "last write failed"}`, "storageDegraded");
+      }
+      return {
+        ok: true,
+        service: "sunbird-social",
+        storage: storage.mode,
+        rooms: ctx.rooms.sessionCount(),
+        pilots: ctx.rooms.pilotCount(),
+        players: Object.keys(ctx.db.state.profiles).length,
+      };
+    },
   },
 
   /* -------------------------------------------------------------- identity */

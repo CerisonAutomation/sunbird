@@ -45,6 +45,8 @@ export class MenuSky {
   private last = 0;
   private acc = 0;
   private time = 0;
+  /** Independent slow clock for the hero bird (its own drift, not the flock's). */
+  private heroT = Math.random() * 100;
   private active = false;
   private width = 1;
   private height = 1;
@@ -222,6 +224,42 @@ export class MenuSky {
       if (dt > 0) this.step(bird, dt);
       this.drawFlocker(ctx, bird, w, h);
     }
+
+    if (dt > 0) this.heroT += dt;
+    this.drawHero();
+  }
+
+  /* ------------------------------------------------------- hero bird layer */
+
+  /**
+   * The hero canvas (z-index 3, above the paper card) carries ONE big
+   * canonical sunbird drifting through the OPEN part of the title screen —
+   * the card is docked right on wide viewports, so the left sky is free;
+   * on narrow viewports the card is centred and the hero uses the strip
+   * above it. The card's own small SVG bird stays in the header; this one
+   * is the "alive" background element. Under reduced motion the ambient
+   * loop never runs, so this renders a single graceful static pose.
+   */
+  private drawHero(): void {
+    const w = this.width;
+    const h = this.height;
+    const ctx = this.hctx;
+    ctx.clearRect(0, 0, w, h);
+    if (w < 2 || h < 2) return;
+    const t = this.heroT;
+    const wide = w >= 840; // same breakpoint that docks the card to the right
+    const cx = wide
+      ? w * (0.27 + 0.15 * Math.sin(t * 0.11))
+      : w * (0.5 + 0.33 * Math.sin(t * 0.09));
+    const cy = wide
+      ? h * (0.36 + 0.09 * Math.sin(t * 0.07 + 1.3))
+      : h * (0.15 + 0.045 * Math.sin(t * 0.13 + 2.1));
+    const size = Math.min(w, h) * (wide ? 0.17 : 0.12);
+    const flap = FLAP_NEUTRAL + Math.sin(t * 2.1) * 0.55;
+    ctx.save();
+    ctx.translate(cx, cy);
+    drawSunbird(ctx, size, flap, 0.92);
+    ctx.restore();
   }
 
   /* ---------------------------------------------------------- distant flock */

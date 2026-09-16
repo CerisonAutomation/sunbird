@@ -15,6 +15,7 @@ import { defaultRival, rankSeasonId, ratingDelta, RIVAL_BASE_RATING, seasonRewar
 import { seasonId } from "./season";
 import { emptyTournamentState, type TournamentState } from "./Tournaments";
 import { emptySocialState, type SocialState } from "./SocialSystem";
+import { storage } from "./Storage";
 
 export type HighScore = {
   date: string;
@@ -325,7 +326,7 @@ export class SaveData {
     const d = defaults();
     let raw: string | null = null;
     try {
-      raw = localStorage.getItem(SAVE_KEY) ?? localStorage.getItem(SAVE_KEY_V1);
+      raw = storage.getItem(SAVE_KEY) ?? storage.getItem(SAVE_KEY_V1);
       if (!raw) {
         this.persistNow(d);
         return d;
@@ -509,7 +510,7 @@ export class SaveData {
       if (raw !== null) {
         this.recoveredFromCorruption = true;
         try {
-          localStorage.setItem(SAVE_KEY_CORRUPT, raw);
+          storage.setItem(SAVE_KEY_CORRUPT, raw);
         } catch {
           /* ignore — nothing more we can do */
         }
@@ -521,7 +522,7 @@ export class SaveData {
   private persistNow(state: SaveState): void {
     const raw = JSON.stringify(state);
     try {
-      localStorage.setItem(SAVE_KEY, raw);
+      storage.setItem(SAVE_KEY, raw);
       if (this.platformAdapter?.saveData) {
         void this.platformAdapter.saveData(SAVE_KEY, raw);
       }
@@ -1044,7 +1045,7 @@ export class SaveData {
       for (const k of Object.keys(defaults())) {
         if (k in parsed) (allowed as Record<string, unknown>)[k] = (parsed as Record<string, unknown>)[k];
       }
-      localStorage.setItem(SAVE_KEY, JSON.stringify(allowed));
+      storage.setItem(SAVE_KEY, JSON.stringify(allowed));
       this.state = this.load();
       return true;
     } catch {

@@ -1,5 +1,21 @@
+import { installRejectionGuard } from "./rejection-guard";
+
+// A floating promise rejection must never surface as a red console ERROR —
+// portal QA treats console errors as defects, and the game's network paths
+// are best-effort by design. Install before anything else can reject.
+installRejectionGuard();
+
+// Mirrors the TARGET check in sdk/platform.ts, but written here so the
+// minifier can fully constant-fold it: vite inlines VITE_PORTAL_TARGET as a
+// literal, and `"poki" !== "none"` folds to a constant — DCE then strips the
+// whole retirement pass from portal bundles. Portals serve the game in
+// iframes where workers are not allowed, and their scanners flag any
+// service-worker API reference. (Builds only succeed with the lowercase
+// values validated in vite.config.ts, so no toLowerCase is needed here.)
+const IS_PORTAL = (import.meta.env.VITE_PORTAL_TARGET ?? "none") !== "none";
+
 /** Retire only Sunbird's old worker/cache; don't erase other apps on portal origins. */
-if ("serviceWorker" in navigator) {
+if (!IS_PORTAL && "serviceWorker" in navigator) {
   const workerUrl = new URL("./sw.js", location.href).href;
   void navigator.serviceWorker.getRegistrations().then(regs => {
     for (const reg of regs) {
@@ -8,7 +24,7 @@ if ("serviceWorker" in navigator) {
     }
   }).catch(() => {});
 }
-if ("caches" in window) {
+if (!IS_PORTAL && "caches" in window) {
   void caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith("sunbird-shell-")).map(k => caches.delete(k)))).catch(() => {});
 }
 

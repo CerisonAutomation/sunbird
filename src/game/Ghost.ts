@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { GHOST_MAX_SAMPLES, GHOST_SAMPLE_DT } from "./constants";
+import { storage } from "./Storage";
 
 type Sample = [number, number, number, number]; // t, x, y, rotation
 
@@ -35,8 +36,8 @@ export class GhostRecorder {
     if (prev && prev.distance >= distance) return false;
     const record: GhostRecord = { seed, distance, samples: this.samples };
     try {
-      localStorage.setItem(KEY_PREFIX + seed, JSON.stringify(record));
-      // Evict old ghosts to prevent localStorage quota exhaustion.
+      storage.setItem(KEY_PREFIX + seed, JSON.stringify(record));
+      // Evict old ghosts to prevent quota exhaustion.
       GhostRecorder.evictOld();
     } catch {
       /* quota */
@@ -49,8 +50,8 @@ export class GhostRecorder {
   private static evictOld(): void {
     const cutoff = Date.now() - 30 * 86_400_000;
     const entries: { key: string; ts: number }[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
       if (key?.startsWith(KEY_PREFIX)) {
         const ts = parseInt(key.slice(KEY_PREFIX.length), 10) || 0;
         entries.push({ key, ts });
@@ -58,13 +59,13 @@ export class GhostRecorder {
     }
     entries.sort((a, b) => b.ts - a.ts);
     for (let i = 10; i < entries.length; i++) {
-      if (entries[i]!.ts < cutoff) localStorage.removeItem(entries[i]!.key);
+      if (entries[i]!.ts < cutoff) storage.removeItem(entries[i]!.key);
     }
   }
 
   static load(seed: string): GhostRecord | null {
     try {
-      const raw = localStorage.getItem(KEY_PREFIX + seed);
+      const raw = storage.getItem(KEY_PREFIX + seed);
       if (!raw) return null;
       const parsed = JSON.parse(raw) as Partial<GhostRecord>;
       if (!Array.isArray(parsed.samples)) return null;

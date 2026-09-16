@@ -132,10 +132,12 @@ describe("daily deal", () => {
 });
 
 describe("portal coin VIP", () => {
-  it("has a visible coin sink and a smaller rewarded-ad step", () => {
+  it("is a pure coin sink — no IAP, no second currency", () => {
+    // Poki allows only its own ad system as monetization and frowns on dual
+    // currencies; VIP is a status bought with earned coins, full stop.
     expect(VIP.coinPrice).toBeGreaterThan(0);
-    expect(VIP.coinAdReward).toBeGreaterThan(0);
-    expect(VIP.coinAdReward).toBeLessThan(VIP.coinPrice);
+    expect(VIP.sku).toBe("sunbird_vip");
+    expect(Object.keys(VIP)).not.toContain("coinAdReward");
   });
 });
 

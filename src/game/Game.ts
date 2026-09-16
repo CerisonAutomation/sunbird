@@ -90,7 +90,7 @@ import { ParticleFX } from "./ParticleFX";
 import { TrailRibbon } from "./Trail";
 import { fetchServerEntitlements,
   MockAdProvider,
-  MockPaymentProvider,
+  CoinPaymentProvider,
   type AdProvider,
   type Sku,
 } from "./Payments";
@@ -103,7 +103,8 @@ import { buildChallengeUrl, readChallengeFromUrl, type RivalChallenge } from "./
 import { flag } from "./Flags";
 import { variant } from "./Experiments";
 import { buildRoomInviteUrl, normalizeRoomCode, readRoomInviteFromUrl } from "./RoomInvite";
-import { CRAZY_BANNER_ID, initPlatform, isPortalBuild, portalTarget, type PlatformAdapter } from "../sdk/platform";
+import { CRAZY_BANNER_ID, initPlatform, isCoarsePointer, isPortalBuild, portalTarget, type PlatformAdapter } from "../sdk/platform";
+import { GameplayEventSink } from "./GameplayEvents";
 import { LivingBackground } from "./LivingBackground";
 import { Sky } from "./Sky";
 import { Telemetry } from "./Telemetry";
@@ -149,9 +150,20 @@ export class Game {
   private useBloom = false;
   private bloomBudget = { enabled: false, goodWindows: 0, cooldown: 0 };
   private readonly sky: Sky;
-  private readonly mockPayments = new MockPaymentProvider();
+  private readonly mockPayments = new CoinPaymentProvider();
   private readonly ads: AdProvider = new MockAdProvider();
   private platform: PlatformAdapter | null = null;
+  /**
+   * Every gameplayStart/gameplayStop that reaches a portal funnels through
+   * this sink — Poki forbids a gameplay event following an identical one.
+   * The adapter may not exist until the async SDK init lands; the sink
+   * records the phase either way so a late landing never replays a stale
+   * stop/start.
+   */
+  private readonly gameplaySink = new GameplayEventSink((phase) => {
+    if (phase === "start") this.platform?.gameplayStart();
+    else this.platform?.gameplayStop();
+  });
   private readonly telemetry = new Telemetry();
   private readonly ghostRecorder = new GhostRecorder();
   private readonly ghostPlayer = new GhostPlayer();
@@ -466,7 +478,11 @@ export class Game {
     // Embedded portal browsers often expose a desktop UA at a phone-sized
     // viewport. Treat the narrow viewport as mobile too, otherwise we keep a
     // 2x render target and shadows that make the flight feel laggy.
-    const isMobile = /Mobi|Android/i.test(navigator.userAgent) || window.innerWidth < 700;
+    // Tablets count as mobile-class: iPads report desktop-ish UAs and wide
+    // viewports, so UA+width alone would hand them the desktop scheme.
+    // Poki requires mobile control/perf schemes on tablets — a coarse
+    // primary pointer (touch) is the robust signal.
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || isCoarsePointer() || window.innerWidth < 700;
     this.isMobile = isMobile;
 
     // Try hardware-accelerated WebGL first; fall back to software (SwiftShader)
@@ -728,7 +744,10 @@ export class Game {
       this.platform = adapter;
       adapter.loadingFinished();
       adapter.signalGameReady();
-      if (this.state === "playing") adapter.gameplayStart();
+      // Late-landing sync: if the player is already mid-flight when the
+      // SDK arrives, start fires once — the sink suppresses the repeat
+      // on the next genuine transition and never replays a stale phase.
+      if (this.state === "playing") this.gameplaySink.send("start");
       this.telemetry.track("portal_ready", { portal: adapter.name, caps: adapter.capabilities().join(",") });
 
       // Portal-native room invite (CrazyGames instant multiplayer): the
@@ -2919,7 +2938,7 @@ export class Game {
         if (this.state === "playing") this.setState("paused");
         break;
       case "resume":
-        if (this.state === "paused") this.setState("playing");
+        void this.resumeFromPause();
         break;
       case "restart-flight":
         if (this.state === "paused" || this.state === "playing") this.replayRun(false);
@@ -3375,9 +3394,6 @@ export class Game {
       case "buy-vault":
         this.buyMysteryVault();
         break;
-      case "portal-vip-ad":
-        void this.earnPortalVipCoins();
-        break;
       case "checkout-cancel":
         if (!this.checkoutBusy) this.backScreen();
         break;
@@ -3573,7 +3589,7 @@ export class Game {
       if (this.hud.dismissCopy()) return;
       if (this.mmOpts) { this.cancelMatchmaking(); return; }
       if (this.state === "playing") this.setState("paused");
-      else if (this.state === "paused") this.setState("playing");
+      else if (this.state === "paused") void this.resumeFromPause();
       else if (this.screen !== "main" && !this.checkoutBusy) this.backScreen();
     }
     if (this.input.consumeRestart()) {
@@ -3974,25 +3990,6 @@ export class Game {
     this.bump();
   }
 
-  private async earnPortalVipCoins(): Promise<void> {
-    const platform = this.platform;
-    if (!platform || platform.name === "none") return;
-    this.setState("ad");
-    this.telemetry.track("portal_reward_request", { reward: "vip_coins", amount: VIP.coinAdReward });
-    const earned = await platform.rewardedBreak();
-    if (this.disposed) return;
-    this.endPortalAd();
-    if (earned) {
-      this.save.addCoins(VIP.coinAdReward);
-      this.hud.toast(`Reward received · +${VIP.coinAdReward} coins`, "gold");
-      this.setState("menu");
-      this.setScreen("paywall");
-    } else {
-      this.setState("menu");
-      this.hud.toast("No reward this time — try again later", "info");
-    }
-  }
-
   private buyMysteryVault(): void {
     const price = 150;
     if (!this.save.spend(price)) {
@@ -4257,6 +4254,13 @@ export class Game {
   /** The SDK owns ad focus. Silence and freeze immediately, then restore only
    * after the callback so portal ads cannot leak game audio/input beneath them. */
   private beginPortalAd(): void {
+    // No gameplay event is sent here on purpose. The stop that precedes a
+    // break is already on the books from the state transition that halted
+    // play (death → gameover, or pause), and Poki's rules are explicit:
+    // a gameplayStop() may NOT follow another gameplayStop(), and ads that
+    // do not interrupt gameplay (a coin break from the shop) must not be
+    // wrapped in stop/start pairs at all. The sink dedupes the rare
+    // late-adapter case without ever producing the duplicate.
     this.input.setEnabled(false);
     this.audio.setAdMuted(true);
   }
@@ -4264,6 +4268,9 @@ export class Game {
   private endPortalAd(): void {
     this.audio.setAdMuted(false);
     this.input.setEnabled(true);
+    // If gameplay somehow already resumed while the break ran, the sink
+    // makes sure the portal catches up without a duplicate start.
+    if (this.state === "playing") this.gameplaySink.send("start");
   }
 
   private portalEnabled(): boolean {
@@ -4559,6 +4566,27 @@ export class Game {
     this.startRun(options);
   }
 
+  /**
+   * Every resume-from-pause path (button, ESC, P) funnels through here. On
+   * portal builds the return into gameplay routes through commercialBreak()
+   * — the documented pause/unpause event order — while the sink keeps the
+   * surrounding stop/start pair duplicate-free. A rejected or absent break
+   * resolves immediately and the resume proceeds; a pause can never wedge
+   * the game in the ad state.
+   */
+  private async resumeFromPause(): Promise<void> {
+    if (this.state !== "paused") return;
+    const platform = this.platform;
+    if (this.portalEnabled() && platform && platform.name !== "none") {
+      this.setState("ad");
+      this.telemetry.track("portal_break_request", { portal: platform.name, placement: "resume" });
+      await platform.commercialBreak();
+      if (this.disposed) return;
+      this.endPortalAd();
+    }
+    if (this.state === "paused" || this.state === "ad") this.setState("playing");
+  }
+
   /** Rewarded continue never succeeds unless the platform explicitly grants it. */
   private async continueWithPortalReward(): Promise<void> {
     const platform = this.platform;
@@ -4591,8 +4619,10 @@ export class Game {
     else if (s === "gameover" || s === "continue") this.audio.setMusicMode("sleep");
     else if (s === "paused") this.audio.duckMusic(0.55, 3);
     else if (s === "playing") this.audio.setMusicMode(this.feverOn ? "fever" : this.stormfront ? "storm" : "play");
-    if (previous === "playing" && s !== "playing") this.platform?.gameplayStop();
-    if (previous !== "playing" && s === "playing") this.platform?.gameplayStart();
+    // Edge-triggered through the sink: stop exactly once per halt
+    // (death, pause, menu), start exactly once per resume.
+    if (previous === "playing" && s !== "playing") this.gameplaySink.send("stop");
+    if (previous !== "playing" && s === "playing") this.gameplaySink.send("start");
     this.bump();
   }
 

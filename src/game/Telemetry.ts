@@ -44,7 +44,11 @@ export class Telemetry {
     this.buffer.push(entry);
     if (this.buffer.length > 100) this.buffer.shift();
     const w = window as unknown as { dataLayer?: unknown[] };
-    w.dataLayer?.push({ event: name, ...props });
+    // Portal hosts inject their own analytics into the document the game
+    // runs in — pushing our events into their dataLayer would pollute
+    // portal-side numbers, so it is off in portal builds (the backend
+    // beacon is off there too — see endpoint()).
+    if (!isPortalBuild()) w.dataLayer?.push({ event: name, ...props });
     if (this.debug) console.debug("[telemetry]", name, props);
     // Queue a coarse copy for the aggregate backend counter (hard-capped).
     if (endpoint() && this.outbox.length < 64) {
