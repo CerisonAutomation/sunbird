@@ -1270,3 +1270,28 @@ h2 {
 .flight-footer .emote-options.hidden { display:none; }
 .versus-guide { display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px 10px; font:600 11px/1.5 system-ui,sans-serif; padding:5px 8px; border-radius:9px; color:#263446; background:#fff6e9; text-shadow:none; }
 .versus-guide span { white-space:nowrap; }
+
+/* ============ Mobile performance optimization (< 640px) ============ */
+@media (max-width: 640px) {
+  /* Disable all non-critical animations for speed */
+  * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+
+  /* Remove expensive visual effects */
+  .overlay { background: rgba(20, 16, 40, 0.5); }
+  .paper-card { box-shadow: 0 10px 30px rgba(20, 16, 40, 0.15); }
+  .primary-btn, .soft-btn, .mini-btn { box-shadow: none; }
+  .icon-btn { box-shadow: none; }
+
+  /* Simplify gradients to flat colors */
+  .menu-hero .home-launch { background: #e78342; border-color: #ad602e; box-shadow: 0 3px 0 #9d482d; }
+  .primary-btn.hero { background: linear-gradient(115deg, #ff6b4a, #e85a3a); }
+
+  /* Remove filter effects */
+  button { filter: none !important; }
+  .logo { filter: none; }
+
+  /* Disable transform transitions on buttons */
+  .primary-btn, .soft-btn, .mini-btn, .icon-btn {
+    transform: none !important;
+  }
+}
