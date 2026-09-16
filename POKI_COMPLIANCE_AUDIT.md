@@ -1,7 +1,32 @@
 # Sunbird × Poki — Full Developer-Docs Compliance Audit
 
-**Date:** 2026-09-16 · **Artifact:** `sunbird-poki.zip` (683 KB) · **Build:** this branch, `pnpm build:portals`
+**Date:** 2026-09-16 · **Artifact:** `sunbird-poki.zip` (697 KB) · **Build:** this branch, `pnpm build:portals`
 **Verdict:** ✅ **Shippable** — every hard requirement passes (several with this audit's fixes baked in); remaining items are submission-time actions, not code blockers.
+
+## Re-verification (2026-09-16, post perf pass)
+
+Re-checked against the current developers.poki.com docs and re-ran every gate on the
+rebuilt zips:
+
+- **`gameLoadingFinished()` is now one-shot** in the Poki adapter. `Game` calls both
+  `loadingFinished()` and `signalGameReady()` on boot; both previously resolved to a
+  `gameLoadingFinished()` call, i.e. two consecutive identical phase markers. The
+  "no consecutive duplicates" rule (enforced by the Inspector, stated for gameplay events
+  and now applied to the loading signal) is honored. — `src/sdk/poki.ts`
+- **Event-order table re-verified** (startup / death→restart / death→revive / pause→resume):
+  all match `GameplayEventSink` + the `setState` transitions. `gameplayStart()` on first
+  input (not load) confirmed by the state machine.
+- **`PokiSDK.login()`** (current API: page-reloads on first login, resolves instantly if
+  already logged in) is **deliberately not called at boot** — identity is passive
+  (`getUser()`), with the local pilot name as fallback. Optional post-launch follow-up:
+  an explicit "Sign in with Poki" button on the profile screen.
+- **`poki-cli`** (github.com/poki/poki-cli) can upload from CI — not wired yet; Inspector
+  folder upload is the working path today.
+- **Perf pass landed** (see `HANDOFF.md` §3): tiered AI fidelity, nametag DOM reuse,
+  no per-frame standings sort, snapshot gating, end-of-race pileup removal. All measured
+  by `massrace-perf.test.ts` and `physics-perf.test.ts` guards.
+- Gates re-run on the rebuilt zips: `verify-portal.mjs` PASS · `audit-zips.mjs` PASS ·
+  `verify-prod.mjs` PASS · full unit suite green.
 
 Every requirement below was checked against the actual source **and** the built poki bundle (greps of the unzipped zip). Statuses:
 

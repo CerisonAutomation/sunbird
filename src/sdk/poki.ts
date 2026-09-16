@@ -110,7 +110,13 @@ export class PokiAdapter implements PlatformAdapter {
     this.sdk?.gameLoadingStart?.();
   }
 
+  private loadingFinishedSent = false;
+
   loadingFinished(): void {
+    // Phase markers are one-shot: Poki's "no consecutive duplicates" rule
+    // (enforced by the Inspector) is applied to the loading signal too.
+    if (this.loadingFinishedSent) return;
+    this.loadingFinishedSent = true;
     this.sdk?.gameLoadingFinished?.();
   }
 

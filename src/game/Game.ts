@@ -395,6 +395,15 @@ export class Game {
   private selectedPvpMode: ModeId = "pvp_sprint";
   private selectedPvpWorld = "emerald";
   private selectedCourse: PvpWorldCourse = PVP_WORLDS[0]!;
+
+  /** The race course in effect (selection, with legacy world-id fallback). */
+  private courseForRace(): PvpWorldCourse {
+    return (
+      this.selectedCourse ??
+      (this.selectedPvpWorld ? PVP_WORLDS.find((w) => w.id === this.selectedPvpWorld) : null) ??
+      PVP_WORLDS[0]!
+    );
+  }
   /** Permanent per-mode mastery perks (coin/daylight/fever/lift), refreshed each run. */
   private masteryPerk: MasteryPerks = NO_MASTERY_PERKS;
   private maxAltitude = 0;
@@ -2396,7 +2405,7 @@ export class Game {
     } else if (opts?.challenge && this.seed !== this.today) {
       this.rebuildWorld(this.today);
     } else if (isRaceMode(this.modeId)) {
-      const course = this.selectedCourse ?? (this.selectedPvpWorld ? PVP_WORLDS.find((w) => w.id === this.selectedPvpWorld) : null) ?? PVP_WORLDS[0]!;
+      const course = this.courseForRace();
       this.startX = course.island * ISLAND_PERIOD + 64;
       const targetSeed = `${this.seed}:${course.id}`;
       if (this.seed !== targetSeed) {
@@ -2919,7 +2928,7 @@ export class Game {
     // Shared/daily/ranked seeds must not depend on an individual save's skill.
     // Apply adaptive calibration only to an unshared casual flight, before sampling spawn.
     this.terrain.setDifficulty(!isRaceMode(this.modeId) && this.seed.startsWith("fly-") ? this.flow.difficulty() : 1);
-    const course = isRaceMode(this.modeId) ? (this.selectedCourse ?? (this.selectedPvpWorld ? PVP_WORLDS.find((w) => w.id === this.selectedPvpWorld) : null) ?? PVP_WORLDS[0]!) : null;
+    const course = isRaceMode(this.modeId) ? this.courseForRace() : null;
     this.startX = course ? course.island * ISLAND_PERIOD + 64 : 64;
     const y = this.terrain.heightAt(this.startX) + BIRD_RADIUS;
     this.bird.reset(this.startX, y);
@@ -5393,7 +5402,11 @@ export class Game {
       roomSize: this.roomSize,
       roomSkill: this.roomSkill,
       roomMuted: this.roomMuted,
-      roomRivals: this.massRace.rivals.slice(0, 12).map((r) => ({ id: r.id, name: r.name, skill: Math.round(r.skill * 100), hue: Math.round(r.hue * 360) })),
+      // Only the lobby screen can consume these — no per-frame allocs elsewhere.
+      roomRivals:
+        this.screen === "live"
+          ? this.massRace.rivals.slice(0, 12).map((r) => ({ id: r.id, name: r.name, skill: Math.round(r.skill * 100), hue: Math.round(r.hue * 360) }))
+          : [],
       netState: this.net?.info().state ?? "offline",
       netError: this.net?.info().error ?? "",
       draft: this.massRace.draft,
@@ -5402,21 +5415,26 @@ export class Game {
       photoFinish: this.photoFinish,
       rival: this.rivalCard(),
       loadout: this.loadoutView(),
-      lobbyRivals: (() => {
-        // Real pilots seated in the room always outrank seeded flavor text.
-        const live = (this.net?.roster() ?? [])
-          .slice(0, 39)
-          .map((p) => ({ name: p.name, tag: "in room · live", ready: p.ready, skin: p.skin }));
-        if (live.length) return live;
-        // Next best: time-shifted doubles of real leaderboard players.
-        const page = this.board.peek("global", "distance");
-        const ghosts = (page?.entries ?? [])
-          .filter((en) => !en.you && en.name)
-          .slice(0, 3)
-          .map((en) => ({ name: en.name, tag: `best ${Math.round(en.distance).toLocaleString()} m` }));
-        if (ghosts.length) return ghosts;
-        return featuredRivals(`${this.seed}:massrace`);
-      })(),
+      // Lobby-only field: computed every frame before, including mid-flight
+      // and on the results card, where no one renders it.
+      lobbyRivals:
+        this.state === "menu" && this.screen === "live"
+          ? (() => {
+              // Real pilots seated in the room always outrank seeded flavor text.
+              const live = (this.net?.roster() ?? [])
+                .slice(0, 39)
+                .map((p) => ({ name: p.name, tag: "in room · live", ready: p.ready, skin: p.skin }));
+              if (live.length) return live;
+              // Next best: time-shifted doubles of real leaderboard players.
+              const page = this.board.peek("global", "distance");
+              const ghosts = (page?.entries ?? [])
+                .filter((en) => !en.you && en.name)
+                .slice(0, 3)
+                .map((en) => ({ name: en.name, tag: `best ${Math.round(en.distance).toLocaleString()} m` }));
+              if (ghosts.length) return ghosts;
+              return featuredRivals(`${this.seed}:massrace`);
+            })()
+          : [],
       raceRated: this.rankedRace,
       raceVerified: this.serverPlaceApplied,
       ratingDelta: this.lastRatingDelta,

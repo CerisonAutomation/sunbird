@@ -136,6 +136,8 @@ export class MassRace {
   draftMax = DRAFT_MAX;
   private emotes = new Map<string, { text: string; at: number }>();
   private clock = 0;
+  /** Alternates full/dead-reckon frames for far-behind rivals (tiered fidelity). */
+  private tierTick = 0;
 
   constructor() {
     this.bodyMesh = new THREE.InstancedMesh(this.bodyGeo, this.bodyMat, 1);
@@ -321,11 +323,35 @@ export class MassRace {
   step(dt: number, terrain: TerrainSystem, finishLine: number, time: number, playerX?: number, playerY?: number): void {
     if (!this.group.visible) return;
     this.clock += dt;
+    // Far-behind rivals alternate full/dead-reckon frames (see below).
+    this.tierTick = (this.tierTick + 1) % 2;
 
     for (const r of this.rivals) {
       r.prevX = r.bird.x;
       r.prevY = r.bird.y;
       if (r.kind === "remote" || r.finished || r.eliminated) continue;
+
+      // TIERED FIDELITY: a rival this far behind the player is off-camera,
+      // cannot draft or interact, and its only jobs are staying plausible
+      // and not missing the line. Dead-reckon it on the off frame — half
+      // the field's physics cost with no visible difference (syncVisual
+      // interpolates prev/current either way). Ahead-of-player rivals always
+      // run full rate so no overtake or finish is ever missed.
+      if (playerX !== undefined && playerX - r.bird.x > 300 && this.tierTick !== 0) {
+        r.bird.justLaunched = false;
+        r.bird.justLanded = false;
+        r.bird.x += r.bird.vx * dt;
+        const ground = terrain.heightAt(r.bird.x) + BIRD_RADIUS;
+        if (r.bird.y < ground) {
+          r.bird.y = ground;
+          r.bird.vy = Math.abs(r.bird.vy) * 0.3;
+        }
+        if (finishLine > 0 && r.bird.x >= finishLine && !r.finished) {
+          r.finished = true;
+          r.finishTime = time;
+        }
+        continue;
+      }
 
       r.reactionT -= dt;
       if (r.reactionT <= 0) {
@@ -523,15 +549,25 @@ export class MassRace {
   /** Visible rival name tag positions near the player for floating HUD badges */
   getVisibleNameTags(cameraX: number, playerX: number, playerY: number, startX: number): RivalNameTag[] {
     if (!this.group.visible) return [];
-    const standings = this.standings(playerX, startX, "you", 40);
     const tags: RivalNameTag[] = [];
+    const rivals = this.rivals;
 
-    for (const r of this.rivals) {
+    for (const r of rivals) {
       if (Math.abs(r.bird.x - cameraX) > 120) continue;
-      const st = standings.rows.find((s) => s.id === r.id);
       const dx = r.bird.x - playerX;
       const dy = Math.abs(r.bird.y - playerY);
       const isDrafting = dx > 0 && dx <= DRAFT_BEHIND && dy <= DRAFT_LATERAL;
+
+      // Place by counting birds ahead (rivals + player). Same answer as the
+      // 41-row standings sort this used to run EVERY frame, without the sort
+      // or the allocation — on the per-frame hot path.
+      let place = 0;
+      if (!r.eliminated) {
+        place = 1 + (playerX > r.bird.x ? 1 : 0);
+        for (const o of rivals) {
+          if (!o.eliminated && o.bird.x > r.bird.x) place++;
+        }
+      }
 
       tags.push({
         id: r.id,
@@ -539,7 +575,7 @@ export class MassRace {
         worldX: r.bird.x,
         worldY: r.bird.y + 1.6,
         distance: Math.round(Math.max(0, r.bird.x - startX)),
-        place: st?.place ?? 0,
+        place,
         remote: r.kind === "remote",
         drafting: isDrafting,
         emote: this.emoteFor(r.id),

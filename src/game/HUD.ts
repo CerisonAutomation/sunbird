@@ -458,6 +458,9 @@ export class HUD {
   private currentSnapshot: HudSnapshot | null = null;
   private lastChips = "";
   private readonly tmpNameTagVec = new THREE.Vector3();
+  /** Live nametag elements, reused per frame (see updateNameTags). */
+  private readonly nameTagEls = new Map<string, HTMLDivElement>();
+  private readonly nameTagKeys = new Map<string, string>();
 
   constructor(parent: HTMLElement) {
     this.menuSky = new MenuSky();
@@ -755,27 +758,54 @@ export class HUD {
   updateNameTags(tags: RivalNameTag[], camera: THREE.Camera, width: number, height: number): void {
     const container = this.root.querySelector<HTMLElement>('[data-ref="nametags"]');
     if (!container) return;
-    if (!tags || !tags.length) {
-      container.innerHTML = "";
-      return;
+    // A root re-render (flushCaches) replaces the container's children — the
+    // cached elements are detached; drop the caches and start fresh.
+    if (!container.childElementCount && this.nameTagEls.size > 0) {
+      this.nameTagEls.clear();
+      this.nameTagKeys.clear();
     }
-    let html = "";
-    for (const tag of tags) {
+    // DOM reuse: positions are cheap style writes (composited), while the
+    // tag CONTENT is only re-parsed when rank/name/emote/draft actually
+    // changes. The old version rebuilt container.innerHTML 60x/second in a
+    // packed field — a full HTML parse + node churn on every frame, which is
+    // where mobile PVP frame times went to die.
+    const seen = new Set<string>();
+    for (const tag of tags ?? []) {
       this.tmpNameTagVec.set(tag.worldX, tag.worldY, -3.5);
       this.tmpNameTagVec.project(camera);
       if (this.tmpNameTagVec.z > 1) continue;
       const px = ((this.tmpNameTagVec.x + 1) * width) / 2;
       const py = ((-this.tmpNameTagVec.y + 1) * height) / 2;
       if (px < -60 || px > width + 60 || py < -60 || py > height + 60) continue;
+      seen.add(tag.id);
 
-      const draftClass = tag.drafting ? "drafting" : "";
-      html += `<div class="rival-nametag ${draftClass}" style="left:${px.toFixed(1)}px; top:${py.toFixed(1)}px;">
-        ${tag.emote ? `<b class="rt-emote" aria-hidden="true">${escapeHtml(tag.emote)}</b>` : ""}
-        <span class="rank-badge">#${tag.place}</span>
-        <span>${escapeHtml(tag.name)}</span>
-      </div>`;
+      let el = this.nameTagEls.get(tag.id);
+      if (!el) {
+        el = document.createElement("div");
+        el.className = "rival-nametag";
+        container.appendChild(el);
+        this.nameTagEls.set(tag.id, el);
+        this.nameTagKeys.set(tag.id, "");
+      }
+      el.style.left = `${px.toFixed(1)}px`;
+      el.style.top = `${py.toFixed(1)}px`;
+
+      const key = `${tag.place}|${tag.name}|${tag.emote}|${tag.drafting ? 1 : 0}`;
+      if (this.nameTagKeys.get(tag.id) !== key) {
+        this.nameTagKeys.set(tag.id, key);
+        el.classList.toggle("drafting", tag.drafting);
+        el.innerHTML =
+          `${tag.emote ? `<b class="rt-emote" aria-hidden="true">${escapeHtml(tag.emote)}</b>` : ""}` +
+          `<span class="rank-badge">#${tag.place}</span><span>${escapeHtml(tag.name)}</span>`;
+      }
     }
-    container.innerHTML = html;
+    for (const [id, el] of this.nameTagEls) {
+      if (!seen.has(id)) {
+        el.remove();
+        this.nameTagEls.delete(id);
+        this.nameTagKeys.delete(id);
+      }
+    }
   }
 
   update(s: HudSnapshot): void {
