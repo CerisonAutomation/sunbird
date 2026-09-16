@@ -323,10 +323,10 @@
 .destination-grid .destination-copy b { font:600 15px/1.25 var(--display); color:#3b4236; }
 .destination-grid .destination-copy > span { font:400 11px/1.45 var(--body); margin-top:5px; color:#645d4d; }
 .destination-grid .destination-arrow { position:absolute; top:8px; right:10px; margin:0; color:#8b8068; font-size:12px; }
-.play-destinations .destination[data-icon="online"] { background:linear-gradient(130deg,#fff8d8,#ffe5a3); border-color:#e7c784; }
-.play-destinations .destination[data-icon="versus"] { background:linear-gradient(130deg,#edf4fb,#dce3f0); border-color:#bdcbe1; }
-.play-destinations .destination[data-icon="compass"] { background:linear-gradient(130deg,#fff4d3,#f3dfb5); border-color:#deca9b; }
-.play-destinations .destination[data-icon="endless"] { background:linear-gradient(130deg,#f6effb,#e5dcef); border-color:#d1bfdc; }
+.play-destinations .destination[data-icon="online"] { background:#fffaf5; border-color:#dcc9ac; }
+.play-destinations .destination[data-icon="versus"] { background:#f5f8fc; border-color:#c5d0e0; }
+.play-destinations .destination[data-icon="compass"] { background:#fffbf5; border-color:#dcc9ac; }
+.play-destinations .destination[data-icon="endless"] { background:#faf7fc; border-color:#d5c5dd; }
 .utility-destinations { border:0; padding-top:0; }
 .utility-destinations .destination { flex-direction:column; gap:5px; padding:12px 8px; text-align:center; }
 .utility-destinations .destination-art { flex-basis:38px; width:38px; height:38px; }
@@ -494,3 +494,13 @@
 .squad-recovery input { flex:0 0 22px; width:22px; height:22px; }
 .squad-fields .club-card.mine { background:linear-gradient(#fff9e4,#fff0c9); border-color:#ddc397; }
 @media(max-width:360px) { .squad-invite { flex-wrap:wrap; } .squad-invite .mini-btn { margin-left:auto; } }
+
+/* Mobile UX: strip effects for performance */
+@media(max-width:640px) {
+  .rival-nametag { font-size:9px; padding:2px 5px; background:rgba(20,15,20,0.8); }
+  .rival-nametag .rank-badge { font-size:7px; padding:0px 3px; }
+  .destination { padding:10px; min-height:64px; }
+  .destination b { font-size:13px; }
+  .destination span { font-size:10px; margin-top:4px; }
+  .utility-destinations .destination { min-height:58px; }
+}
