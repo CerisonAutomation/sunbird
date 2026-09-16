@@ -362,11 +362,18 @@ export const LEGACY_ROUTES: Route[] = [
     re: /^\/social\/health$/,
     rl: "read",
     auth: "guest",
-    handler: (ctx) => ({
-      ok: true,
-      players: Object.keys(ctx.db.state.profiles).length,
-      clubs: Object.keys(ctx.db.state.squads).length,
-    }),
+    handler: (ctx) => {
+      const storage = ctx.db.storageStatus();
+      if (!storage.ok) {
+        throw new HttpError(503, `persistence degraded: ${storage.detail ?? "last write failed"}`, "storageDegraded");
+      }
+      return {
+        ok: true,
+        storage: storage.mode,
+        players: Object.keys(ctx.db.state.profiles).length,
+        clubs: Object.keys(ctx.db.state.squads).length,
+      };
+    },
   },
 ];
 

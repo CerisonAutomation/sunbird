@@ -6,7 +6,7 @@
  * external service required — while leaving a clean seam to swap in Redis or
  * Postgres per-collection for horizontal scale (see DEPLOY.md).
  */
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import type {
@@ -99,11 +99,25 @@ export function emptyCounters(): AchievementCounters {
   };
 }
 
+/**
+ * Storage health as reported by /health. `mode: "memory"` is an honest
+ * label for the no-persistence development mode (data resets on restart),
+ * and `ok: false` means the file backend exists but the last write failed —
+ * the server keeps serving (data is still in RAM) but the probe goes red so
+ * a failing disk is never silently absorbed.
+ */
+export interface DbStorageStatus {
+  mode: "memory" | "file";
+  ok: boolean;
+  detail: string | null;
+}
+
 export class Db {
   state: DbState;
   private file: string | null;
   private saveTimer: NodeJS.Timeout | null = null;
   private dirty = false;
+  private flushError: string | null = null;
 
   constructor(
     state?: DbState,
@@ -129,27 +143,66 @@ export class Db {
 
   flush(): void {
     if (!this.file || !this.dirty) return;
-    this.dirty = false;
-    mkdirSync(dirname(this.file), { recursive: true });
-    const tmp = `${this.file}.tmp`;
-    writeFileSync(tmp, JSON.stringify(this.state));
-    renameSync(tmp, this.file);
+    try {
+      mkdirSync(dirname(this.file), { recursive: true });
+      const tmp = `${this.file}.tmp`;
+      writeFileSync(tmp, JSON.stringify(this.state));
+      renameSync(tmp, this.file);
+      this.dirty = false;
+      if (this.flushError !== null) {
+        this.flushError = null;
+        console.log(`[store] persistence recovered — ${this.file}`);
+      }
+    } catch (err) {
+      // A failing disk (full, read-only, bad path) must neither crash the
+      // process (the failure lands inside a timer callback) nor pretend the
+      // state is durable. Keep it dirty so the next touch retries, and
+      // surface the failure in /health.
+      this.dirty = true;
+      this.flushError = err instanceof Error ? err.message : String(err);
+      console.error(`[store] PERSISTENCE FAILURE — state is in-memory only until the disk recovers: ${this.flushError} (${this.file})`);
+    }
   }
 
   close(): void {
     if (this.saveTimer) clearTimeout(this.saveTimer);
     this.saveTimer = null;
     this.flush();
+    if (this.flushError) {
+      console.error(`[store] close() exited with a pending persistence failure: ${this.flushError}`);
+    }
+  }
+
+  storageStatus(): DbStorageStatus {
+    if (!this.file) return { mode: "memory", ok: true, detail: null };
+    return this.flushError
+      ? { mode: "file", ok: false, detail: this.flushError }
+      : { mode: "file", ok: true, detail: null };
   }
 
   private load(): void {
     if (!this.file) return;
+    if (!existsSync(this.file)) return; // first boot — nothing to load
+    let raw: string;
     try {
-      const raw = readFileSync(this.file, "utf8");
+      raw = readFileSync(this.file, "utf8");
+    } catch (err) {
+      // A file that exists but cannot be read is NOT a first boot. Starting
+      // clean here would silently drop every profile, board and save on the
+      // next restart — fail loud instead; ops recovers by renaming the file.
+      throw new Error(
+        `cannot read state file ${this.file}: ${err instanceof Error ? err.message : String(err)}. ` +
+          `Move or repair the file and restart (refusing to start with a silently empty database).`,
+      );
+    }
+    try {
       const parsed = JSON.parse(raw) as Partial<DbState>;
       this.state = { ...emptyDbState(), ...parsed };
-    } catch {
-      /* first boot or corrupt file — start clean (state is re-derivable) */
+    } catch (err) {
+      throw new Error(
+        `corrupt state file ${this.file}: ${err instanceof Error ? err.message : String(err)}. ` +
+          `Move or repair the file and restart (refusing to start with a silently empty database).`,
+      );
     }
   }
 
