@@ -563,6 +563,7 @@ export class HUD {
     lane("flight-messages", [".launch-banner", ".hint", ".goal-pop", ".finish-countdown", ".countdown"]);
     const footer = lane("flight-footer", [".goal-strip", ".draft-meter", ".fever-wrap", ".emote-wheel"]);
     parent.appendChild(this.root);
+    parent.appendChild(this.menuSky.heroHost);
     this.bind();
     this.overlayNavigation = new OverlayNavigation(this.root);
     // Observe only these small flow containers, not the full scene or per-frame

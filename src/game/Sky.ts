@@ -366,8 +366,9 @@ export class Sky {
     this.sunLight = new THREE.DirectionalLight(0xfff4d0, 1.0);
     this.sunLight.position.set(40, 60, 30);
     this.sunLight.castShadow = true;
-    this.sunLight.shadow.mapSize.width = 1024;
-    this.sunLight.shadow.mapSize.height = 1024;
+    const shadowRes = /Mobi|Android/i.test(navigator.userAgent) || window.innerWidth < 700 ? 512 : 1024;
+    this.sunLight.shadow.mapSize.width = shadowRes;
+    this.sunLight.shadow.mapSize.height = shadowRes;
     this.sunLight.shadow.camera.near = 10;
     this.sunLight.shadow.camera.far = 280;
     this.sunLight.shadow.camera.left = -80;

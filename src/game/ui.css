@@ -54,8 +54,8 @@ button {
 }
 
 .back-btn {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border: none;
   border-radius: 12px;
   background: rgba(42, 28, 40, 0.08);
@@ -2394,16 +2394,19 @@ button {
 /* --- mode row --- */
 .pvp-modes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; margin-bottom: 10px; }
 .pvp-mode {
-  display: flex; flex-direction: column; align-items: center; gap: 1px;
-  border: 2px solid transparent; border-radius: 14px; padding: 9px 4px 8px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  border: 2px solid transparent; border-radius: 14px; padding: 12px 4px 10px;
+  min-height: 72px;
   background: rgba(255, 255, 255, 0.65); color: var(--ink);
   font-family: inherit; cursor: pointer; box-shadow: 0 3px 0 rgba(42, 28, 40, 0.1);
+  transition: transform 0.1s, box-shadow 0.1s;
+  -webkit-tap-highlight-color: transparent;
 }
-.pvp-mode i { font-style: normal; font-size: 20px; }
+.pvp-mode i { font-style: normal; font-size: 22px; }
 .pvp-mode b { font-size: 12px; }
 .pvp-mode span { font-size: 10px; color: #8a6a62; font-weight: 600; }
 .pvp-mode.rated { border-color: #e8a83a; background: #fff6e0; }
-.pvp-mode:active { transform: translateY(2px); box-shadow: none; }
+.pvp-mode:active { transform: translateY(2px); box-shadow: none; transition: none; }
 
 /* --- loadout strip --- */
 .loadout-strip {
@@ -2419,15 +2422,15 @@ button {
 /* --- VS stage (lobby) --- */
 .vs-stage { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px; align-items: stretch; margin-bottom: 8px; }
 .vs-you, .vs-foe {
-  display: flex; flex-direction: column; align-items: center; gap: 1px;
-  background: rgba(255, 255, 255, 0.65); border-radius: 14px; padding: 8px 4px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  background: rgba(255, 255, 255, 0.65); border-radius: 14px; padding: 10px 6px;
 }
 .vs-you { border: 2px solid #ffb020; background: #fff6e0; }
 .vs-foes { display: flex; flex-direction: column; gap: 5px; }
-.vs-foe { padding: 6px 4px; }
-.vs-bird { font-size: 24px; }
-.vs-you b, .vs-foe b { font-size: 12px; }
-.vs-sub { font-size: 10px; color: #8a6a62; font-weight: 600; }
+.vs-foe { padding: 8px 6px; }
+.vs-bird { font-size: 28px; }
+.vs-you b, .vs-foe b { font-size: 13px; }
+.vs-sub { font-size: 11px; color: #8a6a62; font-weight: 600; }
 .vs-mark {
   align-self: center; font-size: 20px; font-weight: 900; font-style: italic;
   color: #fff; background: linear-gradient(180deg, #ff6b4a, #d44528);

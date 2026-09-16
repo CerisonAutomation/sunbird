@@ -493,7 +493,7 @@ export class Game {
       this.renderer = new THREE.WebGLRenderer({
         canvas,
         antialias: !isMobile,
-        powerPreference: isMobile ? "low-power" : "high-performance",
+        powerPreference: isMobile ? "low-power" : "default",
         stencil: false,
         alpha: false,
         premultipliedAlpha: true,
