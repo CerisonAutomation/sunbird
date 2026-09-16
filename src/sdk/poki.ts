@@ -110,7 +110,13 @@ export class PokiAdapter implements PlatformAdapter {
     this.sdk?.gameLoadingStart?.();
   }
 
+  private loadingFinishedSent = false;
+
   loadingFinished(): void {
+    // Phase markers are one-shot: Poki's "no consecutive duplicates" rule
+    // (enforced by the Inspector) is applied to the loading signal too.
+    if (this.loadingFinishedSent) return;
+    this.loadingFinishedSent = true;
     this.sdk?.gameLoadingFinished?.();
   }
 
@@ -317,7 +323,7 @@ export class PokiAdapter implements PlatformAdapter {
   }
 
   /* game events */
-  measure(category: string, label: string, action: "start" | "complete" | "fail"): void {
+  measure(category: string, label: string, action: string): void {
     try {
       this.sdk?.measure?.(category, label, action);
     } catch {

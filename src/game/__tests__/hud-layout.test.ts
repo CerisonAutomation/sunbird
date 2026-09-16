@@ -26,9 +26,22 @@ describe("readable HUD feedback", () => {
     expect(feedbackSlot(state)).toBe("hint");
   });
 
-  it("groups counters and controls in flow without allocating unused menu canvases", () => {
+  it("keeps the painted menu sky out of the DOM — the 3D world is the backdrop", () => {
     const { hud, root, disconnect } = fixture();
-    expect(root.querySelectorAll("canvas")).toHaveLength(0);
+    // The main-screen backdrop is the live 3D gameplay world (attract flight,
+    // Game.menuTick). The painted 2D sky canvas must NOT be mounted, or it
+    // covers the world with a flat opaque painting (regression 2026-09).
+    expect(root.querySelector(".menu-sky")).toBeNull();
+    // The hero-bird overlay stays mounted but permanently hidden (the big
+    // drifting title-screen bird was removed by request); MenuSky.dispose()
+    // relies on it being a real element.
+    const hero = root.querySelector(".menu-hero-layer");
+    expect(hero).not.toBeNull();
+    expect(hero!.classList.contains("hidden")).toBe(true);
+    expect(hero!.querySelector("canvas")).not.toBeNull();
+    // Dormant: no sized canvas buffers (unsized canvases stay at the
+    // 300×150 default — no memory, no rAF).
+    for (const c of root.querySelectorAll("canvas")) expect(c.width).toBe(300);
     expect(root.querySelectorAll(".top-bar .hud-controls button")).toHaveLength(2);
     expect(root.querySelector(".hud-header .roster-bar")).not.toBeNull();
     expect(root.querySelector(".flight-footer .fever-wrap")).not.toBeNull();

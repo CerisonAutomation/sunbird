@@ -95,6 +95,8 @@ export type HudSnapshot = {
   version: number;
   distance: number;
   coins: number;
+  /** True once this run's 3× coin bonus has been claimed (one claim per run). */
+  multiplierClaimed: boolean;
   daylight: number;
   daylightMax: number;
   fever: number;
@@ -285,6 +287,10 @@ export type HudSnapshot = {
   squadNotice: string;
   dailyFlash?: { id: string; price: number; originalPrice: number; discountPct: number };
   stipendClaimed?: boolean;
+  /** This month's rank prize has already been claimed (one per season). */
+  rankPrizeClaimed: boolean;
+  /** The one-time Ace Wingman crate was bought (it pays 250 for 240 — no re-claims). */
+  wingmanBundle: boolean;
   /* --- monetization max value & portal loops --- */
   piggyCoins: number;
   prestigeLevel: number;
@@ -458,6 +464,9 @@ export class HUD {
   private currentSnapshot: HudSnapshot | null = null;
   private lastChips = "";
   private readonly tmpNameTagVec = new THREE.Vector3();
+  /** Live nametag elements, reused per frame (see updateNameTags). */
+  private readonly nameTagEls = new Map<string, HTMLDivElement>();
+  private readonly nameTagKeys = new Map<string, string>();
 
   constructor(parent: HTMLElement) {
     this.menuSky = new MenuSky();
@@ -578,9 +587,13 @@ export class HUD {
     const header = lane("hud-header", [".top-bar", ".mid-meta", ".power-chips", ".power-strip", ".roster-bar", ".versus-bar"]);
     lane("flight-messages", [".launch-banner", ".hint", ".goal-pop", ".finish-countdown", ".countdown"]);
     const footer = lane("flight-footer", [".goal-strip", ".draft-meter", ".fever-wrap", ".emote-wheel"]);
-    parent.appendChild(this.menuSky.host);
+    // The menu backdrop is the LIVE 3D gameplay world (Game.menuTick attract
+    // flight): the painted 2D sky canvas stays OUT of the DOM so it never
+    // covers the world, and its loop never starts. The hero-bird overlay
+    // stays mounted (hidden) so MenuSky.dispose() keeps working unchanged.
+    this.root.querySelector<HTMLElement>('[data-ref="menu"]')!.appendChild(this.menuSky.heroHost);
+    this.menuSky.heroHost.classList.add("hidden");
     parent.appendChild(this.root);
-    parent.appendChild(this.menuSky.heroHost);
     this.bind();
     this.overlayNavigation = new OverlayNavigation(this.root);
     // Observe only these small flow containers, not the full scene or per-frame
@@ -751,26 +764,54 @@ export class HUD {
   updateNameTags(tags: RivalNameTag[], camera: THREE.Camera, width: number, height: number): void {
     const container = this.root.querySelector<HTMLElement>('[data-ref="nametags"]');
     if (!container) return;
-    if (!tags || !tags.length) {
-      container.innerHTML = "";
-      return;
+    // A root re-render (flushCaches) replaces the container's children — the
+    // cached elements are detached; drop the caches and start fresh.
+    if (!container.childElementCount && this.nameTagEls.size > 0) {
+      this.nameTagEls.clear();
+      this.nameTagKeys.clear();
     }
-    let html = "";
-    for (const tag of tags) {
+    // DOM reuse: positions are cheap style writes (composited), while the
+    // tag CONTENT is only re-parsed when rank/name/emote/draft actually
+    // changes. The old version rebuilt container.innerHTML 60x/second in a
+    // packed field — a full HTML parse + node churn on every frame, which is
+    // where mobile PVP frame times went to die.
+    const seen = new Set<string>();
+    for (const tag of tags ?? []) {
       this.tmpNameTagVec.set(tag.worldX, tag.worldY, -3.5);
       this.tmpNameTagVec.project(camera);
       if (this.tmpNameTagVec.z > 1) continue;
       const px = ((this.tmpNameTagVec.x + 1) * width) / 2;
       const py = ((-this.tmpNameTagVec.y + 1) * height) / 2;
       if (px < -60 || px > width + 60 || py < -60 || py > height + 60) continue;
+      seen.add(tag.id);
 
-      const draftClass = tag.drafting ? "drafting" : "";
-      html += `<div class="rival-nametag ${draftClass}" style="left:${px.toFixed(1)}px; top:${py.toFixed(1)}px;">
-        <span class="rank-badge">#${tag.place}</span>
-        <span>${escapeHtml(tag.name)}</span>
-      </div>`;
+      let el = this.nameTagEls.get(tag.id);
+      if (!el) {
+        el = document.createElement("div");
+        el.className = "rival-nametag";
+        container.appendChild(el);
+        this.nameTagEls.set(tag.id, el);
+        this.nameTagKeys.set(tag.id, "");
+      }
+      el.style.left = `${px.toFixed(1)}px`;
+      el.style.top = `${py.toFixed(1)}px`;
+
+      const key = `${tag.place}|${tag.name}|${tag.emote}|${tag.drafting ? 1 : 0}`;
+      if (this.nameTagKeys.get(tag.id) !== key) {
+        this.nameTagKeys.set(tag.id, key);
+        el.classList.toggle("drafting", tag.drafting);
+        el.innerHTML =
+          `${tag.emote ? `<b class="rt-emote" aria-hidden="true">${escapeHtml(tag.emote)}</b>` : ""}` +
+          `<span class="rank-badge">#${tag.place}</span><span>${escapeHtml(tag.name)}</span>`;
+      }
     }
-    container.innerHTML = html;
+    for (const [id, el] of this.nameTagEls) {
+      if (!seen.has(id)) {
+        el.remove();
+        this.nameTagEls.delete(id);
+        this.nameTagKeys.delete(id);
+      }
+    }
   }
 
   update(s: HudSnapshot): void {
@@ -802,9 +843,11 @@ export class HUD {
     if (this.root.dataset.feedback !== feedback) this.root.dataset.feedback = feedback;
     const menuVisible = s.state === "menu" || (s.state === "gameover" && s.screen !== "main");
     this.menuEl.classList.toggle("hidden", !menuVisible);
-    this.menuSky.setActive(menuVisible);
-    this.menuSky.setHeroActive(menuVisible && s.screen === "main");
-    if (menuVisible) this.menuSky.resize(window.innerWidth || 800, window.innerHeight || 600);
+    // The painted 2D sky and the hero bird stay OFF everywhere: the menu
+    // backdrop is the live 3D gameplay world (attract flight) behind the
+    // translucent card — the 2D canvas would cover it with a flat painting.
+    this.menuSky.setActive(false);
+    this.menuSky.heroHost.classList.add("hidden");
     this.pauseEl.classList.toggle("hidden", s.state !== "paused");
     // The pause control only makes sense in live flight — hide it while the
     // crash "second wind" card is up so it can't read as a dead button.
@@ -1004,7 +1047,9 @@ export class HUD {
         const bar = this.draftMeter.firstElementChild as HTMLElement | null;
         if (bar) bar.style.width = `${Math.round(s.draft * 100)}%`;
       }
-      this.emoteWheel.classList.toggle("hidden", !s.massRace);
+      // Emotes are a mid-race signal: hidden on the results card where a
+      // send would just round-trip to a room nobody renders anymore.
+      this.emoteWheel.classList.toggle("hidden", !(s.massRace && s.state === "playing"));
 
       // Live standings ticker: leaders plus your row, with gaps to the car
       // ahead so every position fight reads at a glance. Throttled like the
@@ -1437,7 +1482,9 @@ function renderBoard(s: HudSnapshot): string {
         <div class="prize-tier silver"><span>🥈 2nd Place</span><b>250 Coins + 10 Gems</b></div>
         <div class="prize-tier bronze"><span>🥉 3rd Place</span><b>100 Coins</b></div>
       </div>
-      <button class="primary-btn gold wide" data-ui data-action="claim-rank-prize">Claim Rank Prize 🏆</button>
+      ${s.rankPrizeClaimed
+        ? `<div class="tag" style="width:100%; text-align:center; font-size:12px; font-weight:600; color:#2e7d32; background:#e8f5e9; border-radius:8px; padding:8px;">✓ Claimed · next prize at the season rollover</div>`
+        : `<button class="primary-btn gold wide" data-ui data-action="claim-rank-prize">Claim Rank Prize 🏆</button>`}
     </div>
     <button class="soft-btn wide" data-ui data-action="board-refresh">${s.boardLoading ? "Refreshing…" : "↻ Refresh"}</button>
     <p class="fineprint">${
@@ -1522,19 +1569,23 @@ function renderLive(s: HudSnapshot): string {
           <h3>⚡ Quick Match</h3>
           <span class="board-badge live">Instant action</span>
         </div>
-        <p class="qm-desc">Jump straight into the skies! Race 40 live and neural AI pilots across custom formats and world circuits.</p>
-
-        <div class="lobby-selector-box">
-          <div class="lobby-selector-label"><span>Select PvP Format</span> <b>${activeMode.icon} ${activeMode.name} (${activeMode.finish} m)</b></div>
-          <div class="pills-scroll">${modePills}</div>
-          <div class="lobby-selector-label"><span>Select World Circuit</span> <b>${activeWorld.emoji} ${activeWorld.name}</b></div>
-          <div class="pills-scroll">${worldPills}</div>
-        </div>
+        <p class="qm-desc">One tap into the skies — 40 pilots, ready now. Shuffle the format and world, or just fly.</p>
 
         <div class="quick-match-btns">
-          <button class="primary-btn gold large-btn" data-ui data-action="quick-match-instant">⚡ Launch Match on ${activeWorld.name}</button>
+          <button class="primary-btn gold large-btn" data-ui data-action="quick-match-instant">⚡ ${activeMode.name} on ${activeWorld.name}</button>
+          <button class="soft-btn" data-ui data-action="quick-match-shuffle">🎲 Surprise me — random race</button>
           <button class="soft-btn" data-ui data-action="pvp-casual">Search Online Pilots</button>
         </div>
+
+        <details class="customize-race">
+          <summary>Customize · format &amp; world (${activeMode.name} · ${activeWorld.name})</summary>
+          <div class="lobby-selector-box">
+            <div class="lobby-selector-label"><span>PvP Format</span> <b>${activeMode.icon} ${activeMode.name} (${activeMode.finish} m)</b></div>
+            <div class="pills-scroll">${modePills}</div>
+            <div class="lobby-selector-label"><span>World Circuit</span> <b>${activeWorld.emoji} ${activeWorld.name}</b></div>
+            <div class="pills-scroll">${worldPills}</div>
+          </div>
+        </details>
       </section>
 
       <section class="race-section room-entry" aria-label="Invite friends">
@@ -1995,13 +2046,6 @@ function renderMain(s: HudSnapshot): string {
       aria-label="${s.settings.mute ? "Unmute sound" : "Mute sound"}"
       title="${s.settings.mute ? "Unmute sound" : "Mute sound"}"
     >${s.settings.mute ? "\u{1F507}" : "\u{1F50A}"}</button>
-    <button
-      class="icon-btn menu-fullscreen"
-      data-ui
-      data-action="toggle-fullscreen"
-      aria-label="Toggle Fullscreen"
-      title="Toggle Fullscreen"
-    >⛶</button>
     <header class="hero">
       ${menuHorizon()}
       <!-- Sun and bird both come from Sunbird.ts, so the title screen, the
@@ -2063,7 +2107,7 @@ function renderProgress(s: HudSnapshot): string {
       </div>
       ${s.canFreeSpin
         ? `<button class="primary-btn gold" data-ui data-action="spin-wheel" style="padding:8px 12px; font-size:13px;">Free Spin! 🎡</button>`
-        : `<button class="soft-btn" data-ui data-action="spin-wheel" style="padding:8px 12px; font-size:12px;">Spin · ● 100 / 📺</button>`}
+        : `<button class="soft-btn" disabled style="padding:8px 12px; font-size:12px; opacity:0.65;">🎡 Spins again tomorrow</button>`}
     </div>
 
     <div class="piggy-card" style="background:linear-gradient(135deg,#fff0f5,#ffd1dc); border:1px solid #f8a5c2; border-radius:16px; padding:12px 14px; margin:12px 0; display:flex; align-items:center; gap:12px;">
@@ -2330,9 +2374,11 @@ function renderShop(s: HudSnapshot, browse: ShopBrowse): string {
           <b style="font:700 15px var(--display); color:#0d47a1; display:block;">Ace Wingman Bundle</b>
           <span style="font-size:12px; color:#1976d2; display:block;">3 Boosts (Shield, Flask, Magnet) + Tideglass Trail + 250 Bonus Coins</span>
         </div>
-        ${s.wallet >= 240
-          ? `<button class="primary-btn gold" data-ui data-action="buy-bundle" data-id="wingman" style="white-space:nowrap;">Claim · ● 240</button>`
-          : `<span class="tag need" style="white-space:nowrap;">Need ● ${240 - s.wallet}</span>`
+        ${s.wingmanBundle
+          ? `<span class="tag" style="white-space:nowrap; font-size:12px; font-weight:600; color:#2e7d32; background:#e8f5e9; border-radius:8px; padding:6px 12px;">✓ Unlocked</span>`
+          : s.wallet >= 240
+            ? `<button class="primary-btn gold" data-ui data-action="buy-bundle" data-id="wingman" style="white-space:nowrap;">Claim · ● 240</button>`
+            : `<span class="tag need" style="white-space:nowrap;">Need ● ${240 - s.wallet}</span>`
         }
       </div>
     </div>
@@ -2654,6 +2700,26 @@ export function renderFlightRecap(path: [number, number][]): string {
     </div>`;
 }
 
+/**
+ * End-of-run 3× coin bonus card. Pure and exported so the claim contract is
+ * unit-testable: the bonus claims ONCE per run (Game.multiplierClaimed), the
+ * card carries no ad icon — it is a bonus, not an ad placement — and the
+ * title never wraps (nowrap) so narrow phones don't get a four-line header.
+ */
+export function renderCoinMultiplierCard(coins: number, claimed: boolean): string {
+  if (coins <= 0) return "";
+  if (claimed) {
+    return `<div class="multiplier-cta-card" style="background:#e8f5e9; border:1px solid #a5d6a7; border-radius:12px; padding:8px 12px; margin:14px 0; font-size:12px; font-weight:600; color:#2e7d32; text-align:center; white-space:nowrap;">✓ 3× flight bonus applied · +● ${coins * 2}</div>`;
+  }
+  return `<div class="multiplier-cta-card" style="background:linear-gradient(135deg,#e8f5e9,#c8e6c9); border:1px solid #a5d6a7; border-radius:16px; padding:12px 14px; margin:14px 0; display:flex; align-items:center; gap:12px; box-shadow:0 3px 0 #81c78440;">
+      <div style="flex:1; min-width:0;">
+        <b style="font:600 14px var(--display); color:#1b5e20; display:block; white-space:nowrap;">3× Flight Coin Bonus</b>
+        <span style="font-size:11px; color:#2e7d32; display:block;">Triple this run's ● ${coins} to ● ${coins * 3}!</span>
+      </div>
+      <button class="primary-btn gold" data-ui data-action="multiply-run-coins" style="padding:8px 14px; font-size:13px; white-space:nowrap;">Claim 3× (● +${coins * 2})</button>
+    </div>`;
+}
+
 function renderGameOver(s: HudSnapshot): string {
   if (s.versus && s.p1Stats && s.p2Stats) return renderVersusResult(s);
   const questTotal = s.claimedQuests.reduce((a, q) => a + q.reward, 0);
@@ -2715,16 +2781,7 @@ function renderGameOver(s: HudSnapshot): string {
       <div><span>${t("hud.stat.coins", undefined, "Coins")}</span><b>${s.coins}</b></div>
     </div>
 
-    ${s.coins > 0
-      ? `<div class="multiplier-cta-card" style="background:linear-gradient(135deg,#e8f5e9,#c8e6c9); border:1px solid #a5d6a7; border-radius:16px; padding:12px 14px; margin:14px 0; display:flex; align-items:center; gap:12px; box-shadow:0 3px 0 #81c78440;">
-          <span style="font-size:32px; flex:0 0 36px;">📺</span>
-          <div style="flex:1; min-width:0;">
-            <b style="font:600 15px var(--display); color:#1b5e20; display:block;">3× Flight Coin Bonus</b>
-            <span style="font-size:11px; color:#2e7d32; display:block;">Triple run earnings from ● ${s.coins} to ● ${s.coins * 3}!</span>
-          </div>
-          <button class="primary-btn gold" data-ui data-action="multiply-run-coins" style="padding:8px 14px; font-size:13px;">Claim 3× (● +${s.coins * 2})</button>
-        </div>`
-      : ""}
+    ${renderCoinMultiplierCard(s.coins, s.multiplierClaimed)}
 
     ${renderNextFlight(s)}
     <details class="result-details" data-ref="flightDetails"><summary>Flight details <span>Landmarks &amp; skill</span></summary><div class="over-stats">

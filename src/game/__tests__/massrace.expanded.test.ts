@@ -439,7 +439,7 @@ describe("mass race: draftFor", () => {
     const terrain = new TerrainSystem("2026-09-12");
     const mr = new MassRace();
     mr.spawn(0, "2026-09-12", terrain, 0);
-    expect(mr.draftFor(0, 0)).toBe(1);
+    expect(mr.draftFor(0, 0, 1 / 60)).toBe(1);
     expect(mr.draft).toBe(0);
     terrain.dispose();
   });
@@ -451,7 +451,7 @@ describe("mass race: draftFor", () => {
     mr.rivals[0]!.bird.x = 100;
     mr.rivals[0]!.bird.y = 0;
     // We're at x=80, 20 units behind (within DRAFT_BEHIND=26)
-    const mult = mr.draftFor(80, 0);
+    const mult = mr.draftFor(80, 0, 1 / 60);
     expect(mult).toBeLessThan(1);
     expect(mr.draft).toBeGreaterThan(0);
     terrain.dispose();
@@ -463,7 +463,7 @@ describe("mass race: draftFor", () => {
     mr.spawn(3, "2026-09-12", terrain, 0);
     mr.rivals[0]!.bird.x = 50;
     // We're ahead of all rivals
-    const mult = mr.draftFor(200, 0);
+    const mult = mr.draftFor(200, 0, 1 / 60);
     expect(mult).toBe(1);
     terrain.dispose();
   });
@@ -474,10 +474,10 @@ describe("mass race: draftFor", () => {
     mr.spawn(1, "2026-09-12", terrain, 0);
     mr.rivals[0]!.bird.x = 100;
     mr.rivals[0]!.bird.y = 0;
-    mr.draftFor(80, 0);
+    mr.draftFor(80, 0, 1 / 60);
     const draft1 = mr.draft;
     // Call again with same setup — draft should smooth
-    mr.draftFor(80, 0);
+    mr.draftFor(80, 0, 1 / 60);
     const draft2 = mr.draft;
     expect(draft2).toBeCloseTo(draft1, 1);
     terrain.dispose();
@@ -489,7 +489,7 @@ describe("mass race: draftFor", () => {
     mr.spawn(3, "2026-09-12", terrain, 0);
     // Rivals placed behind player
     mr.rivals[0]!.bird.x = 50;
-    const mult = mr.draftFor(100, 0);
+    const mult = mr.draftFor(100, 0, 1 / 60);
     expect(mult).toBe(1);
     expect(mr.draft).toBe(0);
     terrain.dispose();
@@ -501,7 +501,7 @@ describe("mass race: draftFor", () => {
     mr.spawn(1, "2026-09-12", terrain, 0);
     mr.rivals[0]!.bird.x = 100;
     mr.rivals[0]!.bird.y = 100; // far above
-    const mult = mr.draftFor(80, 0);
+    const mult = mr.draftFor(80, 0, 1 / 60);
     expect(mult).toBe(1);
     terrain.dispose();
   });

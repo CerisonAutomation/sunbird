@@ -83,7 +83,7 @@ import { nextWings, wingsFor, wingsProgress, wingsPromotion } from "./Career";
 import { GhostPlayer, GhostRecorder } from "./Ghost";
 import { fetchRivalGhost, publishGhost } from "./GhostNet";
 import { HUD, type CalendarCard, type CheckoutMode, type DailyCard, type GauntletCard, type HudSnapshot, type LoadoutView, type RivalCard, type SeedMode, type UiScreen, type UiState } from "./HUD";
-import { divisionFor, duelOpponent, duelSkillFor, featuredRivals, nextDivision, seasonReward } from "./pvp";
+import { divisionFor, duelOpponent, duelSkillFor, featuredRivals, nextDivision, rankSeasonId, seasonReward } from "./pvp";
 import { Input } from "./Input";
 import { clamp, dateSeed, formatDatePretty, lerp, SeededRandom } from "./math";
 import { Missions, type MissionView, type QuestReward, type QuestView, type RunStats } from "./Missions";
@@ -254,6 +254,10 @@ export class Game {
   private hintTimer = 0;
   private hint = "";
   private runCoins = 0;
+  /** The end-of-run 3× coin bonus claims once per run — the results card
+   * re-renders every frame, so without this flag the bonus was re-claimable
+   * forever (each claim tripled runCoins and re-armed the card). */
+  private multiplierClaimed = false;
   private runClouds = 0;
   private zeniths = 0;
   private pickups = 0;
@@ -305,6 +309,8 @@ export class Game {
   private boardLoading = false;
   private lastPrize: PrizeGrant | null = null;
   private racePlace = 0;
+  /** Outcome of the in-flight run for the portal funnel (`complete` only when the goal was reached). */
+  private runOutcome: "complete" | "fail" = "fail";
   private raceField = 0;
   private raceFinishTime = 0;
   private net: RealtimeClient | null = null;
@@ -395,6 +401,15 @@ export class Game {
   private selectedPvpMode: ModeId = "pvp_sprint";
   private selectedPvpWorld = "emerald";
   private selectedCourse: PvpWorldCourse = PVP_WORLDS[0]!;
+
+  /** The race course in effect (selection, with legacy world-id fallback). */
+  private courseForRace(): PvpWorldCourse {
+    return (
+      this.selectedCourse ??
+      (this.selectedPvpWorld ? PVP_WORLDS.find((w) => w.id === this.selectedPvpWorld) : null) ??
+      PVP_WORLDS[0]!
+    );
+  }
   /** Permanent per-mode mastery perks (coin/daylight/fever/lift), refreshed each run. */
   private masteryPerk: MasteryPerks = NO_MASTERY_PERKS;
   private maxAltitude = 0;
@@ -1093,7 +1108,7 @@ export class Game {
         boost: this.boostTimer > 0 || this.powers.boostOn(),
         liftMult: this.powers.liftMult() * this.masteryPerk.liftMult,
         // Slipstream: tucking behind a rival genuinely reduces your drag.
-        dragMult: this.powers.dragMult() * this.massRace.draftFor(this.bird.x, this.bird.y),
+        dragMult: this.powers.dragMult() * this.massRace.draftFor(this.bird.x, this.bird.y, dt),
         feather: this.powers.featherOn(),
         gravityMult: this.eventRun ? this.weeklyMods.gravityMult : 1,
       },
@@ -1634,6 +1649,7 @@ export class Game {
 
     // Finish line (Race / Mass Race) — reached by distance, not by clock.
     if (this.mode.finish > 0 && !this.runRecorded && this.bird.x - this.startX >= this.mode.finish) {
+      this.runOutcome = "complete";
       if (this.massRace.active) {
         // Placing is decided by who has actually crossed, not by a script.
         const s = this.massRace.standings(this.bird.x, this.startX, this.pilotName, 8);
@@ -2376,7 +2392,10 @@ export class Game {
   private startRun(opts?: RunOptions): void {
     this.exitVersus();
     this.mode = modeById(this.modeId);
-    // Portal game events: open this attempt's measurement span.
+    // Portal game events: open this attempt's measurement span. The run is a
+    // `fail` until the goal is actually reached (death/sun-out/elimination
+    // all keep it a fail).
+    this.runOutcome = "fail";
     this.platform?.measure("run", this.modeId, "start");
     // Snapshot the record to beat BEFORE this run writes anything, so the
     // mid-run "new record" moment and the results "NEW BEST" banner compare
@@ -2396,7 +2415,7 @@ export class Game {
     } else if (opts?.challenge && this.seed !== this.today) {
       this.rebuildWorld(this.today);
     } else if (isRaceMode(this.modeId)) {
-      const course = this.selectedCourse ?? (this.selectedPvpWorld ? PVP_WORLDS.find((w) => w.id === this.selectedPvpWorld) : null) ?? PVP_WORLDS[0]!;
+      const course = this.courseForRace();
       this.startX = course.island * ISLAND_PERIOD + 64;
       const targetSeed = `${this.seed}:${course.id}`;
       if (this.seed !== targetSeed) {
@@ -2582,6 +2601,9 @@ export class Game {
     if (this.continuesUsed < maxContinues && (gold || canCoins || canAd)) {
       this.continueTimer = CONTINUE_TIMEOUT;
       this.setState("continue");
+      // Poki game-events: measure the rewarded offer's exposure (visible) so
+      // the dashboard can compare it against `interact` when tapped.
+      if (this.portalEnabled() && canAd) this.platform?.measure("button", "continue-ad", "visible");
     } else {
       this.finishRun();
     }
@@ -2608,8 +2630,17 @@ export class Game {
     if (this.runRecorded) return;
     this.runRecorded = true;
     this.bird.asleep = true;
-    // Portal game events: one outcome per attempt — the flight is complete.
-    this.platform?.measure("run", this.modeId, "complete");
+    // The rival field is done: drop the (up to 41) frozen birds out of the
+    // scene the moment the run ends. They keep drawing behind the results
+    // card otherwise, on exactly the frame budget where weak phones die.
+    // Rivals stay allocated — the next startRun() re-seeds the field, and
+    // the server's official-place echo still needs the local finish times.
+    if (this.massRace.active) this.massRace.group.visible = false;
+    // Portal game events: one outcome per attempt — `complete` when the run
+    // reached its goal, `fail` when it ended by death/elimination/sun-out.
+    // (Poki funnel contract: send complete OR fail, never both, and a start
+    // without an outcome would break the drop-off funnel.)
+    this.platform?.measure("run", this.modeId, this.runOutcome);
     const stats = this.runStats();
     this.newBest = this.bestAtStart > 0 && stats.distance > this.bestAtStart;
     // A personal best is the one moment CrazyGames wants celebrated site-wide.
@@ -2913,7 +2944,7 @@ export class Game {
     // Shared/daily/ranked seeds must not depend on an individual save's skill.
     // Apply adaptive calibration only to an unshared casual flight, before sampling spawn.
     this.terrain.setDifficulty(!isRaceMode(this.modeId) && this.seed.startsWith("fly-") ? this.flow.difficulty() : 1);
-    const course = isRaceMode(this.modeId) ? (this.selectedCourse ?? (this.selectedPvpWorld ? PVP_WORLDS.find((w) => w.id === this.selectedPvpWorld) : null) ?? PVP_WORLDS[0]!) : null;
+    const course = isRaceMode(this.modeId) ? this.courseForRace() : null;
     this.startX = course ? course.island * ISLAND_PERIOD + 64 : 64;
     const y = this.terrain.heightAt(this.startX) + BIRD_RADIUS;
     this.bird.reset(this.startX, y);
@@ -2944,6 +2975,7 @@ export class Game {
     this.hintTimer = 0;
     this.hint = idle ? "" : "HOLD to dive";
     this.runCoins = 0;
+    this.multiplierClaimed = false;
     this.runClouds = 0;
     this.zeniths = 0;
     this.pickups = 0;
@@ -3074,12 +3106,16 @@ export class Game {
         break;
       }
       case "multiply-run-coins": {
-        if (this.runCoins > 0) {
+        // One claim per run. The old handler tripled runCoins on every click
+        // and the card re-armed from the live snapshot — an infinite 3× coin
+        // loop. Now it pays the bonus once and the card flips to a claimed
+        // chip (renderCoinMultiplierCard). No ad is shown, so no ad wording.
+        if (this.state === "gameover" && !this.multiplierClaimed && this.runCoins > 0) {
           const bonus = this.runCoins * 2;
+          this.multiplierClaimed = true;
           this.save.addCoins(bonus);
-          this.runCoins *= 3;
           this.audio.chapterFanfare();
-          this.hud.toast(`🎬 Ad Multiplier! 3x End-of-Run Coins (+● ${bonus})!`, "gold");
+          this.hud.toast(`3× flight bonus — +● ${bonus} coins`, "gold");
         }
         this.bump();
         break;
@@ -3212,7 +3248,16 @@ export class Game {
         break;
       }
       case "claim-rank-prize": {
+        // One prize per monthly season: the board re-renders from the live
+        // snapshot, so an unguarded claim button was an infinite coin loop.
+        const season = rankSeasonId();
+        if (this.save.state.rankPrizeSeason === season) {
+          this.hud.toast("Rank prize claimed — the next season starts a fresh one", "info");
+          break;
+        }
         const reward = seasonReward(this.save.state.rival.rating);
+        this.save.state.rankPrizeSeason = season;
+        this.save.persist();
         this.save.addCoins(reward.coins);
         this.hud.toast(`Claimed ${reward.coins} Coins for ${reward.division.name} Rank! 🏆`, "achievement");
         this.audio.fanfare();
@@ -3284,6 +3329,20 @@ export class Game {
         this.selectedPvpWorld = wId;
         this.selectedCourse = PVP_WORLDS.find((w) => w.id === wId) ?? PVP_WORLDS[0]!;
         this.hud.toast(`${this.selectedCourse.emoji} ${this.selectedCourse.name}`, "gold");
+        this.bump();
+        break;
+      }
+      case "quick-match-shuffle": {
+        // "Just make it random": one tap picks a random format AND world so
+        // the big button is always the fastest path into a race.
+        const m = PVP_MODES[Math.floor(Math.random() * PVP_MODES.length)]!;
+        const w = PVP_WORLDS[Math.floor(Math.random() * PVP_WORLDS.length)]!;
+        this.selectedPvpMode = m.id;
+        this.selectedPvpWorld = w.id;
+        this.selectedCourse = w;
+        this.modeId = m.id;
+        this.mode = m;
+        this.hud.toast(`🎲 ${m.icon} ${m.name} on ${w.emoji} ${w.name}`, "gold");
         this.bump();
         break;
       }
@@ -3420,6 +3479,9 @@ export class Game {
         break;
       }
       case "claim-daily-stipend": {
+        // The card disables via the snapshot, but a double-tap can land before
+        // the re-render — the handler must be its own guard.
+        if (this.save.state.lastStipendClaimed === this.today) break;
         this.save.addCoins(250);
         this.save.state.lastStipendClaimed = this.today;
         this.audio.chapterFanfare();
@@ -3429,10 +3491,15 @@ export class Game {
         break;
       }
       case "buy-bundle": {
+        // One crate per save. It pays 250 coins for 240 — re-claimable it is
+        // an infinite +10/click coin faucet.
+        if (this.save.state.wingmanBundle) break;
         if (!this.save.spend(240)) {
           this.hud.toast("Need ● 240 coins to claim Ace Wingman Crate", "warn");
           break;
         }
+        this.save.state.wingmanBundle = true;
+        this.save.persist();
         this.save.armBoost("shield");
         this.save.armBoost("sunflask");
         this.save.armBoost("magnet");
@@ -3716,6 +3783,8 @@ export class Game {
       case "continue-ad":
         if (this.state === "continue") {
           if (this.portalEnabled()) {
+            // Poki game-events: the player chose the rewarded option.
+            this.platform?.measure("button", "continue-ad", "interact");
             void this.continueWithPortalReward();
           } else {
             this.adReason = "continue";
@@ -4653,7 +4722,9 @@ export class Game {
     // Server-authoritative result: the DO ordered every live pilot's finish.
     // Blend it with the local bot field — humans ranked by the referee, bots
     // by simulation — and correct the shown place if the estimate was off.
-    if (!this.serverPlaceApplied && net.myPlace > 0 && this.raceFinishTime > 0 && this.massRace.active) {
+    // Gated on mode, not massRace.active: the pack is hidden the instant the
+    // run ends, but the referee's place echo lands a round-trip later.
+    if (!this.serverPlaceApplied && net.myPlace > 0 && this.raceFinishTime > 0 && isRaceMode(this.modeId)) {
       this.serverPlaceApplied = true;
       const botsAhead = this.massRace.rivals.filter(
         (r) => r.kind === "local" && r.finished && r.finishTime <= this.runTime,
@@ -4681,7 +4752,11 @@ export class Game {
           this.hud.toast(`✅ ${e.name} is ready`, "cloud");
           break;
         case "finish":
-          this.hud.toast(`🏁 ${e.name} finished P${e.place}`, "gold");
+          // While we're still flying, every rival's finish matters. After we
+          // cross, the pack keeps finishing behind the results card — up to
+          // ~40 toasts that each re-render the whole card. The referee's
+          // official ordering already landed via `myPlace`, so stay silent.
+          if (this.state === "playing") this.hud.toast(`🏁 ${e.name} finished P${e.place}`, "gold");
           break;
         case "interrupted":
           this.serverPlaceApplied = false;
@@ -5216,6 +5291,7 @@ export class Game {
       version: this.uiVersion,
       distance: stats.distance,
       coins: this.runCoins,
+      multiplierClaimed: this.multiplierClaimed,
       daylight: this.daylight,
       daylightMax: this.daylightMax(),
       fever: this.feverOn ? this.feverTimer / (FEVER_DURATION + this.gameplaySkin.feverBonus + this.masteryPerk.feverBonus) : this.perfectChain / FEVER_NEED,
@@ -5381,7 +5457,11 @@ export class Game {
       roomSize: this.roomSize,
       roomSkill: this.roomSkill,
       roomMuted: this.roomMuted,
-      roomRivals: this.massRace.rivals.slice(0, 12).map((r) => ({ id: r.id, name: r.name, skill: Math.round(r.skill * 100), hue: Math.round(r.hue * 360) })),
+      // Only the lobby screen can consume these — no per-frame allocs elsewhere.
+      roomRivals:
+        this.screen === "live"
+          ? this.massRace.rivals.slice(0, 12).map((r) => ({ id: r.id, name: r.name, skill: Math.round(r.skill * 100), hue: Math.round(r.hue * 360) }))
+          : [],
       netState: this.net?.info().state ?? "offline",
       netError: this.net?.info().error ?? "",
       draft: this.massRace.draft,
@@ -5390,21 +5470,26 @@ export class Game {
       photoFinish: this.photoFinish,
       rival: this.rivalCard(),
       loadout: this.loadoutView(),
-      lobbyRivals: (() => {
-        // Real pilots seated in the room always outrank seeded flavor text.
-        const live = (this.net?.roster() ?? [])
-          .slice(0, 39)
-          .map((p) => ({ name: p.name, tag: "in room · live", ready: p.ready, skin: p.skin }));
-        if (live.length) return live;
-        // Next best: time-shifted doubles of real leaderboard players.
-        const page = this.board.peek("global", "distance");
-        const ghosts = (page?.entries ?? [])
-          .filter((en) => !en.you && en.name)
-          .slice(0, 3)
-          .map((en) => ({ name: en.name, tag: `best ${Math.round(en.distance).toLocaleString()} m` }));
-        if (ghosts.length) return ghosts;
-        return featuredRivals(`${this.seed}:massrace`);
-      })(),
+      // Lobby-only field: computed every frame before, including mid-flight
+      // and on the results card, where no one renders it.
+      lobbyRivals:
+        this.state === "menu" && this.screen === "live"
+          ? (() => {
+              // Real pilots seated in the room always outrank seeded flavor text.
+              const live = (this.net?.roster() ?? [])
+                .slice(0, 39)
+                .map((p) => ({ name: p.name, tag: "in room · live", ready: p.ready, skin: p.skin }));
+              if (live.length) return live;
+              // Next best: time-shifted doubles of real leaderboard players.
+              const page = this.board.peek("global", "distance");
+              const ghosts = (page?.entries ?? [])
+                .filter((en) => !en.you && en.name)
+                .slice(0, 3)
+                .map((en) => ({ name: en.name, tag: `best ${Math.round(en.distance).toLocaleString()} m` }));
+              if (ghosts.length) return ghosts;
+              return featuredRivals(`${this.seed}:massrace`);
+            })()
+          : [],
       raceRated: this.rankedRace,
       raceVerified: this.serverPlaceApplied,
       ratingDelta: this.lastRatingDelta,
@@ -5431,6 +5516,8 @@ export class Game {
       squadNotice: this.squadNotice,
       dailyFlash: dailyFlashBird(this.today),
       stipendClaimed: this.save.state.lastStipendClaimed === this.today,
+      rankPrizeClaimed: this.save.state.rankPrizeSeason === rankSeasonId(),
+      wingmanBundle: this.save.state.wingmanBundle === true,
       showTutorialHand: this.state === "playing" && st.tutorialRuns < 2 && this.hintTimer < 2.6 && !this.input.diving,
       pvpModes: PVP_MODES,
       pvpWorlds: PVP_WORLDS,

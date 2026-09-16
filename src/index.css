@@ -387,30 +387,6 @@ textarea {
   height: 44px;
 }
 
-.icon-btn.menu-fullscreen {
-  position: absolute;
-  top: calc(10px + env(safe-area-inset-top));
-  left: calc(12px + env(safe-area-inset-left, 0px));
-  z-index: 6;
-  width: 44px;
-  height: 44px;
-  display: grid;
-  place-items: center;
-  font-size: 18px;
-  background: rgba(255, 249, 235, 0.92);
-  border: 1px solid rgba(221, 212, 185, 0.85);
-  border-radius: 14px;
-  color: #302b28;
-  cursor: pointer;
-  box-shadow: 0 2px 0 rgba(197, 184, 155, 0.35);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  transition: transform 0.12s ease;
-}
-.icon-btn.menu-fullscreen:active {
-  transform: scale(0.92);
-}
-
 .mute-btn[aria-label="Unmute sound"] {
   background: rgba(255, 236, 214, 0.96);
   color: #6b3030;
@@ -537,16 +513,17 @@ textarea {
    solid form. Other screens (shop/pass/etc) keep the solid .paper-card. */
 .paper-card.menu-hero {
   width: min(480px, 100%);
-  /* Translucent stage: the live attract flight reads vividly THROUGH the card. */
+  /* Translucent stage: the live attract flight (the real 3D gameplay world)
+     shows through behind the title content. Blur keeps the ink readable over
+     the moving hills — matches the reference title screen. */
   background:
-    linear-gradient(165deg, rgba(255, 252, 244, 0.42) 0%, rgba(255, 244, 230, 0.30) 42%, rgba(255, 236, 218, 0.40) 100%) !important;
-  -webkit-backdrop-filter: blur(18px) saturate(1.28) !important;
-  backdrop-filter: blur(18px) saturate(1.28) !important;
-  border: 1.5px solid rgba(255, 255, 255, 0.72) !important;
+    linear-gradient(180deg, rgba(255, 244, 228, 0.8) 0%, rgba(255, 244, 228, 0.72) 34%, rgba(255, 244, 228, 0.84) 100%);
+  -webkit-backdrop-filter: blur(16px) saturate(1.15);
+  backdrop-filter: blur(16px) saturate(1.15);
+  border: 1px solid rgba(255, 255, 255, 0.65);
   box-shadow:
-    inset 0 1px 1px 0 rgba(255, 255, 255, 0.95),
-    0 18px 0 rgba(42, 28, 40, 0.05),
-    0 36px 72px rgba(20, 16, 40, 0.2) !important;
+    0 22px 0 rgba(42, 28, 40, 0.1),
+    0 40px 80px rgba(20, 16, 40, 0.3);
   padding: 26px 24px 20px;
   text-align: center;
 }

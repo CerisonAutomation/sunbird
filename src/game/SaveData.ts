@@ -146,6 +146,10 @@ export type SaveState = {
   lastStipendClaimed?: string;
   /** Squad team quests claimed record (questId -> dateStr). */
   squadQuestsClaimed?: Record<string, string>;
+  /** Rank-season id (e.g. "R2026-09") whose division prize was claimed. */
+  rankPrizeSeason?: string;
+  /** The one-time Ace Wingman crate was bought (pays 250 for 240 — never re-sell). */
+  wingmanBundle?: boolean;
 };
 
 export type DuelState = {
@@ -250,6 +254,8 @@ function defaults(): SaveState {
     wheel: { lastFreeSpin: "", spinsToday: 0 },
     lastStipendClaimed: "",
     squadQuestsClaimed: {},
+    rankPrizeSeason: "",
+    wingmanBundle: false,
   };
 }
 
@@ -507,6 +513,18 @@ export class SaveData {
           p.wheel && typeof p.wheel === "object"
             ? { lastFreeSpin: String(p.wheel.lastFreeSpin ?? ""), spinsToday: num(p.wheel.spinsToday) }
             : d.wheel,
+        // Optional claim records: these were missing from the parse literal,
+        // so EVERY reload silently dropped them — the daily stipend and squad
+        // quests could be re-claimed after each page load.
+        lastStipendClaimed: String(p.lastStipendClaimed ?? ""),
+        squadQuestsClaimed:
+          p.squadQuestsClaimed && typeof p.squadQuestsClaimed === "object" && !Array.isArray(p.squadQuestsClaimed)
+            ? Object.fromEntries(
+                Object.entries(p.squadQuestsClaimed as Record<string, unknown>).map(([k, v]) => [k, String(v)]),
+              )
+            : {},
+        rankPrizeSeason: String(p.rankPrizeSeason ?? ""),
+        wingmanBundle: Boolean(p.wingmanBundle),
       };
     } catch {
       // Corruption recovery: never destroy a player's data. If we actually read

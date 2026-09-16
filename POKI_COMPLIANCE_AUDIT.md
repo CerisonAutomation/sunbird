@@ -1,7 +1,77 @@
 # Sunbird × Poki — Full Developer-Docs Compliance Audit
 
-**Date:** 2026-09-16 · **Artifact:** `sunbird-poki.zip` (683 KB) · **Build:** this branch, `pnpm build:portals`
+**Date:** 2026-09-16 · **Artifact:** `sunbird-poki.zip` (697 KB) · **Build:** this branch, `pnpm build:portals`
 **Verdict:** ✅ **Shippable** — every hard requirement passes (several with this audit's fixes baked in); remaining items are submission-time actions, not code blockers.
+
+## Re-verification (2026-09-16, post perf pass)
+
+Re-checked against the current developers.poki.com docs and re-ran every gate on the
+rebuilt zips:
+
+- **`gameLoadingFinished()` is now one-shot** in the Poki adapter. `Game` calls both
+  `loadingFinished()` and `signalGameReady()` on boot; both previously resolved to a
+  `gameLoadingFinished()` call, i.e. two consecutive identical phase markers. The
+  "no consecutive duplicates" rule (enforced by the Inspector, stated for gameplay events
+  and now applied to the loading signal) is honored. — `src/sdk/poki.ts`
+- **Event-order table re-verified** (startup / death→restart / death→revive / pause→resume):
+  all match `GameplayEventSink` + the `setState` transitions. `gameplayStart()` on first
+  input (not load) confirmed by the state machine.
+- **`PokiSDK.login()`** (current API: page-reloads on first login, resolves instantly if
+  already logged in) is **deliberately not called at boot** — identity is passive
+  (`getUser()`), with the local pilot name as fallback. Optional post-launch follow-up:
+  an explicit "Sign in with Poki" button on the profile screen.
+- **`poki-cli`** (github.com/poki/poki-cli) can upload from CI — not wired yet; Inspector
+  folder upload is the working path today.
+- **Perf pass landed** (see `HANDOFF.md` §3): tiered AI fidelity, nametag DOM reuse,
+  no per-frame standings sort, snapshot gating, end-of-race pileup removal. All measured
+  by `massrace-perf.test.ts` and `physics-perf.test.ts` guards.
+- Gates re-run on the rebuilt zips: `verify-portal.mjs` PASS · `audit-zips.mjs` PASS ·
+  `verify-prod.mjs` PASS · full unit suite green.
+
+## Full-guide audit (2026-09-16, all remaining docs sections)
+
+Every section of the Poki developer guide not covered above was pulled and checked
+against the code: *requirements & policies, content & player safety, external resources
+policy, easy access & onboarding, engagement context (web-fit metrics), localization,
+game thumbnail, testing (web fit), monetization, game events, user accounts, what we
+look for, release workflow.*
+
+### Issues found — all fixed in this branch
+
+| # | Issue (doc section) | Evidence | Fix |
+|---|---|---|---|
+| F1 | **Drop-off funnel wrong** (Game Events): `measure("run", …, "complete")` fired for *every* run end including deaths — Poki can't distinguish "reached the goal" from "died"; contract says send `complete` OR `fail`, never both | `Game.ts` finishRun | `runOutcome` field: `start` resets to `fail`, only the goal-reached branch sets `complete`; finishRun sends the actual outcome |
+| F2 | **Rewarded-placement analytics missing** (Game Events): docs require `visible` when the offer appears and `interact` when chosen, to measure placement usage | continue screen | `measure("button","continue-ad","visible")` on offer render (portal only) + `"interact"` on tap, before `rewardedBreak()` |
+| F3 | **Poki scaling sizes untested in CI** (Requirements: must scale to 640×360 / 836×470 / 1031×580) | no e2e at those sizes | new `e2e/scaling.spec.ts`: all three exact sizes + phone landscape/portrait — canvas must cover the full viewport, menu + lobby visible, zero page errors |
+| F4 | **Static thumbnail under spec** (Game Thumbnail: full-bleed ≥628×628, no text, required for player fit test) | largest shipped icon was 512×512 | `assets/submission/sunbird-thumbnail-1024.png`: 1024×1024 full-bleed, no text, dynamic mid-dive pose in the default skin, warm palette (high contrast on the #83FFE7 playground background) |
+| F5 | **Infinite 3× coin exploit** (Economy/UX): the results-screen "3× Flight Coin Bonus" card had no once-per-run guard — the card re-renders every frame from the live snapshot, and each claim tripled `runCoins`, re-arming the card forever (unbounded free coins) | `multiply-run-coins` handler | `multiplierClaimed` flag (reset each run); claim pays once, card flips to a "✓ applied" chip; handler now state-guarded (`gameover` only) |
+| F6 | **Fake ad affordances** (Monetization: rewarded placements must be real): the 3× card wore a 📺 TV icon + "Ad Multiplier!" wording with **no ad** (false claim on every run end), and the Daily Lucky Wheel button advertised "Spin · ● 100 / 📺" — a coin price and video option that did nothing | results card + wheel card | TV icon and ad wording removed; wheel's cooldown button is now honest ("Spins again tomorrow", disabled). Real ad placements (continue, restart break) already route through the portal SDK |
+| F7 | **Slipstream (draft) physics bugs** (PVP feel): draft smoothing used a fixed per-frame factor (~2.4× faster response on 144 Hz than 60 Hz), and rival name-tags flagged "drafting" against the default 26 m zone instead of the per-mode zone (Tempest Draft = 38 m) | `MassRace.draftFor` / `getVisibleNameTags` | time-based exponential smoothing (60 fps behavior preserved exactly); name tags use `this.draftBehind`. Pinned by the new `pvp-slipstream-stress.test.ts` (18 tests: frame-rate independence, zone geometry, all 8 mode zones, AI slingshot, knockout elimination, remote-snapshot robustness, post-run hidden field) |
+| F8 | **Economy claim audit — three more coin faucets** (Quality/monetization integrity): (a) *Tournament Rank Prize* button had no claim record at all — every click paid the division reward forever; (b) *Ace Wingman Crate* cost 240 and paid 250 + 3 boosts — re-claimable = infinite +10/click; (c) the *daily stipend* and *squad-quest* claim flags were **missing from the save parse literal**, so every page reload silently dropped them → re-claimable after each boot (plus a stipend double-tap race) | `SaveData.load()` + three claim handlers | rank prize now one per monthly season (`rankPrizeSeason`), crate one per save (`wingmanBundle`), stipend handler re-checks its own flag, and `load()` now parses all four claim records (with hostile-input sanitization). Pinned by two new save round-trip tests in `save.test.ts` |
+| F9 | **PVP entry was over-complex** (UX: "streamlined entry"; user request "just make it random for people"): the Race lobby led with two pill rows (8 formats × 9 worlds) before any button | Race lobby | one big CTA (`⚡ {format} on {world}`) + **🎲 Surprise me** (randomizes format + world in one tap) + "Search Online Pilots" up front; the format/world rows are collapsed behind a "Customize" disclosure. Rooms/duel/practice unchanged and e2e-pinned |
+
+### Verified clean (no change needed)
+
+- **Incognito support** (hard requirement): storage facade = localStorage → sessionStorage → in-memory, canary-probed; game fully playable with storage disabled.
+- **16:9 / full-canvas**: `body,#root { position:fixed; inset:0; overflow:hidden }` + renderer resize; no viewport scroll can reach the parent page (page-integration requirement).
+- **Audio during ads**: `setAdMuted(true)` + input disabled for the whole break; restored on end.
+- **No internal ad timers in portal builds**: `adTimer`/`shouldShowInterstitial`/`adsLeftToday` are all `!portalEnabled()`-gated (local build only); portal signals `commercialBreak()` on every natural stop and lets Poki decide.
+- **One-per-reward / single reward / no reward policy**: `continueWithPortalReward` rewards only on an explicit `rewardedBreak() === true`; state gate (`continue` → `ad`) blocks double-taps; ad-less path gives no reward.
+- **Reward button hierarchy**: standard continue present, simultaneous, ≥ size, above the 🎬 reward, warm-neutral (never green) — fixed in the earlier audit, still holds.
+- **Portrait playability** (easy access / Gamebar Display eligibility): camera has explicit narrow-aspect pull-back + adaptive zoom; phone-viewport e2e exists (rooms spec) and scaling.spec now covers 390×844.
+- **Onboarding** (easy access): 3-step *play-signal* tutorial (dive/soar/land) verified by actual input, runs once, no text wall; one-screen hold-to-start entry.
+- **Localization**: 10 locales (EFIGS + pt-BR + ar-RTL + zh-CN + ja + mt), browser-language auto-detect, persisted choice, private-mode-safe — exceeds the "recommended" bar.
+- **External resources policy**: bundle-verified zero external requests/assets; no chat (the emote system is *exactly* the emoji alternative Poki recommends); no external account systems (passive `getUser()` only, never `login()` at boot, no PII collection).
+- **Content & player safety / AI**: all-ages procedural art & music, no watermarks/prompt text; creation process documented (git history + HANDOFF) — the "show your process on request" rule is satisfiable.
+- **Accessibility**: one-button play works with mouse-only, touch, or keyboard (ESC/P pause) — the control set is the accessible one by construction; key remapping is the only unmet nicety (noted, not a requirement).
+- **What we look for**: quality/tech/fit — one-button web-native loop, 697 KB zip, 10 locales, depth (meta/cosmetics/campaign), originality (procedural biomes + economy — the "inspired, not imitated" table was walked in the first audit).
+- **Web-fit metrics readiness**: C2P = first `gameplayStart()` (fires on first input, boot is 435 KB gzip); CTR = thumbnail (now spec-compliant); time-on-page = session hooks (streaks, daily, quests, cups).
+
+### Remaining human/submission actions
+
+1. **Animated thumbnail** (hover video, required before *global* release): record a 3–5 s gameplay loop from the game (browser screen capture of a fly-by) — not producible in this sandbox.
+2. Upload static thumbnail + build to Poki for Developers → player fit test → web fit test → final review (workflow unchanged).
+3. Optional post-launch: Turkish + Russian locales (Poki's recommended next batch), `login()` button on the profile screen, AUDS cross-device save, Netlib multiplayer.
 
 Every requirement below was checked against the actual source **and** the built poki bundle (greps of the unzipped zip). Statuses:
 

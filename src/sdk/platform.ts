@@ -135,10 +135,12 @@ export interface PlatformAdapter {
   updateRoom(opts: { roomId?: string; isJoinable?: boolean; inviteParams?: InviteParams }): void;
   leftRoom(): void;
   /**
-   * Gameplay event measurement — one `start` per attempt, then exactly one
-   * `complete` or `fail` outcome (Poki game-events contract).
+   * Gameplay event measurement. `action` is a stable string: `start`/
+   * `complete`/`fail` form progress funnels (one outcome per attempt);
+   * `visible`/`interact` measure placement exposure vs. engagement; any
+   * other value is a custom event (Poki reserves `/` and `^` — never use them).
    */
-  measure(category: string, label: string, action: "start" | "complete" | "fail"): void;
+  measure(category: string, label: string, action: string): void;
 /** Share via the portal (best-effort). True on success.
  *
  * `params` is portal share data (Poki appends it to a signed shareable URL,

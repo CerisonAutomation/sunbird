@@ -572,7 +572,7 @@ export class CrazyGamesAdapter implements PlatformAdapter {
    * Gameplay event measurement via the SDK analytics module
    * (start → complete|fail, one outcome per attempt).
    */
-  measure(category: string, label: string, action: "start" | "complete" | "fail"): void {
+  measure(category: string, label: string, action: string): void {
     const analytics = this.sdk?.analytics;
     if (!analytics?.logEvent) return;
     try {
