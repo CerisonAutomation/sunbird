@@ -2608,6 +2608,12 @@ export class Game {
     if (this.runRecorded) return;
     this.runRecorded = true;
     this.bird.asleep = true;
+    // The rival field is done: drop the (up to 41) frozen birds out of the
+    // scene the moment the run ends. They keep drawing behind the results
+    // card otherwise, on exactly the frame budget where weak phones die.
+    // Rivals stay allocated — the next startRun() re-seeds the field, and
+    // the server's official-place echo still needs the local finish times.
+    if (this.massRace.active) this.massRace.group.visible = false;
     // Portal game events: one outcome per attempt — the flight is complete.
     this.platform?.measure("run", this.modeId, "complete");
     const stats = this.runStats();
@@ -4653,7 +4659,9 @@ export class Game {
     // Server-authoritative result: the DO ordered every live pilot's finish.
     // Blend it with the local bot field — humans ranked by the referee, bots
     // by simulation — and correct the shown place if the estimate was off.
-    if (!this.serverPlaceApplied && net.myPlace > 0 && this.raceFinishTime > 0 && this.massRace.active) {
+    // Gated on mode, not massRace.active: the pack is hidden the instant the
+    // run ends, but the referee's place echo lands a round-trip later.
+    if (!this.serverPlaceApplied && net.myPlace > 0 && this.raceFinishTime > 0 && isRaceMode(this.modeId)) {
       this.serverPlaceApplied = true;
       const botsAhead = this.massRace.rivals.filter(
         (r) => r.kind === "local" && r.finished && r.finishTime <= this.runTime,
@@ -4681,7 +4689,11 @@ export class Game {
           this.hud.toast(`✅ ${e.name} is ready`, "cloud");
           break;
         case "finish":
-          this.hud.toast(`🏁 ${e.name} finished P${e.place}`, "gold");
+          // While we're still flying, every rival's finish matters. After we
+          // cross, the pack keeps finishing behind the results card — up to
+          // ~40 toasts that each re-render the whole card. The referee's
+          // official ordering already landed via `myPlace`, so stay silent.
+          if (this.state === "playing") this.hud.toast(`🏁 ${e.name} finished P${e.place}`, "gold");
           break;
         case "interrupted":
           this.serverPlaceApplied = false;

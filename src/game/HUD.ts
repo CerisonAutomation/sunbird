@@ -770,6 +770,7 @@ export class HUD {
 
       const draftClass = tag.drafting ? "drafting" : "";
       html += `<div class="rival-nametag ${draftClass}" style="left:${px.toFixed(1)}px; top:${py.toFixed(1)}px;">
+        ${tag.emote ? `<b class="rt-emote" aria-hidden="true">${escapeHtml(tag.emote)}</b>` : ""}
         <span class="rank-badge">#${tag.place}</span>
         <span>${escapeHtml(tag.name)}</span>
       </div>`;
@@ -1010,7 +1011,9 @@ export class HUD {
         const bar = this.draftMeter.firstElementChild as HTMLElement | null;
         if (bar) bar.style.width = `${Math.round(s.draft * 100)}%`;
       }
-      this.emoteWheel.classList.toggle("hidden", !s.massRace);
+      // Emotes are a mid-race signal: hidden on the results card where a
+      // send would just round-trip to a room nobody renders anymore.
+      this.emoteWheel.classList.toggle("hidden", !(s.massRace && s.state === "playing"));
 
       // Live standings ticker: leaders plus your row, with gaps to the car
       // ahead so every position fight reads at a glance. Throttled like the

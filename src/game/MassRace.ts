@@ -72,6 +72,8 @@ export type RivalNameTag = {
   place: number;
   remote: boolean;
   drafting: boolean;
+  /** Active emote ("" when none) — rendered over the bird, not just in the ticker. */
+  emote: string;
 };
 
 const DRAFT_BEHIND = 26;
@@ -540,6 +542,7 @@ export class MassRace {
         place: st?.place ?? 0,
         remote: r.kind === "remote",
         drafting: isDrafting,
+        emote: this.emoteFor(r.id),
       });
     }
     return tags;

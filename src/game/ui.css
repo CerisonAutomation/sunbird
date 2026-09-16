@@ -4532,6 +4532,19 @@ button:focus-visible, .toggle:focus-visible {
   font-weight: 700;
 }
 
+/* Emote bubble floating over the rival's nametag — the moment emotes
+   actually get seen (the standings ticker alone is too small to notice). */
+.rival-nametag .rt-emote {
+  font-size: 14px;
+  line-height: 1;
+  animation: rt-emote-pop 0.25s ease-out;
+}
+
+@keyframes rt-emote-pop {
+  from { transform: scale(0.4); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
 /* Pilot Name Row with Autogenerate 🎲 button */
 .pilot-name-row {
   display: flex;
