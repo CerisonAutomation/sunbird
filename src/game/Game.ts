@@ -4373,7 +4373,7 @@ export class Game {
     // Mobile gets a lighter decorative particle stream by default. Gameplay
     // events still render because critical emitters are short-lived and the
     // adaptive quality loop can shed more work under sustained load.
-    this.particleBudget = s.quality === "low" ? 0.4 : this.isMobile ? 0.65 : 1;
+    this.particleBudget = s.quality === "low" ? 0.3 : this.isMobile ? 0.5 : 1;
     this.particles.setBudget(this.particleBudget);
     // Soft shadows are the single priciest feature on mobile GPUs — keep them
     // only when the user asked for high quality (auto tiers shed them first).

@@ -463,7 +463,6 @@ export class HUD {
     this.menuSky = new MenuSky();
     this.root = document.createElement("div");
     this.root.className = "hud-root";
-    this.root.appendChild(this.menuSky.host);
     this.root.innerHTML = `
       <div class="play-hud hidden" data-ref="playHud">
         <div class="top-bar">
@@ -579,6 +578,7 @@ export class HUD {
     const header = lane("hud-header", [".top-bar", ".mid-meta", ".power-chips", ".power-strip", ".roster-bar", ".versus-bar"]);
     lane("flight-messages", [".launch-banner", ".hint", ".goal-pop", ".finish-countdown", ".countdown"]);
     const footer = lane("flight-footer", [".goal-strip", ".draft-meter", ".fever-wrap", ".emote-wheel"]);
+    parent.appendChild(this.menuSky.host);
     parent.appendChild(this.root);
     parent.appendChild(this.menuSky.heroHost);
     this.bind();
