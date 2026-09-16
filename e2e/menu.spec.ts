@@ -100,47 +100,32 @@ test("save import requires explicit replacement consent and rejects an invalid c
   expect(app.errors).toEqual([]);
 });
 
-test("the main-menu sky actually paints (no dead background)", async ({ page }) => {
+test("the main-menu backdrop is the live 3D gameplay world (no painted sky)", async ({ page }) => {
   test.setTimeout(120000);
   const app = new SunbirdPage(page);
   await app.open(); await app.ready();
 
-  // Both layers must be active on the main menu.
-  const skyHost = page.locator(".menu-sky");
+  // The menu backdrop is the live 3D attract flight (Game.menuTick). The
+  // painted 2D sky canvas must NOT be mounted — an opaque canvas covering the
+  // gameplay world is exactly the regression this test guards against.
+  await expect(page.locator(".menu-sky")).toHaveCount(0);
+
+  // The hero-bird overlay stays mounted but permanently hidden.
   const heroHost = page.locator(".menu-hero-layer");
-  await expect(skyHost).toHaveClass(/on/);
-  await expect(heroHost).toHaveClass(/on/);
+  await expect(heroHost).toHaveCount(1);
+  await expect(heroHost).toHaveClass(/hidden/);
 
-  // Both layers must live INSIDE .hud-root: the hero layer (z3) only renders
-  // ABOVE the paper card (z1) while it shares the hud-root stacking context.
-  // If a merge moves them to siblings of .hud-root (z4), the hero sunbird is
-  // buried behind the frosted card and the main-screen background looks dead.
-  await expect(page.locator(".hud-root > .menu-sky")).toHaveCount(1);
-  await expect(page.locator(".hud-root > .menu-hero-layer")).toHaveCount(1);
-  await expect(page.locator(".game-root > .menu-sky")).toHaveCount(0);
-  await expect(page.locator(".game-root > .menu-hero-layer")).toHaveCount(0);
-
-  // Count non-transparent pixels in the real raster: the sky gradient
-  // covers 100% of the canvas, the hero bird is a solid silhouette.
-  const skyPixels = await skyHost.locator(".menu-sky-canvas").evaluate(el => {
-    const c = el as HTMLCanvasElement;
-    const ctx = c.getContext("2d")!;
-    const { data } = ctx.getImageData(0, 0, c.width, c.height);
-    let n = 0;
-    for (let i = 3; i < data.length; i += 4) if (data[i] > 8) n++;
-    return { n, total: data.length / 4 };
-  });
-  expect(skyPixels.n / skyPixels.total, "sky gradient must fill the viewport").toBeGreaterThan(0.95);
-
-  const heroPixels = await heroHost.locator(".menu-sky-canvas").evaluate(el => {
-    const c = el as HTMLCanvasElement;
-    const ctx = c.getContext("2d")!;
-    const { data } = ctx.getImageData(0, 0, c.width, c.height);
-    let n = 0;
-    for (let i = 3; i < data.length; i += 4) if (data[i] > 8) n++;
-    return n;
-  });
-  expect(heroPixels, "hero bird must have ink on its canvas").toBeGreaterThan(500);
+  // The 3D gameplay canvas is the backdrop: it fills the viewport under the
+  // translucent card.
+  const canvas = page.locator(".game-canvas");
+  await expect(canvas).toHaveCount(1);
+  const box = await canvas.boundingBox();
+  const vp = page.viewportSize()!;
+  expect(box).not.toBeNull();
+  expect(box!.x).toBeLessThanOrEqual(0);
+  expect(box!.y).toBeLessThanOrEqual(0);
+  expect(box!.width).toBeGreaterThanOrEqual(vp.width);
+  expect(box!.height).toBeGreaterThanOrEqual(vp.height);
 
   expect(app.errors).toEqual([]);
 });

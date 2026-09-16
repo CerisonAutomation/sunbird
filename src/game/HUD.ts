@@ -578,15 +578,12 @@ export class HUD {
     const header = lane("hud-header", [".top-bar", ".mid-meta", ".power-chips", ".power-strip", ".roster-bar", ".versus-bar"]);
     lane("flight-messages", [".launch-banner", ".hint", ".goal-pop", ".finish-countdown", ".countdown"]);
     const footer = lane("flight-footer", [".goal-strip", ".draft-meter", ".fever-wrap", ".emote-wheel"]);
-    // The sky and hero layers must live INSIDE .hud-root for the z-order to
-    // work: sky canvas z0 behind the paper card (z1), hero sunbird z3 ABOVE
-    // the card. The 2D sky is prepended after innerHTML (innerHTML would
-    // otherwise destroy it), and the hero is appended last so it floats over
-    // the translucent card — the living part of the main-screen background.
-    // A merge once moved them to siblings of .hud-root (z4), which buried the
-    // hero bird behind the frosted card; keep them in here.
-    this.root.prepend(this.menuSky.host);
-    this.root.appendChild(this.menuSky.heroHost);
+    // The menu backdrop is the LIVE 3D gameplay world (Game.menuTick attract
+    // flight): the painted 2D sky canvas stays OUT of the DOM so it never
+    // covers the world, and its loop never starts. The hero-bird overlay
+    // stays mounted (hidden) so MenuSky.dispose() keeps working unchanged.
+    this.root.querySelector<HTMLElement>('[data-ref="menu"]')!.appendChild(this.menuSky.heroHost);
+    this.menuSky.heroHost.classList.add("hidden");
     parent.appendChild(this.root);
     this.bind();
     this.overlayNavigation = new OverlayNavigation(this.root);
@@ -809,9 +806,11 @@ export class HUD {
     if (this.root.dataset.feedback !== feedback) this.root.dataset.feedback = feedback;
     const menuVisible = s.state === "menu" || (s.state === "gameover" && s.screen !== "main");
     this.menuEl.classList.toggle("hidden", !menuVisible);
-    this.menuSky.setActive(menuVisible);
-    this.menuSky.setHeroActive(menuVisible && s.screen === "main");
-    if (menuVisible) this.menuSky.resize(window.innerWidth || 800, window.innerHeight || 600);
+    // The painted 2D sky and the hero bird stay OFF everywhere: the menu
+    // backdrop is the live 3D gameplay world (attract flight) behind the
+    // translucent card — the 2D canvas would cover it with a flat painting.
+    this.menuSky.setActive(false);
+    this.menuSky.heroHost.classList.add("hidden");
     this.pauseEl.classList.toggle("hidden", s.state !== "paused");
     // The pause control only makes sense in live flight — hide it while the
     // crash "second wind" card is up so it can't read as a dead button.
@@ -2002,13 +2001,6 @@ function renderMain(s: HudSnapshot): string {
       aria-label="${s.settings.mute ? "Unmute sound" : "Mute sound"}"
       title="${s.settings.mute ? "Unmute sound" : "Mute sound"}"
     >${s.settings.mute ? "\u{1F507}" : "\u{1F50A}"}</button>
-    <button
-      class="icon-btn menu-fullscreen"
-      data-ui
-      data-action="toggle-fullscreen"
-      aria-label="Toggle Fullscreen"
-      title="Toggle Fullscreen"
-    >⛶</button>
     <header class="hero">
       ${menuHorizon()}
       <!-- Sun and bird both come from Sunbird.ts, so the title screen, the
