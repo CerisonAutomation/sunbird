@@ -1257,12 +1257,23 @@ export class Game {
               this.audio.rivalDown();
               this.finishRun();
             } else {
-              const victim = this.massRace.eliminateTrailing(targetDist);
-              if (victim) {
-                this.hud.toast(`💥 ELIMINATED: ${victim.name}! ${standings.total - 1} remain`, "gold");
+            const victim = this.massRace.eliminateTrailing(targetDist);
+            if (victim) {
+              const remaining = standings.total - 1;
+              if (remaining === 1 && standings.place === 1) {
+                this.racePlace = 1;
+                this.raceField = standings.total;
+                this.raceFinishTime = this.runTime;
+                this.save.noteRacePlace(1, standings.total);
+                this.hud.toast(`👑 ROYALE VICTORY! SOLE SURVIVOR!`, "gold");
+                this.audio.fanfare();
+                this.finishRun();
+              } else {
+                this.hud.toast(`💥 ELIMINATED: ${victim.name}! ${remaining} remain`, "gold");
                 this.audio.ding();
                 this.haptic(10);
               }
+            }
             }
           }
         }
@@ -3856,8 +3867,10 @@ export class Game {
       this.bump();
       return;
     }
-    if (!this.save.spend(def.price)) {
-      this.hud.toast(`Need ${def.price - st.wallet} more coins`, "warn");
+    const flash = dailyFlashBird(this.today);
+    const price = def.id === flash.id ? flash.price : def.price;
+    if (!this.save.spend(price)) {
+      this.hud.toast(`Need ${price - st.wallet} more coins`, "warn");
       return;
     }
     this.save.ownSkin(id);
@@ -3865,7 +3878,7 @@ export class Game {
     this.applySkin();
     this.audio.purchase();
     this.hud.toast(`${def.name} is yours!`, "gold");
-    this.telemetry.track("skin_bought", { id, price: def.price });
+    this.telemetry.track("skin_bought", { id, price });
     this.bump();
   }
 
@@ -5095,14 +5108,20 @@ export class Game {
     const stats = this.state === "menu" ? null : this.runStats();
     this.missionViews = this.missions.view(stats);
     this.questViews = this.missions.questView(this.today, stats);
-    this.skinViews = SKINS.map((def) => ({
-      def,
-      owned: st.ownedSkins.includes(def.id),
-      equipped: st.activeSkin === def.id,
-      locked: (Boolean(def.goldOnly) && !st.gold) || (Boolean(def.vipOnly) && !st.vip),
-      lockReason: def.vipOnly && !this.save.isVipActive() ? "vip" : def.goldOnly && !st.gold ? "gold" : null,
-      affordable: st.wallet >= def.price,
-    }));
+    const flash = dailyFlashBird(this.today);
+    this.skinViews = SKINS.map((def) => {
+      const dealPrice = def.id === flash.id ? flash.price : undefined;
+      const price = dealPrice ?? def.price;
+      return {
+        def,
+        owned: st.ownedSkins.includes(def.id),
+        equipped: st.activeSkin === def.id,
+        locked: (Boolean(def.goldOnly) && !st.gold) || (Boolean(def.vipOnly) && !st.vip),
+        lockReason: def.vipOnly && !this.save.isVipActive() ? "vip" : def.goldOnly && !st.gold ? "gold" : null,
+        affordable: st.wallet >= price,
+        dealPrice,
+      };
+    });
     const deal = dailyDealBoost(this.today);
     this.boostViews = BOOSTS.map((def) => {
       const dealPrice = def.id === deal.id ? deal.price : undefined;

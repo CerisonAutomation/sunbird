@@ -688,6 +688,7 @@ export type SkinView = {
   locked: boolean;
   lockReason: "gold" | "vip" | null;
   affordable: boolean;
+  dealPrice?: number;
 };
 
 export type BoostView = {

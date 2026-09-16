@@ -105,4 +105,31 @@ describe("PvP Variants and Offline Neural AI Engine", () => {
 
     race.dispose();
   });
+
+  it("eliminates trailing rivals even if all AI birds are past the distance threshold", () => {
+    const race = new MassRace();
+    const terrain = new TerrainSystem("pvp-seed-4");
+    race.spawn(5, "knockout-speed-seed", terrain, 64);
+
+    // All birds are past 500m
+    race.rivals[0]!.bird.x = 650;
+    race.rivals[1]!.bird.x = 700;
+    race.rivals[2]!.bird.x = 750;
+    race.rivals[3]!.bird.x = 800;
+    race.rivals[4]!.bird.x = 850;
+
+    // Checkpoint at 500m eliminates the lowest bird (at 650m)
+    const eliminated = race.eliminateTrailing(500);
+    expect(eliminated).not.toBeNull();
+    expect(eliminated!.id).toBe(race.rivals[0]!.id);
+    expect(eliminated!.eliminated).toBe(true);
+
+    // Subsequent checkpoint eliminates the next lowest
+    const second = race.eliminateTrailing(1000);
+    expect(second).not.toBeNull();
+    expect(second!.id).toBe(race.rivals[1]!.id);
+    expect(second!.eliminated).toBe(true);
+
+    race.dispose();
+  });
 });

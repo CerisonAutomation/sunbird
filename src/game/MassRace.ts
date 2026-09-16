@@ -178,12 +178,12 @@ export class MassRace {
     }
   }
 
-  eliminateTrailing(thresholdDistance: number): Rival | null {
+  eliminateTrailing(_thresholdDistance?: number): Rival | null {
     const active = this.rivals.filter(r => !r.eliminated && !r.finished && r.kind === "local");
-    if (active.length <= 3) return null; // keep top 3 for the podium
+    if (active.length === 0) return null;
     active.sort((a, b) => a.bird.x - b.bird.x);
     const lowest = active[0];
-    if (lowest && lowest.bird.x < thresholdDistance) {
+    if (lowest) {
       lowest.eliminated = true;
       lowest.alive = false;
       return lowest;

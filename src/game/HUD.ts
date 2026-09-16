@@ -2089,6 +2089,8 @@ function renderSkinCollections(s: HudSnapshot, browse: ShopBrowse): string {
 
 function skinAction(v: SkinView, portal: boolean, wallet: number): string {
   const d = v.def;
+  const price = v.dealPrice ?? d.price;
+  const priceLabel = v.dealPrice !== undefined ? `<s>● ${d.price}</s> ● ${price}` : `● ${price}`;
   let action: string;
   if (v.equipped) action = `<span class="tag on">✓ In use</span>`;
   else if (v.owned) action = `<button class="mini-btn" data-ui data-action="equip-skin" data-id="${d.id}">Equip</button>`;
@@ -2098,15 +2100,17 @@ function skinAction(v: SkinView, portal: boolean, wallet: number): string {
   else if (v.locked)
     action = `<button class="mini-btn ${v.lockReason === "vip" ? "vip" : "gold"}" data-ui data-action="open-paywall">${v.lockReason === "vip" ? "♛ VIP" : "✦ Gold"}</button>`;
   else
-    action = `<button class="mini-btn ${v.affordable ? "" : "off"}" data-ui data-action="buy-skin" data-id="${d.id}" ${v.affordable ? "" : "disabled"} aria-label="${v.affordable ? `Buy ${d.name} for ${d.price} coins` : `${d.name} costs ${d.price} coins; earn more coins to unlock`}">● ${d.price}</button>`;
-  return action + (!v.owned && !v.locked && !d.prizeOnly && !v.affordable ? `<small class="purchase-shortfall">${Math.max(0, d.price - wallet)} more coins</small>` : "");
+    action = `<button class="mini-btn ${v.affordable ? (v.dealPrice !== undefined ? "gold" : "") : "off"}" data-ui data-action="buy-skin" data-id="${d.id}" ${v.affordable ? "" : "disabled"} aria-label="${v.affordable ? `Buy ${d.name} for ${price} coins` : `${d.name} costs ${price} coins; earn more coins to unlock`}">${priceLabel}</button>`;
+  return action + (!v.owned && !v.locked && !d.prizeOnly && !v.affordable ? `<small class="purchase-shortfall">${Math.max(0, price - wallet)} more coins</small>` : "");
 }
 
 function renderSkinCard(v: SkinView, portal: boolean, preview: string, wallet: number): string {
   const d = v.def, rarity = skinRarity(d);
   const birdSvg = sunbirdSVG({ palette: skinPalette(d), width: 88, flap: 0.38 });
-  return `<div class="skin-card r-${rarity.key} ${v.equipped ? "equipped" : ""} ${v.owned ? "owned" : ""}" data-skin="${d.id}">
+  const dealTag = v.dealPrice !== undefined && !v.owned ? `<span class="deal-tag">TODAY −40%</span>` : "";
+  return `<div class="skin-card r-${rarity.key} ${v.equipped ? "equipped" : ""} ${v.owned ? "owned" : ""} ${v.dealPrice !== undefined ? "deal" : ""}" data-skin="${d.id}">
     <span class="rarity">${rarity.label}</span>
+    ${dealTag}
     <button class="skin-bird skin-preview" data-ui data-action="preview-skin" data-id="${d.id}" aria-label="Preview ${d.name}" aria-pressed="${preview === d.id}">${birdSvg}<span>Preview</span></button>
     <div class="sk-name">${d.name}</div><div class="sk-perk">${d.perk}</div>${skinStatBars(d)}${skinAction(v, portal, wallet)}</div>`;
 }
@@ -2579,8 +2583,9 @@ function renderGameOver(s: HudSnapshot): string {
          </div>`
       : "";
   const raceStrip =
-    s.duelWas === "" && s.massRace && s.racePlace > 0
-      ? `<div class="race-hero ${s.racePlace === 1 ? "win" : s.racePlace <= 3 ? "podium" : ""}">
+    s.duelWas === "" && s.massRace
+      ? s.racePlace > 0
+        ? `<div class="race-hero ${s.racePlace === 1 ? "win" : s.racePlace <= 3 ? "podium" : ""}">
            <div class="race-medal">${s.racePlace === 1 ? "🥇" : s.racePlace === 2 ? "🥈" : s.racePlace === 3 ? "🥉" : "🏁"}</div>
            <div class="race-place"><b>P${s.racePlace}</b><span>of ${s.raceField} pilots · ${s.raceFinishTime.toFixed(1)}s</span></div>
            ${s.raceVerified ? `<div class="verified-tag">✓ placement refereed by the room server</div>` : ""}
@@ -2598,6 +2603,15 @@ function renderGameOver(s: HudSnapshot): string {
          </div>
          ${s.photoFinish ? `<div class="reward-strip photo">📸 ${escapeHtml(s.photoFinish)}</div>` : ""}
 `
+        : `<div class="race-hero dnf">
+           <div class="race-medal">💥</div>
+           <div class="race-place"><b>${s.modeId === "pvp_knockout" ? "KNOCKED OUT" : "RACE INCOMPLETE"}</b><span>${s.modeId === "pvp_knockout" ? "Eliminated by the countdown timer" : `DNF · Reached ${Math.round(s.distance)}m of ${s.raceFinishM}m`}</span></div>
+           ${
+             s.raceRated
+               ? `<div class="race-rating">Rival rating ${s.rival.rating} ${deltaTxt}<span class="race-rated-tag">ranked · local</span></div>`
+               : `<div class="race-rating"><span class="race-rated-tag">casual · rating frozen</span></div>`
+           }
+         </div>`
       : "";
   return `
     <div class="results-kicker">${escapeHtml(s.modeName)} · flight recap</div>

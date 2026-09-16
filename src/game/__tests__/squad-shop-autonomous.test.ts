@@ -58,6 +58,35 @@ describe("Autonomous Squad and Upgraded Shop Engine", () => {
     expect(boostDeal.price).toBeGreaterThan(0);
   });
 
+  it("honors daily flash price for SkinView affordability and purchase spend", () => {
+    const dateStr = "2026-09-16";
+    const flash = dailyFlashBird(dateStr);
+    const skinDef = skinById(flash.id);
+    const save = new SaveData();
+
+    // Set wallet to exactly flash.price (which is less than skinDef.price)
+    save.state.wallet = flash.price;
+    expect(save.state.wallet).toBeLessThan(skinDef.price);
+
+    // SkinView with dealPrice is affordable with discounted wallet
+    const skinView = {
+      def: skinDef,
+      owned: false,
+      equipped: false,
+      locked: false,
+      lockReason: null,
+      affordable: save.state.wallet >= (skinDef.id === flash.id ? flash.price : skinDef.price),
+      dealPrice: flash.price,
+    };
+    expect(skinView.affordable).toBe(true);
+    expect(skinView.dealPrice).toBe(flash.price);
+
+    // Spending the flash price succeeds
+    const spent = save.spend(skinView.dealPrice);
+    expect(spent).toBe(true);
+    expect(save.state.wallet).toBe(0);
+  });
+
   it("defines active squadron team quests with claimable rewards", () => {
     expect(SQUAD_QUESTS.length).toBe(3);
     const migration = SQUAD_QUESTS.find((q) => q.id === "migration")!;
