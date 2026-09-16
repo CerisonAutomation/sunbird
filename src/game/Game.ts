@@ -77,7 +77,7 @@ import {
   ZENITH_DURATION,
   ZENITH_SLOWMO,
 } from "./constants";
-import { BOOSTS, COLLECTIONS, GOLD, PROMO_CODES, SHOP_TRAILS, SKINS, STARTER_PACK, VIP, WHEEL_SECTORS, dailyDealBoost, skinById, type BoostView, type ShopTrailDef, type ShopTrailView, type SkinDef, type SkinView } from "./Economy";
+import { BOOSTS, COLLECTIONS, GOLD, PROMO_CODES, SHOP_TRAILS, SKINS, STARTER_PACK, VIP, WHEEL_SECTORS, dailyDealBoost, dailyFlashBird, skinById, type BoostView, type ShopTrailDef, type ShopTrailView, type SkinDef, type SkinView } from "./Economy";
 import { nextWings, wingsFor, wingsProgress, wingsPromotion } from "./Career";
 import { GhostPlayer, GhostRecorder } from "./Ghost";
 import { fetchRivalGhost, publishGhost } from "./GhostNet";
@@ -3348,10 +3348,78 @@ export class Game {
         this.bump();
         break;
       }
+      case "claim-daily-stipend": {
+        this.save.addCoins(250);
+        this.save.state.lastStipendClaimed = this.today;
+        this.audio.chapterFanfare();
+        this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
+        this.hud.toast("🪙 Daily Flight Stipend Claimed! +● 250 coins!", "gold");
+        this.bump();
+        break;
+      }
+      case "buy-bundle": {
+        if (!this.save.spend(240)) {
+          this.hud.toast("Need ● 240 coins to claim Ace Wingman Crate", "warn");
+          break;
+        }
+        this.save.armBoost("shield");
+        this.save.armBoost("sunflask");
+        this.save.armBoost("magnet");
+        this.save.ownTrail("trail_tide");
+        this.save.equipTrail("trail_tide");
+        this.save.addCoins(250);
+        this.audio.chapterFanfare();
+        this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
+        this.hud.toast("📦 Ace Wingman Crate Unlocked! 3 Boosts + Tideglass Trail + 250 Coins!", "gold");
+        this.bump();
+        break;
+      }
+      case "claim-squad-quest": {
+        const questId = id;
+        const rewards: Record<string, number> = {
+          migration: 150,
+          drafting: 120,
+          precision: 100,
+        };
+        const coins = rewards[questId] ?? 100;
+        if (!this.save.state.squadQuestsClaimed) this.save.state.squadQuestsClaimed = {};
+        if (this.save.state.squadQuestsClaimed[questId] === this.today) {
+          this.hud.toast("Already claimed today!", "info");
+          break;
+        }
+        this.save.state.squadQuestsClaimed[questId] = this.today;
+        this.save.addCoins(coins);
+        this.audio.chapterFanfare();
+        this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
+        this.hud.toast(`🎁 Squadron Goal Claimed! +● ${coins} coins!`, "gold");
+        this.bump();
+        break;
+      }
+      case "squad-autonomous": {
+        this.squad?.enableAutonomous();
+        this.squadNotice = "⚡ Autonomous Squadron Hub active!";
+        this.audio.chapterFanfare();
+        this.bump();
+        break;
+      }
       case "open-squad":
         this.setScreen("squad");
         this.squadNotice = "";
-        void this.squad?.refresh();
+        if (this.squad) {
+          if (!this.squad.live || this.squad.isAutonomous) {
+            this.squad.enableAutonomous();
+          } else {
+            void this.squad.refresh().then(() => {
+              if (!this.squad?.state.registered) {
+                this.squad?.enableAutonomous();
+                this.bump();
+              }
+            }).catch(() => {
+              this.squad?.enableAutonomous();
+              this.bump();
+            });
+          }
+        }
         break;
       case "squad-page": {
         const [kind, page] = id.split(":");
@@ -5283,6 +5351,8 @@ export class Game {
       campaignTotal: campaignProgress(st.campaignClaimed).total,
       squad: this.squad?.state ?? emptySquadState(),
       squadNotice: this.squadNotice,
+      dailyFlash: dailyFlashBird(this.today),
+      stipendClaimed: this.save.state.lastStipendClaimed === this.today,
       showTutorialHand: this.state === "playing" && st.tutorialRuns < 2 && this.hintTimer < 2.6 && !this.input.diving,
     };
     this.hud.update(snap);

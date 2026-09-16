@@ -142,6 +142,10 @@ export type SaveState = {
   prestige: { level: number; multiplier: number };
   /** Wheel of Fortune / Daily Lucky Spin state. */
   wheel: { lastFreeSpin: string; spinsToday: number };
+  /** Daily flight stipend claimed date. */
+  lastStipendClaimed?: string;
+  /** Squad team quests claimed record (questId -> dateStr). */
+  squadQuestsClaimed?: Record<string, string>;
 };
 
 export type DuelState = {
@@ -244,6 +248,8 @@ function defaults(): SaveState {
     piggyBank: { coins: 0, maxCoins: 1000 },
     prestige: { level: 0, multiplier: 1.0 },
     wheel: { lastFreeSpin: "", spinsToday: 0 },
+    lastStipendClaimed: "",
+    squadQuestsClaimed: {},
   };
 }
 

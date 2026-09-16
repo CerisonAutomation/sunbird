@@ -863,3 +863,68 @@ button,
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
+
+/* Shimmering Animated Trail Swatches */
+.trail-swatch {
+  background-size: 200% 200% !important;
+  animation: trailShimmer 3.5s ease-in-out infinite !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+
+@keyframes trailShimmer {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Squadron Team Quests */
+.squad-quests {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0 16px;
+}
+
+.squad-quest-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(246, 248, 250, 0.85));
+  border: 1px solid rgba(220, 226, 235, 0.85);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.04);
+}
+
+.squad-quest-card .sq-info {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.squad-quest-card .sq-info b {
+  display: block;
+  font: 600 14px var(--display);
+  color: #2c3e50;
+}
+
+.squad-quest-card .sq-info span {
+  display: block;
+  font: 400 12px var(--body);
+  color: #7f8c8d;
+  margin-top: 2px;
+}
+
+.squad-quest-card .sq-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.squad-quest-card .sq-prog {
+  font: 600 12px var(--display);
+  color: #e67e22;
+  white-space: nowrap;
+}
+

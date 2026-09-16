@@ -390,20 +390,31 @@ function makeBaseSnapshot(): HudSnapshot {
     campaignDone: 5,
     campaignTotal: 15,
     squad: {
-      id: "sq1",
-      name: "Sun Chasers",
-      tag: "SUN",
-      members: [
-        { id: "p1", name: "SkyAce", role: "leader", distance: 14500, online: true },
-        { id: "p2", name: "GoldenFalcon", role: "member", distance: 12400, online: true }
+      live: true,
+      loading: false,
+      busy: false,
+      friendPage: 0,
+      clubPage: 0,
+      error: "",
+      registered: true,
+      credentialError: false,
+      myCode: "SUN-MOCK01",
+      friends: [
+        { name: "SkyAce", code: "SUN-ACE001", club_id: 1 },
+        { name: "GoldenFalcon", code: "SUN-GLD999", club_id: 1 }
       ],
+      clubs: [
+        { id: 1, name: "Apex Falcons", motto: "High speed diving", members: 24 },
+        { id: 2, name: "Golden Horizon", motto: "Chasing sunsets", members: 18 }
+      ],
+      myClubId: 1,
       chat: [
-        { id: "msg1", sender: "SkyAce", text: "Welcome to Sun Chasers! Great flights today!", time: Date.now() - 3600000 }
-      ],
-      weeklyDistance: 45200,
-      trophies: 12
+        { id: 1, name: "SkyAce", text: "Welcome to Sun Chasers! Great flights today!", at: "1h ago" }
+      ]
     },
     squadNotice: "",
+    dailyFlash: { id: "falcon", price: 675, originalPrice: 1125, discountPct: 40 },
+    stipendClaimed: false,
     piggyCoins: 340,
     prestigeLevel: 0,
     prestigeMult: 1.0,

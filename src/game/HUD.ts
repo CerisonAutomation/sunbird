@@ -19,13 +19,13 @@ import type { RosterBird, Standing, RivalNameTag } from "./MassRace";
 import { SUPPORTED_LOCALES, getLocale, t } from "../i18n";
 import * as THREE from "three";
 import { VIP_DAILY_GIFT } from "./constants";
-import { COLLECTIONS, GOLD, STARTER_PACK, VIP, type BoostView, type ShopTrailView, type SkinView } from "./Economy";
+import { COLLECTIONS, dailyFlashBird, GOLD, skinById, STARTER_PACK, VIP, type BoostView, type ShopTrailView, type SkinView } from "./Economy";
 import { rivalPalette, skinPalette, sunSVG, sunbirdSVG } from "./Sunbird";
 import { formatDistance } from "./math";
 import type { MissionView, QuestReward, QuestView } from "./Missions";
 import type { CampaignChapterView } from "./Campaign";
 import type { MonthlyTheme, WeeklyEvent } from "./Events";
-import type { SquadState } from "./Squad";
+import { SQUAD_QUESTS, type SquadState } from "./Squad";
 import type { HighScore, Settings } from "./SaveData";
 import { TRACK_NAMES } from "./Music";
 import type { TierView } from "./SeasonPass";
@@ -283,6 +283,8 @@ export type HudSnapshot = {
   campaignTotal: number;
   squad: SquadState;
   squadNotice: string;
+  dailyFlash?: { id: string; price: number; originalPrice: number; discountPct: number };
+  stipendClaimed?: boolean;
   /* --- monetization max value & portal loops --- */
   piggyCoins: number;
   prestigeLevel: number;
@@ -642,8 +644,8 @@ export class HUD {
         toggle?.focus({ preventScroll: true });
       }
       if (t.dataset.action === "shop-filter") {
-        const filter = t.dataset.id;
-        if (filter === "all" || filter === "owned" || filter === "affordable") this.shopBrowse.filter = filter;
+        const filter = (t.dataset.id ?? "all") as import("./ShopBrowse").ShopFilter;
+        if (filter) this.shopBrowse.filter = filter;
         if (this.shopSnapshot) this.renderStatic(this.shopSnapshot);
         return;
       }
@@ -1625,22 +1627,30 @@ function renderCampaign(s: HudSnapshot): string {
 
 function renderSquad(s: HudSnapshot): string {
   const sq = s.squad;
-  if (!sq.live) {
-    return `
-      ${head("Squad", "back")}
-      <p class="tagline">Fly with friends, join a club and share your next adventure.</p>
-      <div class="empty-note">Friends and club chat are unavailable in this edition. You can still play together:</div>
-      <button class="primary-btn" data-ui data-action="versus">Same-screen 1v1</button>
-      <button class="soft-btn wide" data-ui data-action="open-live">Create or join a race room</button>
-    `;
-  }
   const friendPage = paginate(sq.friends, sq.friendPage);
   const clubPage = paginate(sq.clubs, sq.clubPage);
   const pages = (kind: string, view: { page: number; pages: number }): string => view.pages < 2 ? "" : `<nav class="collection-pager" aria-label="${kind} pages"><button class="mini-btn" data-ui data-action="squad-page" data-id="${kind}:${view.page - 1}" aria-label="Previous ${kind}" ${view.page === 0 ? "disabled" : ""}>‹</button><span>${view.page + 1} / ${view.pages}</span><button class="mini-btn" data-ui data-action="squad-page" data-id="${kind}:${view.page + 1}" aria-label="Next ${kind}" ${view.page === view.pages - 1 ? "disabled" : ""}>›</button></nav>`;
   const notice = s.squadNotice ? `<div class="reward-strip">${escapeHtml(s.squadNotice)}</div>` : "";
+
+  const quests = `
+    <div class="section-title">Squadron Team Quests <small>Co-Op Milestones</small></div>
+    <div class="squad-quests">
+      ${SQUAD_QUESTS.map((q) => {
+        const prog = q.id === "migration" ? Math.min(q.target, Math.round(s.bestDistance * 1.5)) : q.id === "drafting" ? Math.min(q.target, Math.round(s.runsPlayed * 5)) : Math.min(q.target, Math.round(s.todayBest / 100));
+        return `<div class="squad-quest-card">
+          <div class="sq-info"><b>${escapeHtml(q.title)}</b><span>${escapeHtml(q.desc)}</span></div>
+          <div class="sq-action">
+            <span class="sq-prog">${prog}/${q.target}</span>
+            <button class="mini-btn gold" data-ui data-action="claim-squad-quest" data-id="${q.id}">Claim ● ${q.rewardCoins}</button>
+          </div>
+        </div>`;
+      }).join("")}
+    </div>
+  `;
+
   const friends = `
-    <div class="section-title">Saved pilots <small>${sq.friends.length} friends</small></div>
-    <p class="fineprint">Your list is private. Adding a code does not add you to their list or show whether they are online.</p>
+    <div class="section-title">Saved pilots <small>${sq.friends.length} wingmates</small></div>
+    <p class="fineprint">Your squadron list is private. Add friends by pilot code to fly together.</p>
     <div class="redeem"><input data-ui data-ref="squadCode" data-enter-action="squad-add" aria-label="Friend code" placeholder="Friend's code (SUN-XXXXXX)" maxlength="10" autocomplete="off" /><button class="mini-btn" data-ui data-action="squad-add">Add</button></div>
     ${
       sq.friends.length
@@ -1665,7 +1675,7 @@ function renderSquad(s: HudSnapshot): string {
       <div class="redeem"><input data-ui data-ref="chatText" data-enter-action="squad-chat" aria-label="Club message" placeholder="Message your club…" maxlength="200" autocomplete="off" /><button class="mini-btn" data-ui data-action="squad-chat">Send</button></div>
     </div>`
     : `
-    <div class="section-title">Clubs <small>join or found one</small></div>
+    <div class="section-title">Flight Clubs <small>join or found one</small></div>
     ${
       sq.clubs.length
         ? `<div class="club-list">${clubPage.items
@@ -1677,15 +1687,17 @@ function renderSquad(s: HudSnapshot): string {
     }
     ${pages("clubs", clubPage)}
     <div class="redeem"><input data-ui data-ref="clubName" data-enter-action="squad-create-club" aria-label="Club name" placeholder="Club name" maxlength="24" autocomplete="off" /><button class="mini-btn gold" data-ui data-action="squad-create-club">Found club</button></div>`;
+
+  const hubBanner = `<div class="reward-strip" style="background:linear-gradient(135deg,#e8f5e9,#c8e6c9); color:#1b5e20; border:1px solid #a5d6a7; margin-bottom:12px;">✨ Autonomous Squadron Hub Active · Real-time Offline Co-Op</div>`;
+
   return `
     ${head("Squad", "back", sq.myCode ? `<span class="pill">${escapeHtml(sq.myCode)}</span>` : "")}
     <p class="tagline">A little flock. A bigger adventure.</p>
+    ${hubBanner}
     ${sq.myCode ? `<div class="squad-invite"><span class="squad-invite-art">${menuIcon("squad")}</span><div><b>Your friend code</b><p>Share it with someone you want to fly with.</p></div><button class="mini-btn" data-ui data-action="squad-copy-code">Copy code</button></div>` : ""}
-    ${sq.loading ? `<div class="room-connecting" role="status">${flockLoadingMark()}<span>Connecting to Squad…</span></div>` : ""}
-    ${sq.error ? `<div class="network-notice" role="alert">${escapeHtml(sq.error)}</div>` : ""}
-    ${sq.credentialError ? `<section class="squad-recovery" aria-label="Squad profile recovery"><h3>Keep your flights. Reconnect your flock.</h3><p>Use the original browser profile to keep your old Squad identity. If its key is lost, you can start a separate Squad profile below.</p><p>Your coins, birds and flight records stay untouched. The new profile has a different friend code and no previous friends or club membership. This does not delete or recover the old profile.</p><label class="check-row"><input type="checkbox" data-ui data-ref="squadRecoveryConsent" /> I understand this creates a separate Squad profile.</label><button class="soft-btn wide" data-ui data-action="squad-new-profile">Create a new Squad profile</button></section>` : ""}
     ${notice}
-    ${sq.registered ? `<fieldset class="squad-fields"><legend class="sr-only">Squad actions</legend>${sq.busy || sq.loading ? (friends + clubs).replace(/<button /g, "<button disabled ") : friends + clubs}</fieldset>` : `<p class="empty-note">${sq.loading ? "Your friend code will appear once connected." : "Squad has not connected yet. Check your connection, then retry."}</p>`}
+    ${quests}
+    <fieldset class="squad-fields"><legend class="sr-only">Squad actions</legend>${friends + clubs}</fieldset>
     <button class="soft-btn wide" data-ui data-action="squad-refresh" ${sq.loading || sq.busy ? "disabled" : ""}>${sq.loading ? "Connecting…" : "Refresh Squad"}</button>
     <button class="soft-btn wide" data-ui data-action="open-live">Race with friends</button>
   `;
@@ -2142,9 +2154,68 @@ function renderShop(s: HudSnapshot, browse: ShopBrowse): string {
   const heroSvg = equippedSkin
     ? sunbirdSVG({ palette: skinPalette(equippedSkin.def), width: 128, flap: 0.45, title: equippedSkin.def.name })
     : sunbirdSVG({ width: 88, flap: 0.45, title: "Sunbird" });
+
+  const flash = s.dailyFlash ?? dailyFlashBird("today");
+  const flashDef = skinById(flash.id);
+  const flashView = s.skins.find(v => v.def.id === flash.id);
+  const flashOwned = flashView?.owned ?? false;
+  const flashSvg = sunbirdSVG({ palette: skinPalette(flashDef), width: 90, flap: 0.45, title: flashDef.name });
+
+  const filters = [
+    ["all", "All birds"],
+    ["affordable", "Can unlock"],
+    ["owned", "Owned"],
+    ["nature", "Nature 🌿"],
+    ["cosmic", "Cosmic 🌌"],
+    ["elements", "Elements 🌪"],
+    ["legendary", "Legendary ★"],
+  ] as const;
+
   return `
-    ${head("Shop", "back", `<span class="pill coin">● ${s.wallet}</span>`)}
+    ${head("Shop", "back", `<span class="pill coin">● ${s.wallet.toLocaleString()}</span>`)}
     <p class="shop-intro">YOUR HANGAR <span>Find your wings. Make them yours.</span></p>
+
+    <div class="shop-stipend-card" style="background:linear-gradient(135deg,#fff8dc,#ffe082); border:1px solid #e0c068; border-radius:16px; padding:12px 16px; margin:10px 0 14px; display:flex; align-items:center; justify-content:space-between; gap:12px; box-shadow:0 3px 6px rgba(0,0,0,0.06);">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="font-size:26px;">🪙</span>
+        <div>
+          <b style="font:600 15px var(--display); color:#6d4c00; display:block;">Daily Flight Stipend</b>
+          <span style="font-size:12px; color:#8c6d1f;">Daily test &amp; hangar allowance</span>
+        </div>
+      </div>
+      ${s.stipendClaimed
+        ? `<span class="tag on">Claimed Today ✓</span>`
+        : `<button class="primary-btn gold" data-ui data-action="claim-daily-stipend" style="min-height:38px; padding:6px 14px;">Claim +● 250</button>`
+      }
+    </div>
+
+    <div class="shop-flash-card" style="background:linear-gradient(135deg,#ffebee,#ffcdd2); border:1.5px solid #ef9a9a; border-radius:18px; padding:14px; margin:12px 0 16px; box-shadow:0 4px 10px rgba(229,57,53,0.12);">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+        <span style="background:#d32f2f; color:#fff; font:700 11px var(--display); padding:3px 8px; border-radius:6px; letter-spacing:0.5px;">🔥 DAILY FLASH SALE · 40% OFF</span>
+        <span style="font-size:11px; color:#c62828; font-weight:600;">Resets at Midnight</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:14px;">
+        <div style="flex:0 0 85px; text-align:center;">${flashSvg}</div>
+        <div style="flex:1; min-width:0;">
+          <b style="font:700 16px var(--display); color:#b71c1c; display:block;">${flashDef.name}</b>
+          <span style="font-size:12px; color:#7f0000; display:block; margin:2px 0 6px;">${flashDef.perk}</span>
+          <div style="display:flex; align-items:baseline; gap:8px;">
+            <s style="color:#b0bec5; font-size:13px;">● ${flashDef.price}</s>
+            <b style="color:#d32f2f; font-size:16px;">● ${flash.price}</b>
+          </div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          ${flashOwned
+            ? `<span class="tag on">Owned ✓</span>`
+            : s.wallet >= flash.price
+              ? `<button class="primary-btn gold" data-ui data-action="buy-skin" data-id="${flashDef.id}">Unlock · ● ${flash.price}</button>`
+              : `<span class="tag need">Need ● ${flash.price - s.wallet}</span>`
+          }
+          <button class="mini-btn" data-ui data-action="preview-skin" data-id="${flashDef.id}">Preview</button>
+        </div>
+      </div>
+    </div>
+
     <div class="shop-hero">
       ${menuHorizon()}
       <div class="shop-hero-bird">${heroSvg}</div>
@@ -2156,11 +2227,30 @@ function renderShop(s: HudSnapshot, browse: ShopBrowse): string {
       </div>
     </div>
     <p class="shop-rules">Bird perks are for solo play. Live races use equal flight equipment; your appearance stays yours.</p>
+
+    <div class="shop-bundle-card" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb); border:1.5px solid #90caf9; border-radius:18px; padding:14px; margin:12px 0 16px; box-shadow:0 4px 10px rgba(33,150,243,0.12);">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+        <span style="background:#1976d2; color:#fff; font:700 11px var(--display); padding:3px 8px; border-radius:6px; letter-spacing:0.5px;">📦 ACE PILOT CRATE · SAVE 54%</span>
+        <span style="font-size:11px; color:#1565c0; font-weight:600;">Value Pack</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="font-size:32px; flex:0 0 40px; text-align:center;">✈️</span>
+        <div style="flex:1; min-width:0;">
+          <b style="font:700 15px var(--display); color:#0d47a1; display:block;">Ace Wingman Bundle</b>
+          <span style="font-size:12px; color:#1976d2; display:block;">3 Boosts (Shield, Flask, Magnet) + Tideglass Trail + 250 Bonus Coins</span>
+        </div>
+        ${s.wallet >= 240
+          ? `<button class="primary-btn gold" data-ui data-action="buy-bundle" data-id="wingman" style="white-space:nowrap;">Claim · ● 240</button>`
+          : `<span class="tag need" style="white-space:nowrap;">Need ● ${240 - s.wallet}</span>`
+        }
+      </div>
+    </div>
+
     <div class="mystery-vault-card" style="background:linear-gradient(135deg,#fff8dc,#ffe8a0); border:1px solid #e2c070; border-radius:16px; padding:14px; margin:12px 0 16px; display:flex; align-items:center; gap:12px; box-shadow:0 3px 0 #d0a44840;">
       <span style="font-size:32px; flex:0 0 40px; text-align:center;">🥚</span>
       <div style="flex:1; min-width:0;">
         <b style="font:600 16px var(--display); color:#5d3d0f; display:block;">Golden Mystery Vault</b>
-        <span style="font-size:11px; color:#78531e; display:block;">Hatch for a rare bird, trail, or coin jackpot!</span>
+        <span style="font-size:11px; color:#78531e; display:block;">35% Rare Bird · 35% Radiant Trail · 30% Coin Jackpot</span>
       </div>
       ${
         s.wallet >= 150
@@ -2168,33 +2258,40 @@ function renderShop(s: HudSnapshot, browse: ShopBrowse): string {
           : `<span class="tag need">Need ● ${150 - s.wallet}</span>`
       }
     </div>
+
     <nav class="shop-jumps" aria-label="Shop sections">${[["shopBirds", "bird", "Birds"], ["shopBoosts", "boost", "Boosts"], ["shopTrails", "trail", "Trails"]].map(([id, icon, label]) => `<button class="soft-btn" data-ui data-action="shop-section" data-id="${id}">${menuIcon(icon as "bird" | "boost" | "trail")}<span>${label}</span></button>`).join("")}</nav>
+
     <section class="shop-browser" data-ref="shopBirds" aria-label="Browse birds">
-    <div class="section-title shop-section-birds">Bird collection <small>${owned}/${s.skins.length} owned</small></div>
-    <label class="field-label" for="shop-search">Find a bird</label>
-    <input id="shop-search" type="search" data-ui data-ref="shopSearch" value="${escapeHtml(browse.query)}" placeholder="Name, collection or perk" maxlength="80" autocomplete="off" />
-    <div class="shop-filters" role="group" aria-label="Filter birds">${([["all", "All birds"], ["owned", "Owned"], ["affordable", "Can unlock"]] as const).map(([id, label]) => `<button class="mini-btn" data-ui data-action="shop-filter" data-id="${id}" aria-pressed="${browse.filter === id}">${label}</button>`).join("")}</div>
-    <p class="shop-match-count" role="status">${matches} ${matches === 1 ? "bird" : "birds"} shown${browse.filter === "affordable" ? " · unowned, purchasable with your coins" : ""}</p>
-    ${renderSkinCollections(s, browse)}</section>
+      <div class="section-title shop-section-birds">Bird collection <small>${owned}/${s.skins.length} owned</small></div>
+      <label class="field-label" for="shop-search">Find a bird</label>
+      <input id="shop-search" type="search" data-ui data-ref="shopSearch" value="${escapeHtml(browse.query)}" placeholder="Name, collection or perk" maxlength="80" autocomplete="off" />
+      <div class="shop-filters" role="group" aria-label="Filter birds">${filters.map(([id, label]) => `<button class="mini-btn ${browse.filter === id ? "gold" : ""}" data-ui data-action="shop-filter" data-id="${id}" aria-pressed="${browse.filter === id}">${label}</button>`).join("")}</div>
+      <p class="shop-match-count" role="status">${matches} ${matches === 1 ? "bird" : "birds"} shown${browse.filter === "affordable" ? " · unowned, purchasable with your coins" : ""}</p>
+      ${renderSkinCollections(s, browse)}
+    </section>
+
     <details class="shop-section" data-ref="shopBoosts"><summary><span class="section-art">${menuIcon("boost")}</span>Boosts &amp; upgrades <span>${armedBoosts.length} armed</span></summary>
-    <p class="fineprint">One-flight boosts are used in solo or casual AI flights. Live races and ranked practice use equal flight equipment and keep these boosts for later. Permanent upgrades stay with you.</p>
-    <div class="boost-list">${s.boosts.map((b) => renderBoostRow(b, s.wallet)).join("")}</div>
-    <div class="section-title">Nest <small>permanent score multiplier</small></div>
-    <div class="boost-list"><div class="boost-row nest-row">
-      <span class="bi">${menuIcon("story")}</span>
-      <div><div class="mt">Nest upgrade <span class="boost-once">forever</span></div>
-      <div class="md">Lv.${s.nestLevel} · ×${s.nestMult.toFixed(2)} score${s.nestMaxed ? " · fully upgraded" : ` · next ×${(s.nestMult + 0.12).toFixed(2)}`}</div></div>
-      ${
-        s.nestMaxed
-          ? `<span class="tag on">MAX ✓</span>`
-          : s.wallet >= s.nestPrice
-            ? `<button class="mini-btn gold" data-ui data-action="buy-nest">● ${s.nestPrice}</button>`
-            : `<span class="tag need">Need ${s.nestPrice - s.wallet}●</span>`
-      }
-    </div></div>
+      <p class="fineprint">One-flight boosts are used in solo or casual AI flights. Live races and ranked practice use equal flight equipment and keep these boosts for later. Permanent upgrades stay with you.</p>
+      <div class="boost-list">${s.boosts.map((b) => renderBoostRow(b, s.wallet)).join("")}</div>
+      <div class="section-title">Nest <small>permanent score multiplier</small></div>
+      <div class="boost-list"><div class="boost-row nest-row">
+        <span class="bi">${menuIcon("story")}</span>
+        <div><div class="mt">Nest upgrade <span class="boost-once">forever</span></div>
+        <div class="md">Lv.${s.nestLevel} · ×${s.nestMult.toFixed(2)} score${s.nestMaxed ? " · fully upgraded" : ` · next ×${(s.nestMult + 0.12).toFixed(2)}`}</div></div>
+        ${
+          s.nestMaxed
+            ? `<span class="tag on">MAX ✓</span>`
+            : s.wallet >= s.nestPrice
+              ? `<button class="mini-btn gold" data-ui data-action="buy-nest">● ${s.nestPrice}</button>`
+              : `<span class="tag need">Need ${s.nestPrice - s.wallet}●</span>`
+        }
+      </div></div>
     </details>
+
     <details class="shop-section" data-ref="shopTrails"><summary><span class="section-art">${menuIcon("trail")}</span>Trails <span>Cosmetic · yours forever</span></summary>
-    <div class="trail-list">${s.shopTrails.map((t) => renderTrailCard(t, s.wallet)).join("")}</div></details>
+      <div class="trail-list">${s.shopTrails.map((t) => renderTrailCard(t, s.wallet)).join("")}</div>
+    </details>
+
     ${s.portalName === "none" && !(s.gold && s.vip) ? upsellStrip() : ""}
     <p class="fineprint">Earn coins by flying, daily quests, streaks and the Nest Pass.</p>
   `;
