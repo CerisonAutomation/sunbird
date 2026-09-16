@@ -172,6 +172,18 @@ export class MassRace {
     if (modeId === "pvp_draft") {
       this.draftBehind = 38;
       this.draftMax = 0.85;
+    } else if (modeId === "pvp_typhoon") {
+      this.draftBehind = 34;
+      this.draftMax = 0.75;
+    } else if (modeId === "pvp_slalom") {
+      this.draftBehind = 30;
+      this.draftMax = 0.65;
+    } else if (modeId === "pvp_zenith") {
+      this.draftBehind = 32;
+      this.draftMax = 0.6;
+    } else if (modeId === "pvp_coinrush") {
+      this.draftBehind = 28;
+      this.draftMax = 0.6;
     } else {
       this.draftBehind = DRAFT_BEHIND;
       this.draftMax = DRAFT_MAX;

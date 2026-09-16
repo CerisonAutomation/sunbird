@@ -11,7 +11,7 @@ import { feedbackSlot } from "./HudFeedback";
 import type { AchievementView } from "./Achievements";
 import type { ActivePower } from "./PowerUps";
 import type { SessionGoal } from "./Engagement";
-import { PVP_MODES, type ModeDef } from "./Modes";
+import { PVP_MODES, type ModeDef, type PvpWorldCourse, type ModeId } from "./Modes";
 import type { RacerStats } from "./Racer";
 import type { BoardMetric, BoardPage, BoardScope } from "./Leaderboard";
 import type { TournamentView } from "./Tournaments";
@@ -290,6 +290,11 @@ export type HudSnapshot = {
   prestigeLevel: number;
   prestigeMult: number;
   canFreeSpin: boolean;
+  /* --- pvp modes & worlds catalog --- */
+  pvpModes: ModeDef[];
+  pvpWorlds: PvpWorldCourse[];
+  selectedPvpMode: ModeId;
+  selectedPvpWorld: string;
 };
 
 export type DailyCard = {
@@ -548,7 +553,15 @@ export class HUD {
       <div class="toasts" data-ref="toasts"></div>
       <div class="flash" data-ref="flash"></div>
       <div class="impact-popups" data-ref="impactPopups"></div>
-      <div class="matchmaking hidden" data-ref="matchmaking">${flockLoadingMark()}<div class="matchmaking-count" data-ref="matchmakingCount">0 pilots</div><div class="matchmaking-label" data-ref="matchmakingLabel">Searching for live pilots…</div><button class="soft-btn mm-cancel" data-ui data-action="mm-cancel">Cancel</button></div>
+      <div class="matchmaking hidden" data-ref="matchmaking">
+        ${flockLoadingMark()}
+        <div class="matchmaking-count" data-ref="matchmakingCount">0 pilots</div>
+        <div class="matchmaking-label" data-ref="matchmakingLabel">Searching for live pilots…</div>
+        <div class="btn-row mm-actions">
+          <button class="primary-btn mm-instant" data-ui data-action="quick-match-instant">Launch Now ▶</button>
+          <button class="soft-btn mm-cancel" data-ui data-action="mm-cancel">Cancel</button>
+        </div>
+      </div>
     `;
     // Flow-based lanes reserve actual space; independently positioned counters,
     // chips and buttons used to overlap as soon as labels wrapped on phones.
@@ -1438,40 +1451,110 @@ function renderBoard(s: HudSnapshot): string {
 /** Compact top-wings leaderboard embedded on the main menu. */
 function renderLive(s: HudSnapshot): string {
   const connected = s.netState === "lobby" || s.netState === "racing";
-  const status = connected ? "Connected" : s.netState === "connecting" ? "Connecting…" : "Unavailable";
-  const live = s.lobbyRivals.filter(r => r.tag.includes("live"));
+  const status = connected ? "Connected" : s.netState === "connecting" ? "Flock Ready" : "Local Flock";
+  const live = s.lobbyRivals.filter((r) => r.tag.includes("live"));
+
+  const modePills = (s.pvpModes || []).map((m) => `
+    <button class="pvp-pill ${s.selectedPvpMode === m.id ? "on" : ""}" data-ui data-action="select-pvp-mode" data-id="${m.id}" title="${m.blurb}">
+      <span>${m.icon}</span> <b>${m.name}</b> <small>${m.finish}m</small>
+    </button>
+  `).join("");
+
+  const worldPills = (s.pvpWorlds || []).map((w) => `
+    <button class="world-pill ${s.selectedPvpWorld === w.id ? "on" : ""}" data-ui data-action="select-pvp-world" data-id="${w.id}" title="${w.tagline}">
+      <span>${w.emoji}</span> <b>${w.name}</b> <small>${w.difficulty}</small>
+    </button>
+  `).join("");
+
+  const activeMode = (s.pvpModes || []).find((m) => m.id === s.selectedPvpMode) ?? (s.pvpModes || [])[0] ?? { name: "Sprint GP", icon: "⚡", finish: 1500 };
+  const activeWorld = (s.pvpWorlds || []).find((w) => w.id === s.selectedPvpWorld) ?? (s.pvpWorlds || [])[0] ?? { name: "Emerald Circuit", emoji: "🌿" };
+
   return `${head("Race Lobby")}
-    <p class="tagline">Create a room. Invite your friends. Ready up together.</p>
+    <p class="tagline">40-pilot live &amp; neural AI racing across 9 scenic worlds.</p>
     ${s.netState === "error" && s.netError ? `<p class="network-notice" role="alert">${escapeHtml(s.netError)}</p>` : ""}
     <p class="race-fairness">${menuIcon("medal")} Equal flight equipment · your bird, your timing. Store boosts are saved for solo play.</p>
+
     ${s.roomCode ? `      <section class="race-section private-session" aria-label="Your private room">
-        <div class="race-section-head"><h3>Fly with friends</h3><span class="board-badge ${connected ? "live" : "warn"}" role="status">${status}</span></div>
-        <div class="room-now"><span class="room-now-label">Invite code</span><strong class="room-now-code">${escapeHtml(s.roomCode)}</strong>
-          <button class="mini-btn" data-ui data-action="copy-invite" ${connected ? "" : "disabled"}>Copy link</button></div>
-        <p class="room-presence" role="status">${s.roomCount} connected · ${s.roomReadyCount} ready</p>
-        <button class="primary-btn" data-ui data-action="ready-room" aria-pressed="${s.roomReady}" ${s.netState === "lobby" ? "" : "disabled"}>${s.roomReady ? "Cancel ready" : "Ready to race"}</button>
-        ${!connected ? s.netState !== "connecting" ? `<p role="status">Connection unavailable. Leave the room and retry.</p>` : `<div class="room-connecting" role="status">${flockLoadingMark()}<span>Connecting your flock…</span></div>` : `<div class="room-flock" aria-label="Pilots in this room"><div class="room-bird ${s.roomReady ? "is-ready" : ""}">${sunbirdSVG({ width: 48, palette: s.skins.some(v => v.equipped) ? skinPalette(s.skins.find(v => v.equipped)!.def) : undefined })}<b>You</b><small>${s.roomReady ? "Ready ✓" : "Not ready"}</small></div>${live.slice(0, 7).map((p, i) => `<div class="room-bird ${p.ready ? "is-ready" : ""}">${sunbirdSVG({ width: 48, palette: s.skins.some(v => v.def.id === p.skin) ? skinPalette(s.skins.find(v => v.def.id === p.skin)!.def) : rivalPalette(i + 1) })}<b>${escapeHtml(p.name)}</b><small>${p.ready ? "Ready ✓" : "Not ready"}</small></div>`).join("")}</div>${s.roomCount > 8 ? `<p class="fineprint">And ${s.roomCount - 8} more connected pilots</p>` : ""}`}
-        <p class="fineprint">${connected ? "At least two pilots must join. Everyone presses Ready; the server starts you together." : escapeHtml(s.netError || "Waiting for the room server. You can leave and retry if it stays unavailable.")}</p>
+        <div class="race-section-head">
+          <h3>Flock Room: <strong>${escapeHtml(s.roomCode)}</strong></h3>
+          <span class="board-badge ${connected ? "live" : "island"}" role="status">${status}</span>
+        </div>
+        <div class="room-now">
+          <span class="room-now-label">Invite code</span>
+          <strong class="room-now-code">${escapeHtml(s.roomCode)}</strong>
+          <button class="mini-btn" data-ui data-action="copy-invite">Copy link</button>
+        </div>
+
+        <div class="lobby-selector-box">
+          <div class="lobby-selector-label"><span>Race Format</span> <b>${activeMode.icon} ${activeMode.name} (${activeMode.finish} m)</b></div>
+          <div class="pills-scroll">${modePills}</div>
+          <div class="lobby-selector-label"><span>World Circuit</span> <b>${activeWorld.emoji} ${activeWorld.name}</b></div>
+          <div class="pills-scroll">${worldPills}</div>
+        </div>
+
+        <p class="room-presence" role="status">${Math.max(1, s.roomCount)} connected · ${s.roomReadyCount} ready</p>
+
+        <div class="room-actions-bar">
+          <button class="primary-btn gold large-btn" data-ui data-action="start-room-now">⚡ Start Race Now (${s.roomCount > 1 ? "Launch Room" : "Fill with AI flock"})</button>
+          <button class="soft-btn ${s.roomReady ? "on" : ""}" data-ui data-action="ready-room" aria-pressed="${s.roomReady}">${s.roomReady ? "Cancel ready" : "Ready up ✓"}</button>
+        </div>
+
+        <div class="room-flock" aria-label="Pilots in this room">
+          <div class="room-bird ${s.roomReady ? "is-ready" : ""}">
+            ${sunbirdSVG({ width: 48, palette: s.skins.some((v) => v.equipped) ? skinPalette(s.skins.find((v) => v.equipped)!.def) : undefined })}
+            <b>You</b>
+            <small>${s.roomReady ? "Ready ✓" : "In room"}</small>
+          </div>
+          ${live.slice(0, 7).map((p, i) => `
+            <div class="room-bird ${p.ready ? "is-ready" : ""}">
+              ${sunbirdSVG({ width: 48, palette: s.skins.some((v) => v.def.id === p.skin) ? skinPalette(s.skins.find((v) => v.def.id === p.skin)!.def) : rivalPalette(i + 1) })}
+              <b>${escapeHtml(p.name)}</b>
+              <small>${p.ready ? "Ready ✓" : "In room"}</small>
+            </div>
+          `).join("")}
+        </div>
+        ${s.roomCount > 8 ? `<p class="fineprint">And ${s.roomCount - 8} more connected pilots</p>` : ""}
 
         <button class="ghost-btn" data-ui data-action="room-close">Leave room</button>
       </section>` : `
+      <section class="race-section quick-match-hero" aria-label="Quick Match">
+        <div class="race-section-head">
+          <h3>⚡ Quick Match</h3>
+          <span class="board-badge live">Instant action</span>
+        </div>
+        <p class="qm-desc">Jump straight into the skies! Race 40 live and neural AI pilots across custom formats and world circuits.</p>
+
+        <div class="lobby-selector-box">
+          <div class="lobby-selector-label"><span>Select PvP Format</span> <b>${activeMode.icon} ${activeMode.name} (${activeMode.finish} m)</b></div>
+          <div class="pills-scroll">${modePills}</div>
+          <div class="lobby-selector-label"><span>Select World Circuit</span> <b>${activeWorld.emoji} ${activeWorld.name}</b></div>
+          <div class="pills-scroll">${worldPills}</div>
+        </div>
+
+        <div class="quick-match-btns">
+          <button class="primary-btn gold large-btn" data-ui data-action="quick-match-instant">⚡ Launch Match on ${activeWorld.name}</button>
+          <button class="soft-btn" data-ui data-action="pvp-casual">Search Online Pilots</button>
+        </div>
+      </section>
+
       <section class="race-section room-entry" aria-label="Invite friends">
         <div class="room-entry-crest">${menuIcon("online")}</div>
-        <h3>Better with your flock.</h3>
-        <p>${s.multiplayerLive ? "Share one invite. Everyone flies the same 4,000 m course." : "Live rooms are not available in this edition. Practice races still work."}</p>
-        <button class="primary-btn" data-ui data-action="host-room" ${s.multiplayerLive ? "" : "disabled"}>Create room</button>
-        <label class="field-label" for="race-room-code">Or join your friend's room</label>
-        <div class="redeem"><input id="race-room-code" data-ui data-ref="roomCode" data-enter-action="join-room" aria-label="Room code" maxlength="2048" placeholder="Code or invite link" autocomplete="off" autocapitalize="characters" spellcheck="false" />
-          <button class="mini-btn" data-ui data-action="join-room" ${s.multiplayerLive ? "" : "disabled"}>Join</button></div>
+        <h3>Fly with your flock</h3>
+        <p>Create a private room with a custom code and link. Race your squad on any course!</p>
+        <button class="primary-btn" data-ui data-action="host-room">Create Private Room</button>
+        <label class="field-label" for="race-room-code">Or enter a friend's room code</label>
+        <div class="redeem">
+          <input id="race-room-code" data-ui data-ref="roomCode" data-enter-action="join-room" aria-label="Room code" maxlength="2048" placeholder="Code or invite link" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+          <button class="mini-btn" data-ui data-action="join-room">Join</button>
+        </div>
       </section>
       <nav class="destination-grid" aria-label="More ways to race">
-        <button class="destination" data-ui data-action="pvp-casual" ${s.multiplayerLive ? "" : "disabled"}><span class="destination-art">${menuIcon("online")}</span><span class="destination-copy"><b>Quick match</b><span>Find online pilots · AI if empty</span></span></button>
-        <button class="destination" data-ui data-action="open-practice"><span class="destination-art">${menuIcon("compass")}</span><span class="destination-copy"><b>Practice</b><span>AI opponents · no waiting</span></span></button>
-        <button class="destination" data-ui data-action="versus"><span class="destination-art">${menuIcon("versus")}</span><span class="destination-copy"><b>Same-screen 1v1</b><span>A / Space and L / Enter</span></span></button>
+        <button class="destination" data-ui data-action="open-practice"><span class="destination-art">${menuIcon("compass")}</span><span class="destination-copy"><b>AI Practice</b><span>Custom opponent count &amp; skill</span></span></button>
+        <button class="destination" data-ui data-action="versus"><span class="destination-art">${menuIcon("versus")}</span><span class="destination-copy"><b>Same-screen 1v1</b><span>Local split-screen flight</span></span></button>
         <button class="destination" data-ui data-action="open-squad"><span class="destination-art">${menuIcon("squad")}</span><span class="destination-copy"><b>Squad</b><span>Friends &amp; club chat</span></span></button>
       </nav>`}
     <button class="soft-btn wide" data-ui data-action="open-shop">Change loadout</button>
-    <p class="fineprint">Hold downhill to build speed. Release uphill to launch. Live races start only when everyone is ready.</p>`;
+    <p class="fineprint">Hold downhill to build speed. Release uphill to launch. Slipstream behind rivals for slingshot surges!</p>`;
 }
 
 function renderPractice(s: HudSnapshot): string {
@@ -1480,15 +1563,19 @@ function renderPractice(s: HudSnapshot): string {
       <div class="race-section-head"><h3>Practice on your own</h3><span class="section-step">AI pilots · no waiting</span></div>
       <p>Learn the course against computer-controlled birds. These settings apply to practice opponents, not your friends.</p>
       <div class="room-controls">
-        <div class="room-ctl"><span class="room-ctl-label">AI opponents <small>plus you</small></span><div class="seg" role="group" aria-label="AI opponents">${[5, 10, 20, 40].map(n => `<button data-ui data-action="room-size" data-id="${n}" aria-pressed="${s.roomSize === n}" class="${s.roomSize === n ? "on" : ""}">${n}</button>`).join("")}</div></div>
-        <div class="room-ctl"><span class="room-ctl-label">AI skill</span><div class="seg" role="group" aria-label="AI skill">${(["chill", "sharp", "ace"] as const).map(k => `<button data-ui data-action="room-skill" data-id="${k}" aria-pressed="${s.roomSkill === k}" class="${s.roomSkill === k ? "on" : ""}">${k === "chill" ? "Chill" : k === "sharp" ? "Sharp" : "Ace"}</button>`).join("")}</div></div>
+        <div class="room-ctl"><span class="room-ctl-label">AI opponents <small>plus you</small></span><div class="seg" role="group" aria-label="AI opponents">${[5, 10, 20, 40].map((n) => `<button data-ui data-action="room-size" data-id="${n}" aria-pressed="${s.roomSize === n}" class="${s.roomSize === n ? "on" : ""}">${n}</button>`).join("")}</div></div>
+        <div class="room-ctl"><span class="room-ctl-label">AI skill</span><div class="seg" role="group" aria-label="AI skill">${(["chill", "sharp", "ace"] as const).map((k) => `<button data-ui data-action="room-skill" data-id="${k}" aria-pressed="${s.roomSkill === k}" class="${s.roomSkill === k ? "on" : ""}">${k === "chill" ? "Chill" : k === "sharp" ? "Sharp" : "Ace"}</button>`).join("")}</div></div>
       </div>
       <button class="soft-btn wide" data-ui data-action="practice-race">Start AI practice · no rating change</button>
       <div class="practice-formats"><h3>Championship &amp; PvP Formats</h3>
         <p class="fineprint">Dynamic AI pilots adapt locally with neural downslope timing, slipstream drafting, and slingshot attacks. No server connection required!</p>
         <button class="soft-btn wide" data-ui data-action="pick-mode" data-id="pvp_sprint">⚡ Sprint GP · 1,500 m quick burst</button>
-        <button class="soft-btn wide" data-ui data-action="pick-mode" data-id="pvp_knockout">👑 Knockout Royale · elimination every 500 m</button>
+        <button class="soft-btn wide" data-ui data-action="pick-mode" data-id="pvp_slalom">🎯 Sky Slalom GP · 2,500 m precision agility</button>
+        <button class="soft-btn wide" data-ui data-action="pick-mode" data-id="pvp_typhoon">🌀 Typhoon Blitz · 3,000 m storm chase</button>
+        <button class="soft-btn wide" data-ui data-action="pick-mode" data-id="pvp_zenith">🔮 Stratosphere Ascent · 3,200 m vertical climb</button>
         <button class="soft-btn wide" data-ui data-action="pick-mode" data-id="pvp_draft">🌪 Tempest Draft · +100% slipstream power</button>
+        <button class="soft-btn wide" data-ui data-action="pick-mode" data-id="pvp_coinrush">💎 Sunstone Heist · 2,800 m treasure sprint</button>
+        <button class="soft-btn wide" data-ui data-action="pick-mode" data-id="pvp_knockout">👑 Knockout Royale · elimination every 500 m</button>
         <button class="soft-btn wide" data-ui data-action="pick-mode" data-id="pvp_endurance">🦅 Grand Migration · 6,000 m marathon</button>
         <button class="soft-btn wide" data-ui data-action="pvp-duel">⚔ 1v1 Seeded Rival Duel</button>
         <button class="soft-btn wide" data-ui data-action="practice-storm">⛈ Stormfront Race · wild weather</button>

@@ -2970,6 +2970,95 @@ button {
   }
 }
 
+/* ---------- PvP & Quick Match Lobby Upgrade ---------- */
+.lobby-selector-box {
+  background: rgba(255, 255, 255, 0.68);
+  border: 1px solid rgba(180, 150, 120, 0.28);
+  border-radius: 16px;
+  padding: 10px 12px;
+  margin: 12px 0 16px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.lobby-selector-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #7a6352;
+  margin: 6px 0 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.lobby-selector-label b {
+  color: #2b1d16;
+  font-weight: 800;
+}
+.pills-scroll {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+.pills-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+.pills-scroll::-webkit-scrollbar-thumb {
+  background: rgba(180, 150, 120, 0.35);
+  border-radius: 999px;
+}
+.pvp-pill, .world-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid rgba(180, 150, 120, 0.28);
+  color: #3b2c24;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+  flex-shrink: 0;
+}
+.pvp-pill small, .world-pill small {
+  font-size: 10px;
+  opacity: 0.65;
+}
+.pvp-pill:hover, .world-pill:hover {
+  background: #fdf5e9;
+  border-color: #d6984e;
+}
+.pvp-pill.on, .world-pill.on {
+  background: linear-gradient(135deg, #ff9431, #ff6b3d);
+  color: #ffffff;
+  border-color: #e85929;
+  box-shadow: 0 2px 8px rgba(255, 107, 61, 0.35);
+  transform: scale(1.03);
+}
+.pvp-pill.on small, .world-pill.on small {
+  opacity: 0.9;
+  color: #fff9e6;
+}
+.quick-match-btns, .room-actions-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0 8px;
+}
+.quick-match-btns .large-btn, .room-actions-bar .large-btn {
+  font-size: 15px;
+  padding: 13px 18px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
 /* pixel-perfect guards: chip rows wrap, room code shrinks */
 .boost-row .mt {
   display: flex;

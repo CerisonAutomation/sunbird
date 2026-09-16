@@ -17,7 +17,7 @@ import { BIG_LAUNCH_QUIPS, BOP_QUIPS, FEVER_QUIPS, GEM_QUIPS, MILESTONE_QUIPS, S
 import type { Fx } from "./Fx";
 import { DPR_COOLDOWN_SECONDS, nextBloomBudget, nextDpr, QUALITY_WINDOW_SECONDS } from "./quality";
 import { LaunchSystem, ratingLabel, type LaunchResult } from "./LaunchSystem";
-import { isRaceMode, MASS_RACE_FIELD, MODES, modeById, RACE_FINISH, type ModeDef, type ModeId } from "./Modes";
+import { isRaceMode, MASS_RACE_FIELD, MODES, modeById, PVP_MODES, PVP_WORLDS, RACE_FINISH, type ModeDef, type ModeId, type PvpWorldCourse } from "./Modes";
 import { MassRace } from "./MassRace";
 import { FinishGate } from "./FinishGate";
 import { isMultiplayerConfigured, makeRoomCode, RealtimeClient } from "./Realtime";
@@ -64,6 +64,7 @@ import {
   FEVER_DURATION,
   FEVER_NEED,
   HEADSTART_DISTANCE,
+  ISLAND_PERIOD,
   MAGNET_TIME,
   MANUAL_BOOST_COOLDOWN,
   MANUAL_BOOST_SPEED,
@@ -391,6 +392,9 @@ export class Game {
   private coach: FirstFlight | null = null;
   private mode: ModeDef = modeById("daytrip");
   private modeId: ModeId = "daytrip";
+  private selectedPvpMode: ModeId = "pvp_sprint";
+  private selectedPvpWorld = "emerald";
+  private selectedCourse: PvpWorldCourse = PVP_WORLDS[0]!;
   /** Permanent per-mode mastery perks (coin/daylight/fever/lift), refreshed each run. */
   private masteryPerk: MasteryPerks = NO_MASTERY_PERKS;
   private maxAltitude = 0;
@@ -1235,6 +1239,23 @@ export class Game {
         }
       }
 
+      // Typhoon blitz storm tailwinds
+      if (this.modeId === "pvp_typhoon" && !this.bird.asleep && !this.bird.grounded) {
+        this.bird.vx = Math.min(235, this.bird.vx + dt * 4.0);
+      }
+
+      // Sky Slalom launch surge
+      if (this.modeId === "pvp_slalom" && this.bird.justLaunched && this.lastLaunch?.rating === "perfect") {
+        this.bird.vx = Math.min(240, this.bird.vx + 6.5);
+        this.popupAtBird("WARP SLALOM! ⚡", "fever");
+        this.particles.emitWind(this.bird.x, this.bird.y, 1.4);
+      }
+
+      // Stratosphere ascent thermal super-lift
+      if (this.modeId === "pvp_zenith" && this.weather.inThermal) {
+        this.bird.vy = Math.min(180, this.bird.vy + dt * 25);
+      }
+
       // Knockout mode elimination evaluation
       if (this.modeId === "pvp_knockout" && !this.bird.asleep) {
         const dist = this.bird.x - this.startX;
@@ -1506,6 +1527,10 @@ export class Game {
         );
         this.runCoins += value;
         this.bonus += 4 * COIN_VALUE * value;
+        if (this.modeId === "pvp_coinrush") {
+          this.bird.vx = Math.min(225, this.bird.vx + 2.5);
+          this.popupAtBird("COIN TURBO! ⚡", "splash");
+        }
         this.awardXp(XP_RULES.coin);
         this.audio.ding(gem);
         this.particles.emitCollect(x, y);
@@ -2370,6 +2395,13 @@ export class Game {
       this.rebuildWorld(`fly-${Math.random().toString(36).slice(2, 10)}`);
     } else if (opts?.challenge && this.seed !== this.today) {
       this.rebuildWorld(this.today);
+    } else if (isRaceMode(this.modeId)) {
+      const course = this.selectedCourse ?? (this.selectedPvpWorld ? PVP_WORLDS.find((w) => w.id === this.selectedPvpWorld) : null) ?? PVP_WORLDS[0]!;
+      this.startX = course.island * ISLAND_PERIOD + 64;
+      const targetSeed = `${this.seed}:${course.id}`;
+      if (this.seed !== targetSeed) {
+        this.rebuildWorld(targetSeed);
+      }
     }
     // Duels and challenges only apply when their action explicitly asks for
     // them; every other launch path resets to a plain run.
@@ -2881,17 +2913,18 @@ export class Game {
     // Shared/daily/ranked seeds must not depend on an individual save's skill.
     // Apply adaptive calibration only to an unshared casual flight, before sampling spawn.
     this.terrain.setDifficulty(!isRaceMode(this.modeId) && this.seed.startsWith("fly-") ? this.flow.difficulty() : 1);
-    this.startX = 64;
+    const course = isRaceMode(this.modeId) ? (this.selectedCourse ?? (this.selectedPvpWorld ? PVP_WORLDS.find((w) => w.id === this.selectedPvpWorld) : null) ?? PVP_WORLDS[0]!) : null;
+    this.startX = course ? course.island * ISLAND_PERIOD + 64 : 64;
     const y = this.terrain.heightAt(this.startX) + BIRD_RADIUS;
     this.bird.reset(this.startX, y);
-    if (this.modeId === "pvp_sprint") {
+    if (this.modeId === "pvp_sprint" || this.modeId === "pvp_typhoon") {
       this.bird.vx = 42;
     }
     this.nextKnockoutDist = 500;
     this.knockoutWarned = false;
     this.daylight = this.daylightMax();
-    this.island = 0;
-    this.lastIsland = 0;
+    this.island = course ? course.island : 0;
+    this.lastIsland = course ? course.island : 0;
     this.perfects = 0;
     this.perfectChain = 0;
     this.skimTime = 0;
@@ -3207,20 +3240,19 @@ export class Game {
         this.sendEmote(id || "👋");
         break;
       case "host-room": {
-        if (!isMultiplayerConfigured()) { this.hud.toast("Private rooms are unavailable in this edition. Try a practice race.", "info"); break; }
         this.disconnectRace();
         this.localRace = false;
         this.roomCode = makeRoomCode();
-        this.modeId = "massrace";
-        this.mode = modeById("massrace");
+        this.modeId = this.selectedPvpMode;
+        this.mode = modeById(this.selectedPvpMode);
         this.rankedRace = false;
         this.setScreen("live");
         this.preseatLobby();
-        this.hud.toast("Connecting your room… Copy the invite once connected.", "info");
+        this.hud.toast(`Flock room ${this.roomCode} ready!`, "gold");
+        this.bump();
         break;
       }
       case "join-room": {
-        if (!isMultiplayerConfigured()) { this.hud.toast("Private rooms are unavailable in this edition. Try a practice race.", "info"); break; }
         const code = normalizeRoomCode(this.hud.readValue("roomCode"));
         if (!code) {
           this.hud.toast("Enter a 5-letter room code", "warn");
@@ -3229,14 +3261,45 @@ export class Game {
         this.disconnectRace();
         this.localRace = false;
         this.roomCode = code;
-        this.modeId = "massrace";
-        this.mode = modeById("massrace");
+        this.modeId = this.selectedPvpMode;
+        this.mode = modeById(this.selectedPvpMode);
         this.rankedRace = false;
         this.setScreen("live");
         this.preseatLobby();
-        this.hud.toast(`Connecting to room ${code}…`, "info");
+        this.hud.toast(`Joined room ${code}`, "gold");
+        this.bump();
         break;
       }
+      case "select-pvp-mode": {
+        const mId = (id as ModeId) || "pvp_sprint";
+        this.selectedPvpMode = mId;
+        this.modeId = mId;
+        this.mode = modeById(mId);
+        this.hud.toast(`${this.mode.icon} ${this.mode.name}`, "gold");
+        this.bump();
+        break;
+      }
+      case "select-pvp-world": {
+        const wId = id || "emerald";
+        this.selectedPvpWorld = wId;
+        this.selectedCourse = PVP_WORLDS.find((w) => w.id === wId) ?? PVP_WORLDS[0]!;
+        this.hud.toast(`${this.selectedCourse.emoji} ${this.selectedCourse.name}`, "gold");
+        this.bump();
+        break;
+      }
+      case "quick-match-instant":
+        this.cancelMatchmaking();
+        this.disconnectRace();
+        this.modeId = this.selectedPvpMode;
+        this.mode = modeById(this.selectedPvpMode);
+        this.launchMatch({ ranked: true, storm: this.modeId === "pvp_typhoon" }, true);
+        break;
+      case "start-room-now":
+        if (this.net) this.net.startNow();
+        this.modeId = this.selectedPvpMode;
+        this.mode = modeById(this.selectedPvpMode);
+        this.launchMatch({ ranked: false, storm: this.modeId === "pvp_typhoon" }, false);
+        break;
       case "copy-invite": {
         if (this.roomCode) this.copyRoomInvite(this.roomCode);
         else this.hud.toast("Host a room first to get an invite link", "warn");
@@ -3245,23 +3308,20 @@ export class Game {
       case "start-room":
       case "ready-room": {
         if (!this.roomCode) {
-          this.hud.toast("Host or join a room first", "warn");
-          break;
+          this.roomCode = makeRoomCode();
         }
-        this.modeId = "massrace";
-        this.mode = modeById("massrace");
+        this.modeId = this.selectedPvpMode;
+        this.mode = modeById(this.selectedPvpMode);
         this.rankedRace = false;
-        if (!isMultiplayerConfigured()) {
-          this.hud.toast("No live server configured — starting a local practice field", "info");
-          this.startRun();
-          break;
-        }
         this.preseatLobby();
-        if (!this.net?.sendReady(!this.net.info().ready)) {
-          this.hud.toast("Connecting to the room — try ready again in a moment", "info");
-          break;
+        if (this.net) {
+          const isReady = !this.net.info().ready;
+          this.net.sendReady(isReady);
+          this.hud.toast(isReady ? "You are ready! ✓" : "Ready cancelled", "gold");
+        } else {
+          this.hud.toast("Starting race flock…", "info");
+          this.launchMatch({ ranked: false, storm: this.modeId === "pvp_typhoon" }, true);
         }
-        this.hud.toast(this.net.info().ready ? "You are ready — waiting for the flock" : "Ready cancelled", "gold");
         this.bump();
         break;
       }
@@ -4547,20 +4607,19 @@ export class Game {
     this.lastMatchOpts = opts;
     this.localRace = local;
     if (local) this.disconnectRace();
-    this.modeId = "massrace";
-    this.mode = modeById("massrace");
+    if (!isRaceMode(this.modeId)) {
+      this.modeId = this.selectedPvpMode;
+      this.mode = modeById(this.selectedPvpMode);
+    }
     this.rankedRace = opts.ranked;
-    this.stormfront = opts.storm;
-    this.startRun({ storm: opts.storm });
+    this.stormfront = opts.storm || this.modeId === "pvp_typhoon";
+    this.startRun({ storm: this.stormfront });
   }
 
   /** Pre-seats the lobby so the Race screen shows live pilots immediately. */
   private preseatLobby(): void {
-    if (!isMultiplayerConfigured()) return;
     // Warm the ghost source too so the next grid can seat real names.
     void this.refreshBoard();
-    // Join with the massrace seed WITHOUT mutating the current mode — the
-    // player may still back out and start a plain 1P flight.
     if (!this.net) {
       this.net = new RealtimeClient(this.save.state.deviceId, this.pilotName, this.skin.id, 0.06);
       this.massRace.attachTransport(this.net);
@@ -5373,6 +5432,10 @@ export class Game {
       dailyFlash: dailyFlashBird(this.today),
       stipendClaimed: this.save.state.lastStipendClaimed === this.today,
       showTutorialHand: this.state === "playing" && st.tutorialRuns < 2 && this.hintTimer < 2.6 && !this.input.diving,
+      pvpModes: PVP_MODES,
+      pvpWorlds: PVP_WORLDS,
+      selectedPvpMode: this.selectedPvpMode,
+      selectedPvpWorld: this.selectedPvpWorld,
     };
     this.hud.update(snap);
   }

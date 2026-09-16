@@ -1,30 +1,93 @@
 import { describe, expect, it } from "vitest";
-import { isRaceMode, modeById, PVP_MODES } from "../Modes";
+import { isRaceMode, modeById, PVP_MODES, PVP_WORLDS } from "../Modes";
 import { MassRace, type AIArchetype } from "../MassRace";
 import { TerrainSystem } from "../TerrainSystem";
+import { RealtimeClient } from "../Realtime";
+import { ISLAND_PERIOD } from "../constants";
 
 describe("PvP Variants and Offline Neural AI Engine", () => {
-  it("defines and resolves all 4 competitive PvP variants", () => {
-    expect(PVP_MODES).toHaveLength(4);
+  it("defines and resolves all 8 competitive PvP variants", () => {
+    expect(PVP_MODES).toHaveLength(8);
     const sprint = modeById("pvp_sprint");
     expect(sprint.name).toBe("Sprint GP");
     expect(sprint.finish).toBe(1500);
     expect(isRaceMode("pvp_sprint")).toBe(true);
 
-    const endurance = modeById("pvp_endurance");
-    expect(endurance.name).toBe("Grand Migration");
-    expect(endurance.finish).toBe(6000);
-    expect(isRaceMode("pvp_endurance")).toBe(true);
+    const slalom = modeById("pvp_slalom");
+    expect(slalom.name).toBe("Sky Slalom GP");
+    expect(slalom.finish).toBe(2500);
+    expect(isRaceMode("pvp_slalom")).toBe(true);
+
+    const typhoon = modeById("pvp_typhoon");
+    expect(typhoon.name).toBe("Typhoon Blitz");
+    expect(typhoon.finish).toBe(3000);
+    expect(isRaceMode("pvp_typhoon")).toBe(true);
+
+    const zenith = modeById("pvp_zenith");
+    expect(zenith.name).toBe("Stratosphere Ascent");
+    expect(zenith.finish).toBe(3200);
+    expect(isRaceMode("pvp_zenith")).toBe(true);
+
+    const draft = modeById("pvp_draft");
+    expect(draft.name).toBe("Tempest Draft");
+    expect(draft.finish).toBe(3500);
+    expect(isRaceMode("pvp_draft")).toBe(true);
+
+    const coinrush = modeById("pvp_coinrush");
+    expect(coinrush.name).toBe("Sunstone Heist");
+    expect(coinrush.finish).toBe(2800);
+    expect(isRaceMode("pvp_coinrush")).toBe(true);
 
     const knockout = modeById("pvp_knockout");
     expect(knockout.name).toBe("Knockout Royale");
     expect(knockout.finish).toBe(4000);
     expect(isRaceMode("pvp_knockout")).toBe(true);
 
-    const draft = modeById("pvp_draft");
-    expect(draft.name).toBe("Tempest Draft");
-    expect(draft.finish).toBe(3500);
-    expect(isRaceMode("pvp_draft")).toBe(true);
+    const endurance = modeById("pvp_endurance");
+    expect(endurance.name).toBe("Grand Migration");
+    expect(endurance.finish).toBe(6000);
+    expect(isRaceMode("pvp_endurance")).toBe(true);
+  });
+
+  it("catalogs all 9 distinct world tracks with progressive difficulty", () => {
+    expect(PVP_WORLDS).toHaveLength(9);
+    for (let i = 0; i < PVP_WORLDS.length; i++) {
+      const course = PVP_WORLDS[i]!;
+      expect(course.island).toBe(i);
+      expect(course.name).toBeDefined();
+      expect(course.emoji).toBeDefined();
+      expect(course.difficulty).toBeDefined();
+
+      // Start coordinate mapping
+      const startX = course.island * ISLAND_PERIOD + 64;
+      expect(startX).toBe(i * 1100 + 64);
+    }
+  });
+
+  it("provides autonomous fallback in RealtimeClient so race lobby never stalls", () => {
+    const client = new RealtimeClient("test-device-pvp", "SkyCaptain", "phoenix", 0.1);
+    client.activateAutonomousRoom("TEST5", "seed-lobby");
+
+    expect(client.isAutonomous).toBe(true);
+    expect(client.state).toBe("lobby");
+    expect(client.connected).toBe(true);
+    expect(client.info().code).toBe("TEST5");
+    expect(client.info().count).toBeGreaterThan(1); // host + autonomous wingmates
+    expect(client.roster().length).toBeGreaterThan(0);
+
+    // Readying up initiates local flock response
+    const sent = client.sendReady(true);
+    expect(sent).toBe(true);
+    expect(client.info().ready).toBe(true);
+
+    // Instant launch capability
+    client.startNow();
+    expect(client.state).toBe("racing");
+    const events = client.drainEvents();
+    expect(events.some((e) => e.type === "start")).toBe(true);
+
+    client.disconnect();
+    expect(client.state).toBe("offline");
   });
 
   it("spawns 40 AI rivals with diverse archetypes and tiered skills without any server", () => {
@@ -76,6 +139,10 @@ describe("PvP Variants and Offline Neural AI Engine", () => {
     race.configureMode("pvp_draft");
     expect(race.draftBehind).toBe(38);
     expect(race.draftMax).toBe(0.85);
+
+    race.configureMode("pvp_typhoon");
+    expect(race.draftBehind).toBe(34);
+    expect(race.draftMax).toBe(0.75);
 
     race.configureMode("massrace");
     expect(race.draftBehind).toBe(26);
