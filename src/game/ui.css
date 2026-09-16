@@ -65,6 +65,23 @@ button {
   color: var(--ink);
   font-family: inherit;
   padding-bottom: 4px;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-sm);
+}
+
+.back-btn:hover {
+  background: rgba(42, 28, 40, 0.15);
+  box-shadow: var(--shadow-md);
+}
+
+.back-btn:active {
+  transform: translateY(1px);
+  box-shadow: var(--shadow-xs);
+}
+
+.back-btn:focus-visible {
+  outline: 2px solid #ffb35a;
+  outline-offset: 2px;
 }
 
 .section-title {
@@ -3461,6 +3478,14 @@ button {
   transform: translateY(4px);
   box-shadow: 0 2px 0 #cf4526, inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
+.primary-btn:focus-visible {
+  outline: 2px solid #ffb35a;
+  outline-offset: 2px;
+}
+.primary-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 .primary-btn.gold {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0) 46%),
@@ -4476,4 +4501,99 @@ button:focus-visible, .toggle:focus-visible {
   font-size: 12px;
   margin-top: 3px;
   font-weight: 800;
+}
+
+/* ====== POLISH: Consistent interactions & visual feedback ====== */
+
+/* Improved input focus states */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid #ff7a45;
+  outline-offset: 2px;
+}
+
+/* Smooth hover feedback on interactive elements */
+@media (hover: hover) {
+  .soft-btn:hover:not(:disabled),
+  .mini-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    filter: brightness(1.04);
+  }
+}
+
+/* Consistent active/pressed state */
+.soft-btn:active:not(:disabled),
+.mini-btn:active:not(:disabled) {
+  transform: translateY(1px);
+  filter: brightness(0.98);
+}
+
+/* Smooth visibility transitions */
+.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.hidden:not(.hidden) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Better text legibility */
+h1, h2, h3, h4, h5, h6, .heading-art {
+  letter-spacing: -0.01em;
+}
+
+/* Smooth card transitions */
+.paper-card,
+.destination,
+.pvp-mode,
+.vs-you,
+.vs-foe {
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Improved accessibility - high contrast on hover */
+@media (hover: hover) {
+  .destination:hover:not(:disabled) {
+    border-color: #8b6f47;
+    filter: brightness(1.02);
+  }
+
+  .pvp-mode:hover:not(:disabled) {
+    border-color: #b5a085;
+    filter: brightness(1.02);
+  }
+}
+
+/* Loading and skeleton state */
+@keyframes shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+
+.skeleton,
+.loading-placeholder {
+  background: linear-gradient(90deg, #efefef 25%, #e0e0e0 50%, #efefef 75%);
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Polish for touch devices */
+@media (hover: none) and (pointer: coarse) {
+  button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .primary-btn:active {
+    background-color: rgba(255, 90, 54, 0.9);
+  }
+
+  .soft-btn:active,
+  .mini-btn:active {
+    opacity: 0.9;
+  }
 }

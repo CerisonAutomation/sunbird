@@ -27,6 +27,16 @@
 }
 
 html,
+:root {
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-sm: 0 2px 4px rgba(0,0,0,0.08);
+  --shadow-md: 0 4px 8px rgba(0,0,0,0.12);
+  --shadow-lg: 0 8px 16px rgba(0,0,0,0.15);
+  --shadow-xl: 0 12px 24px rgba(0,0,0,0.2);
+  --transition-fast: 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 body,
 #root {
   margin: 0;
@@ -39,10 +49,12 @@ body,
   font-family: var(--body);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   user-select: none;
   -webkit-user-select: none;
   touch-action: none;
   overscroll-behavior: none;
+  scroll-behavior: smooth;
 }
 
 input,
