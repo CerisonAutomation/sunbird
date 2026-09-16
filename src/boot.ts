@@ -1,3 +1,10 @@
+import { installRejectionGuard } from "./rejection-guard";
+
+// A floating promise rejection must never surface as a red console ERROR —
+// portal QA treats console errors as defects, and the game's network paths
+// are best-effort by design. Install before anything else can reject.
+installRejectionGuard();
+
 // Mirrors the TARGET check in sdk/platform.ts, but written here so the
 // minifier can fully constant-fold it: vite inlines VITE_PORTAL_TARGET as a
 // literal, and `"poki" !== "none"` folds to a constant — DCE then strips the
