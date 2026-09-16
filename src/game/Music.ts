@@ -1,10 +1,16 @@
 /**
- * Original procedural island-folk score: ukulele strums, glockenspiel melody,
- * whistled lead, upright-style bass, shaker / kick / clap. Everything is
- * synthesized in-browser — no copied audio and no samples.
+ * Original procedural score — two instrumentation families, all synthesized
+ * in-browser (no copied audio, no samples, no binary assets):
+ *
+ * 1. ARCADE CHIP (tracks flagged `chip`): bouncy 8-bit-style hooks —
+ *    staccato square-wave lead, driving root/octave bass, 2-&-4 backbeat,
+ *    150 BPM (170 in fever). The "viral game" sound; front and center.
+ * 2. ISLAND FOLK / CINEMATIC (the rest): ukulele strums, glockenspiel
+ *    melody, whistled lead, upright-style bass, shaker / kick / clap.
  *
  * Layers respond to game state:
- *   menu  → uke + sparse glock + bass
+ *   menu  → chip: lead + bass + full arcade kit (a game menu stays alive)
+ *           island: uke + sparse glock + bass
  *   play  → + shaker, kick
  *   fever → + clap, whistle lead, brighter, faster
  *   sleep → music-box lullaby
@@ -360,15 +366,110 @@ const WHISTLE_B = [
 // Strum pattern per eighth: 1 = down, 2 = up, 0 = none (island strum D _ D U _ U D U)
 const STRUM = [1, 0, 1, 2, 0, 2, 1, 2];
 
-export type Track = { name: string; prog: string[]; mel: number[]; mood: BiomeMusicStyle };
+export type Track = { name: string; prog: string[]; mel: number[]; mood: BiomeMusicStyle; /** Arcade chiptune family: square lead, driving 8th bass, backbeat, fast tempo. */ chip?: boolean };
+
+/* ============================ ARCADE CHIP FAMILY =========================
+ * Bouncy, hook-first 8-bit-style bangers — the "viral game" sound:
+ * staccato square-wave leads over driving root/octave bass on a 2-&-4
+ * backbeat. Each is a tight 8-bar loop built on a 2-bar motif with
+ * variation, so the ear locks on in one pass. */
+
+const PROG_CHIP_1 = ["C", "G", "Am", "F", "C", "G", "Am", "F"]; // I–V–vi–IV
+const PROG_CHIP_2 = ["C", "F", "G", "F", "C", "F", "G", "G"];  // I–IV–V–IV
+const PROG_CHIP_3 = ["C", "Am", "F", "G", "C", "Am", "F", "G"]; // I–vi–IV–V
+const PROG_CHIP_5 = ["C", "F", "Am", "G", "C", "F", "Am", "G"]; // I–IV–vi–V
+const PROG_CHIP_6 = ["Dm", "G", "C", "F", "Dm", "G", "C", "F"]; // ii–V–I–IV
+
+// Flappy Rush: staccato rising arp → peak hold → falling resolve. The bounce
+// of a coin-tap game: C5–E5–G5–C6 on the downbeat of bar 1.
+const MEL_CHIP_1 = [
+  72, 0, 72, 0, 76, 0, 79, 0,
+  79, 0, 79, 0, 84, 0, 83, 0,
+  81, 0, 81, 0, 79, 0, 76, 0,
+  79, 0, 81, 0, 84, -1, 0, 0,
+  72, 0, 76, 0, 79, 0, 84, -1,
+  84, 0, 83, 0, 79, 0, 79, 0,
+  81, 0, 79, 0, 76, 0, 79, 0,
+  76, 0, 74, 0, 72, -1, -1, 0,
+];
+
+// Coin Pop: paired-note "coin" figure (C5–C5–G5–C6) that repeats a step
+// higher each bar — the most repeatable hook in the box.
+const MEL_CHIP_2 = [
+  72, 0, 72, 79, 0, 79, 84, 0,
+  72, 0, 72, 76, 0, 76, 81, 0,
+  74, 0, 74, 79, 0, 79, 84, 0,
+  76, 0, 76, 81, 0, 81, 79, 0,
+  79, 0, 84, 0, 84, 0, 86, 0,
+  81, 0, 84, 0, 84, 0, 81, 0,
+  84, 0, 84, 83, 0, 83, 79, 0,
+  81, 0, 79, 0, 76, -1, -1, 0,
+];
+
+// Hyper Glide: three-note pickup gallop (E5–E5–G5) that climbs bar by bar
+// and lands on a held peak — pure forward motion.
+const MEL_CHIP_3 = [
+  76, 0, 0, 76, 0, 0, 79, 0,
+  81, 0, 0, 81, 0, 0, 84, 0,
+  79, 0, 0, 79, 0, 0, 76, 0,
+  79, 0, 0, 79, 0, 0, 74, 0,
+  76, 0, 0, 79, 0, 0, 84, -1,
+  81, 0, 0, 79, 0, 0, 81, -1,
+  84, 0, 0, 81, 0, 0, 79, -1,
+  79, 0, 0, 74, 0, 0, 79, -1,
+];
+
+// Bouncy Bird: two-two gallop (A5–A5–G5–E5) over the vi–IV–I–V lift —
+// the "run for your life" footwork.
+const MEL_CHIP_4 = [
+  81, 81, 0, 79, 0, 0, 76, 76,
+  76, 76, 0, 74, 0, 0, 72, 72,
+  72, 72, 0, 76, 0, 0, 79, 79,
+  79, 79, 0, 84, 0, 0, 83, 83,
+  81, 81, 0, 84, 0, 0, 81, 81,
+  79, 79, 0, 76, 0, 0, 74, 74,
+  72, 72, 0, 76, 0, 0, 79, 79,
+  79, 0, 0, 79, 0, 0, 79, -1,
+];
+
+// Sunset Sprint: syncopated quarter-note pop (C5–E5–G5–A5) with a held
+// peak each second phrase — upbeat arcade-pop.
+const MEL_CHIP_5 = [
+  72, 0, 76, 76, 0, 79, 0, 81,
+  79, 0, 76, 76, 0, 81, 0, 84,
+  81, 0, 79, 79, 0, 81, 0, 84,
+  84, 0, 83, 83, 0, 79, 0, 79,
+  76, 0, 79, 79, 0, 84, 0, 84,
+  84, 0, 81, 81, 0, 79, 0, 76,
+  79, 0, 76, 76, 0, 79, 0, 81,
+  79, 0, 74, 74, 0, 79, -1, 0,
+];
+
+// Pixel Coast: offbeat syncopation (0–D5–0–F5–F5–A5) over ii–V–I–IV —
+// the grooviest one in the box; the night-arcade track.
+const MEL_CHIP_6 = [
+  0, 74, 0, 76, 77, 0, 81, 0,
+  0, 79, 0, 84, 83, 0, 79, 0,
+  0, 72, 0, 76, 79, 0, 84, 0,
+  0, 77, 0, 81, 84, 0, 79, 0,
+  0, 74, 0, 76, 79, 0, 81, -1,
+  0, 79, 0, 83, 84, 0, 81, 0,
+  0, 72, 0, 79, 84, -1, 0, 0,
+  0, 77, 0, 79, 81, -1, -1, 0,
+];
 
 /**
- * Thirteen original island-folk compositions. Each is a full 8-bar song — its
- * own chord progression, lead melody, and a `mood` matching the biome
- * orchestration it was written for, so the shuffle can favor tracks that suit
- * the current island and time of day while still cycling all thirteen.
+ * Track list. The arcade chiptune family comes FIRST so it sits at the top
+ * of the settings picker and early in every shuffle pass; the island-folk /
+ * cinematic originals follow unchanged.
  */
 export const TRACKS: Track[] = [
+  { name: "Flappy Rush",     prog: PROG_CHIP_1, mel: MEL_CHIP_1, mood: "bright", chip: true },
+  { name: "Coin Pop",        prog: PROG_CHIP_2, mel: MEL_CHIP_2, mood: "bright", chip: true },
+  { name: "Hyper Glide",     prog: PROG_CHIP_3, mel: MEL_CHIP_3, mood: "airy",   chip: true },
+  { name: "Bouncy Bird",     prog: PROG_K,      mel: MEL_CHIP_4, mood: "warm",   chip: true },
+  { name: "Sunset Sprint",   prog: PROG_CHIP_5, mel: MEL_CHIP_5, mood: "wide",   chip: true },
+  { name: "Pixel Coast",     prog: PROG_CHIP_6, mel: MEL_CHIP_6, mood: "night",  chip: true },
   { name: "Ascent",            prog: PROG_A, mel: MEL_A, mood: "bright"  },
   { name: "Voyage",            prog: PROG_B, mel: MEL_B, mood: "airy"    },
   { name: "Cathedral",         prog: PROG_C, mel: MEL_C, mood: "bright"  },
@@ -460,10 +561,12 @@ export class Music {
   private readonly arpGain: GainNode;
   private readonly organGain: GainNode;
   private readonly tronGain: GainNode;
+  private readonly chipGain: GainNode;
   private readonly noise: AudioBuffer;
   private lullabyStep = 0;
   private baseLevel = 0;
   private isTronTrack = false;
+  private isChipTrack = false;
 
   constructor(
     private readonly ctx: AudioContext,
@@ -513,6 +616,7 @@ export class Music {
     this.arpGain = mk(0);
     this.organGain = mk(0);
     this.tronGain = mk(0);
+    this.chipGain = mk(0);
 
     const len = ctx.sampleRate;
     this.noise = ctx.createBuffer(1, len, ctx.sampleRate);
@@ -521,6 +625,7 @@ export class Music {
 
     this.buildOrder();
     this.section = this.order[0] ?? 0;
+    this.syncFamilyFlags();
   }
 
   setMode(mode: MusicMode): void {
@@ -543,7 +648,11 @@ export class Music {
     // The tension layer rides up quickly for responsiveness, decays a touch
     // slower so a big moment lingers after the peak.
     const style = BIOME_MIX[this.biome];
-    const baseBpm = this.mode === "fever" ? style.fever : style.bpm;
+    // Arcade tracks hold their own tempo floor; intensity adds the same 10%
+    // surge on top for island tracks.
+    const baseBpm = this.isChipTrack
+      ? (this.mode === "fever" ? 170 : 150)
+      : (this.mode === "fever" ? style.fever : style.bpm);
     this.bpm = Math.round(baseBpm * (1 + t * 0.10));
     this.tensionGain.gain.setTargetAtTime(t * 0.24 * style.perc, now, t > this.intensity ? 0.1 : 0.4);
     this.recomputeCutoff(0.3);
@@ -613,11 +722,24 @@ export class Music {
     this.buildOrder();
     this.orderPos = 0;
     this.section = this.order[0] ?? 0;
+    this.syncFamilyFlags();
+    // If we're sounding, re-apply immediately: a fresh family (island ↔ chip
+    // ↔ tron) must change gains and tempo NOW, not at the next section flip.
+    if (this.timer !== null) this.apply();
     if (this.timer !== null) this.onTrackChange?.(TRACKS[this.section]!.name);
   }
 
   get trackName(): string {
     return TRACKS[this.section]?.name ?? "";
+  }
+
+  /** Re-derive the instrumentation family flags from the current section. */
+  private syncFamilyFlags(): void {
+    const sec = TRACKS[this.section]!;
+    const nowTron = sec.prog === PROG_TRON;
+    const nowChip = sec.chip === true;
+    this.isTronTrack = nowTron;
+    this.isChipTrack = nowChip;
   }
 
   private buildOrder(): void {
@@ -655,7 +777,16 @@ export class Music {
 
   /** Sampling weight for a track given the current biome and time of day. */
   private trackWeight(index: number): number {
-    const mood = TRACKS[index]!.mood;
+    const track = TRACKS[index]!;
+    const mood = track.mood;
+    // Arcade chiptune bangers are the default front line: weighted above the
+    // island-folk tracks so shuffle mode opens on them, but below a perfect
+    // biome match so the authored island tracks still surface.
+    if (track.chip) {
+      if (mood === this.biome) return 3.2;
+      if (this.night > 0.6 && mood === "night") return 3.0; // Pixel Coast at night
+      return 2.6;
+    }
     if (mood === this.biome) return 3; // authored for this island
     if (this.night > 0.6) {
       if (mood === "night") return 2.5; // nightfall pulls toward the moon tracks
@@ -679,6 +810,7 @@ export class Music {
     this.duckGain.disconnect();
     this.wetGain.disconnect();
     this.tronGain.disconnect();
+    this.chipGain.disconnect();
   }
 
   private apply(): void {
@@ -690,24 +822,33 @@ export class Music {
     const style = BIOME_MIX[this.biome];
     this.transpose = style.transpose;
     const song = m === "menu" || m === "play" || m === "fever" || m === "storm";
+    // Arcade tracks run their own faster tempo; everything else follows the biome.
+    const chipBpm = this.isChipTrack ? (m === "fever" ? 170 : 150) : (m === "fever" ? style.fever : style.bpm);
     // Fever: glock leads more prominently (it's the hook the ear remembers).
-    this.ukeGain.gain.setTargetAtTime(song ? (m === "menu" ? 0.28 : m === "fever" ? 0.26 : 0.32) * style.uke : 0, t, 0.4);
-    this.glockGain.gain.setTargetAtTime(song ? (m === "menu" ? 0.22 : m === "fever" ? 0.38 : 0.30) * style.glock : 0, t, 0.4);
+    // Island layers stay silent on arcade tracks — square lead + chip bass own the mix.
+    const island = this.isChipTrack ? 0 : 1;
+    this.ukeGain.gain.setTargetAtTime(song ? (m === "menu" ? 0.28 : m === "fever" ? 0.26 : 0.32) * style.uke * island : 0, t, 0.4);
+    this.glockGain.gain.setTargetAtTime(song ? (m === "menu" ? 0.22 : m === "fever" ? 0.38 : 0.30) * style.glock * island : 0, t, 0.4);
     this.bassGain.gain.setTargetAtTime(song ? (m === "fever" ? 0.48 : 0.42) * style.bass : 0, t, 0.4);
-    this.percGain.gain.setTargetAtTime((m === "play" ? 0.22 : m === "fever" ? 0.36 : m === "storm" ? 0.46 : 0) * style.perc, t, 0.3);
-    this.whistleGain.gain.setTargetAtTime((m === "fever" ? 0.30 : 0) * style.whistle, t, 0.3);
-    this.arpGain.gain.setTargetAtTime(m === "fever" ? 0.18 * style.glock : 0, t, 0.5);
+    // Arcade kits keep the drums alive on the menu too — that's what makes it
+    // feel like a game menu instead of a lobby.
+    const percBase = m === "play" ? 0.22 : m === "fever" ? 0.36 : m === "storm" ? 0.46 : this.isChipTrack && m === "menu" ? 0.30 : 0;
+    this.percGain.gain.setTargetAtTime(percBase * style.perc, t, 0.3);
+    this.whistleGain.gain.setTargetAtTime((m === "fever" ? 0.30 : 0) * style.whistle * island, t, 0.3);
+    this.arpGain.gain.setTargetAtTime(m === "fever" ? 0.18 * style.glock * island : 0, t, 0.5);
     // Organ: Interstellar-style deep pad. Swells in play and fever.
-    this.organGain.gain.setTargetAtTime(m === "play" ? 0.10 : m === "fever" ? 0.18 : m === "menu" ? 0.06 : 0, t, 1.2);
+    this.organGain.gain.setTargetAtTime((m === "play" ? 0.10 : m === "fever" ? 0.18 : m === "menu" ? 0.06 : 0) * island, t, 1.2);
     // Warm pad bed: strongest on the menu, subtle underneath play.
-    this.padGain.gain.setTargetAtTime(m === "menu" ? 0.18 : m === "play" ? 0.06 : 0, t, 0.8);
+    this.padGain.gain.setTargetAtTime((m === "menu" ? 0.18 : m === "play" ? 0.06 : 0) * island, t, 0.8);
     // Tron synth: active only on Tron-progression tracks (replaces glock lead)
     this.tronGain.gain.setTargetAtTime(this.isTronTrack && song ? (m === "fever" ? 0.36 : 0.28) : 0, t, 0.4);
+    // Arcade chiptune lead: the hook voice, present even on the menu.
+    this.chipGain.gain.setTargetAtTime(this.isChipTrack && song ? (m === "menu" ? 0.26 : m === "fever" ? 0.40 : 0.32) : 0, t, 0.4);
     this.lullabyGain.gain.setTargetAtTime(m === "sleep" ? 0.3 : 0, t, 0.6);
     const cutoff = musicCutoff(style.cutoff, this.night, this.intensityTarget, this.ctx.sampleRate);
     this.filter.frequency.setTargetAtTime(cutoff, t, 0.55);
     this.lastCutoff = cutoff;
-    this.bpm = m === "fever" ? style.fever : style.bpm;
+    this.bpm = chipBpm;
 
     this.mode = m;
     if (on && this.timer === null) this.start();
@@ -725,7 +866,7 @@ export class Music {
     this.buildOrder();
     this.orderPos = 0;
     this.section = this.order[0] ?? 0;
-    this.isTronTrack = TRACKS[this.section]!.prog === PROG_TRON;
+    this.syncFamilyFlags();
     this.lullabyStep = 0;
     if (this.mode !== "sleep") this.onTrackChange?.(TRACKS[this.section]!.name);
     this.timer = window.setInterval(() => this.tick(), TICK_MS);
@@ -768,10 +909,12 @@ export class Music {
         // repeat the same sequence.
         if (this.orderPos === 0 && this.trackSel === "shuffle") this.buildOrder();
         this.section = this.order[this.orderPos]!;
-        // Update Tron-track flag when the section changes; only adjust gains if it flipped.
-        const nowTron = TRACKS[this.section]!.prog === PROG_TRON;
-        if (nowTron !== this.isTronTrack) {
-          this.isTronTrack = nowTron;
+        // Update the instrumentation family when the section changes; only
+        // adjust gains if the family (island / tron / chip) actually flipped.
+        const wasTron = this.isTronTrack;
+        const wasChip = this.isChipTrack;
+        this.syncFamilyFlags();
+        if (wasTron !== this.isTronTrack || wasChip !== this.isChipTrack) {
           this.apply();
         }
         // Sleep mode plays the lullaby, not the track — don't announce a
@@ -791,17 +934,17 @@ export class Music {
     const idx = this.bar * 8 + this.step;
     const beat = 60 / this.bpm;
 
-    // Chord pad: ensemble strings swell once per bar
-    if (this.step === 0 && (this.mode === "menu" || this.mode === "play")) this.pad(t, chordName, beat * 4);
+    // Chord pad: ensemble strings swell once per bar (island tracks only)
+    if (!this.isChipTrack && this.step === 0 && (this.mode === "menu" || this.mode === "play")) this.pad(t, chordName, beat * 4);
 
     // Menu-only birdsong: an occasional far-away sparkle chirp
-    if (this.mode === "menu" && this.step === 6 && Math.random() < 0.3) {
+    if (!this.isChipTrack && this.mode === "menu" && this.step === 6 && Math.random() < 0.3) {
       this.birdsong(t + Math.random() * beat * 0.5);
     }
 
-    // Chord strum (non-Tron tracks) or Tron chord pulse
+    // Chord strum (island tracks) or Tron chord pulse
     const strum = STRUM[this.step]!;
-    if (strum && !this.isTronTrack) {
+    if (strum && !this.isTronTrack && !this.isChipTrack) {
       const accent = this.step === 0 ? 1 : this.step === 4 ? 0.85 : 0.65;
       const order = strum === 1 ? chord : [...chord].reverse();
       order.forEach((m, i) => this.pluck(t + i * 0.011 + Math.random() * 0.004, mtof(m + this.transpose + stormShift), accent * (0.7 + 0.3 * Math.random())));
@@ -810,20 +953,34 @@ export class Music {
       chord.forEach((m) => this.tronStab(t, mtof(m + this.transpose + stormShift), beat * 0.18));
     }
 
-    // Bass: root on 1, fifth or root on 3, occasional walk-up on 8
-    if (this.step === 0) this.bass(t, mtof(BASS_ROOT[chordName]! + this.transpose + stormShift), beat * 0.9);
-    if (this.step === 4) this.bass(t, mtof(BASS_ROOT[chordName]! + (this.bar % 2 ? 7 : 0) + this.transpose + stormShift), beat * 0.8);
-    if (this.step === 7 && this.bar % 4 === 3) this.bass(t, mtof(BASS_ROOT[chordName]! + 5 + this.transpose + stormShift), beat * 0.4);
+    // Bass: island = root on 1, fifth or root on 3, occasional walk-up on 8;
+    // arcade = relentless root/octave pump on every eighth — the 8-bit drive.
+    if (this.isChipTrack) {
+      const root = mtof(BASS_ROOT[chordName]! + this.transpose + stormShift);
+      const oct = mtof(BASS_ROOT[chordName]! + 12 + this.transpose + stormShift);
+      if (this.step % 2 === 0) this.chipBass(t, root, beat * 0.42, this.step === 0 ? 1 : 0.85);
+      else this.chipBass(t, oct, beat * 0.26, 0.55);
+    } else {
+      if (this.step === 0) this.bass(t, mtof(BASS_ROOT[chordName]! + this.transpose + stormShift), beat * 0.9);
+      if (this.step === 4) this.bass(t, mtof(BASS_ROOT[chordName]! + (this.bar % 2 ? 7 : 0) + this.transpose + stormShift), beat * 0.8);
+      if (this.step === 7 && this.bar % 4 === 3) this.bass(t, mtof(BASS_ROOT[chordName]! + 5 + this.transpose + stormShift), beat * 0.4);
+    }
 
-    // Melody: FM bell/piano on normal tracks, Tron lead synth on Tron tracks
+    // Melody: FM bell/piano on island tracks, Tron lead on Tron tracks,
+    // staccato square-wave chiptune lead on arcade tracks (always present —
+    // a game menu should never sound half-asleep).
     const note = sec.mel[idx] ?? 0;
     if (note > 0) {
-      const sparse = this.mode === "menu" && this.step % 2 === 1 && Math.random() < 0.5;
+      const sparse = !this.isChipTrack && this.mode === "menu" && this.step % 2 === 1 && Math.random() < 0.5;
       if (!sparse) {
         const noteFreq = mtof(note + this.transpose + stormShift);
         const vel = this.step === 0 ? 1 : 0.8;
         if (this.isTronTrack) {
           this.tronLead(t, noteFreq, beat * 0.85, vel);
+        } else if (this.isChipTrack) {
+          let len = 1;
+          while ((sec.mel[idx + len] ?? 0) === -1) len++;
+          this.chipLead(t, noteFreq, Math.min(beat * 0.24 * len, beat * 0.9), vel);
         } else {
           this.glock(t, noteFreq, vel);
         }
@@ -831,7 +988,23 @@ export class Music {
     }
 
     // Percussion
-    if (this.mode === "play" || this.mode === "fever" || this.mode === "storm") {
+    if (this.isChipTrack) {
+      // Arcade kit: 2-&-4 backbeat, driving 8th hats, present on the menu too.
+      const light = this.mode === "menu" ? 0.75 : 1;
+      this.hat(t, (this.step % 2 === 0 ? 0.2 : 0.14) * light, 7800);
+      if (this.step === 0 || this.step === 4) {
+        this.kick(t, (this.step === 0 ? 1 : 0.85) * light);
+        if (this.mode === "fever" || this.intensity > 0.5) this.sidechainPump(0.22 + this.intensity * 0.18, 0.11);
+      }
+      if (this.step === 2 || this.step === 6) {
+        this.snare(t, (this.mode === "fever" ? 0.9 : 0.68) * light);
+        if (this.mode === "fever") this.clap(t);
+      }
+      // Momentum: ghost kick into the downbeat once a run is underway.
+      if ((this.mode === "play" || this.mode === "fever" || this.mode === "storm") && this.step === 7) this.kick(t, 0.58 * light);
+      if (this.mode === "storm" && (this.step === 2 || this.step === 6)) this.kick(t, 0.5 * light);
+      if (this.mode === "fever" && this.step === 3) this.hat(t, 0.22 * light, 5200);
+    } else if (this.mode === "play" || this.mode === "fever" || this.mode === "storm") {
       // Leave breathing space in normal flight; fever earns the busy groove.
       if (this.mode !== "play" || this.step % 2 === 0 || this.intensity > 0.65) {
         this.shaker(t, this.step % 2 === 0 ? 0.48 : 0.24);
@@ -867,18 +1040,18 @@ export class Music {
     }
 
     // Organ: Interstellar-style deep swell on bar starts in play/fever.
-    if ((this.mode === "play" || this.mode === "fever") && this.step === 0 && this.bar % 2 === 0) {
+    if (!this.isChipTrack && (this.mode === "play" || this.mode === "fever") && this.step === 0 && this.bar % 2 === 0) {
       this.organ(t, chordName, beat * 8);
     }
 
     // Arp bursts in fever — Celeste-style fills on offbeats between melody notes.
-    if (this.mode === "fever" && (this.step === 1 || this.step === 5) && this.intensity > 0.3) {
+    if (!this.isChipTrack && this.mode === "fever" && (this.step === 1 || this.step === 5) && this.intensity > 0.3) {
       const arpNote = (UKE[chordName]?.[1] ?? 60) + 24 + this.transpose + stormShift;
       this.arp(t, mtof(arpNote), beat * 0.9);
     }
 
     // Whistle (fever) — alternate between WHISTLE and WHISTLE_B each 4-bar phrase.
-    if (this.mode === "fever") {
+    if (!this.isChipTrack && this.mode === "fever") {
       const whistleSrc = this.bar < 4 ? WHISTLE : WHISTLE_B;
       const w = whistleSrc[idx] ?? 0;
       if (w > 0) {
@@ -1326,6 +1499,62 @@ export class Music {
     f.connect(g);
     g.connect(this.tronGain);
     o.start(t); o.stop(t + dur + 0.01);
+  }
+
+  /** Arcade chiptune lead: two detuned square waves through a bright,
+   * resonant filter — the classic 8-bit hook voice. Staccato by default;
+   * `dur` extends it for held notes. */
+  private chipLead(t: number, freq: number, dur: number, vel: number): void {
+    const o = this.ctx.createOscillator();
+    const o2 = this.ctx.createOscillator();
+    const f = this.ctx.createBiquadFilter();
+    const g = this.ctx.createGain();
+    o.type = "square";
+    o2.type = "square";
+    o.frequency.value = freq;
+    o2.frequency.value = freq * 1.006; // slight detune for width
+    f.type = "lowpass";
+    f.frequency.setValueAtTime(freq * 14, t);          // bright attack
+    f.frequency.exponentialRampToValueAtTime(Math.max(900, freq * 3.4), t + Math.min(dur, 0.16));
+    f.Q.value = 2.2;
+    const peak = 0.34 * vel;
+    const sustain = Math.max(0.04, dur - 0.035);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.004); // hard attack
+    g.gain.exponentialRampToValueAtTime(peak * 0.7, t + 0.05);
+    g.gain.setValueAtTime(peak * 0.7, t + sustain);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.01);
+    const mix2 = this.ctx.createGain();
+    mix2.gain.value = 0.35;
+    o.connect(f);
+    o2.connect(mix2);
+    mix2.connect(f);
+    f.connect(g);
+    g.connect(this.chipGain);
+    o.start(t); o.stop(t + dur + 0.03);
+    o2.start(t); o2.stop(t + dur + 0.03);
+  }
+
+  /** Arcade chiptune bass: short, punchy square through a lowpass — the
+   * driving 8-bit root/octave pump under the hook. */
+  private chipBass(t: number, freq: number, dur: number, vel: number): void {
+    const o = this.ctx.createOscillator();
+    const f = this.ctx.createBiquadFilter();
+    const g = this.ctx.createGain();
+    o.type = "square";
+    o.frequency.value = freq;
+    f.type = "lowpass";
+    f.frequency.setValueAtTime(1800, t);
+    f.frequency.exponentialRampToValueAtTime(480, t + Math.max(0.02, dur));
+    f.Q.value = 0.9;
+    const peak = 0.5 * vel;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(f);
+    f.connect(g);
+    g.connect(this.bassGain);
+    o.start(t); o.stop(t + dur + 0.02);
   }
 
   private clap(t: number): void {
