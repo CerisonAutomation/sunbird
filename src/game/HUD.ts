@@ -287,6 +287,10 @@ export type HudSnapshot = {
   squadNotice: string;
   dailyFlash?: { id: string; price: number; originalPrice: number; discountPct: number };
   stipendClaimed?: boolean;
+  /** This month's rank prize has already been claimed (one per season). */
+  rankPrizeClaimed: boolean;
+  /** The one-time Ace Wingman crate was bought (it pays 250 for 240 — no re-claims). */
+  wingmanBundle: boolean;
   /* --- monetization max value & portal loops --- */
   piggyCoins: number;
   prestigeLevel: number;
@@ -1478,7 +1482,9 @@ function renderBoard(s: HudSnapshot): string {
         <div class="prize-tier silver"><span>🥈 2nd Place</span><b>250 Coins + 10 Gems</b></div>
         <div class="prize-tier bronze"><span>🥉 3rd Place</span><b>100 Coins</b></div>
       </div>
-      <button class="primary-btn gold wide" data-ui data-action="claim-rank-prize">Claim Rank Prize 🏆</button>
+      ${s.rankPrizeClaimed
+        ? `<div class="tag" style="width:100%; text-align:center; font-size:12px; font-weight:600; color:#2e7d32; background:#e8f5e9; border-radius:8px; padding:8px;">✓ Claimed · next prize at the season rollover</div>`
+        : `<button class="primary-btn gold wide" data-ui data-action="claim-rank-prize">Claim Rank Prize 🏆</button>`}
     </div>
     <button class="soft-btn wide" data-ui data-action="board-refresh">${s.boardLoading ? "Refreshing…" : "↻ Refresh"}</button>
     <p class="fineprint">${
@@ -1563,19 +1569,23 @@ function renderLive(s: HudSnapshot): string {
           <h3>⚡ Quick Match</h3>
           <span class="board-badge live">Instant action</span>
         </div>
-        <p class="qm-desc">Jump straight into the skies! Race 40 live and neural AI pilots across custom formats and world circuits.</p>
-
-        <div class="lobby-selector-box">
-          <div class="lobby-selector-label"><span>Select PvP Format</span> <b>${activeMode.icon} ${activeMode.name} (${activeMode.finish} m)</b></div>
-          <div class="pills-scroll">${modePills}</div>
-          <div class="lobby-selector-label"><span>Select World Circuit</span> <b>${activeWorld.emoji} ${activeWorld.name}</b></div>
-          <div class="pills-scroll">${worldPills}</div>
-        </div>
+        <p class="qm-desc">One tap into the skies — 40 pilots, ready now. Shuffle the format and world, or just fly.</p>
 
         <div class="quick-match-btns">
-          <button class="primary-btn gold large-btn" data-ui data-action="quick-match-instant">⚡ Launch Match on ${activeWorld.name}</button>
+          <button class="primary-btn gold large-btn" data-ui data-action="quick-match-instant">⚡ ${activeMode.name} on ${activeWorld.name}</button>
+          <button class="soft-btn" data-ui data-action="quick-match-shuffle">🎲 Surprise me — random race</button>
           <button class="soft-btn" data-ui data-action="pvp-casual">Search Online Pilots</button>
         </div>
+
+        <details class="customize-race">
+          <summary>Customize · format &amp; world (${activeMode.name} · ${activeWorld.name})</summary>
+          <div class="lobby-selector-box">
+            <div class="lobby-selector-label"><span>PvP Format</span> <b>${activeMode.icon} ${activeMode.name} (${activeMode.finish} m)</b></div>
+            <div class="pills-scroll">${modePills}</div>
+            <div class="lobby-selector-label"><span>World Circuit</span> <b>${activeWorld.emoji} ${activeWorld.name}</b></div>
+            <div class="pills-scroll">${worldPills}</div>
+          </div>
+        </details>
       </section>
 
       <section class="race-section room-entry" aria-label="Invite friends">
@@ -2364,9 +2374,11 @@ function renderShop(s: HudSnapshot, browse: ShopBrowse): string {
           <b style="font:700 15px var(--display); color:#0d47a1; display:block;">Ace Wingman Bundle</b>
           <span style="font-size:12px; color:#1976d2; display:block;">3 Boosts (Shield, Flask, Magnet) + Tideglass Trail + 250 Bonus Coins</span>
         </div>
-        ${s.wallet >= 240
-          ? `<button class="primary-btn gold" data-ui data-action="buy-bundle" data-id="wingman" style="white-space:nowrap;">Claim · ● 240</button>`
-          : `<span class="tag need" style="white-space:nowrap;">Need ● ${240 - s.wallet}</span>`
+        ${s.wingmanBundle
+          ? `<span class="tag" style="white-space:nowrap; font-size:12px; font-weight:600; color:#2e7d32; background:#e8f5e9; border-radius:8px; padding:6px 12px;">✓ Unlocked</span>`
+          : s.wallet >= 240
+            ? `<button class="primary-btn gold" data-ui data-action="buy-bundle" data-id="wingman" style="white-space:nowrap;">Claim · ● 240</button>`
+            : `<span class="tag need" style="white-space:nowrap;">Need ● ${240 - s.wallet}</span>`
         }
       </div>
     </div>

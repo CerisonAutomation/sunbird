@@ -85,4 +85,50 @@ describe("local-first persistence", () => {
     expect(sd.importCode("not-a-valid-code!!")).toBe(false);
     expect(sd.importCode(btoa("{\"junk\":true}"))).toBe(false); // no deviceId
   });
+
+  it("keeps one-time/daily claim records across a reload (no re-claim on boot)", () => {
+    // Regression: these optional fields were missing from the parse literal,
+    // so EVERY reload silently dropped them — the daily stipend (+250),
+    // squad quests and the one-time crate (net +10/click) were all re-claimable
+    // after each page load.
+    localStorage.setItem(
+      SAVE_KEY,
+      JSON.stringify({
+        deviceId: "dev-1",
+        lastStipendClaimed: "2026-09-16",
+        squadQuestsClaimed: { drafting: "2026-09-16" },
+        rankPrizeSeason: "R2026-09",
+        wingmanBundle: true,
+      }),
+    );
+    const sd = new SaveData();
+    expect(sd.state.lastStipendClaimed).toBe("2026-09-16");
+    expect(sd.state.squadQuestsClaimed).toEqual({ drafting: "2026-09-16" });
+    expect(sd.state.rankPrizeSeason).toBe("R2026-09");
+    expect(sd.state.wingmanBundle).toBe(true);
+    // A fresh persist keeps them in the on-disk blob.
+    sd.persist();
+    const onDisk = JSON.parse(localStorage.getItem(SAVE_KEY)!);
+    expect(onDisk.lastStipendClaimed).toBe("2026-09-16");
+    expect(onDisk.wingmanBundle).toBe(true);
+  });
+
+  it("sanitizes hostile claim-record payloads on load", () => {
+    localStorage.setItem(
+      SAVE_KEY,
+      JSON.stringify({
+        deviceId: "dev-2",
+        lastStipendClaimed: { evil: true },
+        squadQuestsClaimed: ["drafting"], // array, not a record
+        rankPrizeSeason: 42,
+        wingmanBundle: "yes",
+      }),
+    );
+    const sd = new SaveData();
+    // Type-safe coercion: an object/number/bool never passes through typed.
+    expect(typeof sd.state.lastStipendClaimed).toBe("string");
+    expect(sd.state.squadQuestsClaimed).toEqual({});
+    expect(sd.state.rankPrizeSeason).toBe("42");
+    expect(sd.state.wingmanBundle).toBe(true);
+  });
 });

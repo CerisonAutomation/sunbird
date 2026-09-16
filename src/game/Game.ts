@@ -83,7 +83,7 @@ import { nextWings, wingsFor, wingsProgress, wingsPromotion } from "./Career";
 import { GhostPlayer, GhostRecorder } from "./Ghost";
 import { fetchRivalGhost, publishGhost } from "./GhostNet";
 import { HUD, type CalendarCard, type CheckoutMode, type DailyCard, type GauntletCard, type HudSnapshot, type LoadoutView, type RivalCard, type SeedMode, type UiScreen, type UiState } from "./HUD";
-import { divisionFor, duelOpponent, duelSkillFor, featuredRivals, nextDivision, seasonReward } from "./pvp";
+import { divisionFor, duelOpponent, duelSkillFor, featuredRivals, nextDivision, rankSeasonId, seasonReward } from "./pvp";
 import { Input } from "./Input";
 import { clamp, dateSeed, formatDatePretty, lerp, SeededRandom } from "./math";
 import { Missions, type MissionView, type QuestReward, type QuestView, type RunStats } from "./Missions";
@@ -3248,7 +3248,16 @@ export class Game {
         break;
       }
       case "claim-rank-prize": {
+        // One prize per monthly season: the board re-renders from the live
+        // snapshot, so an unguarded claim button was an infinite coin loop.
+        const season = rankSeasonId();
+        if (this.save.state.rankPrizeSeason === season) {
+          this.hud.toast("Rank prize claimed — the next season starts a fresh one", "info");
+          break;
+        }
         const reward = seasonReward(this.save.state.rival.rating);
+        this.save.state.rankPrizeSeason = season;
+        this.save.persist();
         this.save.addCoins(reward.coins);
         this.hud.toast(`Claimed ${reward.coins} Coins for ${reward.division.name} Rank! 🏆`, "achievement");
         this.audio.fanfare();
@@ -3320,6 +3329,20 @@ export class Game {
         this.selectedPvpWorld = wId;
         this.selectedCourse = PVP_WORLDS.find((w) => w.id === wId) ?? PVP_WORLDS[0]!;
         this.hud.toast(`${this.selectedCourse.emoji} ${this.selectedCourse.name}`, "gold");
+        this.bump();
+        break;
+      }
+      case "quick-match-shuffle": {
+        // "Just make it random": one tap picks a random format AND world so
+        // the big button is always the fastest path into a race.
+        const m = PVP_MODES[Math.floor(Math.random() * PVP_MODES.length)]!;
+        const w = PVP_WORLDS[Math.floor(Math.random() * PVP_WORLDS.length)]!;
+        this.selectedPvpMode = m.id;
+        this.selectedPvpWorld = w.id;
+        this.selectedCourse = w;
+        this.modeId = m.id;
+        this.mode = m;
+        this.hud.toast(`🎲 ${m.icon} ${m.name} on ${w.emoji} ${w.name}`, "gold");
         this.bump();
         break;
       }
@@ -3456,6 +3479,9 @@ export class Game {
         break;
       }
       case "claim-daily-stipend": {
+        // The card disables via the snapshot, but a double-tap can land before
+        // the re-render — the handler must be its own guard.
+        if (this.save.state.lastStipendClaimed === this.today) break;
         this.save.addCoins(250);
         this.save.state.lastStipendClaimed = this.today;
         this.audio.chapterFanfare();
@@ -3465,10 +3491,15 @@ export class Game {
         break;
       }
       case "buy-bundle": {
+        // One crate per save. It pays 250 coins for 240 — re-claimable it is
+        // an infinite +10/click coin faucet.
+        if (this.save.state.wingmanBundle) break;
         if (!this.save.spend(240)) {
           this.hud.toast("Need ● 240 coins to claim Ace Wingman Crate", "warn");
           break;
         }
+        this.save.state.wingmanBundle = true;
+        this.save.persist();
         this.save.armBoost("shield");
         this.save.armBoost("sunflask");
         this.save.armBoost("magnet");
@@ -5485,6 +5516,8 @@ export class Game {
       squadNotice: this.squadNotice,
       dailyFlash: dailyFlashBird(this.today),
       stipendClaimed: this.save.state.lastStipendClaimed === this.today,
+      rankPrizeClaimed: this.save.state.rankPrizeSeason === rankSeasonId(),
+      wingmanBundle: this.save.state.wingmanBundle === true,
       showTutorialHand: this.state === "playing" && st.tutorialRuns < 2 && this.hintTimer < 2.6 && !this.input.diving,
       pvpModes: PVP_MODES,
       pvpWorlds: PVP_WORLDS,

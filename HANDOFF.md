@@ -12,7 +12,7 @@ five build targets, one shared game core.
 ```bash
 pnpm install
 pnpm dev                 # Vite on :5173 (pnpm via corepack: `corepack enable` once)
-pnpm test                # 947 unit suites (Vitest, jsdom)
+pnpm test                # 949 unit suites (Vitest, jsdom)
 pnpm typecheck           # tsc --noEmit
 pnpm build:portals       # dist-poki / dist-crazy / dist-generic + the three submission zips
 pnpm build:itch          # dist-itch (single-file)
@@ -127,6 +127,12 @@ Re-verified against the current Poki docs (developers.poki.com, 2026-09-16):
   multiplier" + dead "Spin · ● 100 / 📺" affordances, widened `measure()` to stable
   strings (`visible`/`interact`), new 18-test `pvp-slipstream-stress.test.ts`, 5-viewport
   `e2e/scaling.spec.ts`, 1024×1024 submission thumbnail.
+- (this session, wave 2) Economy claim audit: rank prize (was infinite per click) → one
+  per monthly season; Ace Wingman crate (paid 250 for 240, infinite +10/click) → one per
+  save; save `load()` now keeps the stipend/squad-quest claim records (were silently
+  dropped every reload → re-claimable after boot) + new save round-trip tests.
+  PVP lobby simplified per request: one big CTA + 🎲 "Surprise me" randomizer;
+  format/world pickers collapsed behind "Customize".
 - `e42ae0d` PVP end-of-race pileup fix + visible emotes (over-head nametag emotes, flight-only emote wheel) + `pvp-end-audit.test.ts`
 - `e194654` 6 new procedural arcade-chiptune tracks (bouncy 8-bit family; picker tracks 1–6; island family untouched)
 - `b247cdd` main-menu background = live 3D gameplay world (attract flight), hero bird removed, fullscreen button removed, cream card
@@ -134,7 +140,7 @@ Re-verified against the current Poki docs (developers.poki.com, 2026-09-16):
 
 ## 6. Test gate (what "ready" means)
 
-- `pnpm test` — 947 tests: unit (jsdom), deterministic-sim (same seed ⇒ bit-identical player
+- `pnpm test` — 949 tests: unit (jsdom), deterministic-sim (same seed ⇒ bit-identical player
   physics), network-boundary (hostile frames), PVP end-of-race audit, slipstream stress,
   perf guards.
 - `pnpm test:server` + `pnpm typecheck:server` — Node reference server.
