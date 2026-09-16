@@ -650,7 +650,6 @@ export const VIP = {
   price: "● 1,500",
   /** Pure coin unlock — earnable directly through gameplay. */
   coinPrice: 1500,
-  coinAdReward: 500,
   name: "Sunbird VIP",
   features: [
     "Exclusive Aurora bird skin with a rainbow trail",

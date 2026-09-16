@@ -182,7 +182,7 @@ export function isPortalBuild(): boolean {
 }
 
 /** Touch/pointer-coarse device (portal mobile + real phones). */
-function isCoarsePointer(): boolean {
+export function isCoarsePointer(): boolean {
   try {
     return (
       window.matchMedia?.("(pointer: coarse)").matches === true ||

@@ -2527,7 +2527,7 @@ function renderContinue(s: HudSnapshot): string {
     <div class="count-ring" data-live="contTimer">${Math.ceil(s.continueTimer)}</div>
     ${!portal && s.gold ? `<button class="primary-btn gold" data-ui data-action="continue-gold">✦ Gold · free wake-up</button>` : ""}
     <button class="primary-btn ${s.canAffordContinue ? "" : "off"}" data-ui data-action="continue-coins" ${s.canAffordContinue ? "" : "disabled"}>Spend ● ${s.continueCost} <small>(you have ${s.wallet})</small></button>
-    ${s.adAvailable ? `<button class="soft-btn wide" data-ui data-action="continue-ad">▶ ${portal ? "Watch for Second Wind" : "Watch a short break"}</button>` : ""}
+    ${s.adAvailable ? `<button class="soft-btn wide" data-ui data-action="continue-ad">🎬 ${portal ? "Watch for Second Wind" : "Watch a short break"}</button>` : ""}
     <button class="ghost-btn" data-ui data-action="continue-sleep">Let it sleep</button>
   `;
 }
