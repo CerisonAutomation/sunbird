@@ -231,36 +231,59 @@ function ensureSdk(target: PlatformName): Promise<PlatformName> {
   if (target === "none" || target === "generic") return Promise.resolve(target);
   if (loadPromise) return loadPromise;
   loadPromise = new Promise((resolve) => {
-    const isReady = target === "poki" ? Boolean(window.PokiSDK) : Boolean(window.CrazyGames?.SDK);
-    if (isReady) {
-      resolve(target);
+    // For Poki Inspector: wait up to 2s for SDK to be injected before loading from CDN
+    if (target === "poki") {
+      let waited = 0;
+      const checkInterval = setInterval(() => {
+        if (window.PokiSDK) {
+          clearInterval(checkInterval);
+          resolve(target);
+          return;
+        }
+        waited += 100;
+        if (waited >= 2000) {
+          clearInterval(checkInterval);
+          // Timeout: fall through to load from CDN
+          loadFromCdn();
+        }
+      }, 100);
       return;
     }
-    const src = scriptFor(target);
-    if (!src) {
-      resolve("none");
-      return;
-    }
-    const existing = document.querySelector<HTMLScriptElement>(`script[data-sunbird-sdk="${target}"]`);
-    if (existing) {
-      if (existing.dataset.loaded === "true") {
+
+    function loadFromCdn() {
+      const isReady = target === "poki" ? Boolean(window.PokiSDK) : Boolean(window.CrazyGames?.SDK);
+      if (isReady) {
         resolve(target);
         return;
       }
-      existing.addEventListener("load", () => resolve(target), { once: true });
-      existing.addEventListener("error", () => resolve("none"), { once: true });
-      return;
+      const src = scriptFor(target);
+      if (!src) {
+        resolve("none");
+        return;
+      }
+      const existing = document.querySelector<HTMLScriptElement>(`script[data-sunbird-sdk="${target}"]`);
+      if (existing) {
+        if (existing.dataset.loaded === "true") {
+          resolve(target);
+          return;
+        }
+        existing.addEventListener("load", () => resolve(target), { once: true });
+        existing.addEventListener("error", () => resolve("none"), { once: true });
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = src;
+      script.async = true;
+      script.dataset.sunbirdSdk = target;
+      script.onload = () => {
+        script.dataset.loaded = "true";
+        resolve(target);
+      };
+      script.onerror = () => resolve("none");
+      document.head.appendChild(script);
     }
-    const script = document.createElement("script");
-    script.src = src;
-    script.async = true;
-    script.dataset.sunbirdSdk = target;
-    script.onload = () => {
-      script.dataset.loaded = "true";
-      resolve(target);
-    };
-    script.onerror = () => resolve("none");
-    document.head.appendChild(script);
+
+    loadFromCdn();
   });
   return loadPromise;
 }
