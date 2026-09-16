@@ -4,9 +4,10 @@ import type * as GuardModule from "./rejection-guard";
 /**
  * The guard's job in one sentence: when the engine reports a floating
  * promise rejection (`unhandledrejection` on window), it must demote it to a
- * rate-limited console WARN instead of the red "Uncaught (in promise)" error
- * frame — portal QA treats console errors as defects, and the game's network
- * paths are best-effort by design.
+ * rate-limited console.debug note (verbose logs only) instead of the red
+ * "Uncaught (in promise)" error frame — portal QA treats console errors as
+ * defects, and the production gate bans console.warn/log in shipped code,
+ * while the game's network paths are best-effort by design.
  *
  * jsdom has no rendering engine to dispatch the event from a real rejection,
  * so the tests dispatch the exact event the browser would. Each test imports
@@ -42,8 +43,9 @@ afterEach(() => {
 });
 
 describe("installRejectionGuard", () => {
-  it("demotes an unhandled rejection to a warn (no error frame)", async () => {
+  it("demotes an unhandled rejection to a debug note (no error frame)", async () => {
     await freshGuard();
+    const debug = vi.spyOn(console, "debug").mockImplementation(SINK);
     const warn = vi.spyOn(console, "warn").mockImplementation(SINK);
     const error = vi.spyOn(console, "error").mockImplementation(SINK);
 
@@ -51,8 +53,10 @@ describe("installRejectionGuard", () => {
     window.dispatchEvent(event);
 
     expect(event.defaultPrevented).toBe(true); // browser error frame suppressed
-    expect(warn).toHaveBeenCalled();
-    expect(warn.mock.calls.map((c) => c.join(" ")).join(" ")).toContain("boom: network fell over");
+    expect(debug).toHaveBeenCalled();
+    expect(debug.mock.calls.map((c) => c.join(" ")).join(" ")).toContain("boom: network fell over");
+    // Shipped code must stay warn/log-free (production gate) and error-free (Poki QA).
+    expect(warn).not.toHaveBeenCalled();
     expect(error).not.toHaveBeenCalled();
   });
 
@@ -66,23 +70,23 @@ describe("installRejectionGuard", () => {
     guard = mod; // let afterEach uninstall
   });
 
-  it("rate-limits the warn — a burst of rejections warns once per window", async () => {
+  it("rate-limits the note — a burst of rejections logs once per window", async () => {
     await freshGuard();
-    const warn = vi.spyOn(console, "warn").mockImplementation(SINK);
+    const debug = vi.spyOn(console, "debug").mockImplementation(SINK);
     for (let i = 0; i < 5; i++) window.dispatchEvent(rejectionEvent(new Error(`burst-${i}`)));
-    const warns = warn.mock.calls.map((c) => String(c[0]));
-    // Five rejections, one warn: the rest are rate-limited.
-    expect(warns.length).toBe(1);
-    expect(warns[0]).toContain("burst-0");
+    const notes = debug.mock.calls.map((c) => String(c[0]));
+    // Five rejections, one note: the rest are rate-limited.
+    expect(notes.length).toBe(1);
+    expect(notes[0]).toContain("burst-0");
   });
 
   it("uninstall stops demoting (restores default behaviour)", async () => {
     await freshGuard();
-    const warn = vi.spyOn(console, "warn").mockImplementation(SINK);
+    const debug = vi.spyOn(console, "debug").mockImplementation(SINK);
     guard?.uninstallRejectionGuard();
     const event = rejectionEvent(new Error("post-uninstall"));
     window.dispatchEvent(event);
     expect(event.defaultPrevented).toBe(false);
-    expect(warn).not.toHaveBeenCalled();
+    expect(debug).not.toHaveBeenCalled();
   });
 });
