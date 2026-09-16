@@ -325,6 +325,7 @@ export class MassRace {
       return 1;
     }
     let best = 0;
+    let packCount = 0;
     for (const r of this.rivals) {
       const dx = r.bird.x - x;
       if (dx <= 0 || dx > DRAFT_BEHIND) continue;
@@ -332,10 +333,27 @@ export class MassRace {
       if (dy > DRAFT_LATERAL) continue;
       const along = 1 - dx / DRAFT_BEHIND;
       const lateral = 1 - dy / DRAFT_LATERAL;
-      best = Math.max(best, along * lateral);
+      const factor = along * lateral;
+      best = Math.max(best, factor);
+      packCount++;
     }
-    this.draft += (best - this.draft) * 0.12;
+    // Flock drafting train: drafting behind multiple birds enhances the slipstream up to +35%!
+    const packMultiplier = packCount > 1 ? Math.min(1.35, 1 + (packCount - 1) * 0.15) : 1;
+    const targetDraft = Math.min(1, best * packMultiplier);
+    this.draft += (targetDraft - this.draft) * 0.15;
     return 1 - this.draft * DRAFT_MAX;
+  }
+
+  checkCloseCall(x: number, y: number, speed: number): { name: string; id: string } | null {
+    if (!this.group.visible || speed < 16) return null;
+    for (const r of this.rivals) {
+      const dx = Math.abs(r.bird.x - x);
+      const dy = Math.abs(r.bird.y - y);
+      if (dx < 3.2 && dy < 2.2) {
+        return { name: r.name, id: r.id };
+      }
+    }
+    return null;
   }
 
   roster(playerX: number, startX: number, finishDistance: number, playerName: string, playerHue = 0.06): RosterBird[] {

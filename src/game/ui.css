@@ -4273,10 +4273,13 @@ button:focus-visible, .toggle:focus-visible {
    readable; blur does the rest. */
 .overlay .paper-card:not(.menu-hero) {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0) 120px),
-    rgba(255, 244, 228, 0.88);
-  -webkit-backdrop-filter: blur(14px) saturate(1.12);
-  backdrop-filter: blur(14px) saturate(1.12);
+    linear-gradient(165deg, rgba(255, 252, 245, 0.62) 0%, rgba(255, 244, 230, 0.48) 50%, rgba(255, 236, 218, 0.58) 100%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.22) !important;
+  backdrop-filter: blur(20px) saturate(1.22) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.65) !important;
+  box-shadow:
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.85),
+    0 24px 50px -12px rgba(18, 12, 28, 0.25) !important;
 }
 
 /* ─── Impact popups ─────────────────────────────────────────────────────────

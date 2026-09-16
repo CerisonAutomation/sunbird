@@ -448,6 +448,7 @@ export class HUD {
   private lastHint = "";
   private readonly shopBrowse = newShopBrowse();
   private shopSnapshot: HudSnapshot | null = null;
+  private currentSnapshot: HudSnapshot | null = null;
   private lastChips = "";
   private readonly tmpNameTagVec = new THREE.Vector3();
 
@@ -498,8 +499,8 @@ export class HUD {
         <div class="draft-meter hidden" data-ref="draftMeter"><i></i><span>SLIPSTREAM</span></div>
         <div class="finish-countdown hidden" data-ref="finishCd"></div>
         <div class="emote-wheel hidden" data-ref="emoteWheel">
-          <button class="emotes-toggle" data-ui data-action="toggle-emotes" aria-expanded="false" aria-controls="flight-emotes">Emotes</button>
-          <div class="emote-options hidden" id="flight-emotes">${[["👋", "Wave"], ["🔥", "Fire"], ["😂", "Laugh"], ["🙌", "Bravo"], ["👑", "Crown"], ["🤝", "GG"]].map(([icon, label]) => `<button data-ui data-action="emote" data-id="${icon}" aria-label="Send ${label}" title="Send ${label}">${label}</button>`).join("")}</div>
+          <button class="emotes-toggle" data-ui data-action="toggle-emotes" aria-expanded="false" aria-controls="flight-emotes">💬 Emotes</button>
+          <div class="emote-options hidden" id="flight-emotes">${[["👋", "Wave"], ["🔥", "Fire"], ["😂", "Laugh"], ["🙌", "Bravo"], ["👑", "Crown"], ["🤝", "GG"]].map(([icon, label]) => `<button data-ui data-action="emote" data-id="${icon}" aria-label="Send ${label}" title="Send ${label}">${icon} ${label}</button>`).join("")}</div>
         </div>
         <div class="mid-meta">
           <div class="island-chip" data-ref="island">Island 1</div>
@@ -611,6 +612,18 @@ export class HUD {
     });
     this.root.addEventListener("compositionend", () => this.menuContinuity.endComposition());
     this.root.addEventListener("click", (e) => {
+      if (e.target === this.pauseEl) {
+        this.onAction("resume");
+        return;
+      }
+      if (e.target === this.overEl) {
+        this.onAction("restart-flight");
+        return;
+      }
+      if (e.target === this.menuEl && this.currentSnapshot && this.currentSnapshot.screen !== "main") {
+        this.onAction("back");
+        return;
+      }
       const t = (e.target as HTMLElement).closest("[data-action]") as HTMLElement | null;
       if (!t || t.matches("input, select, textarea") || (t as HTMLButtonElement).disabled) return;
       e.preventDefault();
@@ -745,6 +758,7 @@ export class HUD {
   }
 
   update(s: HudSnapshot): void {
+    this.currentSnapshot = s;
     if (s.state === "playing" && !this.wasInFlight) this.resultsContinuity.reset();
     this.wasInFlight = s.state === "playing";
     // Keep the menu bird animated by default. The in-game Reduce motion
@@ -773,6 +787,7 @@ export class HUD {
     const menuVisible = s.state === "menu" || (s.state === "gameover" && s.screen !== "main");
     this.menuEl.classList.toggle("hidden", !menuVisible);
     this.menuSky.setActive(menuVisible);
+    this.menuSky.setHeroActive(menuVisible && s.screen === "main");
     if (menuVisible) this.menuSky.resize(window.innerWidth || 800, window.innerHeight || 600);
     this.pauseEl.classList.toggle("hidden", s.state !== "paused");
     // The pause control only makes sense in live flight — hide it while the

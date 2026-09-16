@@ -268,6 +268,7 @@ export class Game {
   private shield = 0;
   private boostTimer = 0;
   private manualBoostCooldown = 0;
+  private wasDiving = false;
   private continuesUsed = 0;
   private continueTimer = 0;
   private adTimer = 0;
@@ -314,6 +315,7 @@ export class Game {
   private roomMuted = false;
   private lastEmoteAt = 0;
   private draftBanner = 0;
+  private wasDrafting = false;
   /** Rival tracking: who beat you last time, for the revenge prompt. */
   private nemesis = "";
   private photoFinish = "";
@@ -322,6 +324,7 @@ export class Game {
   private lastRatingBonus = 0;
   private lastPlace = 0;
   private overtakeAcc = 0;
+  private closeCallAcc = 0;
   /** Ranked 1v1 duel: one seeded opponent, flat ±16 rating swing. */
   private duelActive = false;
   /** Matchmaking search deadline (wall-clock ms; 0 = not searching). Wall
@@ -1012,11 +1015,15 @@ export class Game {
     if (this.input.diving) {
       if (this.needRelease) return;
       this.menuHold += dt;
-      if (this.menuHold > threshold) {
+      if (this.menuHold >= Math.min(threshold, 0.05)) {
         if (this.state === "gameover") this.replayRun(true);
         else this.startRun();
       }
     } else {
+      if (this.menuHold > 0 && !this.needRelease) {
+        if (this.state === "gameover") this.replayRun(true);
+        else this.startRun();
+      }
       this.needRelease = false;
       this.menuHold = 0;
     }
@@ -1027,6 +1034,11 @@ export class Game {
     // bird remains visible, but store perks never decide a competitive result.
     const skin = this.gameplaySkin;
     const diving = this.input.diving && !this.bird.asleep;
+    if (diving && !this.wasDiving && !this.bird.grounded && this.state === "playing") {
+      this.audio.diveCue();
+      this.haptic(10);
+    }
+    this.wasDiving = diving;
     this.magnetTimer = Math.max(0, this.magnetTimer - dt);
     this.boostTimer = Math.max(0, this.boostTimer - dt);
     this.manualBoostCooldown = Math.max(0, this.manualBoostCooldown - dt);
@@ -1165,7 +1177,13 @@ export class Game {
     if (this.massRace.active) {
       this.massRace.step(dt, this.terrain, this.startX + this.mode.finish, this.runTime);
       // Reward the player for holding a draft: visible, audible, scoring.
-      if (this.massRace.draft > 0.35) {
+      if (this.massRace.draft > 0.3) {
+        if (!this.wasDrafting) {
+          this.wasDrafting = true;
+          this.audio.diveCue();
+          this.haptic([10, 15, 20]);
+          this.popupAtBird("SLIPSTREAM", "power");
+        }
         this.draftBanner = Math.min(1, this.draftBanner + dt * 2);
         this.bonus += 14 * dt * this.massRace.draft;
         if (this.draftBanner > 0.98) {
@@ -1173,7 +1191,30 @@ export class Game {
           this.particles.emitWind(this.bird.x, this.bird.y, 0.8);
         }
       } else {
+        if (this.wasDrafting && this.massRace.draft < 0.12) {
+          this.wasDrafting = false;
+          if (this.bird.speed() > 18) {
+            this.audio.chirp();
+            this.haptic([15, 10, 25]);
+            this.popupAtBird("SLINGSHOT! 🚀", "perfect");
+            this.bird.vx = Math.min(234, this.bird.vx + 6);
+            this.particles.emitWind(this.bird.x, this.bird.y + 0.5, 1.6);
+          }
+        }
         this.draftBanner = Math.max(0, this.draftBanner - dt);
+      }
+      // Wingtip buzz near-miss feedback
+      this.closeCallAcc += dt;
+      if (this.closeCallAcc >= 0.35 && !this.bird.asleep) {
+        const close = this.massRace.checkCloseCall(this.bird.x, this.bird.y, this.bird.speed());
+        if (close) {
+          this.closeCallAcc = 0;
+          this.audio.chirp();
+          this.haptic(10);
+          this.popupAtBird("WINGTIP BUZZ! +50", "splash");
+          this.bonus += 50;
+          this.particles.emitWind(this.bird.x, this.bird.y, 0.9);
+        }
       }
       // Overtake / lead-change feedback, sampled at ~4 Hz so the 41-row
       // sort never runs per physics tick.
@@ -1186,11 +1227,21 @@ export class Game {
           this.hud.toast(place === 1 ? "👑 LEAD! Hold it!" : `P${this.lastPlace} → P${place}!`, "gold");
           if (place === 1) {
             this.flash("perfect");
+            this.popupAtBird("👑 P1 LEAD!", "fever");
+            this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
             this.audio.purchase();
+            this.haptic([25, 15, 45]);
+            if (this.elapsed - this.lastEmoteAt >= 2.0) {
+              this.sendEmote("👑");
+            }
           } else if (gain >= 3) {
             this.audio.ding();
+            this.haptic(10);
+            this.popupAtBird(`P${this.lastPlace} → P${place}`, "great");
+          } else {
+            this.audio.ding();
+            this.haptic(8);
           }
-          this.haptic(10);
         }
         this.lastPlace = place;
       }
@@ -1258,10 +1309,12 @@ export class Game {
       this.skimTime += dt;
       if (this.skimTime > 1.1 && this.skimCd <= 0) {
         this.skimCd = 1.4;
-        const pts = 6;
+        const pts = 15;
         this.bonus += pts;
         this.awardXp(XP_RULES.coin);
         this.audio.ridgeSkim();
+        this.haptic(8);
+        this.popupAtBird("RIDGE SKIM! +15", "power");
         this.hud.toast(`Ridge skim +${pts}`, "cloud");
         this.particles.emitDust(this.bird.x, this.terrain.heightAt(this.bird.x) + 0.4, this.bird.speed(), slope);
       }
@@ -1514,9 +1567,21 @@ export class Game {
           if (!won) this.nemesis = rival.name;
           this.hud.toast(this.photoFinish, won ? "gold" : "warn");
           this.flash("perfect");
+          if (won) {
+            this.popupAtBird("PHOTO FINISH WIN!", "fever");
+            this.haptic([30, 20, 50, 20, 80]);
+          }
         } else if (s.place > 1) {
           const ahead = s.rows.find((r) => r.place === s.place - 1);
           if (ahead) this.nemesis = ahead.name;
+        }
+
+        if (s.place <= 3) {
+          this.popupAtBird(s.place === 1 ? "🥇 VICTORY!" : s.place === 2 ? "🥈 2ND PLACE!" : "🥉 3RD PLACE!", "fever");
+          this.flash("perfect");
+          this.haptic([40, 20, 60, 20, 100]);
+          this.particles.emitConfetti(this.bird.x, this.bird.y + 4);
+          this.particles.emitConfetti(this.bird.x + 3, this.bird.y + 6);
         }
 
         this.hud.toast(`FINISH · P${s.place} of ${s.total}`, s.place <= 3 ? "gold" : "island");
@@ -2320,6 +2385,7 @@ export class Game {
       this.lastRatingBonus = 0;
       this.lastPlace = 0;
       this.overtakeAcc = 0;
+      this.closeCallAcc = 0;
       // Duels are strictly 1v1 vs the seeded opponent — never let a stale
       // room connection promote remote pilots into the field.
       if (this.duelActive) this.disconnectRace();
@@ -2795,6 +2861,8 @@ export class Game {
     this.shield = 0;
     this.boostTimer = 0;
     this.manualBoostCooldown = 0;
+    this.wasDiving = false;
+    this.wasDrafting = false;
     this.continuesUsed = 0;
     this.continueTimer = 0;
     this.timeScale = 1;
