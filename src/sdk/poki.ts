@@ -1,7 +1,8 @@
 /**
  * PokiAdapter — full Poki HTML5 SDK surface (sdk.poki.com/html5):
  *
- *   init, gameLoadingFinished, gameplayStart/Stop, commercialBreak,
+ *   init, gameLoadingStart, gameLoadingFinished, gameplayStart/Stop,
+ *   commercialBreak,
  *   rewardedBreak, getUser, getToken (1-minute backend-verification JWT),
  *   shareableURL, getURLParam, measure (game events).
  *
@@ -36,6 +37,12 @@ type PokiShareableData = Record<string, string | number | boolean>;
 type PokiSdk = {
   init?: () => Promise<void>;
   setDebug?: (on: boolean) => void;
+  /**
+   * Marks the start of the loading phase. Poki's loading pipeline is
+   * `gameLoadingStart()` → (assets load) → `gameLoadingFinished()`; calling
+   * only the finished side mis-handles the portal's loading screen.
+   */
+  gameLoadingStart?: () => void;
   gameLoadingFinished?: () => void;
   gameplayStart?: () => void;
   gameplayStop?: () => void;
@@ -96,7 +103,11 @@ export class PokiAdapter implements PlatformAdapter {
 
   /* lifecycle */
   loadingStart(): void {
-    /* Poki has no explicit loading-start signal. */
+    // Poki marks the loading phase with gameLoadingStart(). bootstrapSdk()
+    // already fired it right after init (before the game's asset work), so
+    // this delegate exists for interface symmetry — re-sending a phase
+    // marker is harmless.
+    this.sdk?.gameLoadingStart?.();
   }
 
   loadingFinished(): void {

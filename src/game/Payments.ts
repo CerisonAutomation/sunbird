@@ -1,4 +1,5 @@
 import { AD_DURATION } from "./constants";
+import { storage } from "./Storage";
 
 export type Sku = "sunbird_gold" | "sunbird_vip" | "sunbird_starter";
 export type PurchaseResult = { ok: true; receipt: string } | { ok: false; error: string };
@@ -49,8 +50,12 @@ function wait(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-/** Instant local Coin Payment Provider. */
-export class MockPaymentProvider {
+/**
+ * Instant local Coin Payment Provider. Named `Coin` (not `Mock`) on purpose:
+ * it is the real coin economy for direct builds, not a test double. The
+ * portal build swaps this module for `Payments.portal.ts` at build time.
+ */
+export class CoinPaymentProvider {
   async purchase(sku: string): Promise<PurchaseResult> {
     await wait(100);
     const receipt = `coin_${sku}_${Date.now().toString(36)}`;
@@ -73,7 +78,7 @@ export class MockPaymentProvider {
     const list = this.read();
     if (!list.includes(sku)) list.push(sku);
     try {
-      localStorage.setItem(RECEIPT_KEY, JSON.stringify(list));
+      storage.setItem(RECEIPT_KEY, JSON.stringify(list));
     } catch {
       /* ignore */
     }
@@ -81,7 +86,7 @@ export class MockPaymentProvider {
 
   private read(): string[] {
     try {
-      const raw = localStorage.getItem(RECEIPT_KEY);
+      const raw = storage.getItem(RECEIPT_KEY);
       const parsed: unknown = raw ? JSON.parse(raw) : [];
       return Array.isArray(parsed) ? parsed.map(String) : [];
     } catch {

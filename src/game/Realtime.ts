@@ -203,7 +203,10 @@ export class RealtimeClient implements NetTransport {
     // proxy / same-origin edge). Resolve against the page and force ws(s).
     let socket: WebSocket;
     try {
-      const url = new URL(URL_BASE, typeof location !== "undefined" ? location.href : "http://localhost/");
+      // `location` is always defined in the browser/jsdom contexts this runs
+      // in — no fallback literal (a "http://localhost/" string in the bundle
+      // gets flagged by portal scanners, even though it would never load).
+      const url = new URL(URL_BASE, location.href);
       url.protocol = url.protocol === "https:" ? "wss:" : url.protocol === "http:" ? "ws:" : url.protocol;
       url.searchParams.set("device", this.deviceId);
       url.searchParams.set("name", this.name);

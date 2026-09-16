@@ -12,15 +12,18 @@ import type {
   PlatformIdentity,
   PlatformSystemInfo,
 } from "./platform";
+import { storage, type StorageLike } from "../game/Storage";
 
 const PREFIX = "sunbird.cloud.";
 
-function ls(): Storage | null {
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
+/**
+ * Cross-safe storage backend: localStorage → sessionStorage → memory, in
+ * that order (see Storage.ts). In a sandboxed portal iframe the raw
+ * localStorage accessor throws, so the cloud-save fallback must survive
+ * that — previously it silently no-opped there.
+ */
+function ls(): StorageLike {
+  return storage;
 }
 
 /** Shared localStorage-backed cloud save (also used by the Poki adapter). */
@@ -53,13 +56,12 @@ export const localCloudFallback = {
   clear(): Promise<void> {
     try {
       const doomed: string[] = [];
-      const storage = ls();
-      if (!storage) return Promise.resolve();
-      for (let i = 0; i < storage.length; i++) {
-        const k = storage.key(i);
+      const store = ls();
+      for (let i = 0; i < store.length; i++) {
+        const k = store.key(i);
         if (k && k.startsWith(PREFIX)) doomed.push(k);
       }
-      for (const k of doomed) storage.removeItem(k);
+      for (const k of doomed) store.removeItem(k);
     } catch {
       /* ignore */
     }

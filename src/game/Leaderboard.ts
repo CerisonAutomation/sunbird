@@ -1,5 +1,6 @@
 import { dateSeed, truncate } from "./math";
 import { generatePilotName } from "./pilotNameGenerator";
+import { storage } from "./Storage";
 
 /**
  * Global leaderboard.
@@ -78,14 +79,14 @@ export function isLeaderboardOnline(): boolean {
 
 export function loadPilotName(_fallbackId: string): string {
   try {
-    const v = localStorage.getItem(NAME_KEY);
+    const v = storage.getItem(NAME_KEY);
     if (v && v.trim()) return truncate(v.trim(), 14);
   } catch {
     /* private mode */
   }
   const auto = generatePilotName();
   try {
-    localStorage.setItem(NAME_KEY, auto);
+    storage.setItem(NAME_KEY, auto);
   } catch {
     /* private mode */
   }
@@ -95,7 +96,7 @@ export function loadPilotName(_fallbackId: string): string {
 export function savePilotName(name: string): string {
   const clean = truncate(name.replace(/[^\p{L}\p{N} _.-]/gu, "").trim(), 14) || "Pilot";
   try {
-    localStorage.setItem(NAME_KEY, clean);
+    storage.setItem(NAME_KEY, clean);
   } catch {
     /* private mode */
   }
@@ -113,7 +114,7 @@ function metricOf(row: { distance: number; altitude: number; perfects: number; c
 
 function readLocal(): StoredRow[] {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = storage.getItem(KEY);
     const parsed: unknown = raw ? JSON.parse(raw) : [];
     if (!Array.isArray(parsed)) return [];
     return parsed as StoredRow[];
@@ -124,7 +125,7 @@ function readLocal(): StoredRow[] {
 
 function writeLocal(rows: StoredRow[]): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(rows.slice(0, 400)));
+    storage.setItem(KEY, JSON.stringify(rows.slice(0, 400)));
   } catch {
     /* quota */
   }

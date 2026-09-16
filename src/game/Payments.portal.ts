@@ -27,7 +27,7 @@ export function consumeStripeReturn(): Sku | null {
   return null;
 }
 
-export class MockPaymentProvider {
+export class CoinPaymentProvider {
   async purchase(_sku: string): Promise<PurchaseResult> {
     return { ok: false, error: "Portal purchases use coins earned in flight." };
   }

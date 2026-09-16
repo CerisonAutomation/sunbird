@@ -90,7 +90,7 @@ import { ParticleFX } from "./ParticleFX";
 import { TrailRibbon } from "./Trail";
 import { fetchServerEntitlements,
   MockAdProvider,
-  MockPaymentProvider,
+  CoinPaymentProvider,
   type AdProvider,
   type Sku,
 } from "./Payments";
@@ -149,7 +149,7 @@ export class Game {
   private useBloom = false;
   private bloomBudget = { enabled: false, goodWindows: 0, cooldown: 0 };
   private readonly sky: Sky;
-  private readonly mockPayments = new MockPaymentProvider();
+  private readonly mockPayments = new CoinPaymentProvider();
   private readonly ads: AdProvider = new MockAdProvider();
   private platform: PlatformAdapter | null = null;
   private readonly telemetry = new Telemetry();
@@ -4257,6 +4257,12 @@ export class Game {
   /** The SDK owns ad focus. Silence and freeze immediately, then restore only
    * after the callback so portal ads cannot leak game audio/input beneath them. */
   private beginPortalAd(): void {
+    // Poki requires gameplay to be stopped before any commercial break. The
+    // state machine already sends gameplayStop() when leaving "playing", but
+    // the adapter only exists after async SDK init — a break requested after
+    // death yet before the adapter landed never sent that stop. Re-send it
+    // unconditionally; the signal is idempotent.
+    this.platform?.gameplayStop();
     this.input.setEnabled(false);
     this.audio.setAdMuted(true);
   }
@@ -4264,6 +4270,9 @@ export class Game {
   private endPortalAd(): void {
     this.audio.setAdMuted(false);
     this.input.setEnabled(true);
+    // Mirror of the stop above: if gameplay resumed while the break ran,
+    // make sure the portal's phase state catches up.
+    if (this.state === "playing") this.platform?.gameplayStart();
   }
 
   private portalEnabled(): boolean {

@@ -1,5 +1,6 @@
 import type { BarrelEntry, BarrelRoot } from "./barrel.types";
 import translationsBarrel from "./translations.barrel.json";
+import { storage } from "../game/Storage";
 
 export type SupportedLocale = "en" | "mt" | "it" | "fr" | "de" | "es" | "pt-BR" | "ar" | "zh-CN" | "ja";
 
@@ -22,7 +23,7 @@ let currentLocale: SupportedLocale = "en";
 
 function initLocale(): SupportedLocale {
   try {
-    const saved = localStorage.getItem(LOCALE_STORAGE_KEY);
+    const saved = storage.getItem(LOCALE_STORAGE_KEY);
     if (saved && SUPPORTED_LOCALES.some((l) => l.code === saved)) {
       return saved as SupportedLocale;
     }
@@ -59,7 +60,7 @@ export function setLocale(locale: SupportedLocale): void {
   if (SUPPORTED_LOCALES.some((l) => l.code === locale)) {
     currentLocale = locale;
     try {
-      localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+      storage.setItem(LOCALE_STORAGE_KEY, locale);
     } catch {
       /* private mode */
     }
