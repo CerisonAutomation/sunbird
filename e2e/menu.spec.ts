@@ -99,3 +99,39 @@ test("save import requires explicit replacement consent and rejects an invalid c
   await expect(card.getByLabel("Save code to import")).toHaveValue("not-a-save");
   expect(app.errors).toEqual([]);
 });
+
+test("the main-menu sky actually paints (no dead background)", async ({ page }) => {
+  test.setTimeout(120000);
+  const app = new SunbirdPage(page);
+  await app.open(); await app.ready();
+
+  // Both layers must be active on the main menu.
+  const skyHost = page.locator(".menu-sky");
+  const heroHost = page.locator(".menu-hero-layer");
+  await expect(skyHost).toHaveClass(/on/);
+  await expect(heroHost).toHaveClass(/on/);
+
+  // Count non-transparent pixels in the real raster: the sky gradient
+  // covers 100% of the canvas, the hero bird is a solid silhouette.
+  const skyPixels = await skyHost.locator(".menu-sky-canvas").evaluate(el => {
+    const c = el as HTMLCanvasElement;
+    const ctx = c.getContext("2d")!;
+    const { data } = ctx.getImageData(0, 0, c.width, c.height);
+    let n = 0;
+    for (let i = 3; i < data.length; i += 4) if (data[i] > 8) n++;
+    return { n, total: data.length / 4 };
+  });
+  expect(skyPixels.n / skyPixels.total, "sky gradient must fill the viewport").toBeGreaterThan(0.95);
+
+  const heroPixels = await heroHost.locator(".menu-sky-canvas").evaluate(el => {
+    const c = el as HTMLCanvasElement;
+    const ctx = c.getContext("2d")!;
+    const { data } = ctx.getImageData(0, 0, c.width, c.height);
+    let n = 0;
+    for (let i = 3; i < data.length; i += 4) if (data[i] > 8) n++;
+    return n;
+  });
+  expect(heroPixels, "hero bird must have ink on its canvas").toBeGreaterThan(500);
+
+  expect(app.errors).toEqual([]);
+});
