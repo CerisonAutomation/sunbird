@@ -623,7 +623,9 @@
 }
 
 .overlay.pause {
-  background: rgba(14, 18, 36, 0.22) !important;
+  background: rgba(14, 18, 36, 0.34) !important;
+  -webkit-backdrop-filter: blur(4px) saturate(0.95) !important;
+  backdrop-filter: blur(4px) saturate(0.95) !important;
 }
 
 /* Translucent frosted glass for all remaining screens and overlays */

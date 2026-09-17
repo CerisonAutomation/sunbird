@@ -27,6 +27,29 @@
   --body: "Atkinson Hyperlegible", "Trebuchet MS", "Segoe UI", sans-serif;
 }
 
+/* Atkinson Hyperlegible enables slashed-zero by default via its OpenType
+   features (zero/ss01). In a menu about buying coins that makes every "0"
+   look like an Ø — turn it off globally. */
+body, button, input, textarea {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "zero" 0, "ss01" 0;
+}
+
+/* ---- coin glyph ----
+   The .coin-glyph class is applied to the inline SVG that replaces the
+   legacy "●" bullet in coin amounts. Inline at every call site by
+   renderCoins() in HUD.ts; size/align set in em so it scales with the
+   surrounding text whether it's a 24px title or an 11px reward pill. */
+.coin-glyph {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  vertical-align: -0.1em;
+  margin: 0 0.15em 0 0.02em;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -239,7 +262,21 @@ textarea {
 }
 
 .stat-value.coin::before {
-  content: "● ";
+  /* Coins counter in the flight HUD — use the same inline-SVG coin glyph
+     as the menus so the bullet-● blob never appears there either. */
+  content: "";
+  display: inline-block;
+  width: 0.8em;
+  height: 0.8em;
+  vertical-align: -0.08em;
+  margin-right: 0.18em;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 32%, rgba(255,255,255,0.75) 0%, rgba(255,255,255,0.1) 38%, transparent 50%),
+    radial-gradient(circle at center, #ffd76a 0%, #ffb020 70%, #c98a10 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(0,0,0,0.25),
+    0 1px 0 rgba(0,0,0,0.15);
   color: var(--gold);
 }
 

@@ -304,12 +304,13 @@ export class RaceSession {
     if (this.status === "racing" && !seat.finish) {
       seat.dnf = true;
       seat.finish = {
-        place: 0,
-        timeMs: 0,
-        distance: seat.state?.distance ?? 0,
+        place: this.finishOrder.length + 1,
+        timeMs: this.opts.now() - this.startAtMs,
+        distance: Math.round(seat.state?.distance ?? 0),
         score: 0,
       };
       this.registerDnf(seat);
+      this.emit({ type: "finish", seatId, place: seat.finish.place, timeMs: seat.finish.timeMs, distance: seat.finish.distance });
     }
     this.removeSeat(seatId, "leave");
   }
@@ -319,6 +320,14 @@ export class RaceSession {
     const seat = this.seats.get(seatId);
     if (!seat || seat.phase === "reconnecting") return;
     seat.phase = "reconnecting";
+    // lastSeenAt must be refreshed to the moment of disconnect so the grace
+    // window is measured from the drop, not from the last inbound frame
+    // (which could be arbitrarily older if the peer went radio-silent).
+    seat.lastSeenAt = this.opts.now();
+    // A dropped socket is no longer "ready" — if they reconnect they will
+    // re-send ready. Without clearing this, an in-progress countdown fires
+    // immediately after the drop and starts a new race with a ghost seat.
+    seat.ready = false;
     this.migrateHost();
     this.emit({ type: "roster" });
     this.scheduleGrace(seatId);
@@ -461,38 +470,41 @@ export class RaceSession {
       return;
     }
     if (this.status === "racing") {
-      // DNF for seats disconnected past the DNF grace while racing.
       for (const [seatId, seat] of this.seats) {
-        if (seat.phase === "reconnecting" && !seat.finish) {
-          if (now - seat.lastSeenAt > this.opts.dnfGraceMs) {
-            seat.dnf = true;
-            seat.finish = {
-              place: this.finishOrder.length + 1,
-              timeMs: now - this.startAtMs,
-              distance: Math.round(seat.state?.distance ?? 0),
-              score: 0,
-            };
-            this.finishOrder.push(seatId);
-            this.emit({ type: "finish", seatId, place: seat.finish.place, timeMs: seat.finish.timeMs, distance: seat.finish.distance });
-            this.maybeComplete();
-          }
-        } else if (seat.phase === "reconnecting" && now - seat.lastSeenAt > this.opts.reconnectGraceMs) {
+        if (seat.phase !== "reconnecting" || seat.finish) continue;
+        const silentMs = now - seat.lastSeenAt;
+        if (silentMs > this.opts.reconnectGraceMs) {
+          // Full reconnect grace elapsed: the seat is abandoned. DNF on
+          // the way out.
+          seat.dnf = true;
+          seat.finish = {
+            place: this.finishOrder.length + 1,
+            timeMs: now - this.startAtMs,
+            distance: Math.round(seat.state?.distance ?? 0),
+            score: 0,
+          };
+          this.finishOrder.push(seatId);
+          this.emit({ type: "finish", seatId, place: seat.finish.place, timeMs: seat.finish.timeMs, distance: seat.finish.distance });
           this.removeSeat(seatId, "timeout");
+          this.maybeComplete();
         }
       }
-      // Race cap: nobody flies forever.
+      // Race cap: nobody flies forever. Assign places sequentially so a
+      // wave of simultaneous timeouts can never collide on the same number.
       if (now - this.startAtMs > this.opts.maxRaceMs) {
-        for (const seat of this.seats.values()) {
-          if (!seat.finish) {
-            seat.dnf = true;
-            seat.finish = {
-              place: this.finishOrder.length + 1,
-              timeMs: now - this.startAtMs,
-              distance: Math.round(seat.state?.distance ?? 0),
-              score: 0,
-            };
-            this.finishOrder.push(seat.seatId);
-          }
+        const dnfOrder = [...this.seats.values()]
+          .filter((s) => !s.finish)
+          .sort((a, b) => (b.state?.distance ?? 0) - (a.state?.distance ?? 0));
+        for (const seat of dnfOrder) {
+          seat.dnf = true;
+          seat.finish = {
+            place: this.finishOrder.length + 1,
+            timeMs: now - this.startAtMs,
+            distance: Math.round(seat.state?.distance ?? 0),
+            score: 0,
+          };
+          this.finishOrder.push(seat.seatId);
+          this.emit({ type: "finish", seatId: seat.seatId, place: seat.finish.place, timeMs: seat.finish.timeMs, distance: seat.finish.distance });
         }
         this.completeRace();
         return;
@@ -536,8 +548,13 @@ export class RaceSession {
     if (this.status !== "racing") return;
     const all = [...this.seats.values()];
     if (all.length === 0) return;
-    const unfinished = all.filter((s) => !s.finish && s.phase === "connected");
-    if (unfinished.length === 0) this.completeRace();
+    // A race only completes when no seat is still flying AND no seat is in
+    // the reconnecting grace window waiting to come back. A dropped pilot
+    // still has their seat reserved until reconnectGraceMs elapses; counting
+    // them as finished the moment the TCP FIN lands would immediately
+    // destroy the field before they could re-attach.
+    const flyingOrReconnecting = all.filter((s) => !s.finish && (s.phase === "connected" || s.phase === "reconnecting"));
+    if (flyingOrReconnecting.length === 0) this.completeRace();
   }
 
   private completeRace(): void {

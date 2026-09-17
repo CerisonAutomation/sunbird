@@ -1,22 +1,36 @@
 import { dateSeed, truncate } from "./math";
 import { generatePilotName } from "./pilotNameGenerator";
 import { storage } from "./Storage";
+import { createAudsIfConfigured, type PokiAuds } from "../sdk/auds";
 
 /**
  * Global leaderboard.
  *
- * Two execution paths, and the UI always states which one is live:
+ * Three backends (ordered by priority at runtime):
  *
- *  • ONLINE  — when `VITE_LEADERBOARD_URL` is configured the client talks to a
- *    real HTTP backend (`GET /board`, `POST /score`). Any host that speaks the
- *    tiny JSON contract documented in LEADERBOARD_API.md works.
- *  • LOCAL   — with no endpoint we keep a persistent on-device board. It is
- *    labelled "Local" everywhere in the UI; we never present device-only rows
- *    as if they were worldwide results.
+ *  • CUSTOM HTTP — when VITE_LEADERBOARD_URL is set, the client talks to a
+ *    traditional GET /board + POST /score backend (self-hosted social
+ *    server, Vercel Functions, etc.). This is the dev default.
+ *  • POKI AUDS  — on Poki builds with VITE_POKI_GAME_ID, posts scores to
+ *    Poki's AUDS (Arbitrary User Data Store) per (metric) key and queries
+ *    the public sort=-value list. No secret kept client-side — rows are
+ *    effectively immutable once posted, which matches public leaderboards.
+ *  • LOCAL      — when no backend is configured we keep a persistent
+ *    on-device board (with a friendly benchmark table pre-seeded).
+ *
+ * The UI always states which backend is live (`BoardPage.online` and the
+ * `board-badge` in renderBoard).
  */
 
-const API = (import.meta.env.VITE_LEADERBOARD_URL ?? (import.meta.env.DEV ? "/mp" : "")).replace(/\/$/, "");
+// Dev uses the social server root (vite proxies /board & /score to the local
+// Node social server). Production portal builds default to "" (offline local
+// board) unless VITE_LEADERBOARD_URL or AUDS is configured.
+const API = (import.meta.env.VITE_LEADERBOARD_URL ?? (import.meta.env.DEV ? "" : "")).replace(/\/$/, "");
 const SALT = import.meta.env.VITE_LEADERBOARD_SALT ?? "";
+const AUDS: PokiAuds | null =
+  (import.meta.env.VITE_PORTAL_TARGET as string | undefined) === "poki"
+    ? createAudsIfConfigured()
+    : null;
 
 async function signScore(deviceId: string, distance: number, score: number): Promise<string> {
   if (!SALT || !crypto?.subtle) return "";
@@ -74,7 +88,14 @@ export type ScoreSubmission = {
 type StoredRow = ScoreSubmission & { date: string };
 
 export function isLeaderboardOnline(): boolean {
-  return API.length > 0;
+  return API.length > 0 || AUDS !== null;
+}
+
+/** Stable string identifying which backend is live for UI display. */
+export function leaderboardBackend(): "http" | "auds" | "local" {
+  if (API.length > 0) return "http";
+  if (AUDS) return "auds";
+  return "local";
 }
 
 export function loadPilotName(_fallbackId: string): string {
@@ -108,6 +129,21 @@ function metricOf(row: { distance: number; altitude: number; perfects: number; c
   if (m === "perfects") return row.perfects;
   if (m === "coins") return row.coins;
   return row.distance;
+}
+
+const valueForMetric = metricOf;
+
+/** The device's current personal-best for each metric (from the local store),
+ *  used to avoid spamming AUDS with runs that didn't beat anything. */
+function localBestByDevice(): Map<BoardMetric, number> {
+  const out = new Map<BoardMetric, number>();
+  for (const r of readLocal()) {
+    for (const m of ["distance", "altitude", "perfects", "coins"] as BoardMetric[]) {
+      const v = valueForMetric(r, m);
+      if (v > (out.get(m) ?? 0)) out.set(m, v);
+    }
+  }
+  return out;
 }
 
 /* ----------------------------------------------------------- local store */
@@ -190,6 +226,7 @@ export class Leaderboard {
     if (running) return running;
 
     const task = (async (): Promise<BoardPage> => {
+      // Backend 1: custom HTTP (self-hosted / Vercel functions).
       if (API) {
         this.uploadBest();
         try {
@@ -212,11 +249,51 @@ export class Leaderboard {
           this.cache.set(key, page);
           return page;
         } catch (e) {
-          // Network failure must never blank the board — fall through to local
-          // and clearly mark the page as stale.
           this.lastError = e instanceof Error ? e.message : "network error";
         }
       }
+      // Backend 2: Poki AUDS (only on poki builds with game id configured).
+      // Friends/daily scopes fall back to local — AUDS keys are flat and we
+      // only publish the global all-metric tables there.
+      if (AUDS && scope === "global") {
+        try {
+          const res = await AUDS.fetchTop({ metric, deviceId: this.deviceId, limit: 50 });
+          if (res) {
+            this.lastError = "";
+            const entries: BoardEntry[] = res.entries.map((it) => ({
+              id: String(it.values.device ?? it.id),
+              name: truncate(String(it.values.name ?? "Pilot"), 14),
+              value: Number(it.values.value ?? 0),
+              distance: Number(it.values.distance ?? (metric === "distance" ? it.values.value : 0)),
+              altitude: Number((it.data as Record<string, unknown> | undefined)?.altitude ?? (metric === "altitude" ? it.values.value : 0)),
+              perfects: Number((it.data as Record<string, unknown> | undefined)?.perfects ?? (metric === "perfects" ? it.values.value : 0)),
+              coins: Number((it.data as Record<string, unknown> | undefined)?.coins ?? (metric === "coins" ? it.values.value : 0)),
+              skin: String((it.data as Record<string, unknown> | undefined)?.skin ?? "ember"),
+              date: String(it.values.date ?? dateSeed()),
+              you: Boolean(it.you),
+            }));
+            // If we didn't find ourselves in the top 50, fall back to local
+            // best for "your rank" — AUDS doesn't return a global rank for
+            // a player outside the first page, so we honestly show "—" in
+            // that case instead of guessing.
+            const page: BoardPage = {
+              scope,
+              metric,
+              entries,
+              yourRank: res.yourRank,
+              total: res.total,
+              online: true,
+              stale: false,
+              error: "",
+            };
+            this.cache.set(key, page);
+            return page;
+          }
+        } catch (e) {
+          this.lastError = e instanceof Error ? e.message : "auds error";
+        }
+      }
+      // Backend 3: local on-device (offline / fallback).
       const page = this.localPage(scope, metric);
       this.cache.set(key, page);
       return page;
@@ -239,18 +316,50 @@ export class Leaderboard {
     writeLocal(rows);
     this.cache.clear();
 
-    if (!API) return;
-    void signScore(row.deviceId, row.distance, row.score).then((sig) =>
-      fetch(`${API}/score`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(sig ? { ...row, sig } : row),
-        keepalive: true,
-      }),
-    ).catch(() => {
-      // Submission is best-effort; the local row already persisted so the
-      // player never loses credit for the run.
-    });
+    // Only submit when this run beat the device's existing best for the
+    // metric — otherwise we'd spam AUDS / the HTTP backend with a flood of
+    // mediocre runs and pollute the public board.
+    const metrics: BoardMetric[] = ["distance", "altitude", "perfects", "coins"];
+    const bestLocal = localBestByDevice();
+
+    if (API) {
+      void signScore(row.deviceId, row.distance, row.score).then((sig) =>
+        fetch(`${API}/score`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(sig ? { ...row, sig } : row),
+          keepalive: true,
+        }),
+      ).catch(() => {
+        // Submission is best-effort; the local row already persisted so the
+        // player never loses credit for the run.
+      });
+    }
+
+    if (AUDS) {
+      // Publish each metric the run actually set a new personal best for.
+      for (const m of metrics) {
+        const v = valueForMetric(row, m);
+        const prev = bestLocal.get(m) ?? 0;
+        if (v <= prev) continue;
+        void AUDS.submitScore({
+          metric: m,
+          name: row.name,
+          deviceId: row.deviceId,
+          value: v,
+          skin: row.skin,
+          distance: row.distance,
+          altitude: row.altitude,
+          perfects: row.perfects,
+          coins: row.coins,
+          mode: row.mode,
+          seed: row.seed,
+          date: row.date,
+        }).catch(() => {
+          /* AUDS failure must not surface — local board always works */
+        });
+      }
+    }
   }
 
   /**

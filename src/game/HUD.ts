@@ -13,6 +13,7 @@ import type { ActivePower } from "./PowerUps";
 import type { SessionGoal } from "./Engagement";
 import { PVP_MODES, type ModeDef, type PvpWorldCourse, type ModeId } from "./Modes";
 import type { RacerStats } from "./Racer";
+import { leaderboardBackend } from "./Leaderboard";
 import type { BoardMetric, BoardPage, BoardScope } from "./Leaderboard";
 import type { TournamentView } from "./Tournaments";
 import type { RosterBird, Standing, RivalNameTag } from "./MassRace";
@@ -372,11 +373,19 @@ export class HUD {
   private pauseEl!: HTMLElement;
   private pauseBtnEl!: HTMLElement;
   private muteBtnEl!: HTMLButtonElement;
+  /** Live run-stats shown on the pause card (updated every frame while paused). */
+  private pauseDistanceEl!: HTMLElement;
+  private pauseAltitudeEl!: HTMLElement;
+  private pauseComboEl!: HTMLElement;
+  private pauseMuteBtn!: HTMLButtonElement;
+  private pauseMuteIco!: HTMLElement;
+  private pauseMuteLbl!: HTMLElement;
   /** Menu-sheet mute control. The play HUD's button only exists mid-flight, so
    *  the shell needs its own always-reachable toggle. */
   private menuMuteEl: HTMLButtonElement | null = null;
   private menuMuteShown: boolean | null = null;
   private playMuteShown: boolean | null = null;
+  private pauseMuteShown: boolean | null = null;
   private contEl!: HTMLElement;
   private contCard!: HTMLElement;
   private adEl!: HTMLElement;
@@ -539,18 +548,56 @@ export class HUD {
 
       <div class="overlay menu hidden" data-ref="menu"><div class="paper-card" data-ref="menuCard"></div></div>
 
-      <div class="overlay pause hidden" data-ref="pause">
+      <div class="overlay pause hidden" data-ref="pause" role="dialog" aria-modal="true" aria-label="Paused">
         <div class="paper-card slim pause-card">
           <div class="pause-kicker">FLIGHT ON HOLD</div>
           <h2>Take a breath</h2>
-          <p class="tagline">Your run is safe. Ready when you are.</p>
-          <div class="pause-actions">
-            <button class="primary-btn" data-ui data-action="resume">▶ Keep flying</button>
-            <button class="ghost-btn" data-ui data-action="toggle-fullscreen">⛶ Fullscreen mode</button>
-            <button class="ghost-btn" data-ui data-action="restart-flight">↻ Restart flight</button>
-            <button class="ghost-btn danger-btn" data-ui data-action="menu">✕ Exit flight</button>
+          <p class="tagline">Your run is safe. Adjust settings, grab boosts, or rally your flock — ready when you are.</p>
+          <div class="pause-run-stats" data-ref="pauseStats">
+            <span class="prs"><em>Distance</em><b data-ref="pauseDistance">0 m</b></span>
+            <span class="prs"><em>Altitude</em><b data-ref="pauseAltitude">0 m</b></span>
+            <span class="prs"><em>Combo</em><b data-ref="pauseCombo">×1</b></span>
           </div>
-          <p class="pause-exit-note">Restart begins a fresh flight. Exit returns you to the launch pad.</p>
+          <div class="pause-actions">
+            <button class="primary-btn pause-resume" data-ui data-action="resume">▶ Keep flying</button>
+          </div>
+          <div class="pause-quick-grid" role="group" aria-label="Quick access">
+            <button class="pause-q pause-mute" data-ui data-action="set-mute" data-ref="pauseMute" aria-pressed="false">
+              <i data-ref="pauseMuteIco">🔊</i><span data-ref="pauseMuteLbl">Sound on</span>
+            </button>
+            <button class="pause-q" data-ui data-action="pause-to" data-id="settings">
+              <i>⚙</i><span>Settings</span>
+            </button>
+            <button class="pause-q" data-ui data-action="pause-to" data-id="shop">
+              <i>🛍</i><span>Shop</span>
+            </button>
+            <button class="pause-q" data-ui data-action="pause-to" data-id="board">
+              <i>🌐</i><span>Global Board</span>
+            </button>
+            <button class="pause-q" data-ui data-action="pause-to" data-id="scores">
+              <i>🏆</i><span>My Scores</span>
+            </button>
+            <button class="pause-q" data-ui data-action="pause-to" data-id="pass">
+              <i>🎟</i><span>Nest Pass</span>
+            </button>
+            <button class="pause-q" data-ui data-action="pause-to" data-id="squad">
+              <i>🐦</i><span>Squad</span>
+            </button>
+            <button class="pause-q" data-ui data-action="pause-to" data-id="trophies">
+              <i>🏅</i><span>Trophies</span>
+            </button>
+            <button class="pause-q" data-ui data-action="pause-to" data-id="progress">
+              <i>📈</i><span>Progress</span>
+            </button>
+            <button class="pause-q" data-ui data-action="toggle-fullscreen">
+              <i>⛶</i><span>Fullscreen</span>
+            </button>
+          </div>
+          <div class="pause-exit-row">
+            <button class="soft-btn" data-ui data-action="restart-flight">↻ Restart flight</button>
+            <button class="ghost-btn danger-btn" data-ui data-action="menu">✕ Exit to menu</button>
+          </div>
+          <p class="pause-exit-note">Resume keeps your momentum. Restart begins a fresh flight. Exit returns you to the launch pad.</p>
         </div>
       </div>
 
@@ -841,14 +888,20 @@ export class HUD {
     if (this.root.dataset.flying !== flying) this.root.dataset.flying = flying;
     const feedback = feedbackSlot(s);
     if (this.root.dataset.feedback !== feedback) this.root.dataset.feedback = feedback;
-    const menuVisible = s.state === "menu" || (s.state === "gameover" && s.screen !== "main");
+    // Menu overlay: (a) main menu/attract, (b) post-crash postcards, or
+    // (c) paused-run sub-screens (shop/settings/... overlaid on a frozen flight).
+    const menuVisible = s.state === "menu" || (s.state === "gameover" && s.screen !== "main")
+      || (s.state === "paused" && s.screen !== null && s.screen !== "main");
     this.menuEl.classList.toggle("hidden", !menuVisible);
+    this.menuEl.classList.toggle("pause-submenu", s.state === "paused" && s.screen !== null && s.screen !== "main");
+    // When a pause sub-screen is open, hide the plain pause card (the menu card
+    // shows on top with its own "Back to flight" affordance).
+    this.pauseEl.classList.toggle("hidden", s.state !== "paused" || (s.screen !== null && s.screen !== "main"));
     // The painted 2D sky and the hero bird stay OFF everywhere: the menu
     // backdrop is the live 3D gameplay world (attract flight) behind the
     // translucent card — the 2D canvas would cover it with a flat painting.
     this.menuSky.setActive(false);
     this.menuSky.heroHost.classList.add("hidden");
-    this.pauseEl.classList.toggle("hidden", s.state !== "paused");
     // The pause control only makes sense in live flight — hide it while the
     // crash "second wind" card is up so it can't read as a dead button.
     this.pauseBtnEl.classList.toggle("hidden", s.state !== "playing");
@@ -857,6 +910,18 @@ export class HUD {
     if (this.playMuteShown !== muted) {
       this.playMuteShown = muted;
       this.paintMute(this.muteBtnEl, muted);
+    }
+    // Keep the pause-card stats & mute in sync while paused.
+    if (s.state === "paused") {
+      this.pauseDistanceEl.textContent = `${Math.max(0, Math.round(s.distance))} m`;
+      this.pauseAltitudeEl.textContent = `${Math.max(0, Math.round(s.altitude))} m`;
+      this.pauseComboEl.textContent = `×${Math.max(1, s.combo)}`;
+      if (this.pauseMuteShown !== muted) {
+        this.pauseMuteShown = muted;
+        this.pauseMuteBtn.setAttribute("aria-pressed", String(muted));
+        this.pauseMuteIco.textContent = muted ? "🔇" : "🔊";
+        this.pauseMuteLbl.textContent = muted ? "Sound off" : "Sound on";
+      }
     }
     // Menu mute stays in sync without re-querying every frame. Re-query only
     // when the sheet was re-rendered (the old node is detached).
@@ -1098,7 +1163,7 @@ export class HUD {
       this.handEl.classList.toggle("show", s.showTutorialHand);
       if (html !== this.lastChips) {
         this.lastChips = html;
-        this.powersEl.innerHTML = html;
+        this.powersEl.innerHTML = renderCoins(html);
       }
 
       if (s.hint !== this.lastHint) {
@@ -1208,17 +1273,23 @@ export class HUD {
   }
 
   private renderStatic(s: HudSnapshot): void {
-    if (s.state === "menu" || (s.state === "gameover" && s.screen !== "main")) {
-      const className = `paper-card ${s.screen === "main" ? "menu-hero" : s.screen === "shop" || s.screen === "pass" ? "wide" : ""}`;
-      this.menuContinuity.render(this.menuCard, s.screen, this.renderScreen(s), className);
+    const menuRendered = s.state === "menu"
+      || (s.state === "gameover" && s.screen !== "main")
+      || (s.state === "paused" && s.screen !== null && s.screen !== "main");
+    if (menuRendered) {
+      // In pause sub-screens never show the menu-hero (the launch grid) and
+      // never add "wide" — pause overlays should stay compact over the flight.
+      const wide = s.state === "paused" ? "" : (s.screen === "shop" || s.screen === "pass" ? "wide" : "");
+      const cls = `paper-card ${s.state === "menu" && s.screen === "main" ? "menu-hero" : wide}`;
+      this.menuContinuity.render(this.menuCard, s.screen, renderCoins(this.renderScreen(s)), cls);
     }
-    if (s.state === "gameover") this.resultsContinuity.render(this.overCard, "results", renderGameOver(s), "paper-card results-card");
+    if (s.state === "gameover") this.resultsContinuity.render(this.overCard, "results", renderCoins(renderGameOver(s)), "paper-card results-card");
     if (s.state === "continue") {
-      this.contCard.innerHTML = renderContinue(s);
+      this.contCard.innerHTML = renderCoins(renderContinue(s));
       this.contTimerEl = this.contCard.querySelector('[data-live="contTimer"]');
     }
     if (s.state === "ad") {
-      this.adCard.innerHTML = renderAd(s);
+      this.adCard.innerHTML = renderCoins(renderAd(s));
       this.adBarEl = this.adCard.querySelector('[data-live="adBar"]');
       this.adSkipEl = this.adCard.querySelector('[data-live="adSkip"]');
     }
@@ -1293,6 +1364,12 @@ export class HUD {
     this.pauseEl = grab("pause");
     this.pauseBtnEl = grab("pauseBtn");
     this.muteBtnEl = grab("muteBtn") as HTMLButtonElement;
+    this.pauseDistanceEl = grab("pauseDistance");
+    this.pauseAltitudeEl = grab("pauseAltitude");
+    this.pauseComboEl = grab("pauseCombo");
+    this.pauseMuteBtn = grab("pauseMute") as HTMLButtonElement;
+    this.pauseMuteIco = grab("pauseMuteIco");
+    this.pauseMuteLbl = grab("pauseMuteLbl");
     this.contEl = grab("continue");
     this.contCard = grab("contCard");
     this.adEl = grab("ad");
@@ -1412,6 +1489,31 @@ function escapeHtml(v: string): string {
   );
 }
 
+/** Inline-SVG sun-coin glyph. The UI used to mark coin amounts with the raw
+ *  unicode bullet "●" (U+25CF), but neither Fredoka nor Atkinson Hyperlegible
+ *  ship that codepoint in their latin subsets — the browser fell back to a
+ *  random system font where the glyph was oversized and overlapped adjacent
+ *  digits, producing the "● 250" blob that sat on top of the First Flight
+ *  Pack header. An inline SVG matches the current text size and color, sits
+ *  cleanly on the baseline, and never needs a fallback font. */
+const COIN_SVG =
+  '<svg class="coin-glyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+  '<circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.25"/>' +
+  '<circle cx="12" cy="12" r="8.2" fill="currentColor"/>' +
+  '<circle cx="12" cy="12" r="8.2" fill="none" stroke="rgba(0,0,0,0.22)" stroke-width="1.2"/>' +
+  '<path d="M7.2 12 Q12 7 16.8 12 Q12 17 7.2 12 Z" fill="rgba(255,255,255,0.55)"/>' +
+  '<circle cx="12" cy="12" r="2.2" fill="rgba(255,255,255,0.8)"/>' +
+  "</svg>";
+
+/** Replace every leading bullet with the SVG coin glyph. Runs on the final
+ *  rendered HTML so price strings defined in Economy.ts and toast strings in
+ *  Game.ts all pick up the fix without edits at every call site. */
+function renderCoins(html: string): string {
+  // Match "●" optionally followed by a space and then digits/punctuation
+  // (the coin amount). We keep the whitespace as a non-breaking thin gap.
+  return html.replace(/●\s?/g, COIN_SVG);
+}
+
 function renderBoard(s: HudSnapshot): string {
   const page = s.board;
   const scopes: { id: BoardScope; label: string }[] = [
@@ -1489,7 +1591,9 @@ function renderBoard(s: HudSnapshot): string {
     <button class="soft-btn wide" data-ui data-action="board-refresh">${s.boardLoading ? "Refreshing…" : "↻ Refresh"}</button>
     <p class="fineprint">${
       s.boardOnline
-        ? "Scores sync to the configured global leaderboard service."
+        ? `Scores sync to the ${
+            leaderboardBackend() === "auds" ? "☁️ Poki cloud" : leaderboardBackend() === "http" ? "🌐 global" : "💾 local"
+          } leaderboard.`
         : "Rankings are stored locally. Fly well to climb the leaderboard!"
     }</p>
   `;

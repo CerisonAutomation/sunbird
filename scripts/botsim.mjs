@@ -34,9 +34,9 @@ const opt = (name, fallback) => {
 };
 const flag = (name) => argv.includes(`--${name}`);
 
-// Match the Rust room server used by Vite's /mp proxy. Override with --url
-// for a deployed WSS endpoint or another local server.
-const URL = opt("url", "ws://127.0.0.1:8080/ws");
+// Match the Node social server used by Vite's /mp proxy (and the Rust server
+// on the same port). Override with --url for a deployed WSS endpoint.
+const URL = opt("url", "ws://127.0.0.1:8790/mp");
 const PLAYERS = Number(opt("players", 40));
 const SECONDS = Number(opt("seconds", 12));
 const SEED = opt("seed", String(Date.now()));
@@ -130,10 +130,12 @@ class Bot {
     this.x = 64;
     this.y = 20;
     this.rot = 0;
+    this.seq = 0;
     this.lastFrameAt = 0;
     this.peerX = new Map();
     this.ws = null;
     this.sendTimer = null;
+    this.raceStarted = false;
   }
 
   connect() {
@@ -147,20 +149,31 @@ class Bot {
     return new Promise((resolve) => {
       const ws = new WebSocket(`${URL}?${q}`);
       this.ws = ws;
-      const done = () => resolve();
+      let settled = false;
+      const done = () => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
 
       ws.on("open", () => {
         this.connected = true;
-        this.startSending();
-        done();
+        // Do NOT start sending state frames until after the welcome frame
+        // binds our seat. Frames sent on an unbound socket are rejected.
       });
-      ws.on("message", (raw) => this.onMessage(raw));
+      ws.on("message", (raw) => {
+        const parsed = this.onMessage(raw);
+        // Resolve the connect() promise only once the welcome frame arrives,
+        // so callers (especially the resume path) know the seat is bound.
+        if (parsed === "welcomed") done();
+      });
       ws.on("error", (err) => {
         this.errors.push(String(err?.message ?? err));
         done();
       });
       // Guarded by identity: a stale socket closing must not stop the sender
-      // belonging to the reconnect that replaced it.
+      // belonging to the reconnect that replaced it, and must not resolve a
+      // connect() promise that was already settled by a newer socket.
       ws.on("close", () => {
         if (this.ws === ws) this.stopSending();
         done();
@@ -208,15 +221,20 @@ class Bot {
     if (this.rand() < 0.004) {
       this.send({ type: "emote", emote: "gliding" });
     }
-    // Roughly half the honest field crosses the line during the run.
-    if (!this.finishPlace && this.rand() < 0.0015) {
+    // Finish rate tuned so the field stays airborne long enough for the
+    // mid-race drops to land and resume, but still produces natural finishes
+    // within the configured test window. (~0.3% per frame × 15 Hz = ~3%/s.)
+    if (!this.finishPlace && this.raceStarted && this.x > 2000 && this.rand() < 0.003) {
       this.send({ type: "finish", time: this.x / MAX_SPEED, d: this.x - 64 });
     }
   }
 
   send(obj) {
     try {
-      this.ws.send(JSON.stringify(obj));
+      // Attach a monotonically increasing seq for server-side rate/order
+      // accounting. The gateway rejects frames without a valid seq advance.
+      const withSeq = obj.type === "state" || obj.type === "heartbeat" ? { ...obj, seq: ++this.seq } : obj;
+      this.ws.send(JSON.stringify(withSeq));
     } catch (err) {
       this.errors.push(`send: ${err?.message ?? err}`);
     }
@@ -235,22 +253,36 @@ class Bot {
       msg = JSON.parse(text);
     } catch {
       this.errors.push("unparsable frame from server");
-      return;
+      return null;
     }
 
     switch (msg.type) {
-      case "welcome":
+      case "welcome": {
         this.welcomed = true;
+        const prevId = this.id;
         this.id = msg.id;
         this.welcomeIds.add(msg.id);
-        // Same identity after a drop is the whole point of the device id.
-        if (this.dropped && this.welcomeIds.size === 1) this.resumed = true;
-        break;
+        // Same identity after a drop is the whole point of the device id:
+        // a reconnect must re-seat the SAME seat (same id), not create a new one.
+        if (this.dropped && prevId && msg.id === prevId) this.resumed = true;
+        // Now that the seat is bound it is safe to start sending state frames
+        // and assert ready. Initial connect uses a short staggered ready so
+        // not every bot presses "GO!" on the same tick; reconnect fires ready
+        // immediately so the resumed seat doesn't block the field.
+        this.startSending();
+        const readyDelay = this.dropped ? 50 : 250 + this.index * 15;
+        setTimeout(() => this.send({ type: "ready", ready: true }), readyDelay);
+        return "welcomed";
+      }
       case "peers":
         if (Array.isArray(msg.peers)) this.rosterMax = Math.max(this.rosterMax, msg.peers.length);
         break;
+      case "start":
+        this.raceStarted = true;
+        break;
       case "state":
-        this.stateFrames++;
+        // Only count racing snapshots (post-start) towards frame flow, not lobby rosters.
+        if (this.raceStarted) this.stateFrames++;
         if (Array.isArray(msg.pilots)) this.watchForLeaks(msg.pilots);
         break;
       case "finish":
@@ -262,6 +294,7 @@ class Bot {
       default:
         break;
     }
+    return null;
   }
 
   /**
@@ -295,12 +328,16 @@ class Bot {
     this.dropped = true;
     this.stopSending();
     this.lastFrameAt = 0;
+    // Save the socket reference BEFORE nulling so the close handler can
+    // correctly identify itself as the stale socket (and not touch the
+    // replacement's sender).
+    const old = this.ws;
+    this.ws = null;
     try {
-      this.ws?.close();
+      old?.close();
     } catch {
       /* already gone */
     }
-    this.ws = null;
   }
 
   close() {
@@ -341,10 +378,20 @@ async function main() {
   // them both fires and has time to reconnect before the measurement window
   // closes. A drop scheduled past the end would never happen but would still
   // sit in the denominator, which is exactly the false failure this replaced.
-  const raceMs = Math.max(1000, SECONDS * 1000 - 1500);
+  // The first drop needs to land AFTER the race start countdown (6s) has
+  // elapsed so the resume gate actually exercises mid-race re-seats rather
+  // than lobby-time reconnects. Spread drops across the middle 50% of the
+  // racing window.
+  const countdownMs = 6000;
+  const settleMs = 1500;
+  // Race window available for mid-race drops (after settle + countdown).
+  const racingWindowMs = Math.max(3000, SECONDS * 1000 - settleMs - countdownMs - 1500);
   const resumers = bots.filter((b) => b.role === "resumer");
   const dropTimers = resumers.map((bot, i) => {
-    const at = raceMs * (0.15 + (0.6 * i) / Math.max(1, resumers.length));
+    // Spread drops across the middle 70% of the racing window, starting AFTER
+    // the countdown completes so drops are genuinely mid-race.
+    const offset = racingWindowMs * (0.15 + (0.7 * i) / Math.max(1, resumers.length));
+    const at = settleMs + countdownMs + offset;
     return setTimeout(
       async () => {
         bot.drop();
@@ -355,7 +402,8 @@ async function main() {
     );
   });
 
-  await sleep(raceMs);
+  // Wait for the full scheduled run so drops actually happen.
+  await sleep(settleMs + countdownMs + racingWindowMs);
   dropTimers.forEach(clearTimeout);
 
   // Give the last frames and finish broadcasts time to arrive.
