@@ -36,9 +36,18 @@ describe("physics performance guard", () => {
     // Warm the JIT so cold-start cost doesn't skew the measurement.
     for (let i = 0; i < 1200; i++) step(terrain, bird);
     const N = 12_000; // 100 s of game time
-    const t0 = performance.now();
-    for (let i = 0; i < N; i++) step(terrain, bird);
-    const usPerStep = ((performance.now() - t0) / N) * 1000;
+    // Three batches, keep the fastest. Contention on a shared CI runner can
+    // only make a batch SLOWER, never faster, so the minimum is the honest
+    // estimate of the per-step cost — and a real regression slows every batch,
+    // so the guard is exactly as strict (20 µs/step, measured ~3.5). A single
+    // batch has no such protection: one noisy neighbour and the gate fails on
+    // timing it never measured (seen on CI at 21.7 µs).
+    let usPerStep = Infinity;
+    for (let batch = 0; batch < 3; batch += 1) {
+      const t0 = performance.now();
+      for (let i = 0; i < N; i++) step(terrain, bird);
+      usPerStep = Math.min(usPerStep, ((performance.now() - t0) / N) * 1000);
+    }
     terrain.dispose();
     expect(usPerStep).toBeLessThan(20); // budget: 20 µs/step (measured ~3.5)
   });
