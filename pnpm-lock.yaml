@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@poki/netlib':
+        specifier: ^0.0.20
+        version: 0.0.20
       '@stripe/stripe-js':
         specifier: ^9.15.0
         version: 9.16.0
@@ -487,6 +490,10 @@ packages:
     resolution: {integrity: sha512-akea+6bHYBBfA9uQqSYmlJXn61cTa+jbO87xVLCWbTqbWadRVmhxlXATaOjOgcBaWU4ePo0wB41KMFv3o35IXA==}
     engines: {node: '>=18'}
     hasBin: true
+
+  '@poki/netlib@0.0.20':
+    resolution: {integrity: sha512-x23mkcWwXU2WyyYUKOVyL2IdZGg8u7XLsuxMsxS0x2HNSh5v+5GgcjZ0llr8CwsQXYTtO8XJnCquFbyyemVpVg==}
+    engines: {node: '>=14'}
 
   '@rolldown/pluginutils@1.0.0-beta.47':
     resolution: {integrity: sha512-8QagwMH3kNCuzD8EWL8R2YPW5e4OrHNSAHRFDdmFqEwEaD/KcNKjVoumo+gP2vW5eKB2UPbM6vTYiGZX0ixLnw==}
@@ -1045,6 +1052,9 @@ packages:
   esutils@2.0.3:
     resolution: {integrity: sha512-kVscqXk4OCp68SZ0dkgEKVi6/8ij300KBWTJq32P/dYeWTSwK41WyTxalN1eRmA5Z9UU/LX9D7FWSmV9SAYx6g==}
     engines: {node: '>=0.10.0'}
+
+  eventemitter3@5.0.4:
+    resolution: {integrity: sha512-mlsTRyGaPBjPedk6Bvw+aqbsXDtoAyAzm5MO7JgU+yVRyMQ5O8bD4Kcci7BS85f93veegeCPkL8R4GLClnjLFw==}
 
   expect-type@1.4.0:
     resolution: {integrity: sha512-KfYbmpRm0VbLjEvVa9yGwCi9GI34xvi7A/HXYWQO65CSD2u3MczUJSuwXKFIxlGsgBQizV9q5J9NHj4VG0n+pA==}
@@ -2056,6 +2066,10 @@ snapshots:
     dependencies:
       playwright: 1.58.2
 
+  '@poki/netlib@0.0.20':
+    dependencies:
+      eventemitter3: 5.0.4
+
   '@rolldown/pluginutils@1.0.0-beta.47': {}
 
   '@rollup/rollup-android-arm-eabi@4.63.3':
@@ -2647,6 +2661,8 @@ snapshots:
       '@types/estree': 1.0.9
 
   esutils@2.0.3: {}
+
+  eventemitter3@5.0.4: {}
 
   expect-type@1.4.0: {}
 
