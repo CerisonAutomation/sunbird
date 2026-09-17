@@ -113,17 +113,30 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Load the shipping folder in a real browser
-        run: pnpm test:artifact -- --reporter=list,json
+        shell: bash
+        run: |
+          set -o pipefail
+          {
+            echo "node: $(node -v)"
+            echo "playwright: $(npx playwright --version)"
+            echo "browser cache:"; ls -1 "${HOME}/.cache/ms-playwright" 2>/dev/null || true
+            echo "artifact: $(stat -c '%s bytes' poki-upload/index.html 2>/dev/null || echo MISSING)"
+            npx playwright test -c playwright.artifact.config.ts --reporter=list,json
+          } 2>&1 | tee poki-artifact-test.log
         env:
           PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/report.json
-      - name: Upload the failure report
-        if: failure()
+      # The run's own log is the evidence for a browser test; keep it either
+      # way (GitHub's log API cannot be relied on for this job).
+      - name: Upload the artifact test report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: poki-artifact-failure
-          path: test-results/
+          name: poki-artifact-test
+          path: |
+            poki-artifact-test.log
+            test-results/
           retention-days: 7
-          if-no-files-found: ignore
+          if-no-files-found: warn
 
   portals:
     name: Build (Poki + CrazyGames + generic zips)
