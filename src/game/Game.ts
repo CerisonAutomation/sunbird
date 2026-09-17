@@ -4628,6 +4628,12 @@ export class Game {
     this.disconnectRace();
     this.roomCode = "";
     this.localRace = false;
+    // Commit the selected PvP mode up-front so currentMatchSeed() uses the
+    // right mode+course and the server groups pilots into per-circuit rooms.
+    // Without this, matchmaking used the lobby's casual seed and pilots were
+    // shunted into an empty (or wrong) room the moment the race started.
+    this.modeId = this.selectedPvpMode;
+    this.mode = modeById(this.selectedPvpMode);
     if (!isMultiplayerConfigured()) {
       this.launchMatch(opts, true);
       return;
@@ -4708,6 +4714,11 @@ export class Game {
   private preseatLobby(): void {
     // Warm the ghost source too so the next grid can seat real names.
     void this.refreshBoard();
+    // Matchmaking and race entry must use the SAME room seed. Pre-seating with
+    // a different seed than connectRace() caused PvP modes to drop their lobby
+    // and land in a new empty room the moment the countdown ended — hence the
+    // "circuits aren't actually PvP" bug.
+    const seed = this.currentMatchSeed();
     if (!this.net) {
       // The dynamic import of PokiNetlib resolves on the next tick; attach
       // and connect once the client is ready. In the meantime the HUD shows
@@ -4717,32 +4728,54 @@ export class Game {
         this.net = client;
         this.massRace.attachTransport(this.net);
         this.net.setIdentity(this.racedName(), this.skin.id, 0.06);
-        this.net.connect(this.roomCode, this.roomCode ? this.seed : `${this.today}${this.mmOpts?.storm ? ":storm" : ""}`);
+        this.net.connect(this.roomCode, seed);
         this.bump();
       });
       return;
     }
     this.net.setIdentity(this.racedName(), this.skin.id, 0.06);
-    this.net.connect(this.roomCode, this.roomCode ? this.seed : `${this.today}${this.mmOpts?.storm ? ":storm" : ""}`);
+    this.net.connect(this.roomCode, seed);
+  }
+
+  /** Stable seed for matchmaking/connect that identifies ONE race uniquely:
+   *  world (course) + mode (+ storm qualifier when on). Using the same seed
+   *  in preseatLobby and connectRace is what keeps pilots in the room they
+   *  matched into when the server fires the shared start. */
+  private currentMatchSeed(): string {
+    const mode = isRaceMode(this.modeId) ? this.modeId : this.selectedPvpMode;
+    const course = this.courseForRace();
+    let seed = `${this.today}:${mode}:${course.id}`;
+    if (this.mmOpts?.storm || (mode === "pvp_typhoon")) seed += ":storm";
+    return seed;
   }
 
   /** Opens (or reuses) a realtime seat for the current race seed. */
   private connectRace(): void {
     if (!isMultiplayerConfigured() || this.localRace) return;
-    if (this.net?.connected) { this.massRace.attachTransport(this.net); return; }
+    const seed = this.currentMatchSeed();
+    if (this.net?.connected) {
+      // Already seated in a room — if it's a different race than we're about
+      // to start, drop and rejoin so we don't race against a stale lobby.
+      if (this.net.seed !== seed && this.net.state === "lobby") {
+        this.disconnectRace();
+      } else {
+        this.massRace.attachTransport(this.net);
+        return;
+      }
+    }
     if (!this.net) {
       void this.makeNet().then((client) => {
         if (this.disposed) return;
         this.net = client;
         this.massRace.attachTransport(this.net);
         this.net.setIdentity(this.racedName(), this.skin.id, 0.06);
-        this.net.connect(this.roomCode, `${this.seed}:${this.modeId}`);
+        this.net.connect(this.roomCode, seed);
         this.bump();
       });
       return;
     }
     this.net.setIdentity(this.racedName(), this.skin.id, 0.06);
-    this.net.connect(this.roomCode, `${this.seed}:${this.modeId}`);
+    this.net.connect(this.roomCode, seed);
   }
 
   private disconnectRace(): void {

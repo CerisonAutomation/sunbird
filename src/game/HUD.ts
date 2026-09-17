@@ -1098,7 +1098,7 @@ export class HUD {
       this.handEl.classList.toggle("show", s.showTutorialHand);
       if (html !== this.lastChips) {
         this.lastChips = html;
-        this.powersEl.innerHTML = html;
+        this.powersEl.innerHTML = renderCoins(html);
       }
 
       if (s.hint !== this.lastHint) {
@@ -1210,15 +1210,15 @@ export class HUD {
   private renderStatic(s: HudSnapshot): void {
     if (s.state === "menu" || (s.state === "gameover" && s.screen !== "main")) {
       const className = `paper-card ${s.screen === "main" ? "menu-hero" : s.screen === "shop" || s.screen === "pass" ? "wide" : ""}`;
-      this.menuContinuity.render(this.menuCard, s.screen, this.renderScreen(s), className);
+      this.menuContinuity.render(this.menuCard, s.screen, renderCoins(this.renderScreen(s)), className);
     }
-    if (s.state === "gameover") this.resultsContinuity.render(this.overCard, "results", renderGameOver(s), "paper-card results-card");
+    if (s.state === "gameover") this.resultsContinuity.render(this.overCard, "results", renderCoins(renderGameOver(s)), "paper-card results-card");
     if (s.state === "continue") {
-      this.contCard.innerHTML = renderContinue(s);
+      this.contCard.innerHTML = renderCoins(renderContinue(s));
       this.contTimerEl = this.contCard.querySelector('[data-live="contTimer"]');
     }
     if (s.state === "ad") {
-      this.adCard.innerHTML = renderAd(s);
+      this.adCard.innerHTML = renderCoins(renderAd(s));
       this.adBarEl = this.adCard.querySelector('[data-live="adBar"]');
       this.adSkipEl = this.adCard.querySelector('[data-live="adSkip"]');
     }
@@ -1410,6 +1410,31 @@ function escapeHtml(v: string): string {
   return v.replace(/[&<>"']/g, (c) =>
     c === "&" ? "&amp;" : c === "<" ? "&lt;" : c === ">" ? "&gt;" : c === '"' ? "&quot;" : "&#39;",
   );
+}
+
+/** Inline-SVG sun-coin glyph. The UI used to mark coin amounts with the raw
+ *  unicode bullet "●" (U+25CF), but neither Fredoka nor Atkinson Hyperlegible
+ *  ship that codepoint in their latin subsets — the browser fell back to a
+ *  random system font where the glyph was oversized and overlapped adjacent
+ *  digits, producing the "● 250" blob that sat on top of the First Flight
+ *  Pack header. An inline SVG matches the current text size and color, sits
+ *  cleanly on the baseline, and never needs a fallback font. */
+const COIN_SVG =
+  '<svg class="coin-glyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+  '<circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.25"/>' +
+  '<circle cx="12" cy="12" r="8.2" fill="currentColor"/>' +
+  '<circle cx="12" cy="12" r="8.2" fill="none" stroke="rgba(0,0,0,0.22)" stroke-width="1.2"/>' +
+  '<path d="M7.2 12 Q12 7 16.8 12 Q12 17 7.2 12 Z" fill="rgba(255,255,255,0.55)"/>' +
+  '<circle cx="12" cy="12" r="2.2" fill="rgba(255,255,255,0.8)"/>' +
+  "</svg>";
+
+/** Replace every leading bullet with the SVG coin glyph. Runs on the final
+ *  rendered HTML so price strings defined in Economy.ts and toast strings in
+ *  Game.ts all pick up the fix without edits at every call site. */
+function renderCoins(html: string): string {
+  // Match "●" optionally followed by a space and then digits/punctuation
+  // (the coin amount). We keep the whitespace as a non-breaking thin gap.
+  return html.replace(/●\s?/g, COIN_SVG);
 }
 
 function renderBoard(s: HudSnapshot): string {
