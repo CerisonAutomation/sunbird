@@ -332,6 +332,8 @@ impl LegacyRooms {
                 maybe_start(room);
             }
             In::Finish { time, d } => finish(room, id, time, d),
+            // Handled at the top of this function, before the registry lock.
+            In::Leave => {}
         }
     }
 
@@ -748,8 +750,13 @@ mod tests {
         while let Some(Outbox::Frame(text)) = rx_b.try_recv().ok() {
             frames.push(text);
         }
-        let told = frames.iter().any(|t| t.contains("left") && t.contains("p1"));
-        assert!(told, "peers must be told about the leave, got {frames:?}");
+        let mut told = false;
+        for text in &frames {
+            if text.contains("left") && text.contains("p1") {
+                told = true;
+            }
+        }
+        assert!(told, "peers are told about the leave, got {frames:?}");
 
         let reg = rooms.inner.read();
         let room = reg.rooms.get(&code).expect("room outlives its seats");
