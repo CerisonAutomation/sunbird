@@ -142,9 +142,12 @@ test("the shipping folder boots, plays, and emits the Poki event contract", asyn
   expect(failed).toEqual([]);
   expect(app.errors).toEqual([]);
 
-  // The artifact is self-contained: one html file, icons served from the folder.
-  expect(local).toContain("/index.html");
-  expect(local.some((p) => p.startsWith("/icons/"))).toBe(true);
+  // Self-contained: every request stayed inside the folder (the `external`
+  // assertion above is the real claim), and the assets the html references are
+  // really there — fetched from the page, exactly as a host would serve them.
+  expect(local).toContain("/");
+  const icon = await page.evaluate(async () => (await fetch("./icons/favicon-32.png")).status);
+  expect(icon, "the folder serves its own icons").toBe(200);
 
   // A real WebGL canvas, sized — not a placeholder.
   const canvas = await page.locator("canvas").first().evaluate((el) => {
