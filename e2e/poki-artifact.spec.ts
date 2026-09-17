@@ -137,6 +137,11 @@ test("the shipping folder boots, plays, and emits the Poki event contract", asyn
   await app.open();
   await app.ready();
 
+  // Let the log settle past the loading-screen failsafe window (window load +
+  // 1.5 s). Without this wait the assertions race it — and that race is how the
+  // duplicate `gameLoadingFinished` this test now guards against was found.
+  await page.waitForTimeout(2500);
+
   // What the Inspector's "External Resources" warning looks for.
   expect(external).toEqual([]);
   expect(failed).toEqual([]);

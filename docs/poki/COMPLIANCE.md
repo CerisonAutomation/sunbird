@@ -168,8 +168,8 @@
 | `REQ-04` | requirement | Initial download under ~5 MB, total under ~8 MB. | ✅ verified (executed) | executed: node scripts/verify-portal.mjs |
 | `REQ-05` | requirement | No service worker or manifest inside portal builds. | ✅ verified (executed) | executed: node scripts/verify-portal.mjs |
 | `REQ-06` | requirement | Fixed non-scrolling page with the canvas filling the viewport; portrait and landscape supported. | ✅ | src/index.css matches /position: fixed/ |
-| `REQ-10` | requirement | Lifecycle order init -> gameLoadingStart -> gameLoadingFinished, each phase marker once. | ✅ | src/game/__tests__/gameplay-events.test.ts |
-| `REQ-11` | requirement | gameplayStart on real play start, gameplayStop on stop; never duplicated or inverted. | ✅ | src/game/__tests__/gameplay-events.test.ts |
+| `REQ-10` | requirement | Lifecycle order init -> gameLoadingStart -> gameLoadingFinished, each phase marker once. | ✅ | src/sdk/__tests__/platform-failsafe.test.ts |
+| `REQ-11` | requirement | gameplayStart on real play start, gameplayStop on stop; never duplicated or inverted. | ✅ | e2e/poki-artifact.spec.ts |
 | `REQ-12` | requirement | Pause/unpause order: gameplayStop -> commercialBreak -> gameplayStart. | ✅ | src/game/Game.ts matches /resumeFromPause/ |
 | `REQ-13` | requirement | Game events: one start per attempt, then exactly one of complete or fail. | ✅ | src/game/Game.ts matches /runOutcome/ |
 | `REQ-14` | requirement | Rewarded placements emit visible when shown and interact when chosen. | ✅ | src/game/Game.ts matches /continue-ad/ |
@@ -295,8 +295,8 @@
 | `REQ-04` | Zip gate at 8 MB; measured ≈0.7 MB. |
 | `REQ-05` | Manifest link stripped at packaging; boot.ts skips registration entirely for portal targets. |
 | `REQ-06` | body/#root fixed inset:0 overflow:hidden; renderer resize on viewport change. |
-| `REQ-10` | PokiAdapter.loadingFinished() is one-shot; platform.ts fires gameLoadingStart once right after init. |
-| `REQ-11` | GameplayEventSink dedupes every emission and suppresses stale phase replays. |
+| `REQ-10` | PokiAdapter.loadingFinished() is one-shot; gameLoadingStart fires once right after init; and the entry-point loading-screen failsafe routes through the live adapter instead of the raw SDK global, so it cannot add a second gameLoadingFinished on a healthy boot (it used to, 1.5 s after window load — found by e2e/poki-artifact.spec.ts, pinned by platform-failsafe.test.ts). |
+| `REQ-11` | GameplayEventSink dedupes every emission and suppresses stale phase replays; the shipping artifact is now recorded in a real browser (pnpm test:artifact) and the sequence is asserted to contain no consecutive duplicate gameplay phase. |
 | `REQ-12` | Both resume call sites (button, ESC/P) route through the commercial break. |
 | `REQ-13` | runOutcome resets to fail at run start and is only set to complete on the goal-reached branch. |
 | `REQ-14` | measure('button','continue-ad','visible'\|'interact') on the continue screen. |

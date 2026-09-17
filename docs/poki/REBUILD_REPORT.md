@@ -250,6 +250,31 @@ Each failure mode was **negative-tested** rather than assumed:
 | `index.html` renamed away (the reported error) | `ROOT-01` `index.html MISSING — the Inspector would say "missing index.html"` → exit 1 |
 | zip re-created with a `sunbird-main/` wrapping directory (the GitHub "Download ZIP" shape) | `ROOT-02` "zip is wrapped in a directory: sunbird-main/" → exit 1 |
 
+### A duplicate event the Inspector would have flagged
+
+The artifact test immediately earned its keep. On its first green run the
+recorded event log read:
+
+```
+init → gameLoadingStart → movePill → gameLoadingFinished → getURLParam → getUser
+     → gameLoadingFinished → signalGameReady
+```
+
+`gameLoadingFinished` was sent **twice** — the second time by
+`scheduleFailsafeFinish()` in `src/sdk/platform.ts`, the net that releases
+Poki's loading screen if the game never mounts. The net called the raw
+`window.PokiSDK` global, so it fired unconditionally 1.5 s after window load
+even on a healthy boot, sidestepping the one-shot guard inside
+`PokiAdapter.loadingFinished()`. `REQ-10` ("each phase marker once") was marked
+satisfied with a unit test that only covered the adapter, not the entry point.
+
+The failsafe now routes through the live adapter (one-shot) and falls back to
+the raw global only when no adapter exists at all — the crash it was written
+for. `src/sdk/__tests__/platform-failsafe.test.ts` pins both halves: the healthy
+boot is signalled once, and a boot that never mounts is still released. The
+e2e test now settles past the failsafe window before asserting, so the race
+that hid this cannot hide it again.
+
 The runbook that replaces the old "unzip and hope" instruction is
 [`UPLOAD.md`](./UPLOAD.md); `SUBMISSION_CHECKLIST.md` step 2 now says
 `pnpm upload:poki` followed by dragging the generated `poki-upload/` folder.

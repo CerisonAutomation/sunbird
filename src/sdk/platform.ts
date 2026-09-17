@@ -228,25 +228,47 @@ export function preloadPortalSdk(): void {
     // Hard safety net: if the Game never mounts (WebGL crash, sandbox, a
     // misbehaving browser) and therefore never calls adapter.loadingFinished(),
     // release the portal's loading screen ourselves after a generous timeout.
-    // A healthy build clears this the moment the first adapter fires finish.
+    // The release is idempotent with the adapter's own finish, so a healthy
+    // boot is not signalled twice.
     scheduleFailsafeFinish();
   });
 }
 
+/** The newest adapter (see `initPlatform`). The entry-point failsafe routes
+ *  through it so a late safety net can never re-send a loading phase that the
+ *  adapter — the one-shot owner of `gameLoadingFinished` — already sent. */
+let activeAdapter: PlatformAdapter | null = null;
+
 /** Releases the portal loading screen as a last resort, so a crash or
  *  headless-sandbox WebGL failure can never leave the portal stuck on its
- *  loading splash. One-shot, never fires on a healthy boot. */
+ *  loading splash.
+ *
+ *  It is a NET, not a second signal: when an adapter exists the release goes
+ *  through it, and `PokiAdapter.loadingFinished()` is one-shot, so a healthy
+ *  boot is never signalled twice. (Sending the raw SDK global here — as this
+ *  used to — added a second `gameLoadingFinished` 1.5 s after window load on
+ *  every healthy Poki boot, which the Inspector flags as an invalid event
+ *  sequence. Caught by e2e/poki-artifact.spec.ts.) */
 let failsafeScheduled = false;
 function scheduleFailsafeFinish(): void {
   if (failsafeScheduled) return;
   failsafeScheduled = true;
   const release = (): void => {
     try {
-      if (TARGET === "poki") {
-        const s = (window as unknown as { PokiSDK?: { gameLoadingFinished?: () => void; signalGameReady?: () => void } }).PokiSDK;
-        s?.gameLoadingFinished?.();
-        s?.signalGameReady?.();
+      if (TARGET !== "poki") return;
+      const adapter = activeAdapter;
+      if (adapter) {
+        // Preferred path: the adapter owns the phase markers and dedupes them.
+        adapter.loadingFinished();
+        adapter.signalGameReady();
+        return;
       }
+      // No adapter exists at all — the Game never reached initPlatform (crash,
+      // CSP, headless WebGL failure). Nothing has been sent yet, so the raw
+      // SDK global is the only handle, and it is used exactly once.
+      const s = (window as unknown as { PokiSDK?: { gameLoadingFinished?: () => void; signalGameReady?: () => void } }).PokiSDK;
+      s?.gameLoadingFinished?.();
+      s?.signalGameReady?.();
     } catch { /* ignore */ }
   };
   // Prefer window.load (fires after all subresources), then cap with a timer.
@@ -474,10 +496,12 @@ export async function initPlatform(events: PlatformEvents): Promise<PlatformAdap
     type CGlobal = { SDK?: unknown };
     const cg = (window as unknown as { CrazyGames?: CGlobal }).CrazyGames;
     if (crazyEnvironment === "disabled" || !cg?.SDK) {
-      return new LocalAdapter("none");
+      activeAdapter = new LocalAdapter("none");
+      return activeAdapter;
     }
     adapter = new CrazyGamesAdapter(events, CRAZY_BANNER_ID);
     adapter.syncSettings();
+    activeAdapter = adapter;
     return adapter;
   } else {
     // generic / none
@@ -488,5 +512,6 @@ export async function initPlatform(events: PlatformEvents): Promise<PlatformAdap
   }, 6000);
   const originalFinish = adapter.loadingFinished.bind(adapter);
   adapter.loadingFinished = () => { window.clearTimeout(safety); originalFinish(); };
+  activeAdapter = adapter;
   return adapter;
 }
