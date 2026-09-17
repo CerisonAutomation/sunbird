@@ -747,7 +747,7 @@ mod tests {
 
         // The remaining pilot is told about it without waiting for a socket close.
         let mut frames: Vec<String> = Vec::new();
-        while let Some(Outbox::Frame(text)) = rx_b.try_recv().ok() {
+        while let Ok(Outbox::Frame(text)) = rx_b.try_recv() {
             frames.push(text);
         }
         let mut told = false;
