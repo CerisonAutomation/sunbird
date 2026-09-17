@@ -1,7 +1,7 @@
 import type { NetTransport, RemoteSnapshot } from "./MassRace";
 import { truncate } from "./math";
 import { PROTOCOL_VERSION } from "./protocol/v1";
-import { portalTarget } from "../sdk/platform";
+import { POKI_MULTIPLAYER } from "./edition";
 // PokiMpUtils is a tiny, dependency-free module so importing it here does
 // not pull @poki/netlib into non-Poki bundles. The heavy PokiNetlibClient
 // class lives in PokiNetlib.ts and is loaded only via dynamic import from
@@ -135,14 +135,16 @@ export function protocolGatewayInfo(): ProtocolGatewayInfo {
  */
 export function isMultiplayerConfigured(): boolean {
   if (URL_BASE.length > 0) return true;
-  if (portalTarget() === "poki") return isPokiMultiplayerAvailable();
+  // `POKI_MULTIPLAYER` is a compile-time per-target constant (edition module),
+  // so the Poki transport never reaches — or names — another build's bundle.
+  if (POKI_MULTIPLAYER) return isPokiMultiplayerAvailable();
   return false;
 }
 
 /** Short, unambiguous room codes — no 0/O or 1/I confusion when read aloud.
  * Uses the same alphabet on both transports so invite codes are interchangeable. */
 export function makeRoomCode(): string {
-  if (portalTarget() === "poki") return makePokiRoomCode();
+  if (POKI_MULTIPLAYER) return makePokiRoomCode();
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let out = "";
   for (let i = 0; i < 5; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];

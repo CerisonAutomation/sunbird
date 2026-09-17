@@ -43,6 +43,20 @@ function portalShimPlugin(): Plugin {
       // Using path-absolute comparison is robust against ./ vs no-ext etc.
       const base = path.basename(source);
       const dir = path.basename(path.dirname(importer));
+      // Per-target edition strings (display name, portal-note, labels). Same
+      // reasoning as the adapters: a shared ternary on the runtime portal name
+      // embeds EVERY portal's name in EVERY bundle, and scanners flag a
+      // competitor's name even in dead code. Each build gets exactly one file.
+      if (base === "edition" || base === "edition.ts") {
+        if (dir !== "game") return null;
+        const edition =
+          PORTAL === "poki"
+            ? path.resolve(__dirname, "src/game/edition.poki.ts")
+            : PORTAL === "crazy" || PORTAL === "crazygames"
+              ? path.resolve(__dirname, "src/game/edition.crazy.ts")
+              : null;
+        return edition; // null => the neutral src/game/edition.ts
+      }
       if (dir !== "sdk") return null;
       if (base === "poki" || base === "poki.ts") {
         if (PORTAL !== "poki") return shim;

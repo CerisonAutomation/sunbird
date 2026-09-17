@@ -8,7 +8,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * on a HEALTHY boot it still fired `gameLoadingFinished()` a second time —
  * 1.5 s after window load — and Poki's Inspector flags a repeated loading
  * phase as an invalid event sequence. It now routes through the live adapter,
- * whose `loadingFinished()` is one-shot.
+ * whose `loadingFinished()` is one-shot, and falls back to the target's
+ * registered net (sdk/net.ts) only when no adapter exists — see
+ * poki-loading-net.test.ts for that side.
  *
  * Found by e2e/poki-artifact.spec.ts, which recorded the duplicate in a real
  * browser; this test keeps it fixed without needing one.

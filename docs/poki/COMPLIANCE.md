@@ -317,7 +317,7 @@
 | `REQ-41` | getIapToken() returns the token for immediate verification; nothing persists it. |
 | `REQ-42` | Local save and local boards are the default; platform identity only decorates the profile. |
 | `REQ-50` | docs/poki/09-platform-requirements.md |
-| `REQ-51` | Separate artifacts per portal with distinct hashes; the Poki zip carries no store links. |
+| `REQ-51` | Separate artifacts per portal with distinct hashes; the Poki zip carries no store links, and scripts/audit-zips.mjs + verify-portal.mjs fail on ANY foreign portal marker (scripts/portal-markers.mjs). |
 | `REQ-52` | SUBMISSION_CHECKLIST.md |
 | `REQ-53` | docs/poki/09-platform-requirements.md |
 | `REQ-60` | Pill moved clear of the flight HUD at SDK boot. |

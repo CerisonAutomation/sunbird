@@ -108,7 +108,7 @@ import { buildChallengeUrl, readChallengeFromUrl, type RivalChallenge } from "./
 import { flag } from "./Flags";
 import { variant } from "./Experiments";
 import { buildRoomInviteUrl, normalizeRoomCode, readRoomInviteFromUrl } from "./RoomInvite";
-import { CRAZY_BANNER_ID, initPlatform, isCoarsePointer, isPortalBuild, portalTarget as getPortalTarget, type PlatformAdapter } from "../sdk/platform";
+import { PORTAL_BANNER_ID, initPlatform, isCoarsePointer, isPortalBuild, portalTarget as getPortalTarget, type PlatformAdapter } from "../sdk/platform";
 import { GameplayEventSink } from "./GameplayEvents";
 import { LivingBackground } from "./LivingBackground";
 import { Sky } from "./Sky";
@@ -707,7 +707,7 @@ export class Game {
         void this.audio.resumeExisting();
       }
       if (this.checkoutWaiting && this.screen === "checkout") {
-        this.telemetry.track("stripe_return_focus", { sku: this.checkoutSku });
+        this.telemetry.track("checkout_return_focus", { sku: this.checkoutSku });
         this.hud.toast("Welcome back — confirm below if you finished paying", "info");
       }
     };
@@ -860,8 +860,8 @@ export class Game {
       });
 
       // Portal ad banner: the host div is rendered by App for portal builds.
-      if (CRAZY_BANNER_ID) {
-        const host = document.getElementById(CRAZY_BANNER_ID);
+      if (PORTAL_BANNER_ID) {
+        const host = document.getElementById(PORTAL_BANNER_ID);
         if (host) adapter.mountBanner(host);
       }
       this.bump();
@@ -4246,7 +4246,7 @@ export class Game {
         sku === "sunbird_gold" ? this.save.state.gold
         : sku === "sunbird_vip" ? this.save.isVipActive()
         : this.save.state.starterPack;
-      if (!owned) this.grantSku(sku, "stripe_webhook");
+      if (!owned) this.grantSku(sku, "payment_webhook");
     }
   }
 

@@ -26,7 +26,7 @@ node scripts/verify-prod.mjs     # production gate (lint+typecheck+tests+build, 
 | Target | What it ships | Notes |
 |---|---|---|
 | `poki` | Poki SDK only; multiplayer/leaderboard/telemetry/social/Stripe URLs all blanked | coin economy only; localStorage save |
-| `crazy` | CrazyGames SDK v3 (banner container `VITE_CRAZY_BANNER_ID`) | same blanking |
+| `crazy` | CrazyGames SDK v3 (banner container `VITE_PORTAL_BANNER_ID`) | same blanking |
 | `generic` | no SDK; portal-safe restrictions still apply | for itch.io, GameDistribution, Yandex… |
 | `vercel` (default) | full social build: WS multiplayer, leaderboard, social server | needs the backend env vars |
 | `itch` (`VITE_SINGLEFILE`) | one self-contained HTML file | |

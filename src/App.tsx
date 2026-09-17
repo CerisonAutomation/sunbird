@@ -68,7 +68,7 @@ export default function App() {
   // into this container once the SDK is ready. Rendered only when a banner
   // placement id is configured (portal builds), so direct/PWA builds carry
   // no extra node.
-  const bannerId = import.meta.env.VITE_CRAZY_BANNER_ID ?? "";
+  const bannerId = import.meta.env.VITE_PORTAL_BANNER_ID ?? "";
 
   useEffect(() => {
     const el = ref.current;

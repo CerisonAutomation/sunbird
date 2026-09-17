@@ -170,6 +170,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build all portal zips
         run: pnpm build:portals
+      - name: Verify per-version isolation (each build carries only its own portal)
+        run: pnpm verify:portals && pnpm audit:zips && pnpm verify:thumbnail
       - name: Verify the Poki Inspector upload shape
         run: pnpm verify:upload
       - uses: actions/upload-artifact@v4

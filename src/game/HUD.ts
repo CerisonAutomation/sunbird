@@ -13,6 +13,7 @@ import type { ActivePower } from "./PowerUps";
 import type { SessionGoal } from "./Engagement";
 import { PVP_MODES, type ModeDef, type PvpWorldCourse, type ModeId } from "./Modes";
 import type { RacerStats } from "./Racer";
+import { LEADERBOARD_CLOUD_LABEL, PORTAL_DISPLAY_NAME, PORTAL_EDITION_NOTE } from "./edition";
 import { leaderboardBackend } from "./Leaderboard";
 import type { BoardMetric, BoardPage, BoardScope } from "./Leaderboard";
 import type { TournamentView } from "./Tournaments";
@@ -85,7 +86,7 @@ export type AtlasEntry = {
 };
 export type UiState = "menu" | "playing" | "paused" | "continue" | "ad" | "gameover";
 export type SeedMode = "today" | "yesterday" | "random";
-export type CheckoutMode = "stripe" | "demo";
+export type CheckoutMode = "demo";
 export type PortalName = "none" | "poki" | "crazy" | "generic";
 
 export type HudSnapshot = {
@@ -1596,7 +1597,7 @@ function renderBoard(s: HudSnapshot): string {
     <p class="fineprint">${
       s.boardOnline
         ? `Scores sync to the ${
-            leaderboardBackend() === "auds" ? "☁️ Poki cloud" : leaderboardBackend() === "http" ? "🌐 global" : "💾 local"
+            leaderboardBackend() === "auds" ? LEADERBOARD_CLOUD_LABEL : leaderboardBackend() === "http" ? "🌐 global" : "💾 local"
           } leaderboard.`
         : "Rankings are stored locally. Fly well to climb the leaderboard!"
     }</p>
@@ -2191,7 +2192,7 @@ function renderProgress(s: HudSnapshot): string {
         .map((m) => `<button data-ui data-action="seed-${m.id}" class="${s.seedMode === m.id ? "on" : ""}">${m.label}</button>`)
         .join("")}</div>`
     : portal
-      ? `<p class="portal-note">${s.portalName === "poki" ? "Poki edition · portal rewards enabled" : s.portalName === "crazy" ? "CrazyGames edition · portal rewards enabled" : "Portal edition"}</p>`
+      ? `<p class="portal-note">${PORTAL_EDITION_NOTE}</p>`
       : `<button class="lock-chip" data-ui data-action="open-paywall">✦ Pick your hills with Gold</button>`;
   return `${head(t("hud.progress.title", undefined, "Your progress"))}
     <p class="tagline">${t("hud.progress.tagline", undefined, "Missions and rewards from all your flights, in one place.")}</p>
@@ -2956,7 +2957,7 @@ function renderContinue(s: HudSnapshot): string {
 function renderAd(s: HudSnapshot): string {
   if (s.portalName !== "none") {
     return `
-      <div class="ad-label">${s.portalName === "poki" ? "Poki" : s.portalName === "crazy" ? "CrazyGames" : "Portal"} break</div>
+      <div class="ad-label">${PORTAL_DISPLAY_NAME} break</div>
       <div class="portal-ad-wait"><div class="spinner"></div><h3>Preparing the next flight</h3><p>Your run is paused while the portal handles this break.</p></div>
     `;
   }

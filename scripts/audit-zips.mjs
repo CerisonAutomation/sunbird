@@ -17,6 +17,7 @@ import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { foreignMarkersIn } from "./portal-markers.mjs";
 
 const root = join(fileURLToPath(import.meta.url), "..", "..");
 const PORTALS = ["poki", "crazy", "generic"];
@@ -59,18 +60,20 @@ if (PORTALS.every((p) => zips[p])) {
   }
 
   const sdkHost = { poki: "game-cdn.poki.com", crazy: "sdk.crazygames.com" };
-  const otherSdk = { poki: "sdk.crazygames.com", crazy: "game-cdn.poki.com", generic: null };
   for (const p of PORTALS) {
     const own = sdkHost[p];
     if (own && !zips[p].html.includes(own)) fail(p, `own SDK host ${own} missing from bundle.`);
-    const foreign = otherSdk[p];
-    if (foreign) {
-      // Inert string literals of the OTHER portal's SDK URL ship in every
-      // bundle (platform.ts keeps both constants; scriptFor() gates loading).
-      // What must be true: the foreign URL never appears as a loadable tag.
-      const foreignStatic = new RegExp(`<script[^>]+src=["']https?://[^"']*${foreign}`, "i");
-      if (foreignStatic.test(zips[p].html)) fail(p, `foreign SDK ${foreign} appears as a loadable <script> — portal cross-wiring.`);
-      else if (zips[p].html.includes(foreign)) note(`${p}: foreign SDK literal ${foreign} present but inert (not in any <script>/<link> tag) — expected.`);
+  }
+  // Cross-portal isolation — the machine-checked form of "every version is its
+  // own way" (REQ-51: separate artifacts per portal). Every bundle carries its
+  // OWN SDK/branding and none of another portal's. This used to be a `note`:
+  // the foreign SDK literal shipped in every bundle behind a negative
+  // `TARGET !== "poki"` guard the minifier could not fold. Target-only code now
+  // lives in target-only modules (see scripts/portal-markers.mjs), so a foreign
+  // marker is a hard failure — not an accepted inert string.
+  for (const p of PORTALS) {
+    for (const hit of foreignMarkersIn(zips[p].html, p)) {
+      fail(p, `foreign portal marker in bundle — ${hit}. Portals must not cross-contaminate.`);
     }
   }
 }

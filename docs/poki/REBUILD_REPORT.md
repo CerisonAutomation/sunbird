@@ -269,12 +269,75 @@ even on a healthy boot, sidestepping the one-shot guard inside
 satisfied with a unit test that only covered the adapter, not the entry point.
 
 The failsafe now routes through the live adapter (one-shot) and falls back to
-the raw global only when no adapter exists at all — the crash it was written
-for. `src/sdk/__tests__/platform-failsafe.test.ts` pins both halves: the healthy
-boot is signalled once, and a boot that never mounts is still released. The
-e2e test now settles past the failsafe window before asserting, so the race
-that hid this cannot hide it again.
+the target's **registered net** only when no adapter exists at all — the crash
+it was written for. The net body lives in the Poki adapter module
+(`src/sdk/net.ts` + `poki.ts`), so shared code names no portal SDK (see §11).
+`src/sdk/__tests__/platform-failsafe.test.ts` pins the routing and
+`src/sdk/__tests__/poki-loading-net.test.ts` the net itself: the healthy boot is
+signalled once, and a boot that never mounts is still released. The e2e test now
+settles past the failsafe window before asserting, so the race that hid this
+cannot hide it again.
 
 The runbook that replaces the old "unzip and hope" instruction is
 [`UPLOAD.md`](./UPLOAD.md); `SUBMISSION_CHECKLIST.md` step 2 now says
 `pnpm upload:poki` followed by dragging the generated `poki-upload/` folder.
+
+## 11. Every build is its own way — per-version isolation
+
+The standing requirement is that each artifact is *its own build*: only its own
+SDK and integrations, no other portal's markers. An audit of the shipped
+`index.html` of every target (grep counts) found real cross-contamination, all
+of it from **shared** modules:
+
+| Marker | poki | crazy | generic | Cause |
+|---|---|---|---|---|
+| `window.PokiSDK` fallback text | own | **1 (leak)** | **1 (leak)** | the loading-net fallback lived in `platform.ts` behind `if (TARGET !== "poki") return;` |
+| `CrazyGames` edition string | **2 (leak)** | own | **2 (leak)** | one HUD ternary naming all three portals, plus the ad-label ternary |
+| `"☁️ Poki cloud"` leaderboard label | own | **1 (leak)** | **1 (leak)** | same HUD function |
+| `stripe` (dead checkout code + CSS) | **4 (leak)** | **4 (leak)** | **4 (leak)** | shared payment strings, telemetry names and dead CSS |
+| `crazyEnvironment` key | **3 (leak)** | own | **3 (leak)** | boot-result field name |
+
+The minifier inlines `TARGET` as a literal and **does** fold positive
+`TARGET === "poki"` branches (the Poki CDN URL is absent from the other
+bundles) — but it does **not** fold a negative early-return guard, and a
+runtime ternary on the portal name is never folded at all. Four fixes, all
+structural rather than cosmetic:
+
+1. **The loading net moved into the target module.** `platform.ts` no longer
+   names any portal SDK; it calls `runLoadingNet()` from `src/sdk/net.ts`, and
+   the Poki adapter registers the raw-global release at module scope. Non-Poki
+   builds alias that module to `_shim.ts`, so it is not even in the graph.
+2. **Edition strings are per-target files** (`src/game/edition.ts` +
+   `edition.poki.ts` + `edition.crazy.ts`), swapped by the same alias plugin
+   that shims the adapters. No build can name another portal's brand.
+3. **Names that ship as object keys were de-branded** (`crazyEnvironment` →
+   `platformEnvironment`, `CRAZY_BANNER_ID` → `PORTAL_BANNER_ID` /
+   `VITE_PORTAL_BANNER_ID`), and dead payment code was deleted rather than
+   scrubbed: the `"stripe"` checkout mode, its telemetry event, the grant
+   source, and the unused CSS classes.
+4. **A second, unrelated leak:** two comments in the shared `index.html`
+   template ("…external-resource warnings on Poki", "(Poki EA-04 …)") survive
+   into *every* bundle verbatim — HTML/CSS in the template is not minified
+   away. They now say "portals" / "EA-04".
+
+Before/after, same grep, same files:
+
+```
+BEFORE  dist-crazy   PokiSDK=1  poki=5   CrazyGames=6   stripe=4
+        dist-generic PokiSDK=1  poki=5   CrazyGames=2   stripe=4
+        dist-poki    CrazyGames=2 crazy=2  stripe=4
+AFTER   dist-crazy   PokiSDK=0  poki=0   CrazyGames=6   stripe=0   (own only)
+        dist-generic PokiSDK=0  poki=0   CrazyGames=0   stripe=0   (fully neutral)
+        dist-poki    CrazyGames=0 crazy=0  stripe=0      sdk.poki=own
+        dist / dist-itch  every portal marker 0
+```
+
+The invariant is now **machine-checked** rather than audited by hand:
+`scripts/portal-markers.mjs` holds the table, `verify-portal.mjs` fails a zip
+that carries a foreign marker (it used to *note* the foreign SDK literal as
+expected — that allowance is gone), `audit-zips.mjs` does the same for the
+brutal audit (verifier of `REQ-51`, web exclusivity), and `verify-upload.mjs`
+adds `ROOT-07` for the Inspector folder. CI's portals job runs all of them, and
+each gate was negative-tested (injecting `sdk.crazygames.com` into the generic
+zip fails the audit with a named finding; removing the net registration fails
+`poki-loading-net.test.ts`).

@@ -13,11 +13,13 @@
  *   ROOT-02  the zip has no wrapping directory (Inspector unzips as-is)
  *   ROOT-03  poki-upload/ is fresh — its index.html hash matches the manifest
  *            hash recorded at packaging time, and it carries the current build
- *            (same game-version marker as dist-poki/index.html)
+ *            (byte-identical to dist-poki/index.html over its final 4 KB)
  *   ROOT-04  the folder holds only uploadable files (no sw.js / manifest /
  *            sourcemaps / dotfiles / upload-manifest.json)
  *   ROOT-05  the zip and the folder agree byte-for-byte on index.html
  *   ROOT-06  everything index.html references locally is present
+ *   ROOT-07  no other portal's markers (SDK global, CDN URL, edition string)
+ *            appear in the folder — the Poki edition ships Poki only
  *
  * Usage: node scripts/verify-upload.mjs
  */
@@ -25,6 +27,7 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
+import { foreignMarkersIn } from "./portal-markers.mjs";
 
 const UPLOAD = "poki-upload";
 const ZIP = "sunbird-poki.zip";
@@ -157,6 +160,17 @@ if (folderHtml) {
   const missing = [...refs].filter((r) => !existsSync(path.join(UPLOAD, r.replace(/^\.\//, ""))));
   if (missing.length) bad("ROOT-06", `referenced but absent: ${missing.join(", ")}`);
   else ok("ROOT-06", `all ${refs.size} local asset references resolve inside ${UPLOAD}/`);
+}
+
+/* ROOT-07 ------------------------------------------------------------ */
+// Cross-portal isolation for the shipped artifact ("every version is its own
+// way"). The Inspector folder is the Poki edition: it carries Poki's SDK and
+// no other portal's markers. A hit here means a shared module leaked
+// target-only code again — see scripts/portal-markers.mjs for the history.
+if (folderHtml) {
+  const hits = foreignMarkersIn(folderHtml.toString("utf8"), "poki");
+  if (hits.length) bad("ROOT-07", `foreign portal marker in ${UPLOAD}/ — ${hits.join("; ")}`);
+  else ok("ROOT-07", `${UPLOAD}/ carries no other portal's markers (Poki only)`);
 }
 
 /* ----------------------------------------------------------------- report -- */

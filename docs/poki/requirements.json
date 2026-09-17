@@ -1467,7 +1467,7 @@
           "sunbird-poki.zip"
         ]
       },
-      "evidence": "Separate artifacts per portal with distinct hashes; the Poki zip carries no store links."
+      "evidence": "Separate artifacts per portal with distinct hashes; the Poki zip carries no store links, and scripts/audit-zips.mjs + verify-portal.mjs fail on ANY foreign portal marker (scripts/portal-markers.mjs)."
     },
     {
       "id": "REQ-52",
