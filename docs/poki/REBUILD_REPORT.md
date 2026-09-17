@@ -182,6 +182,7 @@ Re-check with `pnpm verify:thumbnail`.
 | `pnpm test:server` | 7 passed |
 | `pnpm lint` | clean (`--max-warnings 0`) |
 | `pnpm build` | clean — 1.76 MB single-file portal bundle, 557 KB gzipped |
+| `pnpm verify:prod` | PASS — debug artifacts clean (the device summary moved to the telemetry surface), 1.41 MB JS total of a 2.50 MB budget, largest chunk 0.57 MB of 1.50 MB, coverage floors met |
 | `pnpm build:portals` + `pnpm verify:portals` | poki 829 KB · crazy 820 KB · generic 819 KB — gate PASSED |
 | `pnpm audit:zips` | BRUTAL AUDIT PASSED (after reconciling the anatomy/pattern rules with the packaging script — see §8) |
 | `pnpm poki:audit --run` | **99/113 verified**, 0 failures, `COMPLIANCE.md` rewritten, gates executed |
