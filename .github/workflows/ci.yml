@@ -139,20 +139,21 @@ jobs:
           if-no-files-found: warn
       # Belt and braces: step log and artifacts are not always retrievable, so
       # the failure is also emitted as annotations, which the checks API serves.
-      - name: Surface the artifact test failure
-        if: failure()
+      - name: Surface the artifact test result
+        if: always()
         shell: bash
         run: |
           [ -f poki-artifact-test.log ] || exit 0
-          n=0
-          while IFS= read -r line; do
-            clean=$(printf '%s' "$line" | sed 's/%/%25/g; s/\r//g')
-            if [ -n "${clean// }" ]; then
-              echo "::error title=Poki artifact test::${clean}"
-              n=$((n + 1))
-              [ "$n" -ge 8 ] && break
-            fi
-          done < <(tail -c 4000 poki-artifact-test.log)
+          # The SDK sequence the Inspector's Event Log is checked against, and
+          # the failing lines (when there are any), published as check
+          # annotations — the only channel that is always reachable.
+          seq=$(grep -a -m1 "Poki SDK boot sequence" poki-artifact-test.log || true)
+          if [ -n "$seq" ]; then
+            echo "::notice title=Poki SDK event log recorded::$(printf '%s' "$seq" | sed 's/%/%25/g')"
+          fi
+          tail -c 6000 poki-artifact-test.log | grep -a -E "✘|Error:|Expected|Received" | head -8 | while IFS= read -r line; do
+            echo "::error title=Poki artifact test::$(printf '%s' "$line" | sed 's/%/%25/g; s/\r//g')"
+          done || true
 
   portals:
     name: Build (Poki + CrazyGames + generic zips)
