@@ -3469,10 +3469,17 @@ button {
 .soft-btn:hover { background: rgba(255, 255, 255, 0.9); }
 .danger-btn { color: #7a3a36; border-color: rgba(160, 75, 65, 0.28); }
 .pause-exit-note { margin: 11px 4px 0; color: #8a6a62; font-size: 11px; line-height: 1.4; }
-/* When a pause sub-screen is open, tint the backdrop a hair darker so the
-   sub-card reads clearly over the frozen world. */
+/* When a pause sub-screen is open, tint the backdrop darker so the sub-card
+   reads clearly over the frozen world, and lift the menu above any in-flight
+   HUD chrome that might otherwise paint over it. */
 .overlay.menu.pause-submenu {
-  background: rgba(14, 18, 36, 0.28) !important;
+  background: rgba(14, 18, 36, 0.45) !important;
+  z-index: 30;
+}
+.overlay.menu.pause-submenu > .paper-card {
+  max-height: calc(100% - 8px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 /* Tighten the pause grid on small phones so two rows of four fit. */
 @media (max-width: 420px) {
@@ -4730,19 +4737,7 @@ select:focus-visible {
   filter: brightness(0.98);
 }
 
-/* Smooth visibility transitions */
-.hidden {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease;
-}
-
-.hidden:not(.hidden) {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* Better text legibility */
+/* Smooth card transitions */
 h1, h2, h3, h4, h5, h6, .heading-art {
   letter-spacing: -0.01em;
 }
