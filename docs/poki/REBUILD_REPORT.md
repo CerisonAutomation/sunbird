@@ -565,8 +565,26 @@ generator for *simulated* opponents in local duels and the AI flock.
 
 | Check | Result |
 |---|---|
-| `npx vitest run` (whole suite) | see the run recorded at the end of this round |
-| `pnpm isolation:check` | ✅ (and both sabotage directions fail it) |
-| `pnpm build:portals` → `verify:portals` → `isolation:check` → `audit:zips` → `verify:upload` | ✅ |
-| `pnpm pvp:check` | ✅ live suite 7/7 against a real server |
-| Rust `In::Leave` + test | compiled/fmt-checked by CI (`rust.yml`, `botsim.yml`) |
+| `pnpm lint` / `pnpm typecheck` / `pnpm typecheck:server` | ✅ clean |
+| `npx vitest run` (whole suite) | ✅ 1080 passed / 8 skipped (83 files + 1 skipped) — +25 over the round-5 baseline (auds 8, shared-run 11, netlib-id 3, lobby-truth 3) |
+| `pnpm isolation:check` | ✅, and both sabotage directions fail it (a "netlib" mention in `rust/`, a runtime use of the Poki client in `Realtime.ts`) |
+| `pnpm build:portals` → `verify:portals` → `isolation:check` → `audit:zips` → `verify:upload` | ✅ PORTAL GATE PASSED · BRUTAL AUDIT PASSED · UPLOAD READY (1.70 MB) with the new `ROOT-08` |
+| `pnpm verify:thumbnail`, `pnpm poki:audit -- --run` | ✅ every satisfied rule verified; `COMPLIANCE.md` rewritten (TOOL-08 is now an *action*, not *deferred*) |
+| `pnpm pvp:check` | ✅ live suite 7/7 + protocol smoke + pilot directory against a real server |
+| CI on the same commit | ✅ all three workflows: `CI` (6 jobs incl. PvP-live, portal zips + source isolation, Inspector artifact), `rust-backend` (fmt · clippy `-D warnings` · test · release build), `botsim` (40 bots vs Node reference **and** vs the Rust authoritative server, 0 cheat leaks) |
+
+Two things the isolation work exposed, both worth remembering:
+
+* **The build gates caught the feature before CI did.** The first cut of
+  `SharedRun.ts` imported the AUDS client statically, and `verify:portals`
+  immediately reported `auds.poki.io` + `PokiSDK` inside the CrazyGames and
+  generic bundles. The fix is the repo's established pattern — a compile-time
+  gated *dynamic* import — which is exactly why that gate exists.
+* **The Rust change took three CI round-trips, blind.** No Rust toolchain in
+  this environment, so the first attempt shipped a non-exhaustive `match`
+  (build failure), then a line rustfmt wants broken at 70 columns, then a clippy
+  `redundant_pattern_matching` complaint. The workflow's "publish the diff as a
+  check run" step turned out to be silently 403ing under `continue-on-error`
+  (no `checks: write`), so `rust.yml` now grants `checks: write` **and** emits
+  the diff as workflow annotations — the path that actually came back over the
+  API and let the last two fixes land.
