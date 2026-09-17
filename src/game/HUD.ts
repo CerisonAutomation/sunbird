@@ -1269,9 +1269,15 @@ export class HUD {
   }
 
   private renderStatic(s: HudSnapshot): void {
-    if (s.state === "menu" || (s.state === "gameover" && s.screen !== "main")) {
-      const className = `paper-card ${s.screen === "main" ? "menu-hero" : s.screen === "shop" || s.screen === "pass" ? "wide" : ""}`;
-      this.menuContinuity.render(this.menuCard, s.screen, renderCoins(this.renderScreen(s)), className);
+    const menuRendered = s.state === "menu"
+      || (s.state === "gameover" && s.screen !== "main")
+      || (s.state === "paused" && s.screen !== null && s.screen !== "main");
+    if (menuRendered) {
+      // In pause sub-screens never show the menu-hero (the launch grid) and
+      // never add "wide" — pause overlays should stay compact over the flight.
+      const wide = s.state === "paused" ? "" : (s.screen === "shop" || s.screen === "pass" ? "wide" : "");
+      const cls = `paper-card ${s.state === "menu" && s.screen === "main" ? "menu-hero" : wide}`;
+      this.menuContinuity.render(this.menuCard, s.screen, renderCoins(this.renderScreen(s)), cls);
     }
     if (s.state === "gameover") this.resultsContinuity.render(this.overCard, "results", renderCoins(renderGameOver(s)), "paper-card results-card");
     if (s.state === "continue") {
