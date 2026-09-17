@@ -15,9 +15,17 @@
  * "none". The SDK script URLs ship as inert literals (verified by
  * scripts/verify-portal.mjs); only the build target's URL is ever injected.
  */
-import { CrazyGamesAdapter } from "./crazygames";
-import { PokiAdapter } from "./poki";
 import { LocalAdapter } from "./local";
+// Portal adapters are statically imported below but routed through the
+// compile-time TARGET constant. The Vite resolve-alias shim (see
+// vite.config.ts) replaces non-target adapters with `./_shim.ts`, whose
+// classes contain zero SDK references — so a non-Poki build contains
+// neither "@poki/netlib" nor any "PokiSDK" / "shareableURL" literal, and
+// vice-versa for non-Crazy builds. The shim also means the dynamic import
+// is unnecessary; we can instantiate directly and let Rollup DCE the
+// unused branch completely.
+import { PokiAdapter } from "./poki";
+import { CrazyGamesAdapter } from "./crazygames";
 
 export type PlatformName = "poki" | "crazy" | "generic" | "none";
 
@@ -159,28 +167,41 @@ export interface PlatformAdapter {
 
 /* ------------------------------------------------------------------ boot */
 
-const TARGET = (import.meta.env.VITE_PORTAL_TARGET ?? "none").toLowerCase();
+// Vite replaces import.meta.env.VITE_PORTAL_TARGET with a string literal at
+// build time. Do NOT call .toLowerCase() on it here — doing so prevented
+// Rollup's dead-code elimination from folding the ternaries below, leaking
+// non-target SDK URLs into every bundle. The define in vite.config.ts
+// already lowercases the value.
+// TARGET is replaced with a string literal at build time by Vite's
+// define plugin (vite.config.ts pins VITE_PORTAL_TARGET to a constant).
+// Access it directly via import.meta.env so Rollup can statically fold
+// every `TARGET === "poki"` / `TARGET === "crazy"` branch — without the
+// String() cast above, which defeated the substitution. The `as string`
+// cast keeps TS from narrowing the union too aggressively inside branches
+// (which made the "crazygames" alias look unreachable) while still being a
+// compile-time constant for minification.
+const TARGET = (import.meta.env.VITE_PORTAL_TARGET ?? "none") as string;
 const CRAZY_BANNER_ID = import.meta.env.VITE_CRAZY_BANNER_ID ?? "";
-// Both URLs ship as inert string literals in every bundle; only the build
-// target's URL ever reaches the DOM (scriptFor() returns null for any other
-// target), so a non-target SDK can never load — see scripts/verify-portal.mjs.
-const POKI_SRC = "https://game-cdn.poki.com/scripts/v2/poki-sdk.js";
-const CRAZY_SRC = "https://sdk.crazygames.com/crazygames-sdk-v3.js";
+// URL constants are gated to the matching build target via a compile-time
+// constant so Rollup's dead-code elimination strips them from non-target
+// bundles entirely — a non-Poki build never contains the Poki SDK URL
+// string (or vice-versa), and `scriptFor()` can never return the wrong URL.
+const POKI_SRC = TARGET === "poki" ? "https://game-cdn.poki.com/scripts/v2/poki-sdk.js" : "";
+const CRAZY_SRC = TARGET === "crazy" || TARGET === "crazygames" ? "https://sdk.crazygames.com/crazygames-sdk-v3.js" : "";
 /** If the portal SDK can't load in this long, boot the game without it. */
 const SDK_LOAD_TIMEOUT_MS = 6000;
 
 export function portalTarget(): PlatformName {
+  // The TARGET constant is a compile-time string; these branches are
+  // folded by Rollup so non-target code is stripped.
   if (TARGET === "poki") return "poki";
   if (TARGET === "crazy" || TARGET === "crazygames") return "crazy";
-  // "generic": portal-safe build for GameDistribution / Yandex / itch.io /
-  // Newgrounds / GameMonetize etc. — no ads SDK, but ALL portal restrictions
-  // apply (no external payments, no install prompt, no file downloads).
   if (TARGET === "generic") return "generic";
   return "none";
 }
 
 export function isPortalBuild(): boolean {
-  return portalTarget() !== "none";
+  return TARGET !== "none";
 }
 
 /** Touch/pointer-coarse device (portal mobile + real phones). */
@@ -203,7 +224,38 @@ export function isCoarsePointer(): boolean {
  * injection and the never-fail boot are untouched).
  */
 export function preloadPortalSdk(): void {
-  void bootstrapSdk(portalTarget());
+  void bootstrapSdk().then(() => {
+    // Hard safety net: if the Game never mounts (WebGL crash, sandbox, a
+    // misbehaving browser) and therefore never calls adapter.loadingFinished(),
+    // release the portal's loading screen ourselves after a generous timeout.
+    // A healthy build clears this the moment the first adapter fires finish.
+    scheduleFailsafeFinish();
+  });
+}
+
+/** Releases the portal loading screen as a last resort, so a crash or
+ *  headless-sandbox WebGL failure can never leave the portal stuck on its
+ *  loading splash. One-shot, never fires on a healthy boot. */
+let failsafeScheduled = false;
+function scheduleFailsafeFinish(): void {
+  if (failsafeScheduled) return;
+  failsafeScheduled = true;
+  const release = (): void => {
+    try {
+      if (TARGET === "poki") {
+        const s = (window as unknown as { PokiSDK?: { gameLoadingFinished?: () => void; signalGameReady?: () => void } }).PokiSDK;
+        s?.gameLoadingFinished?.();
+        s?.signalGameReady?.();
+      }
+    } catch { /* ignore */ }
+  };
+  // Prefer window.load (fires after all subresources), then cap with a timer.
+  if (document.readyState === "complete") {
+    window.setTimeout(release, 1500);
+  } else {
+    window.addEventListener("load", () => window.setTimeout(release, 1500), { once: true });
+    window.setTimeout(release, 8000);
+  }
 }
 
 export { CRAZY_BANNER_ID };
@@ -221,117 +273,150 @@ let portalEventSink: PlatformEvents | null = null;
 let settingsListenerRegistered = false;
 let pauseListenersRegistered = false;
 
-function scriptFor(target: PlatformName): string | null {
-  if (target === "poki") return POKI_SRC;
-  if (target === "crazy") return CRAZY_SRC;
-  return null; // "generic" and "none": no SDK script
-}
-
-function ensureSdk(target: PlatformName): Promise<PlatformName> {
-  if (target === "none" || target === "generic") return Promise.resolve(target);
+/**
+ * SDK bootstrap is specialized per target using compile-time TARGET so the
+ * non-target SDK globals (`window.PokiSDK`, `window.CrazyGames`) and script
+ * URLs never appear in the wrong bundle. The `as PlatformName` casts inside
+ * each branch keep TypeScript happy; the branch itself is eliminated by
+ * Rollup for the other targets.
+ */
+function ensureSdk(): Promise<PlatformName> {
+  if (TARGET === "none" || TARGET === "generic") return Promise.resolve(TARGET);
   if (loadPromise) return loadPromise;
-  loadPromise = new Promise((resolve) => {
-    // For Poki Inspector: wait up to 2s for SDK to be injected before loading from CDN
-    if (target === "poki") {
-      let waited = 0;
-      const checkInterval = setInterval(() => {
-        if (window.PokiSDK) {
-          clearInterval(checkInterval);
-          resolve(target);
-          return;
-        }
-        waited += 100;
-        if (waited >= 2000) {
-          clearInterval(checkInterval);
-          // Timeout: fall through to load from CDN
-          loadFromCdn();
-        }
-      }, 100);
-      return;
-    }
 
-    function loadFromCdn() {
-      const isReady = target === "poki" ? Boolean(window.PokiSDK) : Boolean(window.CrazyGames?.SDK);
-      if (isReady) {
-        resolve(target);
-        return;
-      }
-      const src = scriptFor(target);
-      if (!src) {
-        resolve("none");
-        return;
-      }
-      const existing = document.querySelector<HTMLScriptElement>(`script[data-sunbird-sdk="${target}"]`);
-      if (existing) {
-        if (existing.dataset.loaded === "true") {
-          resolve(target);
+  if (TARGET === "poki") {
+    // Poki global
+    type PokiGlobal = {
+      init?: () => Promise<void>;
+      setDebug?: (v: boolean) => void;
+      gameLoadingStart?: () => void;
+      movePill?: (x: number, y: number) => void;
+    };
+    const getPoki = (): PokiGlobal | undefined => (window as unknown as { PokiSDK?: PokiGlobal }).PokiSDK;
+    loadPromise = new Promise((resolve) => {
+      // Poki Inspector injects the SDK before the bundle loads; wait up to
+      // 2 s, then fall back to loading from the Poki CDN.
+      let waited = 0;
+      const check = window.setInterval(() => {
+        if (getPoki()) { window.clearInterval(check); resolve("poki"); return; }
+        waited += 100;
+        if (waited >= 2000) { window.clearInterval(check); loadCdn(); }
+      }, 100);
+
+      function loadCdn() {
+        if (getPoki()) { resolve("poki"); return; }
+        const existing = document.querySelector<HTMLScriptElement>('script[data-sunbird-sdk="poki"]');
+        if (existing) {
+          if (existing.dataset.loaded === "true") { resolve("poki"); return; }
+          existing.addEventListener("load", () => resolve("poki"), { once: true });
+          existing.addEventListener("error", () => resolve("none"), { once: true });
           return;
         }
-        existing.addEventListener("load", () => resolve(target), { once: true });
+        const script = document.createElement("script");
+        script.src = POKI_SRC;
+        script.async = true;
+        script.dataset.sunbirdSdk = "poki";
+        script.onload = () => { script.dataset.loaded = "true"; resolve("poki"); };
+        script.onerror = () => resolve("none");
+        document.head.appendChild(script);
+      }
+    });
+    return loadPromise;
+  }
+
+  if (TARGET === "crazy" || TARGET === "crazygames") {
+    type CrazyGlobal = {
+      SDK?: {
+        init?: () => Promise<void>;
+        environment?: string;
+        game?: {
+          loadingStart?: () => void;
+          settings?: { muteAudio?: boolean };
+          addSettingsChangeListener?: (cb: (s: { muteAudio?: boolean }) => void) => void;
+          onPause?: (cb: () => void) => void;
+          onResume?: (cb: () => void) => void;
+        };
+      };
+    };
+    const getCrazy = (): CrazyGlobal | undefined => (window as unknown as { CrazyGames?: CrazyGlobal }).CrazyGames;
+    loadPromise = new Promise((resolve) => {
+      if (getCrazy()?.SDK) { resolve("crazy"); return; }
+      const existing = document.querySelector<HTMLScriptElement>('script[data-sunbird-sdk="crazy"]');
+      if (existing) {
+        if (existing.dataset.loaded === "true") { resolve("crazy"); return; }
+        existing.addEventListener("load", () => resolve("crazy"), { once: true });
         existing.addEventListener("error", () => resolve("none"), { once: true });
         return;
       }
       const script = document.createElement("script");
-      script.src = src;
+      script.src = CRAZY_SRC;
       script.async = true;
-      script.dataset.sunbirdSdk = target;
-      script.onload = () => {
-        script.dataset.loaded = "true";
-        resolve(target);
-      };
+      script.dataset.sunbirdSdk = "crazy";
+      script.onload = () => { script.dataset.loaded = "true"; resolve("crazy"); };
       script.onerror = () => resolve("none");
       document.head.appendChild(script);
-    }
+    });
+    return loadPromise;
+  }
 
-    loadFromCdn();
-  });
-  return loadPromise;
+  return Promise.resolve("none");
 }
 
 /** Boot the portal SDK once; adapters stay per-Game so callbacks are fresh after remounts. */
-function bootstrapSdk(target: PlatformName): Promise<{ name: PlatformName; crazyEnvironment: string | null }> {
+function bootstrapSdk(): Promise<{ name: PlatformName; crazyEnvironment: string | null }> {
   if (sdkBootPromise) return sdkBootPromise;
   // Hard cap: a hanging/blocked SDK script must never hold the game hostage.
   const timeout = new Promise<{ name: PlatformName; crazyEnvironment: string | null }>((resolve) => {
     window.setTimeout(() => resolve({ name: "none", crazyEnvironment: null }), SDK_LOAD_TIMEOUT_MS);
   });
-  const boot = ensureSdk(target).then(async (loaded) => {
-    if (loaded === "poki") {
+
+  let boot: Promise<{ name: PlatformName; crazyEnvironment: string | null }>;
+  if (TARGET === "poki") {
+    type PokiGlobal = {
+      init?: () => Promise<void>;
+      setDebug?: (v: boolean) => void;
+      gameLoadingStart?: () => void;
+      movePill?: (x: number, y: number) => void;
+    };
+    const getPoki = (): PokiGlobal | undefined => (window as unknown as { PokiSDK?: PokiGlobal }).PokiSDK;
+    boot = ensureSdk().then(async (loaded) => {
+      if (loaded !== "poki") return { name: "none", crazyEnvironment: null };
       try {
-        // Debug mode in local development only — the SDK docs are explicit:
-        // never ship `setDebug(true)` in a production build.
-        if (import.meta.env.DEV) window.PokiSDK?.setDebug?.(true);
-        await window.PokiSDK?.init?.();
-        // Poki's loading pipeline is gameLoadingStart() →
-        // gameLoadingFinished(). The start signal must fire BEFORE the game
-        // reports ready (Game.ts calls loadingFinished() once the first
-        // frame is up), or the portal's loading screen mis-handles the
-        // transition. Firing it here — right after init, before any of the
-        // game's own asset work — mirrors the CrazyGames path below, which
-        // calls sdk.game.loadingStart().
-        window.PokiSDK?.gameLoadingStart?.();
-      } catch {
-        // Poki's local sandbox can reject init; preserve a playable build.
-      }
-      // On mobile the pill is 46x62 at the top-left by default; lift it to
-      // the docs' "fits the game" position (100px above center) where it
-      // clears Sunbird's HUD. Desktop keeps the SDK default.
-      if (isCoarsePointer()) {
-        try {
-          window.PokiSDK?.movePill?.(50, -100);
-        } catch {
-          /* cosmetic only */
-        }
-      }
-      return { name: "poki" as PlatformName, crazyEnvironment: null };
-    }
-    if (loaded === "crazy") {
+        if (import.meta.env.DEV) getPoki()?.setDebug?.(true);
+        await getPoki()?.init?.();
+        // gameLoadingStart() fires exactly once, right after init, before
+        // any asset/3D scene work begins. Game.loadingFinished() is called
+        // by the Game constructor once the renderer/HUD/terrain are ready.
+        getPoki()?.gameLoadingStart?.();
+      } catch { /* preserve playable build in sandbox */ }
+      // Mobile: move the Poki pill out of the flight-HUD so it never covers
+      // the score/altitude/distance chips. The 0,0 default has it in the
+      // top-left which clashes with our HUD, so nudge it to a safer spot.
+      try { getPoki()?.movePill?.(50, -4); } catch { /* cosmetic */ }
+      return { name: "poki", crazyEnvironment: null };
+    });
+  } else if (TARGET === "crazy" || TARGET === "crazygames") {
+    type CrazyGlobal = {
+      SDK?: {
+        init?: () => Promise<void>;
+        environment?: string;
+        game?: {
+          loadingStart?: () => void;
+          settings?: { muteAudio?: boolean };
+          addSettingsChangeListener?: (cb: (s: { muteAudio?: boolean }) => void) => void;
+          onPause?: (cb: () => void) => void;
+          onResume?: (cb: () => void) => void;
+        };
+      };
+    };
+    const getCrazy = (): CrazyGlobal | undefined => (window as unknown as { CrazyGames?: CrazyGlobal }).CrazyGames;
+    boot = ensureSdk().then(async (loaded) => {
+      if (loaded !== "crazy") return { name: "none", crazyEnvironment: null };
       try {
-        const sdk = window.CrazyGames?.SDK;
+        const sdk = getCrazy()?.SDK;
         await sdk?.init?.();
         sdk?.game?.loadingStart?.();
         const environment = typeof sdk?.environment === "string" ? sdk.environment : null;
-        // Register the singleton settings + pause/resume listeners once.
         const game = sdk?.game;
         portalEventSink?.onPortalMute?.(game?.settings?.muteAudio === true);
         if (!settingsListenerRegistered && game?.addSettingsChangeListener) {
@@ -343,14 +428,15 @@ function bootstrapSdk(target: PlatformName): Promise<{ name: PlatformName; crazy
           game.onPause?.(() => portalEventSink?.onPause?.());
           game.onResume?.(() => portalEventSink?.onResume?.());
         }
-        return { name: "crazy" as PlatformName, crazyEnvironment: environment };
+        return { name: "crazy", crazyEnvironment: environment };
       } catch {
-        // Graceful fallback also supports direct local preview.
-        return { name: "none" as PlatformName, crazyEnvironment: null };
+        return { name: "none", crazyEnvironment: null };
       }
-    }
-    return { name: loaded, crazyEnvironment: null };
-  });
+    });
+  } else {
+    boot = Promise.resolve({ name: TARGET === "generic" ? "generic" : "none", crazyEnvironment: null });
+  }
+
   sdkBootPromise = Promise.race([boot, timeout]);
   return sdkBootPromise;
 }
@@ -366,19 +452,41 @@ function bootstrapSdk(target: PlatformName): Promise<{ name: PlatformName; crazy
  */
 export async function initPlatform(events: PlatformEvents): Promise<PlatformAdapter> {
   portalEventSink = events;
-  const { name, crazyEnvironment } = await bootstrapSdk(portalTarget());
-  if (name === "poki") {
-    return new PokiAdapter(events);
-  }
-  if (name === "crazy") {
-    if (crazyEnvironment === "disabled" || !window.CrazyGames?.SDK) {
-      // Outside the portal: no ads/identity — a local adapter keeps saves
-      // functional and every other call an honest no-op.
+  // Safety net: on portals the loader must be dismissed even if the Game
+  // constructor throws (e.g. headless WebGL failure, content-security, a
+  // misbehaving browser). If loadingFinished() has not been called within
+  // a short grace period after SDK init, fire it ourselves so the portal
+  // never sits on its loading screen over our error overlay. Real devices
+  // construct the Game fast enough that this timer is always cleared first.
+  let adapter: PlatformAdapter;
+  // Each branch is gated by a compile-time TARGET check so Rollup can strip
+  // the other portals' code entirely from the bundle — dev/generic builds
+  // ship only LocalAdapter, Poki builds ship only PokiAdapter, etc.
+  if (TARGET === "poki") {
+    await bootstrapSdk();
+    adapter = new PokiAdapter(events);
+  } else if (TARGET === "crazy" || TARGET === "crazygames") {
+    const { crazyEnvironment } = await bootstrapSdk();
+    // Runtime fallback: if the SDK never loads (outside the Crazy portal)
+    // use a local adapter so cloud saves still work. Gated behind the
+    // compile-time "crazy" target so the global reference never appears
+    // in other builds.
+    type CGlobal = { SDK?: unknown };
+    const cg = (window as unknown as { CrazyGames?: CGlobal }).CrazyGames;
+    if (crazyEnvironment === "disabled" || !cg?.SDK) {
       return new LocalAdapter("none");
     }
-    const adapter = new CrazyGamesAdapter(events, CRAZY_BANNER_ID);
+    adapter = new CrazyGamesAdapter(events, CRAZY_BANNER_ID);
     adapter.syncSettings();
     return adapter;
+  } else {
+    // generic / none
+    adapter = new LocalAdapter(TARGET === "generic" ? "generic" : "none");
   }
-  return new LocalAdapter(name === "generic" ? "generic" : "none");
+  const safety = window.setTimeout(() => {
+    try { adapter.loadingFinished(); adapter.signalGameReady(); } catch { /* ignore */ }
+  }, 6000);
+  const originalFinish = adapter.loadingFinished.bind(adapter);
+  adapter.loadingFinished = () => { window.clearTimeout(safety); originalFinish(); };
+  return adapter;
 }

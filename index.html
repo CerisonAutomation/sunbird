@@ -25,9 +25,11 @@
     <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <!-- Self-hosted fonts (116 KB total): no CDN dependency, portal-safe,
-         offline-safe. @font-face rules live in src/index.css. -->
-    <link rel="preload" href="/fonts/fredoka-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="/fonts/atkinson-hyperlegible-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin />
+         offline-safe. @font-face rules live in src/index.css and are inlined
+         as data: URIs by vite-plugin-singlefile in portal builds. Preload
+         links are emitted by Vite's CSS handling automatically; explicit
+         <link rel="preload"> tags with absolute /fonts/ URLs would bypass
+         processing and generate external-resource warnings on Poki. -->
   </head>
   <body>
     <div id="root"></div>

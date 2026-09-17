@@ -64,3 +64,10 @@ dist-multiplayer/
 
 .cache/
 sunbird-social-data/
+
+# Poki build output + QA harness
+dist-poki/
+dist-dev/
+poki-upload/
+sunbird-poki.zip
+scripts-tmp/

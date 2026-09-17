@@ -1,6 +1,16 @@
 import type { NetTransport, RemoteSnapshot } from "./MassRace";
 import { truncate } from "./math";
 import { PROTOCOL_VERSION } from "./protocol/v1";
+import { portalTarget } from "../sdk/platform";
+// PokiMpUtils is a tiny, dependency-free module so importing it here does
+// not pull @poki/netlib into non-Poki bundles. The heavy PokiNetlibClient
+// class lives in PokiNetlib.ts and is loaded only via dynamic import from
+// Game.makeNet() on Poki builds.
+import type { PokiNetlibClient } from "./PokiNetlib";
+import {
+  isPokiMultiplayerAvailable,
+  makePokiRoomCode,
+} from "./PokiMpUtils";
 
 /**
  * Realtime multiplayer client for up to 40 concurrent pilots.
@@ -114,17 +124,33 @@ export function protocolGatewayInfo(): ProtocolGatewayInfo {
   };
 }
 
+/** Multiplayer is available when either:
+ *   • a WebSocket relay URL is configured (VITE_MULTIPLAYER_URL, the
+ *     Rust-authoritative server used by direct/crazy builds), OR
+ *   • we're building for Poki and the browser supports WebRTC (Netlib P2P).
+ *
+ * The Poki build ships with VITE_MULTIPLAYER_URL emptied, so without Netlib
+ * the check would incorrectly report "no multiplayer" and hide the PvP UI.
+ */
 export function isMultiplayerConfigured(): boolean {
-  return URL_BASE.length > 0;
+  if (URL_BASE.length > 0) return true;
+  if (portalTarget() === "poki") return isPokiMultiplayerAvailable();
+  return false;
 }
 
-/** Short, unambiguous room codes — no 0/O or 1/I confusion when read aloud. */
+/** Short, unambiguous room codes — no 0/O or 1/I confusion when read aloud.
+ * Uses the same alphabet on both transports so invite codes are interchangeable. */
 export function makeRoomCode(): string {
+  if (portalTarget() === "poki") return makePokiRoomCode();
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let out = "";
   for (let i = 0; i < 5; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
   return out;
 }
+
+/** Union type covering both transports so Game.ts can instantiate whichever
+ * is configured without branching at every call site. */
+export type AnyRealtimeClient = RealtimeClient | PokiNetlibClient;
 
 export class RealtimeClient implements NetTransport {
   state: PresenceState = "offline";

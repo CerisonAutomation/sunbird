@@ -23,6 +23,38 @@ if (!VALID_PORTALS.includes(PORTAL)) {
 const singleFile = process.env.VITE_SINGLEFILE === "true" || PORTAL !== "none";
 const paymentAdapter = PORTAL !== "none" ? path.resolve(__dirname, "src/game/Payments.portal.ts") : undefined;
 
+// Stub out non-target portal adapters at module resolution. Vite's
+// resolve.alias matches import source strings, not resolved filesystem
+// paths, so we register a tiny plugin that intercepts "./poki" /
+// "./crazygames" relative imports from platform.ts and redirects them
+// to _shim.ts when building for a different target. Without this the
+// real adapter modules (with their "PokiSDK" / "shareableURL" method
+// names / script URLs) end up in non-target bundles — inert, but flagged
+// by portal scanners.
+function portalShimPlugin(): Plugin {
+  const shim = path.resolve(__dirname, "src/sdk/_shim.ts");
+  return {
+    name: "sunbird-portal-shim",
+    enforce: "pre",
+    resolveId(source, importer) {
+      if (!importer) return null;
+      // Match exactly the relative imports used by src/sdk/platform.ts (and
+      // any other module under src/sdk) to pull in the portal adapters.
+      // Using path-absolute comparison is robust against ./ vs no-ext etc.
+      const base = path.basename(source);
+      const dir = path.basename(path.dirname(importer));
+      if (dir !== "sdk") return null;
+      if (base === "poki" || base === "poki.ts") {
+        if (PORTAL !== "poki") return shim;
+      }
+      if (base === "crazygames" || base === "crazygames.ts") {
+        if (PORTAL !== "crazy" && PORTAL !== "crazygames") return shim;
+      }
+      return null;
+    },
+  };
+}
+
 // Stamp the service worker cache key per build so each deploy busts stale caches.
 const BUILD_ID = Date.now().toString(36);
 
@@ -55,12 +87,23 @@ export default defineConfig({
       name: "sunbird-boot-mark",
       transformIndexHtml(html) {
         // Inline the SAME artwork as the menu before any JS or assets arrive.
-        return html.replace("<!-- BOOT_SUN -->", sunSVG({ size: 84, className: "boot-sun" }))
+        let out = html
+          .replace("<!-- BOOT_SUN -->", sunSVG({ size: 84, className: "boot-sun" }))
           .replace("<!-- BOOT_BIRD -->", sunbirdSVG({ width: 58, className: "boot-bird", animateWings: true }));
+        // Portal builds: strip the itch.io og:url meta so the bundle is
+        // self-contained with no third-party host references. Inspector
+        // scans the HTML; a stray meta pointing off-portal can trigger the
+        // External Resources warning even though it's never fetched.
+        if (PORTAL !== "none") {
+          out = out.replace(/<meta\s+property=["']og:url["'][^>]*>/i, "");
+          out = out.replace(/<link[^>]*rel=["'](?:preload|canonical|alternate)["'][^>]*href=["']https?:\/\/[^>]+>/gi, "");
+        }
+        return out;
       },
     },
     react(),
     tailwindcss(),
+    portalShimPlugin(),
     ...(singleFile ? [viteSingleFile()] : []),
     ...(singleFile ? [] : [copyrightBanner()]),
   ],
@@ -92,6 +135,11 @@ export default defineConfig({
   },
   define: {
     "import.meta.env.VITE_BUILD_ID": JSON.stringify(BUILD_ID),
+    // Freeze the portal target to a compile-time constant so Rollup can
+    // statically fold `TARGET === "poki"` / `TARGET === "crazy"` branches
+    // and strip non-target SDK URLs / branches (e.g. Poki Netlib dynamic
+    // import) from the output entirely.
+    "import.meta.env.VITE_PORTAL_TARGET": JSON.stringify(PORTAL),
   },
   build: {
     // Keep production bundles lean and avoid publishing source maps that
@@ -115,8 +163,15 @@ export default defineConfig({
                   "./src/game/Audio.ts",
                   "./src/game/Music.ts",
                 ],
+                // Net bundle: only the WebSocket multiplayer transport and
+                // MassRace (which consumes it). Deliberately excludes
+                // src/sdk/platform.ts and src/game/PokiNetlib.ts so that
+                // portal-specific code (Poki SDK strings, @poki/netlib)
+                // stays in its own chunks and Rollup's DCE can strip the
+                // unused adapter path for each build target.
                 net: [
                   "./src/game/Realtime.ts",
+                  "./src/game/PokiMpUtils.ts",
                   "./src/game/MassRace.ts",
                   "./src/game/GhostNet.ts",
                   "./src/game/bufferUpdates.ts",
