@@ -12,6 +12,11 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      # `Publish fmt diff as a check` POSTs a check run so the diff survives
+      # environments where the Actions log blob host is unreachable. Without
+      # `checks: write` that POST 403s and the step's continue-on-error hides
+      # it, leaving a bare "Format (check) failed" with no way to see why.
+      checks: write
     defaults:
       run:
         working-directory: rust
