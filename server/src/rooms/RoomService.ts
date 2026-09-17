@@ -60,7 +60,11 @@ export class RoomService {
     return { room: this.view(session), grant: this.grant(session, seat.seatId) };
   }
 
-  /** Public matchmaking: first open lobby on the same seed, else a new room. */
+  /** Public matchmaking: first open lobby on the same seed, else a racing room
+   *  on the same seed that has capacity (for reconnects and late joiners),
+   *  else a new room. A reconnecting pilot must land back in the room they
+   *  were racing in, not get silently shunted into a fresh lobby just because
+   *  the countdown elapsed while their socket was down. */
   matchmake(input: { playerId: string; name?: unknown; skin?: unknown; hue?: unknown; seed?: unknown }): {
     room: RoomView;
     grant: SeatGrant;
@@ -68,13 +72,37 @@ export class RoomService {
     this.ensureNotSuspended(input.playerId);
     const seed =
       typeof input.seed === "string" && input.seed.length > 0 ? input.seed : dailySeed(this.ctx.now());
+    const cleanName = cleanText(input.name, 14) || "Pilot";
+    const cleanSkin = cleanText(input.skin, 32) || "sunbird";
+    const hue = typeof input.hue === "number" ? input.hue : 0.06;
+    // Lobbies first (that's where new pilots expect to land).
     for (const session of this.sessions.values()) {
       if (session.status === "lobby" && session.seed === seed && session.seatCount() < session.capacity) {
         const { seat } = session.join({
           playerId: input.playerId,
-          name: cleanText(input.name, 14) || "Pilot",
-          skin: cleanText(input.skin, 32) || "sunbird",
-          hue: typeof input.hue === "number" ? input.hue : 0.06,
+          name: cleanName,
+          skin: cleanSkin,
+          hue,
+        });
+        return { room: this.view(session), grant: this.grant(session, seat.seatId) };
+      }
+    }
+    // Racing rooms on the same seed (reconnects, late joins). We must ALWAYS
+    // try the player's existing seat first — even if seatCount() == capacity,
+    // a dropped pilot whose seat is in the reconnecting phase already owns a
+    // slot that join() will hand back to them. Capacity checking happens
+    // inside join() itself when a genuinely NEW late-joiner shows up.
+    for (const session of this.sessions.values()) {
+      if (session.status === "racing" && session.seed === seed) {
+        // Skip rooms where the player does NOT already have a seat AND the
+        // room is genuinely at capacity — those cannot accept late joiners.
+        const alreadySeated = Boolean(session.seatsForPlayer(input.playerId));
+        if (!alreadySeated && session.seatCount() >= session.capacity) continue;
+        const { seat } = session.join({
+          playerId: input.playerId,
+          name: cleanName,
+          skin: cleanSkin,
+          hue,
         });
         return { room: this.view(session), grant: this.grant(session, seat.seatId) };
       }

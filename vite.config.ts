@@ -117,12 +117,12 @@ export default defineConfig({
     // MULTIPLAYER_PROXY_TARGET / SOCIAL_PROXY_TARGET override per machine.
     proxy: {
       "/mp": {
-        target: process.env.MULTIPLAYER_PROXY_TARGET || "http://127.0.0.1:8791",
+        target: process.env.MULTIPLAYER_PROXY_TARGET || "http://127.0.0.1:8790",
         ws: true,
         changeOrigin: true,
       },
       "/social": {
-        target: process.env.SOCIAL_PROXY_TARGET || "http://127.0.0.1:8791",
+        target: process.env.SOCIAL_PROXY_TARGET || "http://127.0.0.1:8790",
         changeOrigin: true,
       },
     },
