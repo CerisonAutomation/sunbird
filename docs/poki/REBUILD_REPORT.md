@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-17 · **Branch:** `arena/01a0b118-sunbird`
 **Input:** the Poki developer guide, extracted into [`docs/poki/`](./README.md) (113 numbered rules, 72 of them hard requirements)
-**Gate:** `pnpm poki:audit` → [`COMPLIANCE.md`](./COMPLIANCE.md) · `pnpm verify:thumbnail` · `pnpm verify:portals` · `pnpm test` (1021 tests)
+**Gate:** `pnpm poki:audit` → [`COMPLIANCE.md`](./COMPLIANCE.md) · `pnpm verify:thumbnail` · `pnpm verify:portals` · `pnpm verify:upload` · `pnpm test` (1026 tests)
 
 This is the audit trail for the rebuild: every landed change, the rule it comes
 from, and how it can be re-checked. Nothing here is "we believe"; each line has
@@ -178,7 +178,7 @@ Re-check with `pnpm verify:thumbnail`.
 | Gate | Result |
 |---|---|
 | `pnpm typecheck` | clean |
-| `pnpm test` | **1021 passed** (75 files) — 72 new cases added by this rebuild (baseline: 949) |
+| `pnpm test` | **1026 passed** (77 files) — 77 new cases added by this rebuild (baseline: 949) |
 | `pnpm test:server` | 7 passed |
 | `pnpm lint` | clean (`--max-warnings 0`) |
 | `pnpm build` | clean — 1.76 MB single-file portal bundle, 557 KB gzipped |
@@ -187,6 +187,9 @@ Re-check with `pnpm verify:thumbnail`.
 | `pnpm audit:zips` | BRUTAL AUDIT PASSED (after reconciling the anatomy/pattern rules with the packaging script — see §8) |
 | `pnpm poki:audit --run` | **99/113 verified**, 0 failures, `COMPLIANCE.md` rewritten, gates executed |
 | `pnpm verify:thumbnail` | THB gate passed |
+| `pnpm verify:upload` | **UPLOAD READY** — `ROOT-01`…`ROOT-07` (folder root, no wrapper, freshness, junk-free, zip ≡ folder, references resolve, Poki-only markers) |
+| `pnpm verify:portals` + `pnpm audit:zips` | per-zip isolation: no foreign portal marker in any bundle (§11) |
+| CI (PR #14, run for `3ff31af`) | **all 13 checks pass** — incl. *Artifact (Inspector folder in a real browser)* and the portals job with the isolation + upload gates; the browser log records `init → gameLoadingStart → movePill → gameLoadingFinished → getURLParam → getUser` (one loading phase) |
 
 ## 8. Two repository gates disagreed — reconciled
 
@@ -234,13 +237,14 @@ that guaranteed the folder would rot:
 | The build output itself was a trap: `dist-poki/` carried `sw.js` + `manifest.webmanifest` next to `index.html`, so a naive folder selection shipped PWA plumbing the portal forbids. | the packager stripped them from the zip only | the packager now **removes** them from `dist-poki/`, `dist-crazy/`, `dist-generic/`, so every folder in the tree is upload-shaped |
 | Nothing verified the upload shape — the gates checked the *zip's* content, never "would the Inspector accept this folder". | no gate referenced the folder | new `scripts/verify-upload.mjs` → `pnpm verify:upload`, wired into `poki:preflight` and CI, and now the recorded verifier for `TOOL-03` |
 
-`verify:upload` implements the Inspector's first checks as `ROOT-01`–`ROOT-06`:
+`verify:upload` implements the Inspector's first checks as `ROOT-01`–`ROOT-07`:
 root `index.html` in **both** the folder and the zip; no wrapping directory in
 the zip; the folder proven **fresh** (packaging-manifest hash, `dist-poki`
 source hash, and a byte-identical final 4 KB against `dist-poki/index.html`);
 only uploadable files (no `sw.js`, manifest, sourcemaps or dotfiles); zip and
-folder byte-identical; and every local reference in the shipped html resolving
-inside the folder.
+folder byte-identical; every local reference in the shipped html resolving
+inside the folder; and `ROOT-07`, the Poki edition carrying no other portal's
+markers (§11).
 
 Each failure mode was **negative-tested** rather than assumed:
 
