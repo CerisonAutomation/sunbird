@@ -3430,8 +3430,8 @@ button {
 .pause-run-stats .prs b { font-size: 16px; color: var(--ink); letter-spacing: 0; }
 .pause-quick-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 7px;
   margin-top: 10px;
 }
 .pause-q {

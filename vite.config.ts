@@ -125,6 +125,16 @@ export default defineConfig({
         target: process.env.SOCIAL_PROXY_TARGET || "http://127.0.0.1:8790",
         changeOrigin: true,
       },
+      // Global leaderboard & score-submission endpoints live at the social
+      // server root. Proxy them so dev can hit the board without CORS fuss.
+      "/board": {
+        target: process.env.SOCIAL_PROXY_TARGET || "http://127.0.0.1:8790",
+        changeOrigin: true,
+      },
+      "/score": {
+        target: process.env.SOCIAL_PROXY_TARGET || "http://127.0.0.1:8790",
+        changeOrigin: true,
+      },
     },
   },
   resolve: {

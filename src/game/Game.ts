@@ -485,9 +485,14 @@ export class Game {
     // unless we say so — route them through the same observability bus.
     this.save.onPersistError = () => this.telemetry.track("save_persist_failed", {});
     this.cups = new Tournaments(this.save.state.tournaments);
+    // First-boot name: if no pilotName was saved, generate one right now so the
+    // player has an identity for leaderboards, multiplayer, and the account
+    // screen before they ever touch a name field. The generator produces
+    // memorable <SkyWord><BirdWord><NN> pairs (e.g. NovaFalcon42).
+    const generatedFresh = !this.save.state.pilotName;
     this.pilotName = this.save.state.pilotName || loadPilotName(this.save.state.deviceId);
     this.save.state.pilotName = this.pilotName;
-    if (this.cups.rollover()) this.save.persist();
+    if (generatedFresh || this.cups.rollover()) this.save.persist();
     // Ranked season rollover can also land between sessions.
     const seasonEnd = this.save.ensureRankSeason();
     this.seed = this.today;
@@ -5194,6 +5199,9 @@ export class Game {
     // Re-seed history from main so back() lands back on the pause card.
     this.screenHistory.resetTo("main");
     this.setScreen(target);
+    // Data-heavy screens should refresh when opened from pause so the player
+    // sees current data, not a stale snapshot from the last menu visit.
+    if (target === "board") void this.refreshBoard();
   }
 
   private closePauseScreen(): void {

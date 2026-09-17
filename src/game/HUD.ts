@@ -570,8 +570,11 @@ export class HUD {
             <button class="pause-q" data-ui data-action="pause-to" data-id="shop">
               <i>🛍</i><span>Shop</span>
             </button>
+            <button class="pause-q" data-ui data-action="pause-to" data-id="board">
+              <i>🌐</i><span>Global Board</span>
+            </button>
             <button class="pause-q" data-ui data-action="pause-to" data-id="scores">
-              <i>🏆</i><span>Scores</span>
+              <i>🏆</i><span>My Scores</span>
             </button>
             <button class="pause-q" data-ui data-action="pause-to" data-id="pass">
               <i>🎟</i><span>Nest Pass</span>

@@ -304,12 +304,13 @@ export class RaceSession {
     if (this.status === "racing" && !seat.finish) {
       seat.dnf = true;
       seat.finish = {
-        place: 0,
-        timeMs: 0,
-        distance: seat.state?.distance ?? 0,
+        place: this.finishOrder.length + 1,
+        timeMs: this.opts.now() - this.startAtMs,
+        distance: Math.round(seat.state?.distance ?? 0),
         score: 0,
       };
       this.registerDnf(seat);
+      this.emit({ type: "finish", seatId, place: seat.finish.place, timeMs: seat.finish.timeMs, distance: seat.finish.distance });
     }
     this.removeSeat(seatId, "leave");
   }
@@ -488,19 +489,22 @@ export class RaceSession {
           this.maybeComplete();
         }
       }
-      // Race cap: nobody flies forever.
+      // Race cap: nobody flies forever. Assign places sequentially so a
+      // wave of simultaneous timeouts can never collide on the same number.
       if (now - this.startAtMs > this.opts.maxRaceMs) {
-        for (const seat of this.seats.values()) {
-          if (!seat.finish) {
-            seat.dnf = true;
-            seat.finish = {
-              place: this.finishOrder.length + 1,
-              timeMs: now - this.startAtMs,
-              distance: Math.round(seat.state?.distance ?? 0),
-              score: 0,
-            };
-            this.finishOrder.push(seat.seatId);
-          }
+        const dnfOrder = [...this.seats.values()]
+          .filter((s) => !s.finish)
+          .sort((a, b) => (b.state?.distance ?? 0) - (a.state?.distance ?? 0));
+        for (const seat of dnfOrder) {
+          seat.dnf = true;
+          seat.finish = {
+            place: this.finishOrder.length + 1,
+            timeMs: now - this.startAtMs,
+            distance: Math.round(seat.state?.distance ?? 0),
+            score: 0,
+          };
+          this.finishOrder.push(seat.seatId);
+          this.emit({ type: "finish", seatId: seat.seatId, place: seat.finish.place, timeMs: seat.finish.timeMs, distance: seat.finish.distance });
         }
         this.completeRace();
         return;

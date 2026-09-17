@@ -15,7 +15,10 @@ import { storage } from "./Storage";
  *    as if they were worldwide results.
  */
 
-const API = (import.meta.env.VITE_LEADERBOARD_URL ?? (import.meta.env.DEV ? "/mp" : "")).replace(/\/$/, "");
+// Dev uses the social server root (vite proxies /board & /score to the local
+// Node social server). Production portal builds default to "" (offline local
+// board); wire VITE_LEADERBOARD_URL for a hosted global ladder.
+const API = (import.meta.env.VITE_LEADERBOARD_URL ?? (import.meta.env.DEV ? "" : "")).replace(/\/$/, "");
 const SALT = import.meta.env.VITE_LEADERBOARD_SALT ?? "";
 
 async function signScore(deviceId: string, distance: number, score: number): Promise<string> {
