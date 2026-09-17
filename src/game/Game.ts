@@ -796,10 +796,13 @@ export class Game {
     // Player Device Report (DEV-03): report the measured baseline once per
     // session so our own quality-tier decisions can be compared against the
     // platform's published distribution. Aggregate capability data only — no
-    // identifiers (REQ-32). Logged in dev so a tier surprise is visible
-    // immediately rather than only in the dashboard.
+    // identifiers (REQ-32).
     this.telemetry.track("device_profile", deviceProfileTelemetry(this.deviceProfile));
-    if (import.meta.env.DEV) console.info(`[sunbird] ${describeDeviceProfile(this.deviceProfile)}`);
+    // The human-readable line rides along as a `summary` field: telemetry's
+    // debug channel prints it on localhost, which is where a tier surprise
+    // should be noticed (the production gate forbids console.* in shipped
+    // client code, so this is the sanctioned observability surface).
+    this.telemetry.track("device_summary", { summary: describeDeviceProfile(this.deviceProfile) });
     // Portal SDK initialization is intentionally late: the first interactive
     // menu frame should never wait on a third-party CDN.
     void initPlatform({
