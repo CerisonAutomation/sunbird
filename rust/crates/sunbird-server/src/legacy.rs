@@ -761,7 +761,10 @@ mod tests {
         let reg = rooms.inner.read();
         let room = reg.rooms.get(&code).expect("room outlives its seats");
         assert!(!room.pilots.contains_key("p1"), "the leaver's seat is free");
-        assert!(room.pilots.contains_key("p2"), "the other pilot keeps their seat");
+        assert!(
+            room.pilots.contains_key("p2"),
+            "the other pilot keeps their seat"
+        );
     }
 
     #[test]
