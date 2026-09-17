@@ -1020,12 +1020,14 @@
       "status": "satisfied",
       "verify": {
         "type": "command",
-        "cmd": "node scripts/verify-portal.mjs",
+        "cmd": "node scripts/verify-upload.mjs",
         "requires": [
-          "sunbird-poki.zip"
+          "poki-upload/index.html",
+          "sunbird-poki.zip",
+          "dist-poki/index.html"
         ]
       },
-      "evidence": "verify-portal.mjs rejects absolute /asset references and asserts index.html + icons/ + fonts/ ship in the zip."
+      "evidence": "`pnpm build:poki` GENERATES `poki-upload/` (index.html at the root); `pnpm verify:upload` (ROOT-01\u2026ROOT-06) asserts the folder and the zip both carry a root index.html, that the folder is current with `dist-poki/`, and that it holds only uploadable files \u2014 the failure mode behind the reported \"missing index.html\" upload. Runbook: docs/poki/UPLOAD.md."
     },
     {
       "id": "TOOL-04",

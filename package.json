@@ -19,7 +19,7 @@
     "verify:thumbnail": "node scripts/verify-thumbnail.mjs",
     "render:thumbnail": "node scripts/render-thumbnail.mjs",
     "poki:audit": "node scripts/poki-audit.mjs",
-    "poki:preflight": "pnpm build:portals && pnpm verify:portals && pnpm audit:zips && pnpm verify:thumbnail && pnpm poki:audit -- --run",
+    "poki:preflight": "pnpm build:portals && pnpm verify:portals && pnpm audit:zips && pnpm verify:upload && pnpm verify:thumbnail && pnpm poki:audit -- --run",
     "test:mp": "node scripts/mp-smoke.mjs",
     "botsim": "node scripts/botsim.mjs",
     "botsim:40": "node scripts/botsim.mjs --players 40 --seconds 15",
@@ -36,7 +36,9 @@
     "lint": "eslint src scripts api --max-warnings 0",
     "test:e2e:multiplayer": "playwright test --config playwright.multiplayer.config.ts",
     "typecheck:server": "tsc -p server/tsconfig.json --noEmit",
-    "test:server": "vitest run -c vitest.server.config.ts"
+    "test:server": "vitest run -c vitest.server.config.ts",
+    "verify:upload": "node scripts/verify-upload.mjs",
+    "upload:poki": "pnpm build:poki && pnpm verify:upload"
   },
   "dependencies": {
     "@poki/netlib": "^0.0.20",

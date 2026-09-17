@@ -135,7 +135,7 @@ Tests: `src/game/__tests__/continue-offer.test.ts` (9 cases).
 | **Space/Return activate an overlay's primary action** even when focus sits on the dialog heading (the overlays move focus there for screen readers), without hijacking a control's own activation | `EN-02` | `overlay-navigation.test.ts` (+4 cases) |
 | Locale set completed to the guide's phase order: **Turkish** (phase 1), **Russian** (phase 3) added — 12 locales × 44 strings | `LOC-04` | `i18n/__tests__/locales.test.ts` |
 | Browser-language matching hardened: `pt`/`pt-PT` → `pt-BR`, `zh-Hant` → `zh-CN`, case/separator-insensitive, `navigator.languages` fallback list | `LOC-05` | `i18n/__tests__/locales.test.ts` |
-| Barrel integrity: every shipped locale complete, every placeholder preserved, and the three copies (`src/`, `public/`, `poki-upload/`) byte-identical | `LOC-02` | `i18n/__tests__/locales.test.ts` |
+| Barrel integrity: every shipped locale complete, every placeholder preserved, and every copy byte-identical — `src/` ⇄ `public/`, plus the generated upload folder when it exists | `LOC-02` | `i18n/__tests__/locales.test.ts` |
 | Device tier now gates shadows and the 2× pixel-ratio path (a measured-lite device with a desktop UA no longer gets a buffer it cannot fill) | `DEV-03`, `ENG-02` | `device-report.test.ts`, existing perf guards |
 
 ## 5. Thumbnail rebuilt to the letter of the spec (THB-05…THB-10)
@@ -215,3 +215,41 @@ from the dialog heading). The browser download for Playwright is blocked in the
 sandbox where this rebuild was produced, so those two specs were **not executed
 here** — they are discovered by `pnpm test:e2e --list` and run in CI. Every other
 gate in §7 ran locally.
+
+## 10. "missing index.html" — the Inspector folder, and why it went stale
+
+A real upload to <https://inspector.poki.dev/> was rejected with **"missing
+index.html"**. The Inspector's own documentation states the shape it wants
+(`08-game-dev-tools.md`, `TOOL-03`): *"If you are accessing the Poki Inspector
+directly, open your game's **folder** to upload it"* and *"drag and drop your
+game folder that contains an `index.html` file"* — a **folder**, with
+`index.html` at the **root of the folder you select**.
+
+The repository had two defects that could produce exactly that error, and one
+that guaranteed the folder would rot:
+
+| Defect | Evidence | Fix |
+|---|---|---|
+| The upload folder was a **hand-committed snapshot** (`poki-upload/` was tracked, 1.68 MB of pre-rebuild html) that no build refreshed. It was byte-different from `dist-poki/index.html` and had not moved through the latest rebuild. | byte compare against `dist-poki/index.html`; only the packaging step knew the current bytes | `poki-upload/` is now **generated on every `pnpm build:poki`**, byte-identical to the zip's `index.html`, git-ignored, and stamped with `upload-manifest.json` (source hash + staged hash + timestamp) |
+| The build output itself was a trap: `dist-poki/` carried `sw.js` + `manifest.webmanifest` next to `index.html`, so a naive folder selection shipped PWA plumbing the portal forbids. | the packager stripped them from the zip only | the packager now **removes** them from `dist-poki/`, `dist-crazy/`, `dist-generic/`, so every folder in the tree is upload-shaped |
+| Nothing verified the upload shape — the gates checked the *zip's* content, never "would the Inspector accept this folder". | no gate referenced the folder | new `scripts/verify-upload.mjs` → `pnpm verify:upload`, wired into `poki:preflight` and CI, and now the recorded verifier for `TOOL-03` |
+
+`verify:upload` implements the Inspector's first checks as `ROOT-01`–`ROOT-06`:
+root `index.html` in **both** the folder and the zip; no wrapping directory in
+the zip; the folder proven **fresh** (packaging-manifest hash, `dist-poki`
+source hash, and a byte-identical final 4 KB against `dist-poki/index.html`);
+only uploadable files (no `sw.js`, manifest, sourcemaps or dotfiles); zip and
+folder byte-identical; and every local reference in the shipped html resolving
+inside the folder.
+
+Each failure mode was **negative-tested** rather than assumed:
+
+| Injected defect | Gate response |
+|---|---|
+| tail of `poki-upload/index.html` edited (a stale snapshot) | `ROOT-03` "was edited after packaging" + "does not carry the current build's code" → exit 1 |
+| `index.html` renamed away (the reported error) | `ROOT-01` `index.html MISSING — the Inspector would say "missing index.html"` → exit 1 |
+| zip re-created with a `sunbird-main/` wrapping directory (the GitHub "Download ZIP" shape) | `ROOT-02` "zip is wrapped in a directory: sunbird-main/" → exit 1 |
+
+The runbook that replaces the old "unzip and hope" instruction is
+[`UPLOAD.md`](./UPLOAD.md); `SUBMISSION_CHECKLIST.md` step 2 now says
+`pnpm upload:poki` followed by dragging the generated `poki-upload/` folder.

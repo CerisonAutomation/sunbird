@@ -149,7 +149,7 @@
 |---|---|---|---|---|
 | `TOOL-01` | informational | The Inspector evaluates a web build against the platform's success factors. | ℹ️ info | Submission-time tool run. |
 | `TOOL-02` | requirement | The build must survive the Inspector's mobile and technical-optimisation passes (no external resources, no console errors, sane image weights). | ✅ verified (executed) | executed: node scripts/audit-zips.mjs |
-| `TOOL-03` | requirement | Uploadable as a folder with index.html at the root, working from any sub-path. | ✅ verified (executed) | executed: node scripts/verify-portal.mjs |
+| `TOOL-03` | requirement | Uploadable as a folder with index.html at the root, working from any sub-path. | ✅ verified (executed) | executed: node scripts/verify-upload.mjs |
 | `TOOL-04` | informational | Netlib is a WebRTC-datachannel P2P library for web games. | ℹ️ info | src/game/PokiNetlib.ts |
 | `TOOL-05` | informational | Netlib is usable whether or not the game is hosted on Poki. | ℹ️ info | Availability note. |
 | `TOOL-06` | requirement | Feature-detect WebRTC and keep a non-P2P path when using Netlib. | ✅ | src/game/PokiMpUtils.ts matches /RTCPeerConnection/ |
@@ -283,7 +283,7 @@
 | `DEV-16` | Probed and reported only; no AI-generated player-visible content ships (see REQ-34). |
 | `TOOL-01` | docs/poki/08-game-dev-tools.md |
 | `TOOL-02` | audit-zips.mjs sweeps the bundle for external URLs, banned markers and lifecycle signals. |
-| `TOOL-03` | verify-portal.mjs rejects absolute /asset references and asserts index.html + icons/ + fonts/ ship in the zip. |
+| `TOOL-03` | `pnpm build:poki` GENERATES `poki-upload/` (index.html at the root); `pnpm verify:upload` (ROOT-01…ROOT-06) asserts the folder and the zip both carry a root index.html, that the folder is current with `dist-poki/`, and that it holds only uploadable files — the failure mode behind the reported "missing index.html" upload. Runbook: docs/poki/UPLOAD.md. |
 | `TOOL-04` | Client implemented behind a code-split. |
 | `TOOL-05` | docs/poki/08-game-dev-tools.md |
 | `TOOL-06` | P2P is selected only when the build targets Poki AND RTCPeerConnection/crypto are present (PokiMpUtils.isPokiMultiplayerAvailable); WebSocket and local paths remain for every other build. |

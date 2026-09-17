@@ -108,6 +108,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build all portal zips
         run: pnpm build:portals
+      - name: Verify the Poki Inspector upload shape
+        run: pnpm verify:upload
       - uses: actions/upload-artifact@v4
         with:
           name: sunbird-portal-zips
@@ -115,4 +117,5 @@ jobs:
             sunbird-poki.zip
             sunbird-crazy.zip
             sunbird-generic.zip
+            poki-upload/
           retention-days: 14
