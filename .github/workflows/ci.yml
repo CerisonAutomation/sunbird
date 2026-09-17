@@ -113,7 +113,17 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Load the shipping folder in a real browser
-        run: pnpm test:artifact
+        run: pnpm test:artifact -- --reporter=list,json
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/report.json
+      - name: Upload the failure report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: poki-artifact-failure
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore
 
   portals:
     name: Build (Poki + CrazyGames + generic zips)
