@@ -77,6 +77,7 @@ export type PresenceEvent =
   | { type: "ready"; name: string }
   | { type: "finish"; name: string; place: number }
   | { type: "start" }
+  | { type: "welcome"; roomCode: string; seed: string }
   | { type: "interrupted"; message: string };
 
 type Keyframe = { t: number; x: number; y: number; rot: number; vx?: number; vy?: number };
@@ -165,6 +166,13 @@ export class RealtimeClient implements NetTransport {
   private localReady = false;
   private requestedCode = "";
   private requestedSeed = "";
+  /** True when the current connect() used an explicit room code (private
+   *  room / invite link). On the welcome frame for such a connect the host's
+   *  seed is authoritative and we emit a "welcome" event so Game.ts adopts
+   *  their format+course. Matchmaking connects (seed-only) trust their own
+   *  seed and ignore echoed seed changes. */
+  private joinedByCode = false;
+
   private heartbeat = 0;
   private autoReadyTimer: number | null = null;
 
@@ -226,8 +234,11 @@ export class RealtimeClient implements NetTransport {
     }
   }
 
-  /** Joins (or creates) a room. `code` empty = matchmake into a public room. */
-  connect(code: string, seed: string): void {
+  /** Joins (or creates) a room. `code` empty = matchmake into a public room.
+   *  When `codeIsRemote` is true the code was supplied by another player
+   *  (friend invite / code entry), so on welcome we adopt their seed rather
+   *  than forcing our own selection. */
+  connect(code: string, seed: string, codeIsRemote = false): void {
     if (!URL_BASE) {
       this.state = "offline";
       this.errorText = "No multiplayer server configured";
@@ -246,6 +257,7 @@ export class RealtimeClient implements NetTransport {
     this.closedByUs = false;
     this.requestedCode = code.toUpperCase();
     this.requestedSeed = seed;
+    this.joinedByCode = codeIsRemote;
     this.roomCode = this.requestedCode;
     this.seed = seed;
     this.myPlace = 0;
@@ -424,6 +436,15 @@ export class RealtimeClient implements NetTransport {
         this.seed = msg.seed || this.seed;
         this.capacity = msg.capacity || 40;
         this.state = "lobby";
+        // When joining a friend's room by code, the host's seed is
+        // authoritative — announce it so Game.ts adopts their format+course
+        // instead of forcing the local default. Only fire on the first
+        // welcome after a by-code connect; reconnects and seed-based
+        // matchmaking (where we already chose our own seed) stay silent.
+        if (this.joinedByCode && this.seed && this.seed !== this.requestedSeed) {
+          this.pendingEvents.push({ type: "welcome", roomCode: this.roomCode, seed: this.seed });
+        }
+        this.joinedByCode = false;
         break;
       case "peers":
         for (const p of msg.peers) {

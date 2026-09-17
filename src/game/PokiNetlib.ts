@@ -68,6 +68,7 @@ export type PresenceEvent =
   | { type: "ready"; name: string }
   | { type: "finish"; name: string; place: number }
   | { type: "start" }
+  | { type: "welcome"; roomCode: string; seed: string }
   | { type: "interrupted"; message: string };
 
 type Keyframe = { t: number; x: number; y: number; rot: number; vx?: number; vy?: number };
@@ -222,8 +223,18 @@ export class PokiNetlibClient implements NetTransport {
                 this.roomCode = this.requestedCode.toUpperCase();
                 this.capacity = info.maxPlayers || MAX_CAPACITY;
                 this.amHost = info.leader === network.id;
-                this.seed = String(info.customData?.seed ?? this.seed);
+                const prevSeed = this.seed;
+                const incoming = String(info.customData?.seed ?? this.seed);
+                // Announce a seed change only when we are NOT the host —
+                // i.e. we joined a friend's room whose format/course differs
+                // from what we selected locally. Hosting or reconnecting must
+                // not fire a spurious "welcome" event.
+                if (!this.amHost && incoming && incoming !== prevSeed) {
+                  this.pendingEvents.push({ type: "welcome", roomCode: this.roomCode, seed: incoming });
+                }
+                this.seed = incoming;
               }
+              this.state = "lobby";
               this.sendHelloAll();
             }).catch((err) => {
               this.fail(`Could not join room ${this.requestedCode}: ${String(err).slice(0, 80)}`);
@@ -263,8 +274,16 @@ export class PokiNetlibClient implements NetTransport {
                   this.roomCode = candidate.code.toUpperCase();
                   this.capacity = info.maxPlayers || candidate.maxPlayers || MAX_CAPACITY;
                   this.amHost = info.leader === network.id;
-                  this.seed = String(info.customData?.seed ?? candidate.customData?.seed ?? this.seed);
+                  const prevSeed = this.seed;
+                  const incoming = String(info.customData?.seed ?? candidate.customData?.seed ?? this.seed);
+                  // Quick-match found a public lobby running a different
+                  // format/world than we asked for — adopt it.
+                  if (!this.amHost && incoming && incoming !== prevSeed) {
+                    this.pendingEvents.push({ type: "welcome", roomCode: this.roomCode, seed: incoming });
+                  }
+                  this.seed = incoming;
                   joined = true;
+                  this.state = "lobby";
                   this.sendHelloAll();
                 }
               }

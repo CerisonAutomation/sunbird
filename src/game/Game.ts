@@ -315,6 +315,11 @@ export class Game {
   private raceFinishTime = 0;
   private net: AnyRealtimeClient | null = null;
   private roomCode = "";
+  /** True when the current roomCode was entered/invited by another player
+   *  (vs. generated locally by host-room or by quick-match shuffle). Only
+   *  remote codes cause the client to adopt the host's seed on welcome —
+   *  our own codes should keep our selected format/world. */
+  private joiningRemoteRoom = false;
   /** Room invite (#room=) pending application on the first frame. */
   private pendingRoomInvite = "";
   private roomSize = 40;
@@ -661,6 +666,7 @@ export class Game {
     const roomInvite = isMultiplayerConfigured() ? readRoomInviteFromUrl() : null;
     if (roomInvite) {
       this.roomCode = roomInvite;
+      this.joiningRemoteRoom = true;
       this.pendingRoomInvite = roomInvite;
     }
 
@@ -792,6 +798,7 @@ export class Game {
       const portalInvite = normalizeRoomCode(adapter.getInviteParam("room") ?? "");
       if (portalInvite && !this.pendingRoomInvite) {
         this.roomCode = portalInvite;
+        this.joiningRemoteRoom = true;
         this.pendingRoomInvite = portalInvite;
         this.telemetry.track("portal_invite", { code: portalInvite });
         this.hud.toast(`🕊 Invited to room ${portalInvite}`, "quest");
@@ -3288,6 +3295,7 @@ export class Game {
         this.disconnectRace();
         this.localRace = false;
         this.roomCode = makeRoomCode();
+        this.joiningRemoteRoom = false;
         this.modeId = this.selectedPvpMode;
         this.mode = modeById(this.selectedPvpMode);
         this.rankedRace = false;
@@ -3306,6 +3314,7 @@ export class Game {
         this.disconnectRace();
         this.localRace = false;
         this.roomCode = code;
+        this.joiningRemoteRoom = true;
         this.modeId = this.selectedPvpMode;
         this.mode = modeById(this.selectedPvpMode);
         this.rankedRace = false;
@@ -3320,6 +3329,21 @@ export class Game {
         this.selectedPvpMode = mId;
         this.modeId = mId;
         this.mode = modeById(mId);
+        // Selecting a new format while already in a private room MUST move
+        // you to a new room code — the existing room's seed is pinned to the
+        // old format on the server, so staying connected would have you
+        // flying Sprint while your invitees queued for Slalom. Same safety
+        // applies mid-matchmaking: tear down so the next preseating uses the
+        // new seed.
+        if (this.roomCode || this.mmOpts) {
+          this.cancelMatchmaking();
+          this.disconnectRace();
+          this.roomCode = this.roomCode ? makeRoomCode() : "";
+          if (this.roomCode) {
+            this.preseatLobby();
+            this.hud.toast(`New room ${this.roomCode} · ${this.mode.icon} ${this.mode.name}`, "gold");
+          }
+        }
         this.hud.toast(`${this.mode.icon} ${this.mode.name}`, "gold");
         this.bump();
         break;
@@ -3328,6 +3352,17 @@ export class Game {
         const wId = id || "emerald";
         this.selectedPvpWorld = wId;
         this.selectedCourse = PVP_WORLDS.find((w) => w.id === wId) ?? PVP_WORLDS[0]!;
+        // Same reseed safety as select-pvp-mode: changing the world while
+        // seated pins a fresh room code so the seed reflects the new course.
+        if (this.roomCode || this.mmOpts) {
+          this.cancelMatchmaking();
+          this.disconnectRace();
+          this.roomCode = this.roomCode ? makeRoomCode() : "";
+          if (this.roomCode) {
+            this.preseatLobby();
+            this.hud.toast(`New room ${this.roomCode} · ${this.selectedCourse.emoji} ${this.selectedCourse.name}`, "gold");
+          }
+        }
         this.hud.toast(`${this.selectedCourse.emoji} ${this.selectedCourse.name}`, "gold");
         this.bump();
         break;
@@ -3658,6 +3693,7 @@ export class Game {
         this.disconnectRace();
         this.massRace.clear();
         this.roomCode = "";
+        this.joiningRemoteRoom = false;
         this.hud.toast("You left the room", "info");
         this.bump();
         break;
@@ -4719,6 +4755,7 @@ export class Game {
     // and land in a new empty room the moment the countdown ended — hence the
     // "circuits aren't actually PvP" bug.
     const seed = this.currentMatchSeed();
+    const remote = this.joiningRemoteRoom;
     if (!this.net) {
       // The dynamic import of PokiNetlib resolves on the next tick; attach
       // and connect once the client is ready. In the meantime the HUD shows
@@ -4728,13 +4765,13 @@ export class Game {
         this.net = client;
         this.massRace.attachTransport(this.net);
         this.net.setIdentity(this.racedName(), this.skin.id, 0.06);
-        this.net.connect(this.roomCode, seed);
+        this.net.connect(this.roomCode, seed, remote);
         this.bump();
       });
       return;
     }
     this.net.setIdentity(this.racedName(), this.skin.id, 0.06);
-    this.net.connect(this.roomCode, seed);
+    this.net.connect(this.roomCode, seed, remote);
   }
 
   /** Stable seed for matchmaking/connect that identifies ONE race uniquely:
@@ -4749,10 +4786,38 @@ export class Game {
     return seed;
   }
 
+  /** Adopt a server-sent seed (e.g. on a private-room 'start'). Parses the
+   *  mode:course suffixes so when you join a friend on Sprint/Emerald you
+   *  load Sprint/Emerald rather than your last-picked local default. Any
+   *  unrecognized seed is taken verbatim. */
+  private applySeedFromServer(serverSeed: string): void {
+    this.seed = serverSeed;
+    const parts = serverSeed.split(":");
+    // Expected shape: `<today>:<modeId>:<courseId>[:storm]`
+    if (parts.length >= 3) {
+      const modeId = parts[1] as ModeId;
+      const worldId = parts[2];
+      const mode = MODES.find((m) => m.id === modeId) ?? PVP_MODES.find((m) => m.id === modeId);
+      const world = PVP_WORLDS.find((w) => w.id === worldId);
+      if (mode) {
+        this.selectedPvpMode = mode.id;
+        this.modeId = mode.id;
+        this.mode = mode;
+      }
+      if (world) {
+        this.selectedPvpWorld = world.id;
+        this.selectedCourse = world;
+      }
+      this.stormfront = parts.includes("storm") || modeId === "pvp_typhoon";
+    }
+    this.rebuildWorld(serverSeed);
+  }
+
   /** Opens (or reuses) a realtime seat for the current race seed. */
   private connectRace(): void {
     if (!isMultiplayerConfigured() || this.localRace) return;
     const seed = this.currentMatchSeed();
+    const remote = this.joiningRemoteRoom;
     if (this.net?.connected) {
       // Already seated in a room — if it's a different race than we're about
       // to start, drop and rejoin so we don't race against a stale lobby.
@@ -4769,13 +4834,13 @@ export class Game {
         this.net = client;
         this.massRace.attachTransport(this.net);
         this.net.setIdentity(this.racedName(), this.skin.id, 0.06);
-        this.net.connect(this.roomCode, seed);
+        this.net.connect(this.roomCode, seed, remote);
         this.bump();
       });
       return;
     }
     this.net.setIdentity(this.racedName(), this.skin.id, 0.06);
-    this.net.connect(this.roomCode, seed);
+    this.net.connect(this.roomCode, seed, remote);
   }
 
   private disconnectRace(): void {
@@ -4838,14 +4903,32 @@ export class Game {
           this.hud.toast(e.message, "warn");
           this.bump();
           break;
+        case "welcome": {
+          // We just landed in a room whose seed may differ from what we asked
+          // for: either a friend's invite code (joiningRemoteRoom) or a
+          // quick-match that seated us into an existing fuller lobby. In both
+          // cases the server/host seed is authoritative for format+course —
+          // adopt it so the lobby UI and startRun() build the right terrain.
+          const shouldAdopt = (this.joiningRemoteRoom || Boolean(this.mmOpts)) && e.seed && e.seed !== this.currentMatchSeed();
+          if (shouldAdopt) {
+            this.roomCode = e.roomCode || this.roomCode;
+            this.applySeedFromServer(e.seed);
+            this.joiningRemoteRoom = false;
+            this.bump();
+          }
+          break;
+        }
         case "start": {
           if (this.mmOpts || (this.state === "menu" && this.screen === "live" && this.roomCode)) {
             const opts = this.mmOpts ?? { ranked: false, storm: false };
             this.mmOpts = null;
             this.mmDeadline = 0;
             this.hud.setMatchmaking(false, this.liveCount(), this.roomSize, 0);
-            // Adopt the host/server terrain BEFORE resetting the player/grid.
-            if (net.seed && net.seed !== this.seed) this.rebuildWorld(net.seed);
+            // Adopt the host/server seed as authoritative. When we joined a
+            // friend's private code this is the host's format+course; without
+            // parsing it the guest would rebuild Emerald/Sprint and fly the
+            // wrong terrain/finish against a host on Turquoise/Slalom.
+            if (net.seed) this.applySeedFromServer(net.seed);
             this.launchMatch(opts);
             this.networkStartAt = net.startsAt;
             this.countdown = Math.max(0, (net.startsAt - Date.now()) / 1000);
