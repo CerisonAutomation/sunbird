@@ -1,3 +1,16 @@
+/**
+ * Dive aliases — Poki EN-02 asks for standardised movement keys ("use WASD or
+ * arrow keys for movement"), and this game's single movement control is
+ * dive/hold. Accepting both clusters (plus Space) means muscle memory from
+ * either convention works; there is no horizontal steering to conflict with.
+ */
+const DIVE_CODES = ["Space", "KeyA", "KeyW", "KeyS", "KeyD", "ArrowUp", "ArrowDown"];
+const DIVE_CODE_SET = new Set(DIVE_CODES);
+
+/** Player-2 dive aliases: Return is the standard secondary confirm key (EN-02). */
+const P2_CODES = ["Enter", "NumpadEnter", "ShiftRight", "KeyL"];
+const P2_CODE_SET = new Set(P2_CODES);
+
 export class Input {
   enabled = true;
   held = false;
@@ -273,12 +286,13 @@ export class Input {
     if (e.repeat || this.isTyping(e.target)) return;
     // Enter/Space must activate native menu controls, not hold a bird down.
     if (e.code !== "Escape" && e.target instanceof Element && e.target.closest("button, a, summary, [role=button]")) return;
-    if (e.code === "Space" || e.code === "KeyA") {
+    if (DIVE_CODE_SET.has(e.code)) {
+      // Arrows would otherwise scroll the host page in embedded frames.
       e.preventDefault();
       this.markFirst();
       this.keys.add(e.code);
       this.space = true;
-    } else if (e.code === "Enter" || e.code === "NumpadEnter" || e.code === "ShiftRight" || e.code === "KeyL") {
+    } else if (P2_CODE_SET.has(e.code)) {
       e.preventDefault();
       this.markFirst();
       this.keys.add(e.code);
@@ -302,7 +316,7 @@ export class Input {
     // Releasing one alias must not release the player's other held key.
     if (this.keys.has(e.code)) e.preventDefault();
     this.keys.delete(e.code);
-    this.space = this.keys.has("Space") || this.keys.has("KeyA");
-    this.p2Key = ["Enter", "NumpadEnter", "ShiftRight", "KeyL"].some(code => this.keys.has(code));
+    this.space = DIVE_CODES.some(code => this.keys.has(code));
+    this.p2Key = P2_CODES.some(code => this.keys.has(code));
   }
 }

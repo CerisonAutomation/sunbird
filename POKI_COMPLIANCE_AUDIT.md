@@ -1,5 +1,18 @@
 # Sunbird × Poki — Full Developer-Docs Compliance Audit
 
+> **Status note (2026-09-17).** This is the narrative audit from the
+> behavioural-compliance pass: what was wrong, why, and how it was fixed. It is
+> kept as **history** — the tree of reasoning behind the fixes below.
+>
+> The **live status of every rule** now lives in
+> [`docs/poki/COMPLIANCE.md`](./docs/poki/COMPLIANCE.md), which is *generated*
+> from the extracted guide (`docs/poki/requirements.json`, 113 numbered rules) by
+> `pnpm poki:audit`. Where this document and the generated report disagree, the
+> generated report is correct. What the extraction added on top of this pass —
+> the device-report probe, boot progress, context-driven rewarded offer, WakeLock,
+> locale completion, the thumbnail gate and the reconciled zip audit — is
+> recorded in [`docs/poki/REBUILD_REPORT.md`](./docs/poki/REBUILD_REPORT.md).
+
 **Date:** 2026-09-16 · **Artifact:** `sunbird-poki.zip` (697 KB) · **Build:** this branch, `pnpm build:portals`
 **Verdict:** ✅ **Shippable** — every hard requirement passes (several with this audit's fixes baked in); remaining items are submission-time actions, not code blockers.
 

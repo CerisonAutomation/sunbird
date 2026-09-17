@@ -1,4 +1,5 @@
 import { installRejectionGuard } from "./rejection-guard";
+import { bootStage } from "./game/BootProgress";
 
 // A floating promise rejection must never surface as a red console ERROR —
 // portal QA treats console errors as defects, and the game's network paths
@@ -27,6 +28,13 @@ if (!IS_PORTAL && "serviceWorker" in navigator) {
 if (!IS_PORTAL && "caches" in window) {
   void caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith("sunbird-shell-")).map(k => caches.delete(k)))).catch(() => {});
 }
+
+// EA-04: the shell is the first boot stage, and it is already painted by the
+// time this module runs (the loader is inline and needs no network) — so the
+// progress bar starts from a truthful baseline instead of a fake timer.
+// Static import on purpose: BootProgress has no dependencies, and a dynamic
+// import here would add a round trip before the bar could move at all.
+bootStage("shell");
 
 const boot = document.getElementById("boot");
 const copy = document.getElementById("boot-copy");

@@ -39,6 +39,10 @@ import {
 } from "./Challenges";
 import { bankMasteryRun, masteryPerks, masteryViews, NO_MASTERY_PERKS, type MasteryPerks } from "./Mastery";
 import { FirstFlight } from "./FirstFlight";
+import { bootStage, defer } from "./BootProgress";
+import { continueOffer, continuePlacementLabel, type ContinueOffer } from "./ContinueOffer";
+import { createWakeLock, type ScreenWakeLock } from "./WakeLock";
+import { detectDeviceProfile, describeDeviceProfile, deviceProfileTelemetry, type DeviceProfile } from "../sdk/device-report";
 import { campaignProgress, campaignViews, CAMPAIGN } from "./Campaign";
 import { monthKey, monthlyTheme, THEME_TRAIL_CLEARS, weeklyEvent } from "./Events";
 import { emptySquadState, SquadClient } from "./Squad";
@@ -233,6 +237,21 @@ export class Game {
   private readonly onInstalled: () => void;
   private readonly onContextLost: (e: Event) => void;
   private readonly onContextRestored: () => void;
+
+  /**
+   * Measured capability baseline (Poki Player Device Report, DEV-03). Probed
+   * once, before the renderer exists, and read for every quality decision —
+   * shadows, pixel ratio, particle budget. Never inferred from the UA alone.
+   */
+  private readonly deviceProfile: DeviceProfile = detectDeviceProfile();
+  /**
+   * Keeps the phone screen awake for the duration of a run (DEV-14: WakeLock is
+   * one of the APIs the Device Report tracks; a dimming screen mid-flight is
+   * the most common non-bug drop-off on mobile). No-op where unsupported.
+   */
+  private readonly wakeLock: ScreenWakeLock = createWakeLock();
+  /** Context-driven rewarded framing for the continue screen (MON-19). */
+  private continueOfferView: ContinueOffer | null = null;
 
   private daylight = DAYLIGHT_MAX;
   private startX = 64;
@@ -557,12 +576,18 @@ export class Game {
     // but lets the hills hold their colour instead of turning milky.
     this.renderer.toneMappingExposure = 1.16;
     // Software renderer: disable shadows and cap pixel ratio to keep it usable.
-    this.renderer.shadowMap.enabled = !softwareMode;
+    // The device baseline does the same for measured-lite hardware (≤2 cores,
+    // ≤2 GB, no WebGL) — DEV-03 is "pick tiers from the probe", not from taste.
+    this.renderer.shadowMap.enabled = !softwareMode && this.deviceProfile.tier !== "lite";
     // PCFSoftShadowMap was removed in three r165+ — PCF with a slightly larger
     // shadow map is the soft look without the console warning every load.
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.dpr = softwareMode ? 1 : this.preferredDpr();
     this.renderer.setPixelRatio(this.dpr);
+
+    // EA-04/EA-05: the renderer (the expensive object) exists — the loading
+    // screen can now say so truthfully.
+    bootStage("engine");
 
     this.scene = new THREE.Scene();
     // Fog pushed well past the action: at near=62 the hills the bird is about
@@ -621,6 +646,7 @@ export class Game {
 
     this.terrain = new TerrainSystem(this.seed);
     this.scene.add(this.terrain.group);
+    bootStage("world");
 
     this.bird = new Bird();
     this.bird.addTo(this.scene);
@@ -767,6 +793,13 @@ export class Game {
       runs: this.save.state.runsPlayed,
       streak: this.save.state.streak.days,
     });
+    // Player Device Report (DEV-03): report the measured baseline once per
+    // session so our own quality-tier decisions can be compared against the
+    // platform's published distribution. Aggregate capability data only — no
+    // identifiers (REQ-32). Logged in dev so a tier surprise is visible
+    // immediately rather than only in the dashboard.
+    this.telemetry.track("device_profile", deviceProfileTelemetry(this.deviceProfile));
+    if (import.meta.env.DEV) console.info(`[sunbird] ${describeDeviceProfile(this.deviceProfile)}`);
     // Portal SDK initialization is intentionally late: the first interactive
     // menu frame should never wait on a third-party CDN.
     void initPlatform({
@@ -832,8 +865,17 @@ export class Game {
     });
     if (seasonEnd) this.hud.toast(`⚔ Ranked season over · ${seasonEnd.division} reward +${seasonEnd.coins} coins`, "gold");
     // Warm the embedded main-menu leaderboard on boot so it isn't empty on
-    // the first frame (serves the cache first, so this never blocks paint).
-    void this.refreshBoard();
+    // the first frame. EA-05: this is background work — it is queued as idle
+    // work so the first interactive frame (and the boot bar's last stage) does
+    // not wait on a network round trip. The board serves its cache first, so
+    // arriving late costs the player nothing.
+    defer("menu-board-warmup", () => this.refreshBoard());
+    // EA-05: same for the music bus — the synth graph is created on the first
+    // gesture anyway (autoplay policy), so priming it here is pure headroom.
+    defer("audio-warmup", () => this.audio.setMusicEnabled(this.save.state.settings.music));
+    // The first flyable frame is what the player is actually waiting for: the
+    // world exists, the menu is interactive, and the loop is about to start.
+    bootStage("flight");
     this.bump();
     this.pushHud();
   }
@@ -856,6 +898,7 @@ export class Game {
     window.removeEventListener("focus", this.onFocus);
     window.removeEventListener("blur", this.onBlur);
     window.removeEventListener("orientationchange", this.onOrientationChange);
+    this.wakeLock.dispose();
     this.telemetry.flush();
     this.squad?.dispose();
     this.telemetry.dispose();
@@ -2612,10 +2655,30 @@ export class Game {
     const maxContinues = gold ? 99 : this.save.isVipActive() ? 2 : 1;
     if (this.continuesUsed < maxContinues && (gold || canCoins || canAd)) {
       this.continueTimer = CONTINUE_TIMEOUT;
+      // MON-19: the offer is context-driven, not a static button — the framing
+      // is chosen from what the run just did (record / near-best / streak /
+      // momentum) and falls back to the neutral card. It never changes what is
+      // on offer, only why the player might care; the standard non-ad options
+      // are rendered beside it either way (MON-05…MON-08).
+      const distance = this.lastRunDistance();
+      this.continueOfferView = continueOffer({
+        distance,
+        runCoins: this.runCoins,
+        personalBest: this.save.state.bestDistance,
+        streakDays: this.save.state.streak.days,
+        nearBest: this.save.state.bestDistance > 0 && distance >= this.save.state.bestDistance * 0.85,
+        isRecord: this.save.state.bestDistance > 0 && distance > this.save.state.bestDistance,
+        altitude: this.bird.y,
+        adAvailable: canAd,
+      });
       this.setState("continue");
       // Poki game-events: measure the rewarded offer's exposure (visible) so
-      // the dashboard can compare it against `interact` when tapped.
-      if (this.portalEnabled() && canAd) this.platform?.measure("button", "continue-ad", "visible");
+      // the dashboard can compare it against `interact` when tapped. The label
+      // carries the offer kind so placement usage is measurable per context.
+      if (this.portalEnabled() && canAd) {
+        this.platform?.measure("button", continuePlacementLabel(this.continueOfferView.kind), "visible");
+      }
+      this.telemetry.track("continue_offer", { kind: this.continueOfferView.kind, distance: Math.round(distance) });
     } else {
       this.finishRun();
     }
@@ -3845,8 +3908,10 @@ export class Game {
       case "continue-ad":
         if (this.state === "continue") {
           if (this.portalEnabled()) {
-            // Poki game-events: the player chose the rewarded option.
-            this.platform?.measure("button", "continue-ad", "interact");
+            // Poki game-events: the player chose the rewarded option. The label
+            // matches the `visible` event for the same offer kind (REQ-14).
+            const kind = this.continueOfferView?.kind ?? "standard";
+            this.platform?.measure("button", continuePlacementLabel(kind), "interact");
             void this.continueWithPortalReward();
           } else {
             this.adReason = "continue";
@@ -4523,7 +4588,8 @@ export class Game {
     this.particles.setBudget(this.particleBudget);
     // Soft shadows are the single priciest feature on mobile GPUs — keep them
     // only when the user asked for high quality (auto tiers shed them first).
-    const wantShadows = !this.isMobile && (s.quality === "high" || (s.quality === "auto" && this.frameEma < 1 / 30));
+    const wantShadows =
+      this.deviceProfile.tier !== "lite" && !this.isMobile && (s.quality === "high" || (s.quality === "auto" && this.frameEma < 1 / 30));
     if (this.renderer.shadowMap.enabled !== wantShadows) this.renderer.shadowMap.enabled = wantShadows;
     this.resize();
     this.bump();
@@ -4535,7 +4601,9 @@ export class Game {
     // Wings-style clarity comes from a stable frame rate, so cap phones at
     // 1x keeps the fill-rate stable on phones; native DPR is reserved for
     // desktop/high quality settings where the GPU budget is predictable.
-    if (this.save.state.settings.quality === "low") return 1;
+    // DEV-03: a measured-lite device never gets a 2x buffer, whatever its UA
+    // claims — fill-rate is the first thing that dies on those GPUs.
+    if (this.deviceProfile.tier === "lite" || this.save.state.settings.quality === "low") return 1;
     return this.isMobile ? 1 : dev;
   }
 
@@ -4591,7 +4659,12 @@ export class Game {
         this.particleBudget = Math.max(0.3, this.particleBudget - 0.2);
         this.particles.setBudget(this.particleBudget);
       }
-    } else if (this.frameEma < 1 / 58 && !this.isMobile && this.renderer.shadowMap.enabled === false) {
+    } else if (
+      this.frameEma < 1 / 58 &&
+      !this.isMobile &&
+      this.deviceProfile.tier !== "lite" &&
+      this.renderer.shadowMap.enabled === false
+    ) {
       // Headroom is back — restore soft shadows (they were only shed under load).
       this.renderer.shadowMap.enabled = true;
       this.particleBudget = Math.min(1, this.particleBudget + 0.2);
@@ -5156,6 +5229,10 @@ export class Game {
       this.timeScale = 1;
       this.zenithTimer = 0;
     }
+    // Wake lock follows gameplay exactly: held while flying, released the
+    // moment the player is in a menu, paused, asleep, or watching a break.
+    if (s === "playing") this.wakeLock.acquire();
+    else this.wakeLock.release();
     if (s === "menu" || s === "ad") this.audio.setMusicMode("menu");
     else if (s === "gameover" || s === "continue") this.audio.setMusicMode("sleep");
     else if (s === "paused") this.audio.duckMusic(0.55, 3);
@@ -5564,6 +5641,8 @@ export class Game {
       ghostDelta: this.state === "playing" || this.state === "gameover" ? this.ghostDelta() : null,
       newBest: this.newBest,
       continueTimer: this.continueTimer,
+      continueReason: this.continueOfferView?.reason ?? "",
+      continueHighlight: this.continueOfferView?.highlight ?? false,
       continueCost: CONTINUE_COST,
       canAffordContinue: st.wallet >= CONTINUE_COST,
       adAvailable: this.portalEnabled() ? Boolean(this.platform && this.platform.name !== "none") : this.ads.isAvailable(),

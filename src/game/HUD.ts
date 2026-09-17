@@ -125,6 +125,10 @@ export type HudSnapshot = {
   /** True when this finished run beat the previous personal-best distance. */
   newBest: boolean;
   continueTimer: number;
+  /** Context-driven reason line for the continue card (Poki MON-19). */
+  continueReason: string;
+  /** True when the offer context is worth a little extra emphasis (still optional). */
+  continueHighlight: boolean;
   continueCost: number;
   canAffordContinue: boolean;
   adAvailable: boolean;
@@ -2932,10 +2936,15 @@ function renderNextFlight(s: HudSnapshot): string {
 
 function renderContinue(s: HudSnapshot): string {
   const portal = s.portalName !== "none";
+  // MON-19: the reason line is context-driven (record / near-best / streak /
+  // momentum). It explains why this run is worth resuming — it never changes
+  // what the options are, and the standard non-ad options stay in the primary
+  // position above the rewarded one (MON-05…MON-08).
   return `
     <div class="zzz">z z z</div>
     <h2>Second wind?</h2>
     <p class="tagline">Sunbird is dozing off at ${formatDistance(s.distance)}.</p>
+    ${s.continueReason ? `<p class="continue-reason${s.continueHighlight ? " is-highlight" : ""}">${escapeHtml(s.continueReason)}</p>` : ""}
     <div class="count-ring" data-live="contTimer">${Math.ceil(s.continueTimer)}</div>
     ${!portal && s.gold ? `<button class="primary-btn gold" data-ui data-action="continue-gold">✦ Gold · free wake-up</button>` : ""}
     <button class="primary-btn ${s.canAffordContinue ? "" : "off"}" data-ui data-action="continue-coins" ${s.canAffordContinue ? "" : "disabled"}>Spend ● ${s.continueCost} <small>(you have ${s.wallet})</small></button>

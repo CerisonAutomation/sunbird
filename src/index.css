@@ -1051,6 +1051,22 @@ h2 {
   animation: floaty 2s ease-in-out infinite;
 }
 
+/* Context-driven reason line on the continue card (Poki MON-19). Deliberately
+   quiet: it explains why the run is worth resuming, it does not sell the ad.
+   The highlighted variant only raises contrast — it never changes layout, so
+   the standard non-ad options keep the primary position (MON-07). */
+.continue-reason {
+  margin: -2px 0 2px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: #6a5a72;
+}
+
+.continue-reason.is-highlight {
+  color: #3f3350;
+  font-weight: 700;
+}
+
 .toasts {
   position: absolute;
   left: 50%;

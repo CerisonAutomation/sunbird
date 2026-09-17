@@ -66,6 +66,10 @@ Copy `.env.example` → `.env.local`. All variables are optional — the game ru
 | `npm run typecheck` | TypeScript type-check without emit |
 | `npm test` | Run the full Vitest suite |
 | `npm run verify` | typecheck + test + build |
+| `npm run poki:audit` | Run every extracted Poki rule check, rewrite `docs/poki/COMPLIANCE.md` (add `-- --run` to execute the build/zip/thumbnail gates too) |
+| `npm run poki:preflight` | The full pre-submission pass: build portals → gates → thumbnail check → audit |
+| `npm run verify:thumbnail` | Thumbnail gate (square, ≥628px, full-bleed, contrast, playground-colour distance, weight) |
+| `npm run render:thumbnail` | Regenerate the submission thumbnails from `assets/submission/art/` |
 | `npm run lint` | ESLint over src, scripts (`--max-warnings 0`) |
 | `npm run test:e2e` | Production-browser smoke tests using desktop/phone Page Objects (`pnpm exec playwright install chromium` once) |
 | `npm run test:mp` | Two-client multiplayer smoke test — needs `npm run dev` **and** the room server running |
@@ -110,6 +114,7 @@ public/         PWA manifest, service worker, icons, self-hosted fonts
 
 ## Docs index
 
+- [docs/poki/](./docs/poki/) — **the Poki developer guide, extracted into 113 numbered rules** plus the machine-readable `requirements.json`. `pnpm poki:audit` executes them and regenerates [COMPLIANCE.md](./docs/poki/COMPLIANCE.md); [REBUILD_REPORT.md](./docs/poki/REBUILD_REPORT.md) records what the extraction changed in the game and the evidence for each change.
 - [ROADMAP.md](./ROADMAP.md) — what works, what's wired-but-undeployed, what's aspirational (the anti-overclaim file)
 - [PORTAL_PUBLISHING.md](./PORTAL_PUBLISHING.md) — portal compliance matrix + QA checklist
 - [LEADERBOARD_API.md](./LEADERBOARD_API.md) — leaderboard + ghost API
