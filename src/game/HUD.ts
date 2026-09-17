@@ -13,6 +13,7 @@ import type { ActivePower } from "./PowerUps";
 import type { SessionGoal } from "./Engagement";
 import { PVP_MODES, type ModeDef, type PvpWorldCourse, type ModeId } from "./Modes";
 import type { RacerStats } from "./Racer";
+import { leaderboardBackend } from "./Leaderboard";
 import type { BoardMetric, BoardPage, BoardScope } from "./Leaderboard";
 import type { TournamentView } from "./Tournaments";
 import type { RosterBird, Standing, RivalNameTag } from "./MassRace";
@@ -1590,7 +1591,9 @@ function renderBoard(s: HudSnapshot): string {
     <button class="soft-btn wide" data-ui data-action="board-refresh">${s.boardLoading ? "Refreshing…" : "↻ Refresh"}</button>
     <p class="fineprint">${
       s.boardOnline
-        ? "Scores sync to the configured global leaderboard service."
+        ? `Scores sync to the ${
+            leaderboardBackend() === "auds" ? "☁️ Poki cloud" : leaderboardBackend() === "http" ? "🌐 global" : "💾 local"
+          } leaderboard.`
         : "Rankings are stored locally. Fly well to climb the leaderboard!"
     }</p>
   `;
