@@ -3163,7 +3163,10 @@ export class Game {
         void this.resumeFromPause();
         break;
       case "restart-flight":
-        if (this.state === "paused" || this.state === "playing") this.replayRun(false);
+        if (this.state === "paused" || this.state === "playing") {
+          if (this.state === "paused") this.closePauseScreen();
+          this.replayRun(false);
+        }
         break;
       case "menu":
         // From a pause sub-screen, "Exit to menu" first closes the sub-screen so
@@ -3993,6 +3996,16 @@ export class Game {
       } else if (this.state === "playing" || this.state === "paused") {
         this.replayRun(false);
       }
+    }
+    if (this.input.consumeMute()) {
+      // M works everywhere (menu, play, pause, sub-screens) — global toggle.
+      this.save.state.settings.mute = !this.save.state.settings.mute;
+      this.save.persist();
+      this.applySettings();
+      this.hud.toast(this.save.state.settings.mute ? "Sound off" : "Sound on", "info");
+    }
+    if (this.input.consumeFullscreen()) {
+      this.toggleFullscreen();
     }
   }
 
@@ -5127,6 +5140,9 @@ export class Game {
   private setState(s: GameState): void {
     const previous = this.state;
     this.state = s;
+    // Leaving pause entirely collapses any open pause sub-screen state so the
+    // next pause opens cleanly on the base card.
+    if (s !== "paused") this.pauseScreenOrigin = null;
     this.acc = 0;
     this.last = performance.now();
     this.menuHold = 0;

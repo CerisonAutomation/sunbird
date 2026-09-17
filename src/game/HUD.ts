@@ -547,7 +547,7 @@ export class HUD {
 
       <div class="overlay menu hidden" data-ref="menu"><div class="paper-card" data-ref="menuCard"></div></div>
 
-      <div class="overlay pause hidden" data-ref="pause">
+      <div class="overlay pause hidden" data-ref="pause" role="dialog" aria-modal="true" aria-label="Paused">
         <div class="paper-card slim pause-card">
           <div class="pause-kicker">FLIGHT ON HOLD</div>
           <h2>Take a breath</h2>

@@ -3,6 +3,8 @@ export class Input {
   held = false;
   pausePressed = false;
   restartPressed = false;
+  mutePressed = false;
+  fullscreenPressed = false;
   boostPressed = false;
   /** Player 2: Enter / right-half touch / second gamepad. */
   p2Key = false;
@@ -114,6 +116,18 @@ export class Input {
   consumeRestart(): boolean {
     const v = this.restartPressed;
     this.restartPressed = false;
+    return v;
+  }
+
+  consumeMute(): boolean {
+    const v = this.mutePressed;
+    this.mutePressed = false;
+    return v;
+  }
+
+  consumeFullscreen(): boolean {
+    const v = this.fullscreenPressed;
+    this.fullscreenPressed = false;
     return v;
   }
 
@@ -273,6 +287,14 @@ export class Input {
       this.pausePressed = true;
     } else if (e.code === "KeyR") {
       this.restartPressed = true;
+    } else if (e.code === "KeyM") {
+      // Prevent browser/OS mute or tab-mute shortcuts from stealing our M.
+      e.preventDefault();
+      this.mutePressed = true;
+    } else if (e.code === "KeyF") {
+      // F is an alt fullscreen; don't let the browser's "Find in page" pop up.
+      if (!e.ctrlKey && !e.metaKey && !e.altKey) e.preventDefault();
+      this.fullscreenPressed = true;
     }
   }
 
