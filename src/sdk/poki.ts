@@ -46,8 +46,22 @@ type PokiSdk = {
   gameLoadingFinished?: () => void;
   gameplayStart?: () => void;
   gameplayStop?: () => void;
+  signalGameReady?: () => void;
   commercialBreak?: (onStart?: () => void) => Promise<void>;
   rewardedBreak?: (onStart?: () => void) => Promise<boolean>;
+  /** Display ad (banner placement) — Poki's IAB display ad API. */
+  displayAd?: (adType: string, size?: string, cb?: () => void) => Promise<void>;
+  destroyAd?: (adType: string) => void;
+  /** Celebratory overlay (personal best, level complete). */
+  happytime?: () => Promise<void>;
+  /** Mute / unmute gameplay audio on portal request. */
+  mute?: (muted?: boolean) => void;
+  isMuted?: () => boolean;
+  /** Detect ad blockers so the game can avoid gating content behind ads. */
+  setAdBlockActive?: (active: boolean) => void;
+  hasAdBlock?: () => boolean;
+  /** Language tag for the current player (e.g. "en", "es-MX"). */
+  getLanguage?: () => string;
   getUser?: () => Promise<PokiUser>;
   /** Short-lived JWT for backend verification (expires in 1 minute). */
   getToken?: () => Promise<string | null>;
@@ -59,6 +73,8 @@ type PokiSdk = {
   measure?: (category: string, label: string, action: string) => void;
   /** Reposition the mobile Poki Pill: (0–50)% from top + px offset. */
   movePill?: (topPercent: number, topPx: number) => void;
+  /** Tracking events for custom analytics. */
+  sendUserEvent?: (name: string, params?: Record<string, unknown>) => void;
 };
 
 declare global {
@@ -137,7 +153,15 @@ export class PokiAdapter implements PlatformAdapter {
   }
 
   happytime(): void {
-    // Poki has no celebration API — the game's own confetti covers it.
+    // PokiSDK.happytime() triggers a celebratory confetti overlay for
+    // personal bests and other milestone moments. Fire-and-forget so it
+    // never blocks gameplay even when the SDK is unavailable in an
+    // off-portal preview.
+    try {
+      void this.sdk?.happytime?.();
+    } catch {
+      /* celebrate locally — the game already emits its own confetti */
+    }
   }
 
   /* ads */
@@ -187,6 +211,18 @@ export class PokiAdapter implements PlatformAdapter {
     // Poki intentionally does not expose a banner placement API.
   }
 
+  /** Cached ad-block detection result (probed once at boot). */
+  private adBlockProbed = false;
+  private cachedAdBlock = false;
+
+  private probeAdBlock(): void {
+    if (this.adBlockProbed) return;
+    this.adBlockProbed = true;
+    try {
+      if (this.sdk?.hasAdBlock) this.cachedAdBlock = Boolean(this.sdk.hasAdBlock());
+    } catch { /* ignore */ }
+  }
+
   /* cloud save — localStorage fallback (Poki has no public data module) */
   saveCloud<T>(key: string, value: T): Promise<void> {
     return localCloudFallback.save(key, value);
@@ -224,7 +260,24 @@ export class PokiAdapter implements PlatformAdapter {
   }
 
   getSystemInfo(): PlatformSystemInfo {
-    return { ...EMPTY_INFO };
+    // Poki exposes locale via getLanguage() but does not expose device/OS
+    // descriptors to the game (the portal abstracts them). Provide what we
+    // can detect locally, leave the rest null.
+    const locale = (() => {
+      try { return this.sdk?.getLanguage?.() ?? navigator.language ?? null; } catch { return null; }
+    })();
+    const deviceType: PlatformSystemInfo["deviceType"] = (() => {
+      try {
+        const coarse = window.matchMedia?.("(pointer: coarse)")?.matches;
+        const narrow = window.innerWidth < 700;
+        const ipad = /Macintosh/i.test(navigator.userAgent) && coarse;
+        const tablet = /iPad|Android(?!.*Mobile)/i.test(navigator.userAgent) || ipad;
+        if (tablet) return "tablet";
+        if (coarse || narrow || /Mobi|Android|iPhone|iPod/i.test(navigator.userAgent)) return "mobile";
+        return "desktop";
+      } catch { return null; }
+    })();
+    return { ...EMPTY_INFO, locale, deviceType };
   }
 
   async submitPlatformScore(_score: number): Promise<void> {
@@ -331,14 +384,39 @@ export class PokiAdapter implements PlatformAdapter {
     }
   }
 
+  /* ad-block state */
+  hasAdBlock(): boolean {
+    this.probeAdBlock();
+    return this.cachedAdBlock;
+  }
+
+  setAdBlockActive(active: boolean): void {
+    // Called by the SDK's ad-block-detection probe; remember the value so
+    // later ad-breaks can short-circuit gracefully instead of hanging.
+    this.cachedAdBlock = Boolean(active);
+    this.adBlockProbed = true;
+    try { this.sdk?.setAdBlockActive?.(active); } catch { /* ignore */ }
+  }
+
   /* settings */
   syncSettings(): void {
-    /* Poki has no portal mute surface */
+    // On Poki the game must respect the portal's mute preference. There is
+    // no settings change event, so poll once at boot and relay the current
+    // state to the event sink so audio starts muted when the player muted
+    // the site through Poki.
+    this.probeAdBlock();
+    try {
+      this.sdk?.setAdBlockActive?.(this.cachedAdBlock);
+    } catch { /* ignore */ }
+    try {
+      const muted = Boolean(this.sdk?.isMuted?.());
+      this.events.onPortalMute?.(muted);
+    } catch { /* ignore */ }
   }
   isMuted(): boolean {
-    return false;
+    try { return Boolean(this.sdk?.isMuted?.()); } catch { return false; }
   }
   getSettings(): { muteAudio: boolean; disableChat: boolean } {
-    return { muteAudio: false, disableChat: false };
+    return { muteAudio: this.isMuted(), disableChat: false };
   }
 }

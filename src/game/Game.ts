@@ -20,7 +20,7 @@ import { LaunchSystem, ratingLabel, type LaunchResult } from "./LaunchSystem";
 import { isRaceMode, MASS_RACE_FIELD, MODES, modeById, PVP_MODES, PVP_WORLDS, RACE_FINISH, type ModeDef, type ModeId, type PvpWorldCourse } from "./Modes";
 import { MassRace } from "./MassRace";
 import { FinishGate } from "./FinishGate";
-import { isMultiplayerConfigured, makeRoomCode, RealtimeClient } from "./Realtime";
+import { isMultiplayerConfigured, makeRoomCode, RealtimeClient, type AnyRealtimeClient } from "./Realtime";
 import { Leaderboard, loadPilotName, savePilotName, isLeaderboardOnline, type BoardMetric, type BoardPage, type BoardScope } from "./Leaderboard";
 import { generatePilotName } from "./pilotNameGenerator";
 import { setLocale, type SupportedLocale } from "../i18n";
@@ -104,7 +104,7 @@ import { buildChallengeUrl, readChallengeFromUrl, type RivalChallenge } from "./
 import { flag } from "./Flags";
 import { variant } from "./Experiments";
 import { buildRoomInviteUrl, normalizeRoomCode, readRoomInviteFromUrl } from "./RoomInvite";
-import { CRAZY_BANNER_ID, initPlatform, isCoarsePointer, isPortalBuild, portalTarget, type PlatformAdapter } from "../sdk/platform";
+import { CRAZY_BANNER_ID, initPlatform, isCoarsePointer, isPortalBuild, portalTarget as getPortalTarget, type PlatformAdapter } from "../sdk/platform";
 import { GameplayEventSink } from "./GameplayEvents";
 import { LivingBackground } from "./LivingBackground";
 import { Sky } from "./Sky";
@@ -313,7 +313,7 @@ export class Game {
   private runOutcome: "complete" | "fail" = "fail";
   private raceField = 0;
   private raceFinishTime = 0;
-  private net: RealtimeClient | null = null;
+  private net: AnyRealtimeClient | null = null;
   private roomCode = "";
   /** Room invite (#room=) pending application on the first frame. */
   private pendingRoomInvite = "";
@@ -4685,13 +4685,42 @@ export class Game {
     this.startRun({ storm: this.stormfront });
   }
 
+  /** Instantiates the appropriate multiplayer backend for this build:
+   *  Poki uses WebRTC P2P via @poki/netlib; direct/crazy/generic keep the
+   *  existing WebSocket relay. The two classes share the same public API
+   *  so Game.ts doesn't need to branch elsewhere.
+   *
+   *  The Poki client is loaded via a DYNAMIC import guarded by a
+   *  compile-time constant (`VITE_PORTAL_TARGET === "poki"`). Rollup
+   *  can statically evaluate this: in non-Poki builds the branch is
+   *  dead-code-eliminated along with the dynamic import, so @poki/netlib
+   *  (~34 KB gz, with WebRTC + the wss:// signalling URL) is NEVER
+   *  emitted into direct/crazy/generic/none bundles. */
+  private async makeNet(): Promise<AnyRealtimeClient> {
+    if (import.meta.env.VITE_PORTAL_TARGET === "poki") {
+      const { PokiNetlibClient } = await import("./PokiNetlib");
+      return new PokiNetlibClient(this.save.state.deviceId, this.pilotName, this.skin.id, 0.06);
+    }
+    return new RealtimeClient(this.save.state.deviceId, this.pilotName, this.skin.id, 0.06);
+  }
+
   /** Pre-seats the lobby so the Race screen shows live pilots immediately. */
   private preseatLobby(): void {
     // Warm the ghost source too so the next grid can seat real names.
     void this.refreshBoard();
     if (!this.net) {
-      this.net = new RealtimeClient(this.save.state.deviceId, this.pilotName, this.skin.id, 0.06);
-      this.massRace.attachTransport(this.net);
+      // The dynamic import of PokiNetlib resolves on the next tick; attach
+      // and connect once the client is ready. In the meantime the HUD shows
+      // "connecting…" via netState.
+      void this.makeNet().then((client) => {
+        if (this.disposed) return;
+        this.net = client;
+        this.massRace.attachTransport(this.net);
+        this.net.setIdentity(this.racedName(), this.skin.id, 0.06);
+        this.net.connect(this.roomCode, this.roomCode ? this.seed : `${this.today}${this.mmOpts?.storm ? ":storm" : ""}`);
+        this.bump();
+      });
+      return;
     }
     this.net.setIdentity(this.racedName(), this.skin.id, 0.06);
     this.net.connect(this.roomCode, this.roomCode ? this.seed : `${this.today}${this.mmOpts?.storm ? ":storm" : ""}`);
@@ -4702,8 +4731,15 @@ export class Game {
     if (!isMultiplayerConfigured() || this.localRace) return;
     if (this.net?.connected) { this.massRace.attachTransport(this.net); return; }
     if (!this.net) {
-      this.net = new RealtimeClient(this.save.state.deviceId, this.pilotName, this.skin.id, 0.06);
-      this.massRace.attachTransport(this.net);
+      void this.makeNet().then((client) => {
+        if (this.disposed) return;
+        this.net = client;
+        this.massRace.attachTransport(this.net);
+        this.net.setIdentity(this.racedName(), this.skin.id, 0.06);
+        this.net.connect(this.roomCode, `${this.seed}:${this.modeId}`);
+        this.bump();
+      });
+      return;
     }
     this.net.setIdentity(this.racedName(), this.skin.id, 0.06);
     this.net.connect(this.roomCode, `${this.seed}:${this.modeId}`);
@@ -5287,7 +5323,7 @@ export class Game {
       state: this.state,
       screen: this.screen,
       checkoutSku: this.checkoutSku,
-      portalName: this.platform?.name ?? portalTarget(),
+      portalName: this.platform?.name ?? getPortalTarget(),
       version: this.uiVersion,
       distance: stats.distance,
       coins: this.runCoins,
