@@ -93,6 +93,28 @@ jobs:
           path: dist-itch/
           retention-days: 14
 
+  artifact:
+    name: Artifact (Inspector folder in a real browser)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build the Poki artifact
+        run: pnpm build:poki
+      - name: Verify the upload shape
+        run: pnpm verify:upload
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Load the shipping folder in a real browser
+        run: pnpm test:artifact
+
   portals:
     name: Build (Poki + CrazyGames + generic zips)
     runs-on: ubuntu-latest
