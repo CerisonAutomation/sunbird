@@ -54,7 +54,9 @@ function portalShimPlugin(): Plugin {
             ? path.resolve(__dirname, "src/game/edition.poki.ts")
             : PORTAL === "crazy" || PORTAL === "crazygames"
               ? path.resolve(__dirname, "src/game/edition.crazy.ts")
-              : null;
+              : PORTAL === "generic"
+                ? path.resolve(__dirname, "src/game/edition.generic.ts")
+                : null;
         return edition; // null => the neutral src/game/edition.ts
       }
       if (dir !== "sdk") return null;

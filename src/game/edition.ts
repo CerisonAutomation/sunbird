@@ -19,3 +19,12 @@ export const LEADERBOARD_CLOUD_LABEL = "☁️ cloud";
 
 /** True only in the Poki build (Poki's netlib multiplayer transport). */
 export const POKI_MULTIPLAYER = false;
+
+/**
+ * Club chat. OFF in every portal edition: the platforms forbid chat in
+ * multiplayer surfaces (Poki rule REQ-31 — emotes/quick-messages are the
+ * sanctioned alternative), so the chat box is not merely disabled at runtime
+ * there, it is not in the bundle at all. The direct/web/itch build owns its
+ * own surfaces and keeps it.
+ */
+export const SQUAD_CHAT = true;

@@ -345,3 +345,65 @@ adds `ROOT-07` for the Inspector folder. CI's portals job runs all of them, and
 each gate was negative-tested (injecting `sdk.crazygames.com` into the generic
 zip fails the audit with a named finding; removing the net registration fails
 `poki-loading-net.test.ts`).
+
+## 12. Mode & menu audit — "emote does nothing", chat, and PvP that wasn't PvP
+
+Three player-facing defects were reported against the built game. Each was
+reproduced by reading the shipped code path, fixed at the root, and pinned.
+
+### 12.1 Emotes appeared to do nothing
+
+| Cause | Evidence in code | Fix |
+|---|---|---|
+| The wheel was gated on `state === "playing"`, so it was **invisible in the Race Lobby** — where a room's players gather, and the first screen a PvP player selects | `HUD.update`: `classList.toggle("hidden", !(s.massRace && s.state === "playing"))` | visibility is now `emoteWheelVisible(s)` — a function of the race field only. The signature has no `state` argument, so the old gate cannot come back |
+| The sender's only feedback was a ~8 px emoji on their **roster dot** (off-screen when leading); the in-world bubble belongs to the sim clock, which is frozen in the lobby | `MassRace.showEmote` → `emoteFor` measured against `this.clock` | new `HUD.pulseEmote()` pops the player's own bubble instantly (throttled, `aria-live`, auto-fades in 2.2 s). `Game.sendEmote` also stopped firing a toast, whose layer sat above the wheel and swallowed the tap that sent the emote |
+| Rate-limit used the **run** clock (`this.elapsed`), which never advances in the lobby | `Game.sendEmote`: `this.elapsed - this.lastEmoteAt < 1.2` | rate-limited on `performance.now()` |
+
+Tests: `src/game/__tests__/emote-ui.test.ts` (6 cases: visibility, six labelled
+buttons, bubble pop / auto-fade / rapid re-pop) and `massrace.test.ts` (an
+emote is visible without a `step()`, and still expires). Each was
+negative-tested: removing the bubble's un-hide fails two cases.
+
+### 12.2 Chat shipped in portal builds (Poki REQ-31)
+
+`game-note: "chat is not allowed in poki"`. The club chat box, its input, the
+chat promise in two menu copies and the chat polling loop were in **every**
+build. Portal editions now compile chat out entirely — `SQUAD_CHAT = false` in
+`edition.poki/crazy/generic.ts`:
+
+| Surface | Direct/web/itch | Portal editions |
+|---|---|---|
+| Club chat log + message input | yes | **not rendered**, and the Squad copy says "Friends & clubs" |
+| `Game` action `squad-chat` | sends | `if (!SQUAD_CHAT) break;` → minifies to `case"squad-chat":break;` (no trigger in the DOM) |
+| `SquadClient.sendChat` / `pollChat` | live | dead return / no polling — no chat endpoint is ever contacted |
+| Enforcement | — | new `PORTAL_FORBIDDEN_MARKERS` in `scripts/portal-markers.mjs`, checked by `verify-portal`, `audit-zips` and `verify-upload` `ROOT-07` |
+
+Negative-tested: injecting `Message your club` into the Poki zip fails the
+portal gate with *"club chat input (REQ-31 forbids chat surfaces)"*. The
+sanctioned alternative — emotes — is now reachable in every race state, which is
+what §12.1 is about.
+
+### 12.3 "PvP" started an offline AI race
+
+The screen said *Championship & PvP Circuits*; every one of the eight circuit
+cards called `pick-mode`, which started a **solo run against the AI flock** —
+no lobby, no options, no notice. The same mis-wiring reached "Quick Match", the
+one-tap online hero, which called `launchMatch(..., true)` (forced local) for
+every player. And "AI Practice" cards used the same action, so any fix had to
+split the two intents.
+
+| Route | Behaviour |
+|---|---|
+| `launchIntentFor(id)` (new `src/game/launchRouting.ts`) | `pvp_*` → **`pvp-options`**, `massrace` → `lobby`, everything else → `solo` |
+| Modes screen → a PvP circuit card | opens the Race Lobby with that circuit preselected (ranked, casual, private room, or AI flock) and says so in the toast |
+| New **AI PvP** destination (home menu, `open-practice`) | the explicit offline route: race the neural flock, same eight circuits, opponent count + skill |
+| Practice screen (retitled **AI PvP**) | its cards now use the new `ai-pvp` action — every one of them really does start an AI race, as its copy promises |
+| `quick-match-instant` | routes through `beginMatchmaking` (real public matchmaking) instead of forcing a local race |
+| No transport in the runtime | `beginMatchmaking` now **says** "Online racing is unavailable here — starting an AI flock race" instead of silently pretending |
+
+Tests: `src/game/__tests__/launch-routing.test.ts` (4 cases, including "no
+unknown id is treated as PvP" so a bad `data-id` cannot seat a player online).
+Audit of the rest of the surface: every `data-action` in the HUD has a handler
+or is handled locally (`toggle-emotes`, `shop-*`, `preview-skin`,
+`dismiss-copy`), every `UiScreen` has a renderer, and every screen has a route
+into it.

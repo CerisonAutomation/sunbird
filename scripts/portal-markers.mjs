@@ -40,12 +40,32 @@ export const FOREIGN_MARKERS = {
   ],
 };
 
-/** Every foreign marker that appears in `html`, as "reason (matched text)". */
+/**
+ * Markers that must not appear in ANY portal edition.
+ *
+ * Chat (Poki REQ-31: "no chat in multiplayer product surfaces — emotes are the
+ * recommended alternative"). The club chat surface is a direct-build feature:
+ * portal editions have no chat UI at all (`SQUAD_CHAT` in the edition module),
+ * no chat polling, and `SquadClient.sendChat` is a dead return. These markers
+ * pin the UI contract — the input, its accessible name and its action wiring —
+ * so a future renderer cannot quietly reintroduce a message box into a portal
+ * build. (Inert remnants are expected and allowed: the `.chat-box` CSS rule and
+ * a minified `case"squad-chat":break;` with nothing to trigger it.)
+ */
+export const PORTAL_FORBIDDEN_MARKERS = [
+  [/Message your club/, "club chat input (REQ-31 forbids chat surfaces)"],
+  [/chatText/, "club chat input ref"],
+  [/data-action=["']squad-chat/, "club chat send button"],
+  [/Club chat history/, "club chat log"],
+  [/Friends &amp; club chat|Friends & club chat/, "chat promise in the Squad menu copy"],
+];
+
+/** Every forbidden marker that appears in `html`, as "reason (matched text)". */
 export function foreignMarkersIn(html, portal) {
   const table = FOREIGN_MARKERS[portal];
   if (!table) return [];
   const hits = [];
-  for (const [re, why] of table) {
+  for (const [re, why] of [...table, ...PORTAL_FORBIDDEN_MARKERS]) {
     const m = re.exec(html);
     if (m) hits.push(`${why}: "${m[0]}"`);
   }

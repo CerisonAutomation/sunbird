@@ -589,6 +589,11 @@ export class MassRace {
     return tags;
   }
 
+  /** Show an emote over a bird ("you" for the player). Visible immediately —
+   *  the stamp uses the current clock, and `emoteFor` expires it 2.5 s later,
+   *  so no step() is needed for the bubble to exist. The sender's own
+   *  feedback is `HUD.pulseEmote()` (Game.sendEmote), which does not depend on
+   *  the sim clock advancing. */
   showEmote(id: string, text: string): void {
     this.emotes.set(id, { text, at: this.clock });
   }

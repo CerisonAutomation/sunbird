@@ -12,3 +12,6 @@ export const LEADERBOARD_CLOUD_LABEL = "☁️ cloud";
 
 /** CrazyGames multiplayer is its own instant-multiplayer module, not netlib. */
 export const POKI_MULTIPLAYER = false;
+
+/** Portal submissions ship no chat surface (Poki REQ-31, same policy everywhere). */
+export const SQUAD_CHAT = false;

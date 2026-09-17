@@ -9,6 +9,8 @@
  * offline UI rather than breaking the menu.
  */
 
+import { SQUAD_CHAT } from "./edition";
+
 const ENV: Record<string, string | undefined> = (import.meta as unknown as { env?: Record<string, string> }).env ?? {};
 const API = (ENV.VITE_SOCIAL_URL ?? (ENV.DEV ? "/social" : "")).replace(/\/$/, "");
 
@@ -453,6 +455,10 @@ export class SquadClient {
   }
 
   async sendChat(text: string): Promise<boolean> {
+    // Portal editions have no chat surface (Poki REQ-31), so the send is dead
+    // here even if a stale DOM node or a future caller reaches it: no chat
+    // endpoint is ever contacted in those builds.
+    if (!SQUAD_CHAT) return false;
     const t = text.trim();
     if (!t) return false;
     if (this.isAutonomous) {
@@ -509,6 +515,7 @@ export class SquadClient {
   }
 
   async pollChat(reset: boolean): Promise<void> {
+    if (!SQUAD_CHAT) return;
     if (this.isAutonomous) return;
     const club = this.state.myClubId;
     if (this.lifetime.signal.aborted || !club || this.polling) return;

@@ -181,7 +181,7 @@
 | `REQ-23` | requirement | No ad-timer or cooldown manipulation. | ✅ | src/game/Game.ts matches /portalEnabled\(\)/ |
 | `REQ-24` | requirement | External links only through the platform API; portal builds should have none. | ✅ verified (executed) | executed: node scripts/verify-portal.mjs |
 | `REQ-30` | requirement | All-ages content: no violence, sexual content, gambling, substances, fear or bullying. | ✅ attested | Family-friendly bird flight; no combat, no gore, no casino framing (the lucky wheel is a free daily gift, not a paid spin), no substances, no chat. |
-| `REQ-31` | requirement | No chat in multiplayer surfaces; emotes are the recommended alternative. | ✅ | src/game/Social.ts |
+| `REQ-31` | requirement | No chat in multiplayer surfaces; emotes are the recommended alternative. | ✅ verified (executed) | executed: node scripts/verify-portal.mjs |
 | `REQ-32` | requirement | No PII collection; platform identity is display-only. | ✅ | src/sdk/poki.ts matches /getIdentity/ |
 | `REQ-33` | requirement | Originality: art, UI, mechanics, characters, audio and name must be the developer's own. | ✅ attested | Procedural biomes, custom UI, original bird/characters, procedural score; no third-party art or audio. |
 | `REQ-34` | requirement | AI-assisted production: no watermarks or prompt text; process documentable on request. | ✅ attested | No AI-generated asset files ship (art is procedural, audio is synthesized); production history is the git log. |
@@ -308,7 +308,7 @@
 | `REQ-23` | Local ad pacing logic is excluded from portal builds. |
 | `REQ-24` | Zero external links in portal bundles (og:url stripped, store links scrubbed). |
 | `REQ-30` | POKI_COMPLIANCE_AUDIT.md C12 |
-| `REQ-31` | Emote/quick-message system only; portal builds ship no multiplayer server UI. |
+| `REQ-31` | Portal editions ship NO chat: SQUAD_CHAT=false in edition.poki/crazy/generic.ts removes the club chat box, its input and the chat promise from the menu copy, Game/Squad refuse the send, and the polling loop never runs. Enforced by the PORTAL_FORBIDDEN_MARKERS table in scripts/portal-markers.mjs (checked by verify-portal, audit-zips and verify-upload ROOT-07); emotes are the sanctioned alternative and are now reachable in every race state (src/game/__tests__/emote-ui.test.ts). |
 | `REQ-32` | Passive getUser() only, never persisted; no email/social login. |
 | `REQ-33` | POKI_COMPLIANCE_AUDIT.md C13 |
 | `REQ-34` | Bundle sweep for watermark/prompt strings (audit-zips.mjs) |

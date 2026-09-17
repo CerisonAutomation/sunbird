@@ -12,3 +12,6 @@ export const LEADERBOARD_CLOUD_LABEL = "☁️ Poki cloud";
 
 /** Poki's netlib transport handles multiplayer; other builds have no room API. */
 export const POKI_MULTIPLAYER = true;
+
+/** Poki forbids chat in multiplayer surfaces (REQ-31) — emotes only. */
+export const SQUAD_CHAT = false;

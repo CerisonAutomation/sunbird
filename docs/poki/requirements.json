@@ -1348,10 +1348,15 @@
       "rule": "No chat in multiplayer surfaces; emotes are the recommended alternative.",
       "status": "satisfied",
       "verify": {
-        "type": "file",
-        "path": "src/game/Social.ts"
+        "type": "command",
+        "cmd": "node scripts/verify-portal.mjs",
+        "requires": [
+          "sunbird-poki.zip",
+          "sunbird-crazy.zip",
+          "sunbird-generic.zip"
+        ]
       },
-      "evidence": "Emote/quick-message system only; portal builds ship no multiplayer server UI."
+      "evidence": "Portal editions ship NO chat: SQUAD_CHAT=false in edition.poki/crazy/generic.ts removes the club chat box, its input and the chat promise from the menu copy, Game/Squad refuse the send, and the polling loop never runs. Enforced by the PORTAL_FORBIDDEN_MARKERS table in scripts/portal-markers.mjs (checked by verify-portal, audit-zips and verify-upload ROOT-07); emotes are the sanctioned alternative and are now reachable in every race state (src/game/__tests__/emote-ui.test.ts)."
     },
     {
       "id": "REQ-32",

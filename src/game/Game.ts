@@ -88,6 +88,7 @@ import { GhostPlayer, GhostRecorder } from "./Ghost";
 import { fetchRivalGhost, publishGhost } from "./GhostNet";
 import { HUD, type CalendarCard, type CheckoutMode, type DailyCard, type GauntletCard, type HudSnapshot, type LoadoutView, type RivalCard, type SeedMode, type UiScreen, type UiState } from "./HUD";
 import { divisionFor, duelOpponent, duelSkillFor, featuredRivals, nextDivision, rankSeasonId, seasonReward } from "./pvp";
+import { launchIntentFor, pvpCircuitFor } from "./launchRouting";
 import { Input } from "./Input";
 import { clamp, dateSeed, formatDatePretty, lerp, SeededRandom } from "./math";
 import { Missions, type MissionView, type QuestReward, type QuestView, type RunStats } from "./Missions";
@@ -109,6 +110,7 @@ import { flag } from "./Flags";
 import { variant } from "./Experiments";
 import { buildRoomInviteUrl, normalizeRoomCode, readRoomInviteFromUrl } from "./RoomInvite";
 import { PORTAL_BANNER_ID, initPlatform, isCoarsePointer, isPortalBuild, portalTarget as getPortalTarget, type PlatformAdapter } from "../sdk/platform";
+import { SQUAD_CHAT } from "./edition";
 import { GameplayEventSink } from "./GameplayEvents";
 import { LivingBackground } from "./LivingBackground";
 import { Sky } from "./Sky";
@@ -344,7 +346,9 @@ export class Game {
   private roomSize = 40;
   private roomSkill: "chill" | "sharp" | "ace" = "sharp";
   private roomMuted = false;
-  private lastEmoteAt = 0;
+  private lastEmoteWallAt = 0;
+  /** Run-clock stamp for the automatic crown emote on a personal best. */
+  private lastEmoteRunAt = 0;
   private draftBanner = 0;
   private wasDrafting = false;
   /** Rival tracking: who beat you last time, for the revenge prompt. */
@@ -953,8 +957,10 @@ export class Game {
       this.hud.toast(`🎟 Invited to room ${code} — ready up together to race`, "gold");
       this.telemetry.track("room_invite_opened", { room: code });
     }
-    // Club chat: light polling only while the Squad screen is on screen.
-    if (this.screen === "squad" && (this.state === "menu" || this.state === "gameover") && this.squad?.live) {
+    // Club chat: light polling only while the Squad screen is on screen, and
+    // only in editions that have a chat surface at all (portal builds do not —
+    // Poki REQ-31). No dead network traffic, no chat endpoint in the log.
+    if (SQUAD_CHAT && this.screen === "squad" && (this.state === "menu" || this.state === "gameover") && this.squad?.live) {
       this.squadPoll += raw;
       if (this.squadPoll >= 4) {
         this.squadPoll = 0;
@@ -1387,7 +1393,8 @@ export class Game {
             this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
             this.audio.purchase();
             this.haptic([25, 15, 45]);
-            if (this.elapsed - this.lastEmoteAt >= 2.0) {
+            if (this.elapsed - this.lastEmoteRunAt >= 2.0) {
+              this.lastEmoteRunAt = this.elapsed;
               this.sendEmote("👑");
             }
           } else if (gain >= 3) {
@@ -3201,13 +3208,47 @@ export class Game {
       case "mode-select":
         this.setScreen("modes");
         break;
-      case "pick-mode":
-        if (id === "massrace") { this.setScreen("live"); break; }
+      case "pick-mode": {
+        // Route by intent (see launchRouting.ts): solo modes start a run, the
+        // mass race opens the lobby, and a PvP circuit opens the PvP OPTIONS
+        // with that circuit preselected. A card labelled PvP must never drop
+        // the player straight into an offline AI race.
+        const intent = launchIntentFor(id);
+        if (intent === "lobby") { this.setScreen("live"); break; }
+        if (intent === "pvp-options") {
+          const circuit = pvpCircuitFor(id);
+          if (circuit) {
+            this.selectedPvpMode = circuit;
+            this.mode = modeById(circuit);
+            this.hud.toast(`${this.mode.icon} ${this.mode.name} selected — ranked, casual, a room, or the AI flock`, "gold");
+          }
+          this.setScreen("live");
+          this.bump();
+          break;
+        }
         this.modeId = (id || "daytrip") as ModeId;
         this.mode = modeById(this.modeId);
         this.exitVersus();
         this.startRun();
         break;
+      }
+      case "ai-pvp": {
+        // The explicit offline route: race the neural flock right now, on the
+        // card's circuit when it names one, otherwise on the last selection.
+        const circuit = pvpCircuitFor(id) ?? this.selectedPvpMode;
+        const m = modeById(circuit);
+        this.selectedPvpMode = m.id;
+        this.modeId = m.id;
+        this.mode = m;
+        this.exitVersus();
+        this.cancelMatchmaking();
+        this.disconnectRace();
+        this.roomCode = "";
+        this.rankedRace = false;
+        this.hud.toast(`🤖 AI PvP · ${m.icon} ${m.name} vs the flock`, "info");
+        this.launchMatch({ ranked: false, storm: m.id === "pvp_typhoon" }, true);
+        break;
+      }
       case "versus":
         this.startVersus();
         break;
@@ -3473,13 +3514,19 @@ export class Game {
         this.bump();
         break;
       }
-      case "quick-match-instant":
-        this.cancelMatchmaking();
-        this.disconnectRace();
-        this.modeId = this.selectedPvpMode;
-        this.mode = modeById(this.selectedPvpMode);
-        this.launchMatch({ ranked: true, storm: this.modeId === "pvp_typhoon" }, true);
+      case "quick-match-instant": {
+        // "Quick Match" is the one-tap ONLINE path: it seats the player in
+        // public matchmaking for the chosen circuit. It used to force a local
+        // AI race (launchMatch(..., true)) while sitting under a "40 pilots,
+        // ready now" hero — the player asked for a PvP race and got bots.
+        // beginMatchmaking falls back to the AI flock only when no transport
+        // exists in this runtime, and now says so when it does.
+        const mode = modeById(this.selectedPvpMode);
+        this.modeId = mode.id;
+        this.mode = mode;
+        this.beginMatchmaking({ ranked: true, storm: mode.id === "pvp_typhoon" });
         break;
+      }
       case "start-room-now":
         if (this.net) this.net.startNow();
         this.modeId = this.selectedPvpMode;
@@ -3740,6 +3787,11 @@ export class Game {
         void this.squad?.leaveClub();
         break;
       case "squad-chat": {
+        // Portal editions ship without a chat surface (Poki REQ-31: no chat in
+        // multiplayer surfaces; emotes are the sanctioned alternative). The
+        // action stays for the direct build; here it can only be reached by a
+        // stale DOM node.
+        if (!SQUAD_CHAT) break;
         const text = this.hud.readValue("chatText");
         void this.squad?.sendChat(text).then(sent => {
           if (sent && this.hud.readValue("chatText") === text) this.hud.clearValue("chatText");
@@ -4788,6 +4840,10 @@ export class Game {
     this.modeId = this.selectedPvpMode;
     this.mode = modeById(this.selectedPvpMode);
     if (!isMultiplayerConfigured()) {
+      // No transport in this runtime (e.g. a Poki iframe without WebRTC, or a
+      // direct build without VITE_MULTIPLAYER_URL). Say so instead of silently
+      // starting an offline race the player believes is online.
+      this.hud.toast("Online racing is unavailable here — starting an AI flock race", "info");
       this.launchMatch(opts, true);
       return;
     }
@@ -5065,10 +5121,18 @@ export class Game {
       this.hud.toast("Emotes muted in this room", "info");
       return;
     }
-    if (this.elapsed - this.lastEmoteAt < 1.2) return; // simple spam guard
-    this.lastEmoteAt = this.elapsed;
+    // Rate-limit on wall-clock, not the run clock: the run clock is frozen in
+    // the menu, where the emote wheel is also visible.
+    const now = performance.now();
+    if (now - this.lastEmoteWallAt < 1200) return;
+    this.lastEmoteWallAt = now;
+    // Sender feedback is immediate: the flight HUD pops your own bubble and the
+    // floating nametag shows it, regardless of whether a net transport exists.
     this.massRace.showEmote("you", text);
+    this.hud.pulseEmote(text);
     this.net?.sendEmote(text);
+    // No toast here: the toast layer renders above the wheel and swallowed the
+    // click that sent the emote (feedback is the bubble, not a banner).
     this.audio.chirp();
     this.bump();
   }

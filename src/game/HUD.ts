@@ -13,7 +13,7 @@ import type { ActivePower } from "./PowerUps";
 import type { SessionGoal } from "./Engagement";
 import { PVP_MODES, type ModeDef, type PvpWorldCourse, type ModeId } from "./Modes";
 import type { RacerStats } from "./Racer";
-import { LEADERBOARD_CLOUD_LABEL, PORTAL_DISPLAY_NAME, PORTAL_EDITION_NOTE } from "./edition";
+import { LEADERBOARD_CLOUD_LABEL, PORTAL_DISPLAY_NAME, PORTAL_EDITION_NOTE, SQUAD_CHAT } from "./edition";
 import { leaderboardBackend } from "./Leaderboard";
 import type { BoardMetric, BoardPage, BoardScope } from "./Leaderboard";
 import type { TournamentView } from "./Tournaments";
@@ -355,6 +355,17 @@ export type MasteryRow = {
 
 type ActionHandler = (action: string, id: string) => void;
 
+/**
+ * Emote wheel visibility. Deliberately a function of the race field ONLY —
+ * there is no `state` argument, because the old `state === "playing"` gate hid
+ * the wheel in the lobby, where a room's players actually gather. Emotes are
+ * the platform-sanctioned alternative to chat (Poki REQ-31), so they must be
+ * reachable wherever a field of racers exists.
+ */
+export function emoteWheelVisible(s: Pick<HudSnapshot, "massRace">): boolean {
+  return Boolean(s.massRace);
+}
+
 export class HUD {
   readonly root: HTMLDivElement;
   private readonly menuSky: MenuSky;
@@ -423,6 +434,8 @@ export class HUD {
   private finishCd!: HTMLElement;
   private lastFinishCd = "";
   private emoteWheel!: HTMLElement;
+  private emoteBubble!: HTMLElement;
+  private emoteBubbleTimer = 0;
   private impactPopupsEl!: HTMLElement;
   private lastStandings = "";
   private lastRoster = "";
@@ -527,6 +540,7 @@ export class HUD {
         <div class="rival-nametag-container" data-ref="nametags"></div>
         <div class="draft-meter hidden" data-ref="draftMeter"><i></i><span>SLIPSTREAM</span></div>
         <div class="finish-countdown hidden" data-ref="finishCd"></div>
+        <div class="emote-bubble hidden" data-ref="emoteBubble" role="status" aria-live="polite" aria-atomic="true"></div>
         <div class="emote-wheel hidden" data-ref="emoteWheel">
           <button class="emotes-toggle" data-ui data-action="toggle-emotes" aria-expanded="false" aria-controls="flight-emotes">💬 Emotes</button>
           <div class="emote-options hidden" id="flight-emotes">${[["👋", "Wave"], ["🔥", "Fire"], ["😂", "Laugh"], ["🙌", "Bravo"], ["👑", "Crown"], ["🤝", "GG"]].map(([icon, label]) => `<button data-ui data-action="emote" data-id="${icon}" aria-label="Send ${label}" title="Send ${label}">${icon} ${label}</button>`).join("")}</div>
@@ -769,6 +783,21 @@ export class HUD {
         if (output) output.textContent = `${field.value}%`;
       }
     });
+  }
+
+  /** Immediate sender feedback for an emote: your own bubble pops above the
+   *  wheel. Without this the tap looked dead in states where the sim clock
+   *  (which drives the in-world bubble's lifetime) is not advancing, and the
+   *  reply took a whole step to appear while racing. */
+  pulseEmote(text: string): void {
+    if (!this.emoteBubble) return;
+    this.emoteBubble.textContent = text;
+    this.emoteBubble.classList.remove("hidden", "pop");
+    // Force a reflow so the pop animation restarts on a rapid second emote.
+    void this.emoteBubble.offsetWidth;
+    this.emoteBubble.classList.add("pop");
+    window.clearTimeout(this.emoteBubbleTimer);
+    this.emoteBubbleTimer = window.setTimeout(() => this.emoteBubble.classList.add("hidden"), 2200);
   }
 
   clearValue(ref: string): void {
@@ -1117,9 +1146,11 @@ export class HUD {
         const bar = this.draftMeter.firstElementChild as HTMLElement | null;
         if (bar) bar.style.width = `${Math.round(s.draft * 100)}%`;
       }
-      // Emotes are a mid-race signal: hidden on the results card where a
-      // send would just round-trip to a room nobody renders anymore.
-      this.emoteWheel.classList.toggle("hidden", !(s.massRace && s.state === "playing"));
+      // Emotes show whenever a race field exists — lobby included (see
+      // emoteWheelVisible). Sending on the results card is harmless: the
+      // toast-free local echo still pops and the net send is a no-op after
+      // disconnect.
+      this.emoteWheel.classList.toggle("hidden", !emoteWheelVisible(s));
 
       // Live standings ticker: leaders plus your row, with gaps to the car
       // ahead so every position fight reads at a glance. Throttled like the
@@ -1405,6 +1436,7 @@ export class HUD {
     this.draftMeter = grab("draftMeter");
     this.finishCd = grab("finishCd");
     this.emoteWheel = grab("emoteWheel");
+    this.emoteBubble = grab("emoteBubble");
     this.impactPopupsEl = grab("impactPopups");
   }
 
@@ -1711,37 +1743,31 @@ function renderLive(s: HudSnapshot): string {
       <nav class="destination-grid" aria-label="More ways to race">
         <button class="destination" data-ui data-action="open-practice"><span class="destination-art">${menuIcon("compass")}</span><span class="destination-copy"><b>AI Practice</b><span>Custom opponent count &amp; skill</span></span></button>
         <button class="destination" data-ui data-action="versus"><span class="destination-art">${menuIcon("versus")}</span><span class="destination-copy"><b>Same-screen 1v1</b><span>Local split-screen flight</span></span></button>
-        <button class="destination" data-ui data-action="open-squad"><span class="destination-art">${menuIcon("squad")}</span><span class="destination-copy"><b>Squad</b><span>Friends &amp; club chat</span></span></button>
+        <button class="destination" data-ui data-action="open-squad"><span class="destination-art">${menuIcon("squad")}</span><span class="destination-copy"><b>Squad</b><span>${SQUAD_CHAT ? "Friends &amp; club chat" : "Friends &amp; clubs"}</span></span></button>
       </nav>`}
     <button class="soft-btn wide" data-ui data-action="open-shop">Change loadout</button>
     <p class="fineprint">Hold downhill to build speed. Release uphill to launch. Slipstream behind rivals for slingshot surges!</p>`;
 }
 
 function renderPractice(s: HudSnapshot): string {
-  return `${head("Race practice")}
-    <section class="race-section" aria-label="AI practice">
-      <div class="race-section-head"><h3>Practice on your own</h3><span class="section-step">AI pilots · no waiting</span></div>
-      <p>Learn the course against computer-controlled birds. These settings apply to practice opponents, not your friends.</p>
+  return `${head("AI PvP")}
+    <section class="race-section" aria-label="AI race practice">
+      <div class="race-section-head"><h3>Race the AI flock offline</h3><span class="section-step">AI pilots · no waiting</span></div>
+      <p>Every format below starts immediately against computer-controlled birds — no server, no room, no rating. Learning the circuits here is the fastest way to win them online.</p>
       <div class="room-controls">
         <div class="room-ctl"><span class="room-ctl-label">AI opponents <small>plus you</small></span><div class="seg" role="group" aria-label="AI opponents">${[5, 10, 20, 40].map((n) => `<button data-ui data-action="room-size" data-id="${n}" aria-pressed="${s.roomSize === n}" class="${s.roomSize === n ? "on" : ""}">${n}</button>`).join("")}</div></div>
         <div class="room-ctl"><span class="room-ctl-label">AI skill</span><div class="seg" role="group" aria-label="AI skill">${(["chill", "sharp", "ace"] as const).map((k) => `<button data-ui data-action="room-skill" data-id="${k}" aria-pressed="${s.roomSkill === k}" class="${s.roomSkill === k ? "on" : ""}">${k === "chill" ? "Chill" : k === "sharp" ? "Sharp" : "Ace"}</button>`).join("")}</div></div>
       </div>
-      <button class="soft-btn wide" data-ui data-action="practice-race">Start AI practice · no rating change</button>
-      <div class="practice-formats"><h3>Championship &amp; PvP Formats</h3>
+      <button class="primary-btn gold wide" data-ui data-action="ai-pvp" data-id="${s.selectedPvpMode}">🤖 Race the AI flock · ${(s.pvpModes || []).find((m) => m.id === s.selectedPvpMode)?.name ?? "Sprint GP"}</button>
+      <div class="practice-formats"><h3>Race formats</h3>
         <p class="fineprint">Dynamic AI pilots adapt locally with neural downslope timing, slipstream drafting, and slingshot attacks. No server connection required!</p>
-        <button class="soft-btn wide" data-ui data-action="pick-mode" data-id="pvp_sprint">⚡ Sprint GP · 1,500 m quick burst</button>
-        <button class="soft-btn wide" data-ui data-action="pick-mode" data-id="pvp_slalom">🎯 Sky Slalom GP · 2,500 m precision agility</button>
-        <button class="soft-btn wide" data-ui data-action="pick-mode" data-id="pvp_typhoon">🌀 Typhoon Blitz · 3,000 m storm chase</button>
-        <button class="soft-btn wide" data-ui data-action="pick-mode" data-id="pvp_zenith">🔮 Stratosphere Ascent · 3,200 m vertical climb</button>
-        <button class="soft-btn wide" data-ui data-action="pick-mode" data-id="pvp_draft">🌪 Tempest Draft · +100% slipstream power</button>
-        <button class="soft-btn wide" data-ui data-action="pick-mode" data-id="pvp_coinrush">💎 Sunstone Heist · 2,800 m treasure sprint</button>
-        <button class="soft-btn wide" data-ui data-action="pick-mode" data-id="pvp_knockout">👑 Knockout Royale · elimination every 500 m</button>
-        <button class="soft-btn wide" data-ui data-action="pick-mode" data-id="pvp_endurance">🦅 Grand Migration · 6,000 m marathon</button>
+        ${PVP_MODES.map((m) => `<button class="soft-btn wide ${s.selectedPvpMode === m.id ? "on" : ""}" data-ui data-action="ai-pvp" data-id="${m.id}">${m.icon} ${m.name} · ${m.blurb}</button>`).join("")}
         <button class="soft-btn wide" data-ui data-action="pvp-duel">⚔ 1v1 Seeded Rival Duel</button>
         <button class="soft-btn wide" data-ui data-action="practice-storm">⛈ Stormfront Race · wild weather</button>
         <button class="soft-btn wide" data-ui data-action="practice-ranked">🏆 40-Pilot Flock Grand Prix</button>
       </div>
     </section>
+    <button class="soft-btn wide" data-ui data-action="open-live">🌐 Want human rivals? Open PvP</button>
     <button class="soft-btn wide" data-ui data-action="open-shop">Change loadout</button>`;
 }
 
@@ -1914,12 +1940,20 @@ function renderSquad(s: HudSnapshot): string {
     <div class="section-title">Your club <small>${myClub.members}/30 members</small></div>
     <div class="club-card mine">
       <div class="daily-head"><span class="daily-icon">🏰</span><div><b>${escapeHtml(myClub.name)}</b><em>${escapeHtml(myClub.motto)}</em></div><button class="mini-btn ghost" data-ui data-action="squad-leave-club">Leave</button></div>
-      <div class="chat-box" data-ref="chatBox" data-scroll-memory="club-${myClub.id}" data-stick-bottom aria-label="Club chat history">${
-        sq.chat.length
-          ? sq.chat.map((m) => `<div class="chat-msg"><b>${escapeHtml(m.name)}</b><span>${escapeHtml(m.text)}</span></div>`).join("")
-          : `<div class="chat-msg dim"><span>Quiet in here. Say hi 👋</span></div>`
-      }</div>
-      <div class="redeem"><input data-ui data-ref="chatText" data-enter-action="squad-chat" aria-label="Club message" placeholder="Message your club…" maxlength="200" autocomplete="off" /><button class="mini-btn" data-ui data-action="squad-chat">Send</button></div>
+      ${
+        // Club chat is a direct-build surface only: portal editions ship without
+        // any chat UI (Poki REQ-31 forbids chat in multiplayer products; emotes
+        // are the sanctioned alternative). The club card keeps its members and
+        // weekly challenge — only the message box is gone.
+        SQUAD_CHAT
+          ? `<div class="chat-box" data-ref="chatBox" data-scroll-memory="club-${myClub.id}" data-stick-bottom aria-label="Club chat history">${
+              sq.chat.length
+                ? sq.chat.map((m) => `<div class="chat-msg"><b>${escapeHtml(m.name)}</b><span>${escapeHtml(m.text)}</span></div>`).join("")
+                : `<div class="chat-msg dim"><span>Quiet in here. Say hi 👋</span></div>`
+            }</div>
+      <div class="redeem"><input data-ui data-ref="chatText" data-enter-action="squad-chat" aria-label="Club message" placeholder="Message your club…" maxlength="200" autocomplete="off" /><button class="mini-btn" data-ui data-action="squad-chat">Send</button></div>`
+          : `<p class="fineprint">Club chat is unavailable in this edition — wave to your club mid-race with emotes instead.</p>`
+      }
     </div>`
     : `
     <div class="section-title">Flight Clubs <small>join or found one</small></div>
@@ -2049,7 +2083,7 @@ function renderCups(s: HudSnapshot): string {
 function renderModes(s: HudSnapshot): string {
   return `
     ${head("Game modes")}
-    <p class="tagline">Choose a solo flight below, or share this device in Split-screen. Race Lobby opens online and AI races. All modes share your unlocks.</p>
+    <p class="tagline">Solo flights below are you against the course. A <b>PvP circuit</b> opens the PvP options — ranked and casual online racing, private rooms, or the AI flock. All modes share your unlocks.</p>
     <div class="mode-list">
       ${s.modes
         .map(
@@ -2061,7 +2095,7 @@ function renderModes(s: HudSnapshot): string {
         )
         .join("")}
     </div>
-    <div class="section-title">Championship &amp; PvP Circuits</div>
+    <div class="section-title">Championship &amp; PvP Circuits <small>opens PvP options</small></div>
     <div class="mode-list">
       ${PVP_MODES
         .map(
@@ -2073,6 +2107,8 @@ function renderModes(s: HudSnapshot): string {
         )
         .join("")}
     </div>
+    <div class="section-title">Race the flock offline</div>
+    <button class="primary-btn gold wide" data-ui data-action="open-practice">🤖 AI PvP · pick a circuit &amp; race the neural flock</button>
     <button class="soft-btn wide" data-ui data-action="versus">👥 Split-screen · 2 players on this device</button>
   `;
 }
