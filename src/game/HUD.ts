@@ -1901,7 +1901,8 @@ function renderCampaign(s: HudSnapshot): string {
   `;
 }
 
-function renderSquad(s: HudSnapshot): string {
+/** Exported so the Pilot Lookup panel can be tested without a live game. */
+export function renderSquad(s: HudSnapshot): string {
   const sq = s.squad;
   const friendPage = paginate(sq.friends, sq.friendPage);
   const clubPage = paginate(sq.clubs, sq.clubPage);

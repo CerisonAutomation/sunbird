@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { PilotBook, isRealPilotName, searchPilots, seenAgo, type FlightMate } from "../pilots";
 import { SquadClient } from "../Squad";
+import { renderSquad } from "../HUD";
 
 function memoryStorage(): { getItem(k: string): string | null; setItem(k: string, v: string): void; data: Record<string, string> } {
   const data: Record<string, string> = {};
@@ -177,5 +178,116 @@ describe("Pilot lookup honesty", () => {
     // Adding the same pilot twice is a no-op, not a duplicate row.
     expect(squad.rememberWingman("bora sky")).toMatch(/already/i);
     expect(squad.state.friends).toHaveLength(1);
+  });
+});
+
+describe("Pilot Lookup panel markup", () => {
+  /** renderSquad only reads these fields; the cast keeps the fixture small. */
+  function renderPanel(overrides: Record<string, unknown>): string {
+    const squad = {
+      live: false,
+      loading: false,
+      busy: false,
+      friendPage: 0,
+      clubPage: 0,
+      error: "",
+      registered: true,
+      credentialError: false,
+      myCode: "SUN-MINE99",
+      friends: [],
+      clubs: [],
+      myClubId: null,
+      chat: [],
+      isAutonomous: true,
+      pilotQuery: "",
+      lookup: null,
+      lookupBusy: false,
+      requestsIn: [],
+      requestsOut: [],
+      ...(overrides.squad as object ?? {}),
+    };
+    const snapshot = {
+      squadNotice: "",
+      recentPilots: [],
+      bestDistance: 0,
+      runsPlayed: 0,
+      todayBest: 0,
+      ...overrides,
+      squad,
+    };
+    return renderSquad(snapshot as never);
+  }
+
+  it("offers a real lookup and is honest when no directory is reachable", () => {
+    const html = renderPanel({
+      squad: {
+        isAutonomous: true,
+        lookup: { status: "unavailable", query: "SUN-9F3K2A", name: "", code: "", online: false, club: "", bestDistance: 0, rank: 0, friend: false, outgoing: false, incoming: false, message: "Pilot lookup needs the online service, which this build does not have." },
+      },
+    });
+    expect(html).toContain("Pilot Lookup");
+    expect(html).toContain('data-ref="pilotCode"');
+    expect(html).toContain('data-action="pilot-lookup"');
+    expect(html).toContain("Pilot lookup needs the online service");
+    // The panel must not dress the code up as a pilot.
+    expect(html).not.toContain("Wingman-");
+    expect(html).not.toMatch(/SUN-9F3K2A<\/b>\s*<small>/);
+  });
+
+  it("renders a real result card with the fields the directory returned", () => {
+    const html = renderPanel({
+      squad: {
+        lookup: {
+          status: "ok",
+          query: "SUN-9F3K2A",
+          name: "Bora Sky",
+          code: "SUN-9F3K2A",
+          online: true,
+          club: "Thermal Drifters",
+          bestDistance: 12345,
+          rank: 7,
+          friend: false,
+          outgoing: false,
+          incoming: false,
+          message: "",
+        },
+      },
+    });
+    expect(html).toContain("Bora Sky");
+    expect(html).toContain("Online now");
+    expect(html).toContain("Thermal Drifters");
+    expect(html).toContain("12,345 m");
+    expect(html).toContain('data-action="pilot-add" data-id="SUN-9F3K2A"');
+    expect(html).toContain('data-action="pilot-invite"');
+  });
+
+  it("shows pending requests on both sides and the wingmen list", () => {
+    const html = renderPanel({
+      squad: {
+        requestsIn: [{ requestId: "fr_1", name: "Alita", code: "SUN-AAAAAA" }],
+        requestsOut: [{ requestId: "fr_2", name: "Cedar", code: "SUN-BBBBBB" }],
+        friends: [{ name: "Bora Sky", code: "SUN-9F3K2A", club_id: null, online: false, bestDistance: 4200 }],
+      },
+    });
+    expect(html).toContain('data-action="req-accept" data-id="fr_1"');
+    expect(html).toContain('data-action="req-decline" data-id="fr_1"');
+    expect(html).toContain('data-action="req-cancel" data-id="fr_2"');
+    expect(html).toContain("Bora Sky");
+    expect(html).toContain("4,200 m");
+  });
+
+  it("lists the pilots really flown with, and says so when the list is empty", () => {
+    const empty = renderPanel({});
+    expect(empty).toContain("Pilots who share a room with you appear here");
+
+    const html = renderPanel({
+      recentPilots: [
+        { id: "p1", name: "Bora Sky", skin: "sunbird", roomCode: "FLOCK", lastSeenAt: Date.now() - 60_000, bestDistance: 1450, placed: 2 },
+      ],
+    });
+    expect(html).toContain("Flew with");
+    expect(html).toContain("room FLOCK");
+    expect(html).toContain("1m ago");
+    expect(html).toContain('data-action="mate-wingman" data-id="Bora Sky"');
   });
 });
