@@ -82,6 +82,21 @@ jobs:
             -f conclusion="neutral" \
             -F output_title="rustfmt diff (run ${GITHUB_RUN_ID})" \
             -F output_summary="$(cat /tmp/fmt-summary.txt)"
+      # Same goal as the check-run POST above, reached a way that cannot fail
+      # silently: the POST needs `checks: write` and, under
+      # `continue-on-error`, a 403 from it still shows a green step — which is
+      # how this repo shipped a bare "Format (check) failed" with no diff to
+      # act on. Workflow-command annotations always come back over
+      # api.github.com (check-runs → annotations), so the diff travels there.
+      - name: Publish fmt diff as annotations
+        if: failure() && steps.fmt.outcome == 'failure'
+        continue-on-error: true
+        run: |
+          cd rust 2>/dev/null || cd .
+          cargo fmt --all
+          git diff --unified=2 | grep -E '^(@@|[+-][^+-])' | head -80 | while IFS= read -r line; do
+            echo "::warning title=rustfmt::${line//%/%25}"
+          done
       - name: Clippy
         id: clippy
         run: |
