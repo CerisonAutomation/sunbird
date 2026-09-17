@@ -3153,15 +3153,33 @@ export class Game {
         this.toggleFullscreen();
         break;
       case "resume":
+        // If the user hit resume (or ESC) while browsing a pause sub-screen,
+        // first drop back to the plain pause card rather than flying off
+        // unexpectedly. A second resume press/ESC gets them back to flight.
+        if (this.state === "paused" && this.screen !== "main") {
+          this.closePauseScreen();
+          break;
+        }
         void this.resumeFromPause();
         break;
       case "restart-flight":
         if (this.state === "paused" || this.state === "playing") this.replayRun(false);
         break;
       case "menu":
+        // From a pause sub-screen, "Exit to menu" first closes the sub-screen so
+        // the confirmation flow (goToMenu returns to menu state) starts clean.
+        if (this.state === "paused") this.closePauseScreen();
         this.exitVersus();
         this.goToMenu();
         break;
+      case "pause-to": {
+        // Navigate into a menu sub-screen WITHOUT forfeiting the paused run.
+        // Only valid during pause; otherwise fall through to setScreen below.
+        const target = id as UiScreen;
+        if (this.state === "paused") this.openPauseScreen(target);
+        else this.setScreen(target);
+        break;
+      }
       case "open-practice":
         this.setScreen("practice");
         break;
@@ -3961,7 +3979,12 @@ export class Game {
       if (this.hud.dismissCopy()) return;
       if (this.mmOpts) { this.cancelMatchmaking(); return; }
       if (this.state === "playing") this.setState("paused");
-      else if (this.state === "paused") void this.resumeFromPause();
+      else if (this.state === "paused") {
+        // ESC/P from a pause sub-screen collapses the sub-screen first (matching
+        // the button behaviour); from the bare pause card it resumes flight.
+        if (this.screen !== "main") this.closePauseScreen();
+        else void this.resumeFromPause();
+      }
       else if (this.screen !== "main" && !this.checkoutBusy) this.backScreen();
     }
     if (this.input.consumeRestart()) {
@@ -5071,6 +5094,8 @@ export class Game {
    */
   private async resumeFromPause(): Promise<void> {
     if (this.state !== "paused") return;
+    // Collapse any pause sub-screen (shop/settings/...) before returning to flight.
+    this.closePauseScreen();
     const platform = this.platform;
     if (this.portalEnabled() && platform && platform.name !== "none") {
       this.setState("ad");
@@ -5141,8 +5166,38 @@ export class Game {
     return out;
   }
 
+  // ----- Pause overlay / sub-menu navigation --------------------------------
+  // When paused, sub-screens (shop, settings, scores, ...) show over the
+  // frozen flight without abandoning the run. `closePauseScreen()` returns to
+  // the plain pause card (the equivalent of "back to pause" from a sub-screen).
+
+  private pauseScreenOrigin: "main" | "paused" | null = null;
+
+  private openPauseScreen(target: UiScreen): void {
+    if (this.pauseScreenOrigin === null) this.pauseScreenOrigin = this.screen === "main" ? "main" : "paused";
+    // Re-seed history from main so back() lands back on the pause card.
+    this.screenHistory.resetTo("main");
+    this.setScreen(target);
+  }
+
+  private closePauseScreen(): void {
+    if (this.screen === "live" && this.state === "paused") this.disconnectRace();
+    this.checkoutOk = false;
+    this.checkoutWaiting = false;
+    this.pauseScreenOrigin = null;
+    this.screenHistory.resetTo("main");
+    this.setScreen("main");
+  }
+  // --------------------------------------------------------------------------
+
   private backScreen(): void {
     if (this.checkoutBusy) return;
+    // If we're in a pause sub-screen, "back" collapses to the pause card, not
+    // to the previous menu page (which would belong to the main menu stack).
+    if (this.state === "paused") {
+      this.closePauseScreen();
+      return;
+    }
     this.checkoutOk = false;
     this.checkoutWaiting = false;
     if (this.screen === "live") { this.disconnectRace(); this.roomCode = ""; }
@@ -5150,6 +5205,20 @@ export class Game {
   }
 
   private setScreen(s: UiScreen): void {
+    // Block sub-screens that would implicitly abandon or race a paused run.
+    // (Quick-launch grid deliberately omits "live" and "practice"; this is the
+    // belt-and-braces guard if anything else tries to navigate there.)
+    if (this.state === "paused" && (s === "live" || s === "practice")) {
+      this.hud.toast("Resume your flight first, then race.", "info");
+      return;
+    }
+    // If we ever navigate away from main while paused without going through
+    // openPauseScreen (e.g. clicking a score/settings button from a postcard
+    // or reward flow), mark origin so back returns us cleanly.
+    if (this.state === "paused" && s !== "main" && this.pauseScreenOrigin === null) {
+      this.pauseScreenOrigin = "paused";
+      this.screenHistory.resetTo("main");
+    }
     this.screenHistory.visit(s);
     if (this.screen === "live" && s !== "live" && this.state === "menu") this.net?.sendReady(false);
     if (s !== this.screen) this.audio.uiTick();
@@ -5157,8 +5226,9 @@ export class Game {
     this.menuHold = 0;
     this.needRelease = true;
     // Every return to the home screen refreshes the embedded leaderboard so a
-    // just-finished run shows up immediately (cache-first, non-blocking).
-    if (s === "main") void this.refreshBoard();
+    // just-finished run shows up immediately (cache-first, non-blocking). Only
+    // do this for the real main menu — during pause, "main" is the pause card.
+    if (s === "main" && this.state !== "paused") void this.refreshBoard();
     this.bump();
   }
 

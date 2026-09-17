@@ -16,4 +16,10 @@ export class ScreenHistory<T extends string> {
     this.current = this.trail.pop() ?? this.home;
     return this.current;
   }
+  /** Clear history and re-home the stack (used when entering a modal context
+   *  such as pause sub-screens, so Back always returns to the new root). */
+  resetTo(home: T): void {
+    this.current = home;
+    this.trail = [];
+  }
 }

@@ -3411,9 +3411,76 @@ button {
   letter-spacing: 0.16em;
   margin-bottom: 6px;
 }
-.pause-actions { display: grid; gap: 9px; margin-top: 16px; }
+.pause-actions { display: grid; gap: 9px; margin-top: 12px; }
+.pause-actions .pause-resume { font-size: 16px; padding: 13px 14px; }
+.pause-run-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin: 14px 0 4px;
+  padding: 10px 8px;
+  background: rgba(255, 255, 255, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 14px;
+}
+.pause-run-stats .prs {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  font-size: 10px; color: #8a6a62; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.pause-run-stats .prs b { font-size: 16px; color: var(--ink); letter-spacing: 0; }
+.pause-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+.pause-q {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 10px 4px 8px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 14px;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.08s ease, background 0.15s ease;
+  min-height: 64px;
+}
+.pause-q i { font-size: 20px; font-style: normal; line-height: 1; }
+.pause-q span { font-size: 10.5px; letter-spacing: 0.01em; opacity: 0.82; }
+.pause-q:hover { background: rgba(255, 255, 255, 0.82); }
+.pause-q:active { transform: scale(0.96); }
+.pause-q[aria-pressed="true"] {
+  background: linear-gradient(165deg, rgba(255, 202, 120, 0.65), rgba(255, 166, 70, 0.55));
+  border-color: rgba(255, 150, 60, 0.6);
+}
+.pause-exit-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.pause-exit-row .soft-btn,
+.pause-exit-row .ghost-btn { padding: 11px 10px; font-size: 13px; }
+.soft-btn {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 12px;
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+}
+.soft-btn:hover { background: rgba(255, 255, 255, 0.9); }
 .danger-btn { color: #7a3a36; border-color: rgba(160, 75, 65, 0.28); }
 .pause-exit-note { margin: 11px 4px 0; color: #8a6a62; font-size: 11px; line-height: 1.4; }
+/* When a pause sub-screen is open, tint the backdrop a hair darker so the
+   sub-card reads clearly over the frozen world. */
+.overlay.menu.pause-submenu {
+  background: rgba(14, 18, 36, 0.28) !important;
+}
+/* Tighten the pause grid on small phones so two rows of four fit. */
+@media (max-width: 420px) {
+  .pause-quick-grid { gap: 6px; }
+  .pause-q { padding: 8px 2px 6px; min-height: 58px; }
+  .pause-q i { font-size: 18px; }
+  .pause-q span { font-size: 9.5px; }
+}
 .home-more-heading {
   display: flex;
   align-items: baseline;
