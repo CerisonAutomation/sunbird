@@ -1,6 +1,6 @@
 # Sunbird — Handoff Document
 
-_Last verified: 2026-09-16 · branch `arena/01a0a95f-sunbird` · full gate green (949 tests, portal zips, production gate) · CI green_
+_Last verified: 2026-09-18 · branch `arena/01a0b118-sunbird` · full gate green (1051 browser tests + 14 server tests, 7-case live PvP suite, portal zips, preflight, production gate) · CI green_
 
 Sunbird is a one-button arcade glider (procedural islands, hold-to-dive). Single codebase,
 five build targets, one shared game core.
@@ -12,13 +12,16 @@ five build targets, one shared game core.
 ```bash
 pnpm install
 pnpm dev                 # Vite on :5173 (pnpm via corepack: `corepack enable` once)
-pnpm test                # 949 unit suites (Vitest, jsdom)
+pnpm test                # full Vitest suite (1051 tests + the live PvP suite, skipped without a server)
 pnpm typecheck           # tsc --noEmit
 pnpm build:portals       # dist-poki / dist-crazy / dist-generic + the three submission zips
 pnpm build:itch          # dist-itch (single-file)
 node scripts/verify-portal.mjs   # shippability gate on the zips (8 MB Poki budget, etc.)
 node scripts/audit-zips.mjs      # forensic zip audit (bundle separation, URL inventory)
 node scripts/verify-prod.mjs     # production gate (lint+typecheck+tests+build, budgets, debug-artifact ban)
+pnpm pvp:check                   # boots the real room server on a scratch port and proves online play:
+                                 # protocol smoke + two live RealtimeClient instances + pilot directory
+pnpm test:lookup                 # the pilot-directory contract alone (against a running server)
 ```
 
 ### Build targets (`VITE_PORTAL_TARGET`)
@@ -33,6 +36,16 @@ node scripts/verify-prod.mjs     # production gate (lint+typecheck+tests+build, 
 
 The SDK script URL for each portal ships in **every** bundle as an inert string literal;
 only the build target's URL is ever injected (enforced by `scripts/verify-portal.mjs`).
+
+### Online play & pilot lookup (verified 2026-09-18)
+
+| Piece | Where | Notes |
+|---|---|---|
+| Client transport | `src/game/Realtime.ts` | `VITE_MULTIPLAYER_URL` (absolute `ws://…/mp`) or the dev proxy; explicit `leave` frame on disconnect, authoritative `peers` roster, real finish places |
+| Room server (dev/CI) | `server/` (`node --import tsx server/src/index.ts`, PORT default 8790) | CI reference implementation: `server/sunbird-server.mjs` |
+| Room server (authoritative) | `rust/crates/sunbird-server` | `/ws`, frees the seat when the socket closes |
+| Live proof | `scripts/pvp-check.mjs` (`pnpm pvp:check`), `src/game/__tests__/pvp-live.test.ts` | CI job `pvp-live` on every push |
+| Pilot lookup | `src/game/pilots.ts`, `Squad.ts`, `server/src/http/legacy.ts` | real directory + local "flew with" history; **no fabricated pilots anywhere** (see REBUILD_REPORT §13) |
 
 ## 2. Architecture (honest version)
 
@@ -140,7 +153,7 @@ Re-verified against the current Poki docs (developers.poki.com, 2026-09-16):
 
 ## 6. Test gate (what "ready" means)
 
-- `pnpm test` — 949 tests: unit (jsdom), deterministic-sim (same seed ⇒ bit-identical player
+- `pnpm test` — 1051 tests (+ 8 skipped, incl. the live PvP suite without a server): unit (jsdom), deterministic-sim (same seed ⇒ bit-identical player
   physics), network-boundary (hostile frames), PVP end-of-race audit, slipstream stress,
   perf guards.
 - `pnpm test:server` + `pnpm typecheck:server` — Node reference server.
