@@ -17,7 +17,7 @@ import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { foreignMarkersIn } from "./portal-markers.mjs";
+import { foreignMarkersIn, missingMarkersIn } from "./portal-markers.mjs";
 
 const root = join(fileURLToPath(import.meta.url), "..", "..");
 const PORTALS = ["poki", "crazy", "generic"];
@@ -72,6 +72,9 @@ if (PORTALS.every((p) => zips[p])) {
   // lives in target-only modules (see scripts/portal-markers.mjs), so a foreign
   // marker is a hard failure — not an accepted inert string.
   for (const p of PORTALS) {
+    for (const missed of missingMarkersIn(zips[p].html, p)) {
+      fail(p, `required platform marker missing: ${missed}`);
+    }
     for (const hit of foreignMarkersIn(zips[p].html, p)) {
       fail(p, `foreign portal marker in bundle — ${hit}. Portals must not cross-contaminate.`);
     }

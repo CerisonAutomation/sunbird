@@ -64,6 +64,7 @@ Copy `.env.example` → `.env.local`. All variables are optional — the game ru
 | `npm run build:poki` / `build:crazy` / `build:generic` | Portal zips (see [PORTAL_PUBLISHING.md](./PORTAL_PUBLISHING.md)) |
 | `npm run build:portals` | All three portal zips |
 | `npm run test:mp` | Multiplayer protocol smoke against a running server |
+| `npm run isolation:check` | Source-level split: the Rust stack stays platform-agnostic, the Poki edition stays Netlib P2P + AUDS, and neither leaks into the other |
 | `npm run typecheck` | TypeScript type-check without emit |
 | `npm test` | Run the full Vitest suite |
 | `npm run pvp:check` | **Online stack, proven end to end**: boots the real room server on a scratch port and runs the protocol smoke, the live two-client PvP suite and the pilot-directory contract against it |
@@ -103,6 +104,22 @@ For the flight/performance changes and measurement limits, see [Flight & perform
 | `dist-itch/` | Direct-host / itch.io raw HTML | None | As configured |
 
 Every portal zip is self-contained (`index.html` + `icons/` + `fonts/`), uses only relative paths, boots from any CDN subpath, mutes on tab-hide/ads, fires `gameplayStart/Stop` + loading signals, and degrades to local ghosts/boards with no backend. Full compliance matrix and QA checklist: [PORTAL_PUBLISHING.md](./PORTAL_PUBLISHING.md).
+
+### Multiplayer: two transports, one interface
+
+| Build | Transport | Backend |
+|---|---|---|
+| Poki | **Netlib P2P** (`@poki/netlib` over WebRTC datachannels, code-split + dynamically imported) | none of ours — signalling is Poki's; player data uses **AUDS** (boards, ghost shares, run share codes) |
+| Direct / CrazyGames / generic | Self-hosted **authoritative WebSocket room server** (`VITE_MULTIPLAYER_URL` → TS `server/` or the Rust `rust/` workspace) | ours |
+| Any build without WebRTC / a backend | Local AI flock (the UI says so) | none |
+
+The split is enforced, not assumed: `pnpm isolation:check` fails if the Rust stack names
+a platform integration, if `@poki/netlib` is imported outside `src/game/PokiNetlib.ts`, or
+if the self-hosted client reaches the Poki transport at runtime; the portal markers
+(`verify:portals`, `audit:zips`, `verify:upload`) do the same for the shipped bundles — no
+`auds.poki.io` outside Poki, and no `/mp/v1/`, `sunbird-social` or `ws://` anywhere in a
+portal edition. `pnpm pvp:check` then proves the self-hosted path works end to end with two
+real clients against a real server.
 
 ## Project structure
 

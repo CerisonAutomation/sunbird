@@ -24,12 +24,26 @@ const IS_POKI: boolean = (import.meta.env.VITE_PORTAL_TARGET as string) === "pok
  * against public Netlib signaling. Per Netlib's basic-usage guide any UUID
  * is accepted during development.
  */
+/** Canonical UUID shape — Netlib rejects anything else in production. */
+export function isNetlibGameId(value: string | undefined): boolean {
+  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
+
+/** Random v4 UUID reserved for this repo's dev/preview builds. */
+const DEV_NETLIB_GAME_ID = "33c4c5a6-ee70-4726-aa1f-ced8a9578254";
+
+/**
+ * Submission supplies `VITE_POKI_NETLIB_GAME_ID` (the id Poki issues); a
+ * development build falls back to the fixed dev UUID, so everyone testing the
+ * same build finds the same lobbies (a fresh random id per session would mean
+ * nobody could ever find a lobby another tab created). A malformed value is
+ * treated as absent rather than shipped — Netlib rejects bad ids in
+ * production, and failing at build time is better than failing in a lobby.
+ */
 export const POKI_NETLIB_GAME_ID: string = IS_POKI
-  // Fixed dev UUID so all clients of the same build see each other's lobbies
-  // (a fresh random UUID per session would mean nobody could ever find a
-  // lobby another tab created). Replace with your Poki-issued game id at
-  // submission time.
-  ? "33c4c5a6-ee70-4726-aa1f-ced8a9578254"
+  ? isNetlibGameId(import.meta.env.VITE_POKI_NETLIB_GAME_ID as string | undefined)
+    ? (import.meta.env.VITE_POKI_NETLIB_GAME_ID as string)
+    : DEV_NETLIB_GAME_ID
   : "";
 
 /** @deprecated use POKI_NETLIB_GAME_ID */

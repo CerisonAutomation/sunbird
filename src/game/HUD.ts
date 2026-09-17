@@ -293,6 +293,14 @@ export type HudSnapshot = {
   squad: SquadState;
   /** Real pilots from rooms this device shared — see src/game/pilots.ts. */
   recentPilots: FlightMate[];
+  /** AUDS shared-run state (async multiplayer by code, Poki platform only). */
+  share: {
+    available: boolean;
+    code: string;
+    busy: boolean;
+    error: string;
+    loaded: { name: string; seed: string; mode: string; distance: number; timeMs: number; place: number; bird: string } | null;
+  };
   squadNotice: string;
   dailyFlash?: { id: string; price: number; originalPrice: number; discountPct: number };
   stipendClaimed?: boolean;
@@ -1704,6 +1712,7 @@ function renderLive(s: HudSnapshot): string {
             </div>
           `).join("")}
         </div>
+        ${live.length === 0 ? `<p class="fineprint">Just you so far — share the code above and the room fills with real pilots.</p>` : ""}
         ${s.roomCount > 8 ? `<p class="fineprint">And ${s.roomCount - 8} more connected pilots</p>` : ""}
 
         <button class="ghost-btn" data-ui data-action="room-close">Leave room</button>
@@ -2997,6 +3006,31 @@ function renderGameOver(s: HudSnapshot): string {
            }
          </div>`
       : "";
+  // Async multiplayer by code. Only rendered when this build can actually
+  // talk to AUDS (Poki + game id) or when the player has already loaded a run.
+  const shareBlock =
+    s.share.available || s.share.loaded || s.share.code
+      ? `
+    <div class="share-run">
+      <div class="section-title">🔗 Shared run <small>friend's code · async race</small></div>
+      ${
+        s.share.code
+          ? `<div class="friend-row"><span class="fr-name">Run code</span><span class="fr-code">${escapeHtml(s.share.code)}</span><button class="mini-btn" data-ui data-action="copy-share">Copy code</button></div>`
+          : `<button class="soft-btn wide" data-ui data-action="share-run" ${s.share.busy ? "disabled" : ""}>${s.share.busy ? "Publishing…" : "Share this run for a friend"}</button>`
+      }
+      <div class="redeem">
+        <input data-ui data-ref="shareCode" data-enter-action="load-run" aria-label="Shared run code" placeholder="A friend's run code" maxlength="40" autocomplete="off" spellcheck="false" />
+        <button class="mini-btn" data-ui data-action="load-run" ${s.share.busy ? "disabled" : ""}>Load</button>
+      </div>
+      ${
+        s.share.loaded
+          ? `<div class="pilot-note">Loaded <b>${escapeHtml(s.share.loaded.name)}</b>'s run — ${Math.round(s.share.loaded.distance).toLocaleString()} m on the same hills. <button class="mini-btn gold" data-ui data-action="race-share">Race their mark</button></div>`
+          : ""
+      }
+      ${s.share.error ? `<div class="pilot-note warn" role="status">${escapeHtml(s.share.error)}</div>` : ""}
+    </div>`
+      : "";
+
   return `
     <div class="results-kicker">${escapeHtml(s.modeName)} · flight recap</div>
     <h2>${t("hud.gameover.title", undefined, "Flight completed")}</h2>
@@ -3005,6 +3039,7 @@ function renderGameOver(s: HudSnapshot): string {
     ${s.newBest ? `<div class="new-best">👑 NEW BEST · ${formatDistance(s.distance)}<small>your farthest flight yet</small></div>` : ""}
     ${s.boardScope === "global" && s.boardMetric === "distance" && s.board && s.board.yourRank > 0 ? `<div class="reward-strip rank-strip">Leaderboard rank · <b>#${s.board.yourRank}</b> of ${s.board.total}</div>` : ""}
 
+    ${shareBlock}
     ${renderFlightRecap(s.flightPath)}
     <div class="over-stats result-summary">
       <div><span>${t("hud.stat.distance", undefined, "Distance")}</span><b>${formatDistance(s.distance)}</b></div>

@@ -88,8 +88,24 @@ const RIVAL_NAMES = [
 ];
 
 /**
- * Deterministic featured rivals for the pre-race lobby, drawn from the same
- * name pool as the simulated field. Clearly local pilots, never live players.
+ * Presence list for the race lobby — **real pilots only**.
+ *
+ * The lobby once padded itself with deterministic name-pool "rivals" and with
+ * time-shifted leaderboard names so the room never looked empty. Both were
+ * fiction: nobody was in the room. A lobby that invents occupants is worse
+ * than a lobby that says it is empty, so this maps the live roster and stops
+ * there — zero peers in, zero rows out, and the UI can say so honestly.
+ */
+export function lobbyRivals(
+  peers: { name: string; ready: boolean; skin: string }[],
+): { name: string; tag: string; ready: boolean; skin: string }[] {
+  return peers.slice(0, 39).map((p) => ({ name: p.name, tag: "in room · live", ready: p.ready, skin: p.skin }));
+}
+
+/**
+ * Deterministic featured rivals, drawn from the same name pool as the
+ * simulated field. Used for **simulated opponents** (local duels, the AI
+ * flock) — never to stand in for live players in the lobby.
  */
 export function featuredRivals(seed: string, count = 3): { name: string; tag: string }[] {
   let h = 2166136261;

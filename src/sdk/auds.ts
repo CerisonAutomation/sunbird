@@ -328,6 +328,32 @@ export class PokiAuds {
     }
   }
 
+  /**
+   * Atomically bump a public counter on an entry.
+   *
+   * Docs: `POST /v0/<game-id>/userdata/<key>/<id>/_increment?key=<value-key>`.
+   * No secret and no body are required — the endpoint is deliberately public
+   * so any player can count a view/play. Constraints enforced by AUDS:
+   *   • the value key must contain "count" (e.g. `play-count`);
+   *   • the existing value must already be a number;
+   *   • the counter increases by exactly 1 and the revision does not change.
+   * Returns the new value when the response carries it, else null.
+   */
+  async increment(key: string, id: string, valueKey: string): Promise<number | null> {
+    if (!valueKey.toLowerCase().includes("count")) return null;
+    try {
+      const res = await fetch(`${this.url(key, `/${encodeURIComponent(id)}/_increment`)}?key=${encodeURIComponent(valueKey)}`, {
+        method: "POST",
+      });
+      if (!res.ok) return null;
+      const j = (await res.json().catch(() => null)) as { values?: Record<string, unknown> } | null;
+      const value = j?.values?.[valueKey];
+      return typeof value === "number" && Number.isFinite(value) ? value : null;
+    } catch {
+      return null;
+    }
+  }
+
   /** Create-or-update a singleton record (one-per-user: settings, loadout).
    *  If no existing id is provided (or the stored secret is missing), we
    *  create a fresh record and remember the new id+secret. */

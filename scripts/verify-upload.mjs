@@ -27,7 +27,7 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
-import { foreignMarkersIn } from "./portal-markers.mjs";
+import { foreignMarkersIn, missingMarkersIn } from "./portal-markers.mjs";
 
 const UPLOAD = "poki-upload";
 const ZIP = "sunbird-poki.zip";
@@ -171,6 +171,13 @@ if (folderHtml) {
   const hits = foreignMarkersIn(folderHtml.toString("utf8"), "poki");
   if (hits.length) bad("ROOT-07", `foreign portal marker in ${UPLOAD}/ — ${hits.join("; ")}`);
   else ok("ROOT-07", `${UPLOAD}/ carries no other portal's markers (Poki only)`);
+
+  /* ROOT-08 --------------------------------------------------------- */
+  // …and the Poki edition keeps its own platform integration: Netlib for P2P
+  // races, AUDS for boards/share codes, the Poki SDK for the platform hooks.
+  const missed = missingMarkersIn(folderHtml.toString("utf8"), "poki");
+  if (missed.length) bad("ROOT-08", `${UPLOAD}/ is missing Poki platform integration — ${missed.join("; ")}`);
+  else ok("ROOT-08", `${UPLOAD}/ keeps Poki's own integrations (Netlib P2P · AUDS · SDK)`);
 }
 
 /* ----------------------------------------------------------------- report -- */

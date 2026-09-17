@@ -129,11 +129,23 @@ Re-verified against the current Poki docs (developers.poki.com, 2026-09-16):
 2. Upload static + animated thumbnails.
 3. Confirm **web exclusivity** for the Poki build at submission (the `generic` zip is a
    separate artifact, which is what makes the pledge possible).
-4. Keep the social/WS build out of the Poki artifact (already true — bundle-verified).
-5. Post-launch: AUDS (cross-device save), Netlib (portal multiplayer), optional `login()` button.
+4. Keep the social/WS build out of the Poki artifact — `pnpm isolation:check` plus the
+   portal markers (`verify:portals`, `audit:zips`, `verify:upload` `ROOT-07`/`ROOT-08`) prove
+   it at source *and* bundle level on every push.
+5. Supply the Poki-issued ids at build time: `VITE_POKI_GAME_ID` (AUDS) and
+   `VITE_POKI_NETLIB_GAME_ID` (Netlib). Both integrations already ship — without the ids
+   they stay dormant rather than broken. Optional `login()` button after that.
 
 ## 5. Recent significant work (git log, newest first)
 
+- (this session, Poki platform pass) Poki multiplayer proven to be the Netlib P2P path
+  end-to-end; AUDS completed (public `_increment` counter) and used for its documented
+  non-real-time-multiplayer case — **run share codes** (`src/game/SharedRun.ts`: publish a
+  finished run, race a friend's code on the same seed, count plays); race lobby no longer
+  pads itself with invented rivals (`lobbyRivals(roster)` is truth-only); `VITE_POKI_NETLIB_GAME_ID`
+  override for the Poki-issued id; new `pnpm isolation:check` proves the Rust stack stays
+  platform-agnostic and Poki stays P2P + AUDS (with the mirror-image required-marker checks
+  in every build gate); Rust legacy gateway learned the `leave` frame for parity.
 - (this session) PVP/slipstream hardening + results-economy audit: time-based draft
   smoothing (frame-rate independent), per-mode name-tag draft zones, **one-shot 3× coin
   bonus** (was re-claimable forever from the live snapshot), removed the false 📺 "ad
@@ -165,10 +177,12 @@ Re-verified against the current Poki docs (developers.poki.com, 2026-09-16):
 
 - AI rival emotes are generated locally per client (two players see different AI emotes) —
   fixing needs server-side AI emotes; cosmetic only.
-- Cloud save on portals is wrapped localStorage (no Poki AUDS yet) — cross-device saves
-  are a post-launch item.
-- Portal multiplayer is deferred (Poki Netlib / external-server approval) — the social
-  build is separate and works independently.
+- Cloud save on portals is wrapped localStorage today; the AUDS per-user sync paths
+  ship behind `VITE_POKI_GAME_ID` and activate once Poki issues a game id.
+- Poki multiplayer is Netlib P2P (no external-server approval needed); the self-hosted
+  WebSocket room server stays on the direct/crazy/generic builds and never enters the
+  Poki bundle. If Poki later requires an external-server approval for anything, only that
+  path is affected.
 - No headless browser in the dev sandbox — runtime verification there is unit + e2e-in-CI +
   Inspector. If a device-specific issue is reported, reproduce in the Inspector first.
 

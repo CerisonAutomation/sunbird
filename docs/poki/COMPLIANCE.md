@@ -8,8 +8,8 @@
 | Status | Rules |
 |---|---|
 | satisfied | 99 |
-| action (submission step) | 3 |
-| deferred (accepted) | 1 |
+| action (submission step) | 4 |
+| deferred (accepted) | 0 |
 | informational | 10 |
 
 ## GK — Developer Guide overview
@@ -154,7 +154,7 @@
 | `TOOL-05` | informational | Netlib is usable whether or not the game is hosted on Poki. | ℹ️ info | Availability note. |
 | `TOOL-06` | requirement | Feature-detect WebRTC and keep a non-P2P path when using Netlib. | ✅ | src/game/PokiMpUtils.ts matches /RTCPeerConnection/ |
 | `TOOL-07` | informational | AUDS stores user-generated content and returns shareable codes, enabling non-real-time multiplayer. | ℹ️ info | src/sdk/auds.ts |
-| `TOOL-08` | requirement | AUDS is exclusive to Poki-hosted games and needs a live game id, so it cannot be a dependency of portable builds. | ⏸ deferred | Deferred until the game is live with a Poki game id; the leaderboard/ghost seams are shaped for it (ROADMAP.md). |
+| `TOOL-08` | requirement | AUDS is exclusive to Poki-hosted games and needs a live game id, so it cannot be a dependency of portable builds. | 📋 action | Submission step: ship with the Poki-issued game id (VITE_POKI_GAME_ID); without it every AUDS call is skipped, so the integration is dormant rather than broken. Portable builds cannot depend on it — `pnpm isolation:check` fails if auds.poki.io reaches a non-Poki edition. |
 
 ## REQ — Platform requirements, policies & release
 
@@ -201,7 +201,7 @@
 |---|---|---|
 | `EA-09` | action | Upload to Poki Playtest and review the first-run funnel; telemetry already emits the funnel events. |
 | `THB-09` | action | Record the 3-5 s capture from a real play session (the build is capture-ready: embed-safe, no fullscreen requirement). |
-| `TOOL-08` | deferred | Deferred until the game is live with a Poki game id; the leaderboard/ghost seams are shaped for it (ROADMAP.md). |
+| `TOOL-08` | action | Submission step: ship with the Poki-issued game id (VITE_POKI_GAME_ID); without it every AUDS call is skipped, so the integration is dormant rather than broken. Portable builds cannot depend on it — `pnpm isolation:check` fails if auds.poki.io reaches a non-Poki edition. |
 | `REQ-52` | action | Walk the Inspector QA modules on the unzipped folder (Event Log sequences, External Resources, Image Optimization, Scaling tests, mobile QR). |
 
 ## Evidence index
@@ -287,8 +287,8 @@
 | `TOOL-04` | Client implemented behind a code-split. |
 | `TOOL-05` | docs/poki/08-game-dev-tools.md |
 | `TOOL-06` | P2P is selected only when the build targets Poki AND RTCPeerConnection/crypto are present (PokiMpUtils.isPokiMultiplayerAvailable); WebSocket and local paths remain for every other build. |
-| `TOOL-07` | Adapter present. |
-| `TOOL-08` | ROADMAP.md, POKI_COMPLIANCE_AUDIT.md B3 |
+| `TOOL-07` | Implemented: score boards, ghost shares, per-user sync and — for non-real-time multiplayer — run share codes (src/sdk/auds.ts, src/game/SharedRun.ts: publish a run, race a friend's code, count plays through the public _increment endpoint). |
+| `TOOL-08` | src/sdk/auds.ts (dormant without VITE_POKI_GAME_ID), scripts/verify-isolation.mjs, scripts/portal-markers.mjs |
 | `REQ-01` | e2e asserts canvas coverage, visible menu/lobby and zero page errors at each size. |
 | `REQ-02` | Rejection guard installed before anything else; overlay-only UI; share flow uses the platform share API. |
 | `REQ-03` | Storage facade: localStorage -> sessionStorage -> in-memory, canary-probed. |

@@ -58,7 +58,45 @@ export const PORTAL_FORBIDDEN_MARKERS = [
   [/data-action=["']squad-chat/, "club chat send button"],
   [/Club chat history/, "club chat log"],
   [/Friends &amp; club chat|Friends & club chat/, "chat promise in the Squad menu copy"],
+  // The self-hosted stack (Rust/TS room server, social service, leaderboard
+  // backend) is the DIRECT-BUILD path. Portal editions blank
+  // VITE_MULTIPLAYER_URL / VITE_SOCIAL_URL / VITE_LEADERBOARD_URL at build
+  // time and must therefore carry no trace of that infrastructure — the Poki
+  // edition reaches other pilots over Netlib P2P and stores through AUDS
+  // instead. These markers keep the two worlds from bleeding into each other.
+  [/\/mp\/v1\//, "self-hosted multiplayer REST path (portal editions ship no backend)"],
+  [/sunbird-social/, "self-hosted social service marker"],
+  [/\bws:\/\//, "insecure WebSocket URL (portal builds must never hardcode a backend)"],
 ];
+
+/**
+ * Markers every edition of a given portal MUST carry.
+ *
+ * Isolation has two directions. The forbidden lists above stop another
+ * platform's code from leaking in; this one stops a build from quietly
+ * *losing its own* platform integration — e.g. a Poki bundle that no longer
+ * knows how to do P2P multiplayer, or a CrazyGames bundle without its SDK.
+ * An empty list means the edition has no platform integration by design.
+ */
+export const REQUIRED_MARKERS = {
+  poki: [
+    [/netlib\.poki\.io/, "Poki Netlib signaling endpoint (P2P multiplayer)"],
+    [/auds\.poki\.io/, "Poki AUDS endpoint (leaderboards + share codes)"],
+    [/\bPokiSDK\b/, "Poki SDK global"],
+  ],
+  crazy: [[/crazygames/i, "CrazyGames SDK marker"]],
+  generic: [],
+};
+
+/** Required markers missing from `html`, as "reason" strings. */
+export function missingMarkersIn(html, portal) {
+  const table = REQUIRED_MARKERS[portal] ?? [];
+  const missing = [];
+  for (const [re, why] of table) {
+    if (!re.test(html)) missing.push(why);
+  }
+  return missing;
+}
 
 /** Every forbidden marker that appears in `html`, as "reason (matched text)". */
 export function foreignMarkersIn(html, portal) {

@@ -87,9 +87,10 @@ import { nextWings, wingsFor, wingsProgress, wingsPromotion } from "./Career";
 import { GhostPlayer, GhostRecorder } from "./Ghost";
 import { fetchRivalGhost, publishGhost } from "./GhostNet";
 import { HUD, type CalendarCard, type CheckoutMode, type DailyCard, type GauntletCard, type HudSnapshot, type LoadoutView, type RivalCard, type SeedMode, type UiScreen, type UiState } from "./HUD";
-import { divisionFor, duelOpponent, duelSkillFor, featuredRivals, nextDivision, rankSeasonId, seasonReward } from "./pvp";
+import { divisionFor, duelOpponent, duelSkillFor, lobbyRivals, nextDivision, rankSeasonId, seasonReward } from "./pvp";
 import { PilotBook } from "./pilots";
 import { launchIntentFor, pvpCircuitFor } from "./launchRouting";
+import { countSharePlay, loadSharedRun, shareRun, sharingAvailable, type SharedRun } from "./SharedRun";
 import { Input } from "./Input";
 import { clamp, dateSeed, formatDatePretty, lerp, SeededRandom } from "./math";
 import { Missions, type MissionView, type QuestReward, type QuestView, type RunStats } from "./Missions";
@@ -389,6 +390,14 @@ export class Game {
   private goldenHour = false;
   private nextMilestone = 500;
   private rivalBeatenToast = false;
+
+  /* ---- AUDS shared runs: async multiplayer by code (Poki builds) ---- */
+  /** The code published for the run on screen, "" until the player shares. */
+  private shareCode = "";
+  private runShareBusy = false;
+  private shareError = "";
+  /** The friend's run loaded from a code, waiting to be raced. */
+  private sharedRun: SharedRun | null = null;
   /** True once the DO's official finish place has been folded in this race. */
   private serverPlaceApplied = false;
   private duelResult: "" | "won" | "lost" = "";
@@ -3756,6 +3765,88 @@ export class Game {
         this.squadNotice = "";
         void this.squad?.refresh();
         break;
+      case "share-run": {
+        // Publish this run so a friend can race the same hills against our
+        // mark. AUDS is Poki's store (it needs a Poki game id), so elsewhere
+        // the button is not rendered and this is unreachable.
+        if (this.runShareBusy) break;
+        this.runShareBusy = true;
+        this.shareError = "";
+        this.bump();
+        const run: SharedRun = {
+          v: 1,
+          name: this.racedName(),
+          seed: this.seed,
+          mode: this.modeId,
+          distance: Math.round(this.bird.x - this.startX),
+          timeMs: Math.round((this.raceFinishTime || this.runTime) * 1000),
+          place: this.racePlace,
+          bird: this.skin.id,
+        };
+        void shareRun(run).then((code) => {
+          if (this.disposed) return;
+          this.runShareBusy = false;
+          if (code) {
+            this.shareCode = code;
+            this.hud.toast("🔗 Run shared — send the code to a friend", "gold");
+          } else {
+            // Platform-neutral copy: this string ships in every edition, and
+            // the isolation gates reject the platform's name in other builds.
+            this.shareError = "Sharing isn't available in this build — no platform store is configured.";
+          }
+          this.bump();
+        });
+        break;
+      }
+      case "copy-share": {
+        if (!this.shareCode) break;
+        const code = this.shareCode;
+        void copyText(code).then((ok) => {
+          if (this.disposed) return;
+          this.hud.toast(ok ? `Run code ${code} copied` : `Run code: ${code}`, ok ? "gold" : "info");
+        });
+        break;
+      }
+      case "load-run": {
+        const code = this.hud.readValue("shareCode").trim();
+        if (!code) break;
+        this.runShareBusy = true;
+        this.shareError = "";
+        this.bump();
+        void loadSharedRun(code).then((run) => {
+          if (this.disposed) return;
+          this.runShareBusy = false;
+          if (!run) {
+            this.shareError = sharingAvailable()
+              ? "No shared run with that code — check the code and try again."
+              : "Run codes aren't available in this build — no platform store is configured.";
+            this.bump();
+            return;
+          }
+          this.sharedRun = run;
+          // Same hills, same mode, their mark: this is the existing rival
+          // challenge path, just delivered by code instead of a URL.
+          this.rival = { seed: run.seed, distance: run.distance, name: run.name, mode: run.mode };
+          this.rebuildWorld(run.seed);
+          this.seedMode = "random";
+          if (MODES.some((m) => m.id === run.mode)) {
+            this.modeId = run.mode as ModeId;
+            this.mode = modeById(this.modeId);
+          }
+          // Count the play — the AUDS counter endpoint is public by design.
+          void countSharePlay(code);
+          this.hud.toast(`🥊 ${run.name} flew ${run.distance.toLocaleString()} m here — beat it`, "quest");
+          this.telemetry.track("shared_run_loaded", { mode: this.modeId, distance: run.distance });
+          this.bump();
+        });
+        break;
+      }
+      case "race-share": {
+        if (!this.sharedRun) break;
+        this.exitVersus();
+        this.startRun();
+        break;
+      }
       case "pilot-lookup": {
         // Real lookup: the panel shows the directory's answer, including
         // "no pilot with that code" and "this build is offline".
@@ -5953,21 +6044,10 @@ export class Game {
       // and on the results card, where no one renders it.
       lobbyRivals:
         this.state === "menu" && this.screen === "live"
-          ? (() => {
-              // Real pilots seated in the room always outrank seeded flavor text.
-              const live = (this.net?.roster() ?? [])
-                .slice(0, 39)
-                .map((p) => ({ name: p.name, tag: "in room · live", ready: p.ready, skin: p.skin }));
-              if (live.length) return live;
-              // Next best: time-shifted doubles of real leaderboard players.
-              const page = this.board.peek("global", "distance");
-              const ghosts = (page?.entries ?? [])
-                .filter((en) => !en.you && en.name)
-                .slice(0, 3)
-                .map((en) => ({ name: en.name, tag: `best ${Math.round(en.distance).toLocaleString()} m` }));
-              if (ghosts.length) return ghosts;
-              return featuredRivals(`${this.seed}:massrace`);
-            })()
+          // Truth only: the pilots actually seated in this room. No padded
+          // name-pool rivals, no borrowed leaderboard names — an empty room
+          // renders as an empty room.
+          ? lobbyRivals(this.net?.roster() ?? [])
           : [],
       raceRated: this.rankedRace,
       raceVerified: this.serverPlaceApplied,
@@ -5993,6 +6073,13 @@ export class Game {
       campaignTotal: campaignProgress(st.campaignClaimed).total,
       squad: this.squad?.state ?? emptySquadState(),
       recentPilots: this.pilots.all(),
+      share: {
+        available: sharingAvailable(),
+        code: this.shareCode,
+        busy: this.runShareBusy,
+        error: this.shareError,
+        loaded: this.sharedRun,
+      },
       squadNotice: this.squadNotice,
       dailyFlash: dailyFlashBird(this.today),
       stipendClaimed: this.save.state.lastStipendClaimed === this.today,

@@ -481,3 +481,92 @@ instance of Event. Received an instance of Event` — two realms). The suite is
 pinned to `// @vitest-environment node`, where Node's own `Event` and `WebSocket`
 agree, and it now throws a clear error if no global `WebSocket` exists rather
 than timing out mysteriously.
+
+---
+
+## 14. Async multiplayer by code, and the Rust/Poki split made checkable
+
+Two Poki platform services were pasted alongside the request — **AUDS**
+(arbitrary user data store) and **Netlib** (WebRTC P2P) — plus one instruction
+that decided the shape of everything below: *"make sure Rust uses P2P and Poki
+is separated"*. The split that satisfies it is the one the platform actually
+implies: **Poki races peer-to-peer over Netlib and stores through AUDS; the
+self-hosted authoritative stack (TS room server + `rust/`) serves direct,
+CrazyGames and generic builds; neither knows the other exists.**
+
+### 14.1 AUDS: the missing endpoint and the documented use case
+
+`src/sdk/auds.ts` already wrapped create/read/list/update/delete. The docs'
+public counter — `POST /v0/<game-id>/userdata/<key>/<id>/_increment?key=…`,
+no secret, key must contain `count`, revision unchanged — was missing, so it is
+now `PokiAuds.increment()`, with the documented constraints enforced client-side
+(a key without "count" never leaves the browser) and every failure resolving to
+`null` instead of a fabricated number.
+
+The flagship AUDS use case per the docs is *"levels, leaderboards, even
+non-real-time multiplayer"*. That last one is now a feature: **run share codes**
+(`src/game/SharedRun.ts`).
+
+* A finished run publishes `{name, seed, mode, distance, timeMs, place, bird}`
+  under `sb:shared:run:v1` and shows the returned code on the results card.
+* A friend pastes the code; the game loads the entry, teleports onto the same
+  seed/mode — the existing rival-challenge path, delivered by code instead of a
+  URL — and races the mark. The entry's play count is bumped through the public
+  `_increment` endpoint.
+* `topSharedRuns(seed)` reuses the same key as a per-seed mini board
+  (`q=seed:…`, `sort=-distance`, `limit` clamped to the documented 1–100).
+* **Every field from the network is hostile until proven otherwise:** a payload
+  is rejected without a seed or a mark, names have control characters stripped
+  and clamp to 14 chars, distance/time/place clamp to sane maxima. A share with
+  junk in it becomes "no such run", never a broken race.
+
+Availability is honest: `createAudsIfConfigured()` needs `VITE_POKI_GAME_ID`,
+so every non-Poki build offers no share button at all rather than a dead one.
+
+### 14.2 "Rust uses P2P and Poki is separated", made checkable
+
+The instruction started as a phrase and is now four machine-checked statements:
+
+1. **Source level** — `pnpm isolation:check` (`scripts/verify-isolation.mjs`):
+   the Rust workspace references no platform integration at all (0 hits across
+   13 source files); `@poki/netlib` is imported by exactly one module
+   (`src/game/PokiNetlib.ts`) and that module reaches nothing self-hosted; the
+   self-hosted transport (`src/game/Realtime.ts`) touches the Poki transport
+   only as a type; the Poki-only modules name no self-hosted endpoint. Sabotage
+   checks: appending the word "netlib" to a Rust file, or constructing the Poki
+   client inside `Realtime.ts`, each fail the gate with a file:line.
+2. **Bundle level** — the portal markers gained the mirror image of the foreign
+   list: `REQUIRED_MARKERS` (a Poki zip must still carry netlib + AUDS + the
+   SDK; CrazyGames must carry its SDK) and the self-hosted bans (`/mp/v1/`,
+   `sunbird-social`, `ws://`) that no portal edition may contain. Wired into
+   `verify:portals`, `audit:zips` and the Inspector gate (`ROOT-08`).
+3. **Rust parity** — the Rust legacy gateway had no inbound `leave` frame, so an
+   explicit exit only freed the seat when the socket dropped. It now handles
+   `{"type":"leave"}` like the TypeScript gateway, with a unit test asserting the
+   seat is freed *and* the remaining pilot is told. (No cargo in this
+   environment, so the Rust edit is verified by CI's `cargo fmt`/`clippy`/`test`
+   job.)
+4. **Netlib id** — a submission no longer means editing a source constant:
+   `VITE_POKI_NETLIB_GAME_ID` supplies the Poki-issued UUID, a malformed value
+   is discarded in favour of the dev UUID rather than shipped, and the existing
+   build-time folding keeps the whole Poki block out of other bundles.
+
+### 14.3 The lobby stops inventing people
+
+The race lobby's rival list had two fallback tiers of fiction: deterministic
+name-pool "rivals" from `pvp.ts`, then borrowed leaderboard names presented as
+room occupants. Truth is now the only source: `lobbyRivals(roster)` maps the
+pilots actually seated in the room, zero peers means zero rows, and the empty
+state says so ("Just you so far — share the code above and the room fills with
+real pilots"). `featuredRivals()` survives only where it is honest — as the
+generator for *simulated* opponents in local duels and the AI flock.
+
+### 14.4 Verification for this round
+
+| Check | Result |
+|---|---|
+| `npx vitest run` (whole suite) | see the run recorded at the end of this round |
+| `pnpm isolation:check` | ✅ (and both sabotage directions fail it) |
+| `pnpm build:portals` → `verify:portals` → `isolation:check` → `audit:zips` → `verify:upload` | ✅ |
+| `pnpm pvp:check` | ✅ live suite 7/7 against a real server |
+| Rust `In::Leave` + test | compiled/fmt-checked by CI (`rust.yml`, `botsim.yml`) |

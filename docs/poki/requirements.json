@@ -1076,19 +1076,19 @@
         "type": "file",
         "path": "src/sdk/auds.ts"
       },
-      "evidence": "Adapter present."
+      "evidence": "Implemented: score boards, ghost shares, per-user sync and \u2014 for non-real-time multiplayer \u2014 run share codes (src/sdk/auds.ts, src/game/SharedRun.ts: publish a run, race a friend's code, count plays through the public _increment endpoint)."
     },
     {
       "id": "TOOL-08",
       "group": "TOOL",
       "kind": "requirement",
       "rule": "AUDS is exclusive to Poki-hosted games and needs a live game id, so it cannot be a dependency of portable builds.",
-      "status": "deferred",
+      "status": "action",
       "verify": {
         "type": "manual",
-        "note": "Deferred until the game is live with a Poki game id; the leaderboard/ghost seams are shaped for it (ROADMAP.md)."
+        "note": "Submission step: ship with the Poki-issued game id (VITE_POKI_GAME_ID); without it every AUDS call is skipped, so the integration is dormant rather than broken. Portable builds cannot depend on it \u2014 `pnpm isolation:check` fails if auds.poki.io reaches a non-Poki edition."
       },
-      "evidence": "ROADMAP.md, POKI_COMPLIANCE_AUDIT.md B3"
+      "evidence": "src/sdk/auds.ts (dormant without VITE_POKI_GAME_ID), scripts/verify-isolation.mjs, scripts/portal-markers.mjs"
     },
     {
       "id": "REQ-01",

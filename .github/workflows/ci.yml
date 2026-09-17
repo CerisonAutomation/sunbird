@@ -194,6 +194,10 @@ jobs:
         run: pnpm build:portals
       - name: Verify per-version isolation (each build carries only its own portal)
         run: pnpm verify:portals && pnpm audit:zips && pnpm verify:thumbnail
+      # Source-level half of the same contract: the Rust stack stays
+      # platform-agnostic and the Poki edition stays P2P (netlib) + AUDS.
+      - name: Verify the Rust/Poki split at the source level
+        run: pnpm isolation:check
       - name: Verify the Poki Inspector upload shape
         run: pnpm verify:upload
       - uses: actions/upload-artifact@v4
