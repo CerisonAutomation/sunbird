@@ -848,13 +848,20 @@ describe("RealtimeClient — send throttling (18 tests)", () => {
     expect(parsed.d).toBe(2001);
   });
 
-  it("send after disconnect is a no-op", async () => {
+  it("send after disconnect is a no-op (the leave frame is the last word)", async () => {
     const client = await loadClient();
     openSocket();
     client.disconnect();
+    // Leaving on purpose announces itself once, so the room frees the seat
+    // instead of holding it for the reconnect grace window — a deliberate
+    // departure must not look like a dropped socket to everyone else.
+    expect(instances[0]!.sent.map((raw) => JSON.parse(raw).type)).toEqual(["leave"]);
     client.tick(1);
     client.send(10, 20, 0.5, 100);
-    expect(instances[0]!.sent).toHaveLength(0);
+    client.sendEmote("👋");
+    client.sendReady(true);
+    client.sendFinish(12, 900);
+    expect(instances[0]!.sent).toHaveLength(1);
   });
 
   it("send does not fire when still connecting", async () => {

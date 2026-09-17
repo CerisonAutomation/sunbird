@@ -1,34 +1,40 @@
 import { describe, expect, it } from "vitest";
-import { SquadClient, SQUAD_QUESTS, DEFAULT_LOCAL_CLUBS, DEFAULT_LOCAL_FRIENDS } from "../Squad";
+import { SquadClient, SQUAD_QUESTS } from "../Squad";
 import { dailyFlashBird, dailyDealBoost, skinById } from "../Economy";
 import { SaveData } from "../SaveData";
 
 describe("Autonomous Squad and Upgraded Shop Engine", () => {
-  it("enables autonomous local squadron hub with persistent code, clubs, friends and chat", async () => {
+  it("starts the offline squadron hub empty and honest — no invented pilots, clubs or chat", () => {
     const squad = new SquadClient("test-device-auto", () => "Captain Falcon");
     squad.enableAutonomous();
 
     expect(squad.state.live).toBe(true);
     expect(squad.state.registered).toBe(true);
     expect(squad.state.myCode).toMatch(/^SUN-[A-Z0-9]{6}$/);
-    expect(squad.state.clubs.length).toBeGreaterThanOrEqual(DEFAULT_LOCAL_CLUBS.length);
-    expect(squad.state.friends.length).toBeGreaterThanOrEqual(DEFAULT_LOCAL_FRIENDS.length);
-    expect(squad.state.myClubId).toBe(1);
-    expect(squad.state.chat.length).toBeGreaterThan(0);
+    // The panel must never ship a roster of fictional wingmates or a club the
+    // player never joined: an empty, explained screen beats a fake busy one.
+    expect(squad.state.friends).toEqual([]);
+    expect(squad.state.clubs).toEqual([]);
+    expect(squad.state.myClubId).toBeNull();
+    expect(squad.state.chat).toEqual([]);
   });
 
   it("handles offline friend addition, removal, and club founding", async () => {
     const squad = new SquadClient("test-device-mutations", () => "Captain Falcon");
     squad.enableAutonomous();
 
-    // Add friend
+    // Adding by code offline must NOT invent a pilot from the code itself.
     const addResult = await squad.addFriend("SUN-PILOT99");
-    expect(addResult).toContain("added");
-    expect(squad.state.friends.some((f) => f.code === "SUN-PILOT99")).toBe(true);
+    expect(addResult).toMatch(/online service/i);
+    expect(squad.state.friends).toEqual([]);
+    expect(JSON.stringify(squad.state)).not.toContain("Wingman-");
 
-    // Remove friend
-    await squad.removeFriend("SUN-PILOT99");
-    expect(squad.state.friends.some((f) => f.code === "SUN-PILOT99")).toBe(false);
+    // A real pilot met in a race can still be saved, because the name is real.
+    const saved = squad.rememberWingman("Bora Sky");
+    expect(saved).toContain("Bora Sky");
+    expect(squad.state.friends.map((f) => f.name)).toEqual(["Bora Sky"]);
+    await squad.removeFriend("Bora Sky");
+    expect(squad.state.friends).toEqual([]);
 
     // Create club
     const clubResult = await squad.createClub("Cloud Raiders", "Soar above the storm");

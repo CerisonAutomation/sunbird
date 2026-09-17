@@ -407,3 +407,77 @@ Audit of the rest of the surface: every `data-action` in the HUD has a handler
 or is handled locally (`toggle-emotes`, `shop-*`, `preview-skin`,
 `dismiss-copy`), every `UiScreen` has a renderer, and every screen has a route
 into it.
+
+## 13. PvP actually verified, and a pilot lookup that isn't invented
+
+The previous two sections fixed what the audit could see in the source. This
+section is about the thing the source cannot prove: **that two players on two
+devices really meet**. Everything below is executed by one command,
+`pnpm pvp:check`, which boots the real room server on a scratch port (8795),
+then runs three layers against it and fails unless all three pass:
+
+| Layer | What it proves | Script |
+|---|---|---|
+| 1. Protocol smoke | two raw sockets see each other, receive a shared start and exchange live state frames | `scripts/mp-smoke.mjs` |
+| 2. Live client suite | two **real `RealtimeClient` instances** join one room, adopt the host's seed, stream interpolated state, relay emotes, agree on one countdown, see a leave, and get a server-assigned finish place | `src/game/__tests__/pvp-live.test.ts` (7 cases) |
+| 3. Pilot directory | unknown code → 404, real code → real name/presence/best, request → pending on both sides, accept → wingmen with a verified code | `scripts/smoke-pilot-lookup.mjs` (17 checks) |
+
+The live suite found and pinned three real defects, all fixed:
+
+| Defect | Symptom for a player | Fix |
+|---|---|---|
+| `roster().place` was hard-coded `0` | every rival row showed place 0, and `recordRivalResult` (Game.ts:1778) never saw a real placement | the finish frame's place is stored on the track and reported by `roster()` |
+| the `peers` roster frame was merged, never reconciled | a pilot who left (or switched rooms) stayed "connected" forever — a ghost in the lobby | the frame is authoritative now: anyone absent is dropped, with a real `leave` event |
+| leaving on purpose looked like a dropped socket | the room held your seat for the reconnect grace window, so everyone still counted you | `disconnect()` sends an explicit `leave` frame; the legacy gateway frees the seat immediately (Rust already frees it when the socket closes) |
+
+The exact same honesty rule that §12 established for chat and PvP was then
+applied to the squad screen, because it was the last place in the game that
+invented people:
+
+- **`DEFAULT_LOCAL_FRIENDS`** — four fictional pilots ("Echo Falcon", "Zephyr
+  Sky", …) seeded into every offline build — deleted. Wingmen now start empty.
+- **`INITIAL_CLUB_CHAT`** — invented club members talking about races that never
+  happened — deleted; offline chat holds only messages this device received.
+- **`DEFAULT_LOCAL_CLUBS`** — four clubs with fictional member counts, plus a
+  default membership the player never joined — deleted.
+- **`addFriend("SUN-XXXXXX")` offline used to invent a name from the code**
+  ("Wingman-9F3K"). It now refuses honestly and says the lookup needs the
+  online service.
+- The wingman request flow no longer claims "added!" for a request that is
+  still pending: the panel shows **Requests** (incoming with accept/decline,
+  outgoing with cancel) and the toast says *"Request sent to …"* until the
+  other pilot accepts. Re-adding an existing wingman answers "already a
+  wingman" instead of queueing a duplicate.
+
+What replaced the fabrication is real on both sides of the wire:
+
+- `src/game/pilots.ts` (**new**) — a local book of the pilots this device has
+  actually shared a room with: real names from real rosters, the room code, the
+  best distance they flew, when you last saw them. Placeholders ("Pilot", "AI",
+  empty) are rejected; nothing is ever invented. This is the "🛫 Flew with"
+  list, and it works offline because it is real history, not a directory.
+- `server/src/http/legacy.ts` — three routes the panel calls:
+  `GET /social/players/:code` (real name, presence, club, best distance, rank,
+  friend/pending state; 404 for unknown codes), `GET /social/friends/requests`
+  (real pending in/out) and `POST /social/friends/respond|cancel`; the add route
+  now reports `requested` / `accepted` / `friends` instead of implying success.
+  Presence respects the pilot's `showPresence` privacy flag.
+
+The panel itself ("🔍 Pilot Lookup" on the Squad screen) shows a code, a real
+result card, the requests, the wingmen list with real presence and best
+distance, and the offline banner says exactly what is and is not available.
+Tests: `src/game/__tests__/pilot-lookup.test.ts` (13), `server/tests/pilot-lookup-routes.test.ts`
+(7, driving the route handlers directly), `pnpm test:lookup` (17 live checks).
+
+CI grew a `pvp-live` job that runs `pnpm pvp:check` on every push, so
+"multiplayer works" is a checked claim rather than a remembered one.
+
+### 13.1 One more gate: the state a test itself can be in
+
+The live suite initially reported "7 passed" and still exited non-zero:
+vitest was collecting fourteen unhandled `ERR_INVALID_ARG_TYPE` errors from the
+Node WebSocket inside the jsdom environment (`The "event" argument must be an
+instance of Event. Received an instance of Event` — two realms). The suite is
+pinned to `// @vitest-environment node`, where Node's own `Event` and `WebSocket`
+agree, and it now throws a clear error if no global `WebSocket` exists rather
+than timing out mysteriously.

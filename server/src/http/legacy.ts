@@ -253,10 +253,15 @@ export const LEGACY_ROUTES: Route[] = [
     handler: (ctx, _p, _q, _b, actor) => {
       const profile = ctx.db.state.profiles[actor];
       if (!profile) throw new HttpError(404, "not registered", "notFound");
+      // Real wingman rows: presence, best distance and last-seen all come from
+      // the service. The client renders only what is present here.
       const friends = ctx.friends.listFriends(actor).map((f) => ({
         name: f.displayName,
-        code: ctx.db.state.profiles[f.playerId]?.playerCode ?? f.playerId,
+        code: f.playerCode,
         clubId: null,
+        online: f.online,
+        bestDistance: Math.round(f.bestDistance),
+        lastSeen: f.lastSeen,
       }));
       return { name: profile.displayName, code: profile.playerCode, clubId: null, friends, playerId: actor };
     },
@@ -271,13 +276,110 @@ export const LEGACY_ROUTES: Route[] = [
       const target = code ? ctx.identity.byCode(code) : null;
       if (!target) throw new HttpError(404, "No pilot with that code", "notFound");
       if (target.playerId === actor) throw new HttpError(400, "That's your own code", "self");
+      // Already wingmen? Then the honest answer is "already", not a new request.
+      if (ctx.friends.areFriends(actor, target.playerId)) {
+        return { ok: true, status: "friends", friend: { name: target.displayName, code: target.playerCode } };
+      }
+      // They already asked us: accept instead of piling up a second request.
+      const inbound = ctx.friends.listPending(actor).find((r) => r.fromId === target.playerId);
+      if (inbound) {
+        ctx.friends.respond(actor, inbound.id, true);
+        return { ok: true, status: "accepted", friend: { name: target.displayName, code: target.playerCode } };
+      }
       const req = ctx.friends.sendRequest(actor, target.playerCode);
-      return { ok: true, friend: { name: target.displayName, code: target.playerCode, requestId: req.id } };
+      return {
+        ok: true,
+        status: req.status === "pending" ? "requested" : req.status,
+        friend: { name: target.displayName, code: target.playerCode, requestId: req.id },
+      };
+    },
+  },
+  {
+    // Pilot lookup by exact code — the client's "look up a pilot" surface.
+    // Real data only: the profile, their club, their best distance and
+    // whether they are online right now. Unknown codes are a 404 (never a
+    // fabricated pilot), and privacy flags are honoured by publicView.
+    method: "GET",
+    re: /^\/social\/players\/(?<code>[A-Za-z0-9-]{4,20})$/,
+    rl: "read",
+    auth: "guest",
+    handler: (ctx, p, _q, _b, actor) => {
+      const code = p.code.toUpperCase();
+      const target = ctx.identity.byCode(code, actor);
+      if (!target) throw new HttpError(404, "No pilot with that code", "notFound");
+      const clubs = ctx.squads.squadsOf(target.playerId);
+      const club = clubs[0] ?? null;
+      return {
+        pilot: {
+          name: target.displayName,
+          code: target.playerCode,
+          online: target.online,
+          countryCode: target.countryCode ?? "",
+          club: club ? { id: club.id, name: club.name, members: club.members.length } : null,
+          bestDistance: Math.round(ctx.leaderboards.bestDistanceFor(target.playerId)),
+          rank: ctx.leaderboards.rankOf(target.playerId, "global", "distance"),
+          friend: ctx.friends.areFriends(actor, target.playerId),
+          outgoing: ctx.friends
+            .listOutgoing(actor)
+            .some((r) => r.toId === target.playerId && r.status === "pending"),
+          incoming: ctx.friends
+            .listPending(actor)
+            .some((r) => r.fromId === target.playerId && r.status === "pending"),
+          self: target.playerId === actor,
+        },
+      };
+    },
+  },
+  {
+    // Real friend-request state: who asked to fly with you, and who you have
+    // asked. Without this the client could only say "added!" and hope — the
+    // roster would then not change, which reads as a fake lookup.
+    method: "GET",
+    re: /^\/social\/friends\/requests$/,
+    rl: "read",
+    auth: "guest",
+    handler: (ctx, _p, _q, _b, actor) => {
+      const view = (r: { id: string; fromId: string; toId: string; other: string }) => {
+        const profile = ctx.db.state.profiles[r.other];
+        return {
+          requestId: r.id,
+          name: profile?.displayName ?? "Pilot",
+          code: profile?.playerCode ?? "",
+        };
+      };
+      return {
+        incoming: ctx.friends.listPending(actor).map((r) => view({ ...r, other: r.fromId })),
+        outgoing: ctx.friends.listOutgoing(actor).map((r) => view({ ...r, other: r.toId })),
+      };
     },
   },
   {
     method: "POST",
-    re: /^\/social\/friends\/remove$/,
+    re: /^\/social\/friends\/respond$/,
+    rl: "write",
+    auth: "guest",
+    handler: (ctx, _p, _q, body, actor) => {
+      const requestId = cleanText(body.requestId, 64);
+      if (!requestId) throw new HttpError(400, "requestId required", "invalidRequest");
+      const status = ctx.friends.respond(actor, requestId, body.accept === true);
+      return { ok: true, status: status.status };
+    },
+  },
+  {
+    method: "POST",
+    re: /^\/social\/friends\/cancel$/,
+    rl: "write",
+    auth: "guest",
+    handler: (ctx, _p, _q, body, actor) => {
+      const requestId = cleanText(body.requestId, 64);
+      if (!requestId) throw new HttpError(400, "requestId required", "invalidRequest");
+      const req = ctx.friends.cancelRequest(actor, requestId);
+      return { ok: true, status: req.status };
+    },
+  },
+  {
+    method: "POST",
+    re: /^\/social\/friends\/remove$/, 
     rl: "write",
     auth: "guest",
     handler: (ctx, _p, _q, body, actor) => {

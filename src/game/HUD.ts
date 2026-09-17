@@ -28,6 +28,7 @@ import type { MissionView, QuestReward, QuestView } from "./Missions";
 import type { CampaignChapterView } from "./Campaign";
 import type { MonthlyTheme, WeeklyEvent } from "./Events";
 import { SQUAD_QUESTS, type SquadState } from "./Squad";
+import { seenAgo, type FlightMate } from "./pilots";
 import type { HighScore, Settings } from "./SaveData";
 import { TRACK_NAMES } from "./Music";
 import type { TierView } from "./SeasonPass";
@@ -290,6 +291,8 @@ export type HudSnapshot = {
   campaignDone: number;
   campaignTotal: number;
   squad: SquadState;
+  /** Real pilots from rooms this device shared — see src/game/pilots.ts. */
+  recentPilots: FlightMate[];
   squadNotice: string;
   dailyFlash?: { id: string; price: number; originalPrice: number; discountPct: number };
   stipendClaimed?: boolean;
@@ -1921,19 +1924,99 @@ function renderSquad(s: HudSnapshot): string {
     </div>
   `;
 
-  const friends = `
-    <div class="section-title">Saved pilots <small>${sq.friends.length} wingmates</small></div>
-    <p class="fineprint">Your squadron list is private. Add friends by pilot code to fly together.</p>
-    <div class="redeem"><input data-ui data-ref="squadCode" data-enter-action="squad-add" aria-label="Friend code" placeholder="Friend's code (SUN-XXXXXX)" maxlength="10" autocomplete="off" /><button class="mini-btn" data-ui data-action="squad-add">Add</button></div>
-    ${
-      sq.friends.length
-        ? `<div class="friend-list">${friendPage.items
-            .map(
-              (f) => `<div class="friend-row"><span class="fr-name">🐦 ${escapeHtml(f.name)}</span><span class="fr-code">${escapeHtml(f.code)}</span><button class="mini-btn ghost" data-ui data-action="squad-remove" aria-label="Remove ${escapeHtml(f.name)}" data-id="${escapeHtml(f.code)}">✕</button></div>`,
-            )
-            .join("")}</div>`
-        : `<div class="empty-note">No friends yet — swap codes! Yours is <b>${escapeHtml(sq.myCode || "…")}</b></div>`
-    }${pages("friends", friendPage)}`;
+  // ---------------------------------------------------------- pilot lookup
+  // The panel never invents a pilot. Every row below is either a code the
+  // service resolved, a wingman row the service returned, or a pilot this
+  // device actually shared a room with.
+  const lookup = sq.lookup;
+  const lookupCard = (() => {
+    if (!lookup) return "";
+    if (lookup.status !== "ok") {
+      const tone = lookup.status === "unavailable" ? "island" : "warn";
+      return `<div class="pilot-note ${tone}" role="status">${escapeHtml(lookup.message)}${lookup.query ? ` <b>${escapeHtml(lookup.query)}</b>` : ""}</div>`;
+    }
+    const stats = [
+      lookup.club ? `🏰 ${escapeHtml(lookup.club)}` : "",
+      lookup.bestDistance > 0 ? `🛫 best ${lookup.bestDistance.toLocaleString()} m` : "",
+      lookup.rank > 0 ? `#${lookup.rank} global` : "",
+    ].filter(Boolean).join(" · ");
+    const action = lookup.friend
+      ? `<span class="fineprint">Already in your wingmen</span>`
+      : lookup.incoming
+        ? `<button class="primary-btn" data-ui data-action="pilot-add" data-id="${escapeHtml(lookup.code)}">Accept their request</button>`
+        : lookup.outgoing
+          ? `<span class="fineprint">Request sent — waiting for them</span>`
+          : `<button class="primary-btn" data-ui data-action="pilot-add" data-id="${escapeHtml(lookup.code)}">🪽 Add wingman</button>`;
+    return `
+      <div class="pilot-card">
+        <div class="pilot-card-head">
+          <b>${escapeHtml(lookup.name)}</b>
+          <span class="pilot-dot ${lookup.online ? "on" : ""}">${lookup.online ? "● Online now" : "○ Offline"}</span>
+        </div>
+        <div class="pilot-card-meta"><span class="pilot-code">${escapeHtml(lookup.code)}</span>${stats ? `<span>${stats}</span>` : ""}</div>
+        <div class="pilot-card-actions">
+          ${action}
+          <button class="mini-btn" data-ui data-action="pilot-invite" data-id="${escapeHtml(lookup.name)}">Invite to my room</button>
+          <button class="mini-btn" data-ui data-action="pilot-copy" data-id="${escapeHtml(lookup.code)}">Copy code</button>
+        </div>
+      </div>`;
+  })();
+
+  const requests = (() => {
+    const rows = [
+      ...sq.requestsIn.map((r) => `<div class="friend-row"><span class="fr-name">📨 ${escapeHtml(r.name)}</span><span class="fr-code">wants to fly with you</span><button class="mini-btn" data-ui data-action="req-accept" data-id="${escapeHtml(r.requestId)}">Accept</button><button class="mini-btn ghost" data-ui data-action="req-decline" data-id="${escapeHtml(r.requestId)}">Decline</button></div>`),
+      ...sq.requestsOut.map((r) => `<div class="friend-row"><span class="fr-name">📤 ${escapeHtml(r.name)}</span><span class="fr-code">request pending</span><button class="mini-btn ghost" data-ui data-action="req-cancel" data-id="${escapeHtml(r.requestId)}">Cancel</button></div>`),
+    ];
+    if (!rows.length) return "";
+    return `<div class="section-title">Requests <small>${rows.length} waiting</small></div><div class="friend-list">${rows.join("")}</div>`;
+  })();
+
+  const lookupPanel = `
+    <div class="section-title">🔍 Pilot Lookup <small>${sq.live && !sq.isAutonomous ? "online directory" : "offline build"}</small></div>
+    <p class="fineprint">Look a pilot up by their exact code. Results come from the pilot directory — nothing here is invented, and an unknown or unreachable code says so.</p>
+    <div class="redeem">
+      <input data-ui data-ref="pilotCode" data-enter-action="pilot-lookup" aria-label="Pilot code" placeholder="Pilot code (SUN-9F3K2A)" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${escapeHtml(sq.pilotQuery)}" />
+      <button class="mini-btn" data-ui data-action="pilot-lookup">${sq.lookupBusy ? "Looking…" : "Look up"}</button>
+    </div>
+    ${lookupCard}
+    ${requests}`;
+
+  const wingmen = (() => {
+    const page = sq.friends.length > 0 ? friendPage : { items: [], page: 0, pages: 0 };
+    if (!sq.friends.length) {
+      return `<div class="section-title">🪽 Wingmen <small>0</small></div>
+        <div class="empty-note">No wingmen yet. Look one up by code above, or save a pilot you have actually raced with below. Your code is <b>${escapeHtml(sq.myCode || "…")}</b>.</div>`;
+    }
+    return `
+    <div class="section-title">🪽 Wingmen <small>${sq.friends.length}</small></div>
+    <div class="friend-list">${(page.items as typeof sq.friends)
+      .map((f) => {
+        const presence = f.local ? "met in a race" : f.online ? "● online" : "○ offline";
+        const best = f.bestDistance && f.bestDistance > 0 ? ` · best ${Math.round(f.bestDistance).toLocaleString()} m` : "";
+        return `<div class="friend-row"><span class="fr-name">🐦 ${escapeHtml(f.name)}</span><span class="fr-code">${escapeHtml(presence)}${f.code ? ` · ${escapeHtml(f.code)}` : ""}${best}</span><button class="mini-btn ghost" data-ui data-action="squad-remove" aria-label="Remove ${escapeHtml(f.name)}" data-id="${escapeHtml(f.code || f.name)}">✕</button></div>`;
+      })
+      .join("")}</div>${pages("friends", page)}`;
+  })();
+
+  // Real history: rooms this device actually shared with other pilots.
+  const flewWith = (() => {
+    const mates = s.recentPilots.filter((m) => !sq.friends.some((f) => f.name.toLowerCase() === m.name.toLowerCase()));
+    if (!s.recentPilots.length) {
+      return `<div class="section-title">🛫 Flew with <small>0</small></div><div class="empty-note">Pilots who share a room with you appear here — real rooms, real names, remembered on this device.</div>`;
+    }
+    const rows = mates.slice(0, 8).map((m) => `<div class="friend-row">
+      <span class="fr-name">🐦 ${escapeHtml(m.name)}</span>
+      <span class="fr-code">room ${escapeHtml(m.roomCode)} · ${escapeHtml(seenAgo(m.lastSeenAt, Date.now()))}${m.bestDistance > 0 ? ` · ${m.bestDistance.toLocaleString()} m` : ""}</span>
+      <button class="mini-btn" data-ui data-action="mate-wingman" data-id="${escapeHtml(m.name)}">Save</button>
+      <button class="mini-btn ghost" data-ui data-action="mate-invite" data-id="${escapeHtml(m.name)}">Invite</button>
+      <button class="mini-btn ghost" data-ui data-action="mate-forget" data-id="${escapeHtml(m.name)}" aria-label="Forget ${escapeHtml(m.name)}">✕</button>
+    </div>`).join("");
+    return `<div class="section-title">🛫 Flew with <small>${s.recentPilots.length} remembered</small></div>
+      <p class="fineprint">Kept on this device from races you actually flew together.</p>
+      <div class="friend-list">${rows || `<div class="empty-note">Everyone you flew with is already in your wingmen.</div>`}</div>`;
+  })();
+
+  const friends = `${lookupPanel}${wingmen}${flewWith}`;
   const myClub = sq.clubs.find((c) => c.id === sq.myClubId);
   const clubs = myClub
     ? `
@@ -1969,7 +2052,9 @@ function renderSquad(s: HudSnapshot): string {
     ${pages("clubs", clubPage)}
     <div class="redeem"><input data-ui data-ref="clubName" data-enter-action="squad-create-club" aria-label="Club name" placeholder="Club name" maxlength="24" autocomplete="off" /><button class="mini-btn gold" data-ui data-action="squad-create-club">Found club</button></div>`;
 
-  const hubBanner = `<div class="reward-strip" style="background:linear-gradient(135deg,#e8f5e9,#c8e6c9); color:#1b5e20; border:1px solid #a5d6a7; margin-bottom:12px;">✨ Autonomous Squadron Hub Active · Real-time Offline Co-Op</div>`;
+  const hubBanner = sq.isAutonomous
+    ? `<div class="reward-strip" style="background:linear-gradient(135deg,#fff8e1,#ffe082); color:#5d4037; border:1px solid #ffcc80; margin-bottom:12px;">📴 Offline build · wingman requests and pilot lookup need the online service. Pilots you actually raced with still work.</div>`
+    : "";
 
   return `
     ${head("Squad", "back", sq.myCode ? `<span class="pill">${escapeHtml(sq.myCode)}</span>` : "")}

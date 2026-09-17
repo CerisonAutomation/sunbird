@@ -88,6 +88,7 @@ import { GhostPlayer, GhostRecorder } from "./Ghost";
 import { fetchRivalGhost, publishGhost } from "./GhostNet";
 import { HUD, type CalendarCard, type CheckoutMode, type DailyCard, type GauntletCard, type HudSnapshot, type LoadoutView, type RivalCard, type SeedMode, type UiScreen, type UiState } from "./HUD";
 import { divisionFor, duelOpponent, duelSkillFor, featuredRivals, nextDivision, rankSeasonId, seasonReward } from "./pvp";
+import { PilotBook } from "./pilots";
 import { launchIntentFor, pvpCircuitFor } from "./launchRouting";
 import { Input } from "./Input";
 import { clamp, dateSeed, formatDatePretty, lerp, SeededRandom } from "./math";
@@ -404,6 +405,8 @@ export class Game {
   private eventRun = false;
   /** Squad (friends/clubs/chat) client + last action notice. */
   private squad: SquadClient | null = null;
+  /** The real pilots this device has flown with (see pilots.ts). */
+  private readonly pilots = new PilotBook();
   private squadNotice = "";
   private squadPoll = 0;
   private readonly flow = new FlowTuner();
@@ -3753,8 +3756,67 @@ export class Game {
         this.squadNotice = "";
         void this.squad?.refresh();
         break;
+      case "pilot-lookup": {
+        // Real lookup: the panel shows the directory's answer, including
+        // "no pilot with that code" and "this build is offline".
+        const code = this.hud.readValue("pilotCode").trim().toUpperCase();
+        void this.squad?.lookupPilot(code).then(() => this.bump());
+        break;
+      }
+      case "pilot-add": {
+        const code = id || this.squad?.state.lookup?.code || this.hud.readValue("pilotCode");
+        void this.squad?.addFriend(code).then((msg) => {
+          this.squadNotice = msg;
+          this.bump();
+        });
+        break;
+      }
+      case "pilot-copy": {
+        const code = id || this.squad?.state.lookup?.code || "";
+        if (!code) break;
+        void copyText(code).then((ok) => {
+          if (this.disposed) return;
+          this.hud.toast(ok ? `Pilot code ${code} copied` : "Copy the code from the field", "info");
+        });
+        break;
+      }
+      case "pilot-invite":
+      case "mate-invite": {
+        // Inviting a wingman is the same real artefact as inviting anyone:
+        // the room's invite link. No room yet → say so instead of pretending.
+        const who = id || "your wingman";
+        if (!this.roomCode) {
+          this.hud.toast("Create a private room first — then invites are one tap", "info");
+          break;
+        }
+        void this.invitePilot(this.roomCode, who);
+        break;
+      }
+      case "mate-wingman": {
+        const name = id;
+        if (name) this.squadNotice = this.squad?.rememberWingman(name) ?? "";
+        this.bump();
+        break;
+      }
+      case "mate-forget": {
+        if (id && this.pilots.forget(id)) {
+          this.hud.toast(`Forgot ${id}`, "info");
+          this.bump();
+        }
+        break;
+      }
+      case "req-accept":
+        void this.squad?.respondRequest(id, true);
+        break;
+      case "req-decline":
+        void this.squad?.respondRequest(id, false);
+        break;
+      case "req-cancel":
+        void this.squad?.cancelRequest(id);
+        break;
       case "squad-add": {
-        const code = this.hud.readValue("squadCode").trim().toUpperCase();
+        // Kept for older builds/links that still post a bare code.
+        const code = (this.hud.readValue("squadCode") || this.hud.readValue("pilotCode")).trim().toUpperCase();
         if (!code) break;
         void this.squad?.addFriend(code).then((msg) => {
           this.squadNotice = msg;
@@ -5022,6 +5084,19 @@ export class Game {
   }
 
   /** Per-frame network pump: cadence, inbound emotes, outbound state. */
+  /**
+   * Remember the real pilots sharing our room: real names, the room code and
+   * how far they flew. This is the local, honest source behind the "Flew with"
+   * list in Pilot Lookup — it never invents anyone.
+   */
+  private recordRoomPilots(): void {
+    const net = this.net;
+    if (!net?.connected) return;
+    const code = net.info().code;
+    if (!code) return;
+    if (this.pilots.remember(net.roster(), code, Date.now())) this.bump();
+  }
+
   private pumpNetwork(raw: number): void {
     const net = this.net;
     if (!net) return;
@@ -5051,6 +5126,7 @@ export class Game {
         case "join":
           this.hud.toast(`🕊 ${e.name} joined the race`, "island");
           this.audio.chirp();
+          this.recordRoomPilots();
           break;
         case "leave":
           this.hud.toast(`👋 ${e.name} left`, "warn");
@@ -5410,6 +5486,17 @@ export class Game {
   }
 
   /** Copies the room invite link, preferring the native share sheet. */
+  /** Share the room invite link with a named pilot (real link, real toast). */
+  private async invitePilot(room: string, who: string): Promise<void> {
+    const link = `${location.origin}${location.pathname}?room=${encodeURIComponent(room)}`;
+    const ok = await copyText(link);
+    if (this.disposed) return;
+    this.hud.toast(
+      ok ? `Invite link for room ${room} copied — send it to ${who}` : `Room ${room} — copy the link from the lobby`,
+      ok ? "gold" : "info",
+    );
+  }
+
   private copyRoomInvite(code: string): void {
     const url = buildRoomInviteUrl(code);
     const text = `Join my Sunbird race room ${code}: ${url}`;
@@ -5905,6 +5992,7 @@ export class Game {
       campaignDone: campaignProgress(st.campaignClaimed).done,
       campaignTotal: campaignProgress(st.campaignClaimed).total,
       squad: this.squad?.state ?? emptySquadState(),
+      recentPilots: this.pilots.all(),
       squadNotice: this.squadNotice,
       dailyFlash: dailyFlashBird(this.today),
       stipendClaimed: this.save.state.lastStipendClaimed === this.today,

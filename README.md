@@ -63,8 +63,12 @@ Copy `.env.example` → `.env.local`. All variables are optional — the game ru
 | `npm run build:itch` | Single-file bundle → `dist-itch/` |
 | `npm run build:poki` / `build:crazy` / `build:generic` | Portal zips (see [PORTAL_PUBLISHING.md](./PORTAL_PUBLISHING.md)) |
 | `npm run build:portals` | All three portal zips |
+| `npm run test:mp` | Multiplayer protocol smoke against a running server |
 | `npm run typecheck` | TypeScript type-check without emit |
 | `npm test` | Run the full Vitest suite |
+| `npm run pvp:check` | **Online stack, proven end to end**: boots the real room server on a scratch port and runs the protocol smoke, the live two-client PvP suite and the pilot-directory contract against it |
+| `npm run test:pvp` / `test:lookup` | The same live suites against an already-running server (`VITE_MULTIPLAYER_URL=ws://127.0.0.1:8790/mp`) |
+| `npm run test:server` | Social-backend suite (routes, storage, rooms) |
 | `npm run verify` | typecheck + test + build |
 | `npm run poki:audit` | Run every extracted Poki rule check, rewrite `docs/poki/COMPLIANCE.md` (add `-- --run` to execute the build/zip/thumbnail gates too) |
 | `npm run poki:preflight` | The full pre-submission pass: build portals → gates → thumbnail check → audit |

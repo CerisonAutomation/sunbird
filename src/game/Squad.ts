@@ -32,36 +32,36 @@ export const SQUAD_QUESTS: SquadQuest[] = [
   { id: "precision", title: "✦ Perfect Formations", desc: "Chain 8 perfect kinetic carve launches", target: 8, rewardCoins: 100 },
 ];
 
-export const DEFAULT_LOCAL_CLUBS: Club[] = [
-  { id: 1, name: "Apex Falcons", motto: "High-speed diving & kinetic carving", members: 28 },
-  { id: 2, name: "Golden Horizon", motto: "Chasing sunsets & endless migrations", members: 19 },
-  { id: 3, name: "Thermal Drifters", motto: "Drafting experts & slipstream trains", members: 24 },
-  { id: 4, name: "Cloud Striders", motto: "Casual gliders & sky explorers", members: 15 },
-];
+/** One row of the wingman list — real data from the social service. */
+export type Wingman = Friend & {
+  /** Present when the service reports it; never guessed. */
+  online?: boolean;
+  bestDistance?: number;
+  lastSeen?: string;
+  /** Saved from a real race (met in a room) — no code was ever exchanged. */
+  local?: boolean;
+};
 
-export const DEFAULT_LOCAL_FRIENDS: Friend[] = [
-  { name: "Echo Falcon", code: "SUN-ECH001", club_id: 1 },
-  { name: "Zephyr Sky", code: "SUN-ZEP999", club_id: 1 },
-  { name: "Aurora Wing", code: "SUN-AUR777", club_id: 2 },
-  { name: "Shadow Swift", code: "SUN-SWF505", club_id: 3 },
-];
+export type PilotRequest = { requestId: string; name: string; code: string };
 
-export const INITIAL_CLUB_CHAT: Record<number, ChatMessage[]> = {
-  1: [
-    { id: 101, name: "Echo Falcon", text: "Welcome to Apex Falcons! Hit the downslopes hard for maximum kinetic boost 🚀", at: "10m ago" },
-    { id: 102, name: "Zephyr Sky", text: "Just completed a 3,800m run in Sprint GP! Who's ready to fly?", at: "5m ago" },
-    { id: 103, name: "Shadow Swift", text: "Remember to tuck into slipstreams on the Tempest Draft circuit 🌪️", at: "2m ago" },
-  ],
-  2: [
-    { id: 201, name: "Aurora Wing", text: "Golden Horizon pilots: today's sunset flight is crystal clear 🌅", at: "15m ago" },
-    { id: 202, name: "Solbird", text: "Saved daylight on island 14! Keep gliding!", at: "8m ago" },
-  ],
-  3: [
-    { id: 301, name: "Vortex", text: "Drafting trains give +35% speed when 3 birds align!", at: "20m ago" },
-  ],
-  4: [
-    { id: 401, name: "Breeze", text: "Enjoying the gentle winds over Island 4 🌴", at: "30m ago" },
-  ],
+/**
+ * The result of looking a pilot up. `status` is the honest outcome, and the
+ * card only ever shows fields the service actually returned.
+ */
+export type PilotLookup = {
+  status: "ok" | "unknown" | "self" | "unavailable" | "error";
+  /** The code the pilot typed, echoed back so "no such code" is unambiguous. */
+  query: string;
+  name: string;
+  code: string;
+  online: boolean;
+  club: string;
+  bestDistance: number;
+  rank: number;
+  friend: boolean;
+  outgoing: boolean;
+  incoming: boolean;
+  message: string;
 };
 
 export type SquadState = {
@@ -74,11 +74,17 @@ export type SquadState = {
   registered: boolean;
   credentialError: boolean;
   myCode: string;
-  friends: Friend[];
+  friends: Wingman[];
   clubs: Club[];
   myClubId: number | null;
   chat: ChatMessage[];
   isAutonomous?: boolean;
+  /** Pilot Lookup panel. */
+  pilotQuery: string;
+  lookup: PilotLookup | null;
+  lookupBusy: boolean;
+  requestsIn: PilotRequest[];
+  requestsOut: PilotRequest[];
 };
 
 export function emptySquadState(): SquadState {
@@ -97,6 +103,11 @@ export function emptySquadState(): SquadState {
     myClubId: null,
     chat: [],
     isAutonomous: false,
+    pilotQuery: "",
+    lookup: null,
+    lookupBusy: false,
+    requestsIn: [],
+    requestsOut: [],
   };
 }
 
@@ -107,6 +118,22 @@ function squadKey(deviceId: string): string {
   const token = [...crypto.getRandomValues(new Uint8Array(32))].map(n => n.toString(16).padStart(2, "0")).join("");
   try { localStorage.setItem(key, token); } catch { /* session remains usable */ }
   return token;
+}
+
+/** localStorage is shared with older builds: keep only rows that still
+ *  describe a real pilot (a name and a SUN- code), never placeholder junk. */
+function isStoredWingman(value: unknown): value is Wingman {
+  if (!value || typeof value !== "object") return false;
+  const v = value as Record<string, unknown>;
+  if (typeof v.name !== "string" || v.name.trim().length === 0) return false;
+  if (v.local === true) return true; // met in a race: real name, no code
+  return typeof v.code === "string" && v.code.startsWith("SUN-");
+}
+
+function isStoredChat(value: unknown): value is ChatMessage {
+  if (!value || typeof value !== "object") return false;
+  const v = value as Record<string, unknown>;
+  return typeof v.text === "string" && typeof v.name === "string";
 }
 
 class SquadError extends Error { constructor(message: string, readonly status: number) { super(message); } }
@@ -180,37 +207,53 @@ export class SquadClient {
     }
     this.state.myCode = localCode;
 
-    // Load or set persistent clubs
-    let clubs: Club[] = DEFAULT_LOCAL_CLUBS;
+    // Clubs are only ever ones this pilot founded or joined. Seeding a few
+    // fictional clubs with fictional member counts made an empty screen look
+    // busy — which is the same lie in a different row.
+    let clubs: Club[] = [];
     try {
       const savedClubs = localStorage.getItem("sunbird.squad.local_clubs");
-      if (savedClubs) clubs = JSON.parse(savedClubs);
-    } catch { /* use defaults */ }
+      if (savedClubs) {
+        const parsed = JSON.parse(savedClubs) as unknown;
+        if (Array.isArray(parsed)) clubs = parsed.filter((c): c is Club => Boolean(c) && typeof (c as Club).name === "string");
+      }
+    } catch { /* start empty */ }
     this.state.clubs = clubs;
 
-    // Load or set persistent friends
-    let friends: Friend[] = DEFAULT_LOCAL_FRIENDS;
+    // Wingmen are only ever real pilots this device verified. Nothing is
+    // seeded: an invented list of "friends" is worse than an empty one, and
+    // offline there is no way to verify a stranger's code, so the panel says
+    // exactly that instead of inventing a name to fill the row.
+    let friends: Wingman[] = [];
     try {
       const savedFriends = localStorage.getItem("sunbird.squad.local_friends");
-      if (savedFriends) friends = JSON.parse(savedFriends);
-    } catch { /* use defaults */ }
+      if (savedFriends) {
+        const parsed = JSON.parse(savedFriends) as unknown;
+        if (Array.isArray(parsed)) friends = parsed.filter(isStoredWingman);
+      }
+    } catch { /* start empty */ }
     this.state.friends = friends;
 
-    // Load or set joined club
-    let clubId: number | null = 1;
+    // No default membership: a pilot is in a club only if they joined one.
+    let clubId: number | null = null;
     try {
       const savedClubId = localStorage.getItem("sunbird.squad.local_club_id");
-      if (savedClubId !== null) clubId = savedClubId === "" ? null : Number(savedClubId);
-    } catch { /* default to club 1 */ }
+      if (savedClubId !== null && savedClubId !== "") clubId = Number(savedClubId);
+    } catch { /* not a member */ }
     this.setMembership(clubId);
 
-    // Load chat for active club
+    // Club chat only holds messages this device actually received: the seeded
+    // conversation starters were invented people discussing races that never
+    // happened.
     if (clubId) {
-      let chat: ChatMessage[] = INITIAL_CLUB_CHAT[clubId] || [];
+      let chat: ChatMessage[] = [];
       try {
         const savedChat = localStorage.getItem(`sunbird.squad.local_chat.${clubId}`);
-        if (savedChat) chat = JSON.parse(savedChat);
-      } catch { /* use initial */ }
+        if (savedChat) {
+          const parsed = JSON.parse(savedChat) as unknown;
+          if (Array.isArray(parsed)) chat = parsed.filter(isStoredChat);
+        }
+      } catch { /* start empty */ }
       this.state.chat = chat;
     }
 
@@ -302,11 +345,16 @@ export class SquadClient {
       this.state.registered = true;
       this.state.credentialError = false;
       this.state.myCode = reg.code;
-      const [profile, clubs] = await Promise.all([
-        this.call<{ friends: Friend[]; clubId: number | null }>(`/profile?device=${encodeURIComponent(this.deviceId)}`),
+      const [profile, clubs, requests] = await Promise.all([
+        this.call<{ friends: Wingman[]; clubId: number | null }>(`/profile?device=${encodeURIComponent(this.deviceId)}`),
         this.call<{ clubs: Club[]; mine: number | null }>(`/clubs?device=${encodeURIComponent(this.deviceId)}`),
+        this.call<{ incoming: PilotRequest[]; outgoing: PilotRequest[] }>(`/friends/requests?device=${encodeURIComponent(this.deviceId)}`),
       ]);
-      this.state.friends = Array.isArray(profile.friends) ? profile.friends.filter(f => typeof f?.name === "string" && typeof f.code === "string") : [];
+      this.state.requestsIn = Array.isArray(requests.incoming) ? requests.incoming : [];
+      this.state.requestsOut = Array.isArray(requests.outgoing) ? requests.outgoing : [];
+      this.state.friends = Array.isArray(profile.friends)
+        ? profile.friends.filter((f) => typeof f?.name === "string" && f.name.trim().length > 0)
+        : [];
       if (profile.clubId !== null && (!Number.isSafeInteger(profile.clubId) || profile.clubId < 1)) throw new Error("Squad returned invalid membership data. Try Refresh.");
       this.setMembership(profile.clubId);
       this.state.clubs = Array.isArray(clubs.clubs) ? clubs.clubs.filter(c => Number.isSafeInteger(c?.id) && typeof c.name === "string" && typeof c.motto === "string" && Number.isFinite(c.members)) : [];
@@ -319,50 +367,232 @@ export class SquadClient {
     }
   }
 
-  async addFriend(code: string): Promise<string> {
-    if (this.isAutonomous) {
-      const clean = code.trim().toUpperCase();
-      if (!clean.startsWith("SUN-") || clean.length < 7) {
-        this.state.error = "Friend code must start with SUN-";
-        this.onChange();
-        return "";
-      }
-      if (this.state.friends.some(f => f.code === clean)) {
-        this.state.error = "This pilot is already in your squadron";
-        this.onChange();
-        return "";
-      }
-      const newFriend: Friend = { name: `Wingman-${clean.slice(-4)}`, code: clean, club_id: null };
-      this.state.friends.push(newFriend);
-      try { localStorage.setItem("sunbird.squad.local_friends", JSON.stringify(this.state.friends)); } catch {}
+  /** True when a pilot directory is actually reachable from this build. */
+  hasService(): boolean {
+    return Boolean(API) && !this.isAutonomous;
+  }
+
+  /** Straight from the panel's search box. */
+  setPilotQuery(query: string): void {
+    this.state.pilotQuery = query;
+    this.onChange();
+  }
+
+  /**
+   * Look a pilot up by their exact code.
+   *
+   * This is the honest core of the panel. Three outcomes are possible and all
+   * three are shown to the player verbatim:
+   *   • the service knows the code  → a card with the real name, club, best
+   *     distance, rank and presence;
+   *   • the service does not know it → "no pilot with that code";
+   *   • there is no service (offline/portal build) → "unavailable", with the
+   *     local, real sources offered instead.
+   * A code is NEVER turned into a name locally. That fabrication ("Wingman-
+   * 9F3K") is gone for good.
+   */
+  async lookupPilot(raw: string): Promise<PilotLookup> {
+    const query = raw.trim().toUpperCase();
+    this.state.pilotQuery = query;
+    const fail = (status: PilotLookup["status"], message: string): PilotLookup => ({
+      status,
+      query,
+      name: "",
+      code: "",
+      online: false,
+      club: "",
+      bestDistance: 0,
+      rank: 0,
+      friend: false,
+      outgoing: false,
+      incoming: false,
+      message,
+    });
+
+    if (!/^SUN-[A-Z0-9]{6}$/.test(query)) {
+      const result = fail("unknown", "Pilot codes look like SUN-9F3K2A — check the code and try again.");
+      this.state.lookup = result;
       this.onChange();
-      return `${newFriend.name} added!`;
+      return result;
+    }
+
+    if (!this.hasService()) {
+      // No social service in this build. Say so, and point at the real list
+      // of pilots this device has actually flown with.
+      const result = fail(
+        "unavailable",
+        "Pilot lookup needs the online service, which this build does not have. Pilots you have actually raced with are listed below.",
+      );
+      this.state.lookup = result;
+      this.onChange();
+      return result;
+    }
+
+    this.state.lookupBusy = true;
+    this.onChange();
+    try {
+      const res = await this.call<{
+        pilot: {
+          name: string;
+          code: string;
+          online: boolean;
+          club: { name: string } | null;
+          bestDistance: number;
+          rank: number;
+          friend: boolean;
+          outgoing: boolean;
+          incoming: boolean;
+          self: boolean;
+        };
+      }>(`/players/${encodeURIComponent(query)}`);
+      const p = res.pilot;
+      if (p.self) {
+        const result = fail("self", "That is your own pilot code — share it so others can find you.");
+        result.name = p.name;
+        result.code = p.code;
+        this.state.lookup = result;
+        return result;
+      }
+      const result: PilotLookup = {
+        status: "ok",
+        query,
+        name: p.name,
+        code: p.code,
+        online: Boolean(p.online),
+        club: p.club?.name ?? "",
+        bestDistance: Math.max(0, Math.round(Number(p.bestDistance) || 0)),
+        rank: Math.max(0, Math.round(Number(p.rank) || 0)),
+        friend: Boolean(p.friend),
+        outgoing: Boolean(p.outgoing),
+        incoming: Boolean(p.incoming),
+        message: "",
+      };
+      this.state.lookup = result;
+      return result;
+    } catch (err) {
+      // Structural check: the status is what matters, not which error class
+      // carried it (fetch layers and tests both produce plain Error objects).
+      const status = (err as { status?: number })?.status === 404 ? "unknown" : "error";
+      const result = fail(
+        status,
+        status === "unknown"
+          ? `No pilot has the code ${query}. Codes are shown on a pilot's own Squad screen.`
+          : "Could not reach the pilot directory. Try again in a moment.",
+      );
+      this.state.lookup = result;
+      return result;
+    } finally {
+      this.state.lookupBusy = false;
+      this.onChange();
+    }
+  }
+
+  /**
+   * Send a wingman request for a looked-up pilot. Returns the notice line for
+   * the panel; the friend list itself only changes when the other pilot
+   * accepts (see {@link respondRequest}), which is now stated honestly instead
+   * of claiming "added!" for a request that is still pending.
+   */
+  async addFriend(code: string): Promise<string> {
+    const clean = code.trim().toUpperCase();
+    if (!clean) return "";
+    if (!this.hasService()) {
+      this.state.error =
+        "Wingman requests need the online service, which this build does not have. You can still see and save the pilots you have actually raced with, below.";
+      this.onChange();
+      return this.state.error;
     }
     return this.mutate(async () => {
       try {
-        const r = await this.call<{ friend: Friend }>("/friends/add", {
-          method: "POST",
-          body: JSON.stringify({ deviceId: this.deviceId, code }),
-        });
+        const r = await this.call<{
+          status: "requested" | "accepted" | "friends" | "pending";
+          friend: { name: string; code: string };
+        }>("/friends/add", { method: "POST", body: JSON.stringify({ deviceId: this.deviceId, code: clean }) });
         await this.load();
-        return `${r.friend.name} added!`;
+        if (r.status === "friends") return `🪽 ${r.friend.name} is already a wingman.`;
+        if (r.status === "accepted") return `🪽 ${r.friend.name} had asked you first — added!`;
+        return `📨 Request sent to ${r.friend.name}. They will see it under Wingmen → Requests.`;
       } catch (err) {
-        this.recordError(err, "Could not add friend");
+        if ((err as { status?: number })?.status === 404) {
+          this.state.error = `No pilot has the code ${clean}.`;
+          this.onChange();
+          return "";
+        }
+        this.recordError(err, "Could not send the wingman request");
         return "";
       }
-    }, "Another Squad request is still running.");
+    }, "");
   }
 
-  async removeFriend(code: string): Promise<void> {
+  /** Local wingmen (met in a race, no code to verify) live in localStorage. */
+  private persistLocalFriends(): void {
+    try {
+      localStorage.setItem("sunbird.squad.local_friends", JSON.stringify(this.state.friends.filter((f) => !f.code)));
+    } catch {
+      /* memory-only session */
+    }
+  }
+
+  /** Accept or decline an incoming request. */
+  async respondRequest(requestId: string, accept: boolean): Promise<void> {
+    if (!this.hasService() || !requestId) return;
+    return this.mutate(async () => {
+      try {
+        await this.call("/friends/respond", { method: "POST", body: JSON.stringify({ requestId, accept }) });
+      } catch (err) {
+        this.recordError(err, "Could not update that request");
+        return;
+      }
+      await this.load();
+    }, undefined);
+  }
+
+  /** Withdraw a request you sent. */
+  async cancelRequest(requestId: string): Promise<void> {
+    if (!this.hasService() || !requestId) return;
+    return this.mutate(async () => {
+      try {
+        await this.call("/friends/cancel", { method: "POST", body: JSON.stringify({ requestId }) });
+      } catch (err) {
+        this.recordError(err, "Could not cancel that request");
+        return;
+      }
+      await this.load();
+    }, undefined);
+  }
+
+  /**
+   * Save a pilot this device has really flown with as a wingman. These come
+   * from {@link PilotBook}, i.e. from real room rosters, so the name is real
+   * even though there is no code to verify.
+   */
+  rememberWingman(name: string): string {
+    const clean = name.trim();
+    if (!clean) return "";
+    if (this.state.friends.some((f) => f.name.toLowerCase() === clean.toLowerCase())) {
+      return `${clean} is already in your wingmen.`;
+    }
+    this.state.friends = [...this.state.friends, { name: clean, code: "", club_id: null, local: true } as Wingman];
+    this.persistLocalFriends();
+    this.onChange();
+    return `🪽 ${clean} saved to your wingmen (met in a race).`;
+  }
+
+  async removeFriend(ref: string): Promise<void> {
+    // `ref` is a pilot code for verified wingmen, or a name for the local ones
+    // saved from a race (they never had a code to share).
+    const isCode = /^SUN-[A-Z0-9]{6}$/.test(ref.trim().toUpperCase());
     if (this.isAutonomous) {
-      this.state.friends = this.state.friends.filter(f => f.code !== code);
-      try { localStorage.setItem("sunbird.squad.local_friends", JSON.stringify(this.state.friends)); } catch {}
+      this.state.friends = this.state.friends.filter((f) =>
+        isCode ? f.code !== ref.trim().toUpperCase() : f.name.toLowerCase() !== ref.trim().toLowerCase(),
+      );
+      this.persistLocalFriends();
       this.onChange();
       return;
     }
     return this.mutate(async () => {
       try {
-        await this.call("/friends/remove", { method: "POST", body: JSON.stringify({ deviceId: this.deviceId, code }) });
+        await this.call("/friends/remove", { method: "POST", body: JSON.stringify({ deviceId: this.deviceId, code: ref }) });
       } catch {
         this.state.error = "Could not remove this friend. Try again.";
         return;
@@ -406,7 +636,7 @@ export class SquadClient {
   async joinClub(clubId: number): Promise<string> {
     if (this.isAutonomous) {
       this.setMembership(clubId);
-      let chat: ChatMessage[] = INITIAL_CLUB_CHAT[clubId] || [];
+      let chat: ChatMessage[] = [];
       try {
         const savedChat = localStorage.getItem(`sunbird.squad.local_chat.${clubId}`);
         if (savedChat) chat = JSON.parse(savedChat);
