@@ -40,6 +40,28 @@ hand-maintained copy to go stale — that was the bug behind the original
 | A **stale** `poki-upload/` snapshot (pre-2026-09-17 it was hand-committed and never refreshed by a build) | an older build | `pnpm build:poki` regenerates the folder; `pnpm verify:upload` proves it is current |
 | Any folder whose `index.html` lives in a sub-directory | no root entry document | the entry document must be at the root of the selected folder |
 
+## Putting the artifact online (for a URL-mode pass)
+
+The Inspector opens a folder; when you want the same build reachable as a URL —
+for a browser check on another device, or for the Inspector's URL mode — serve
+the artifact itself rather than a dev server:
+
+```bash
+pnpm serve:upload        # http://localhost:4174/  ← the exact upload folder
+```
+
+`scripts/serve-upload.mjs` sends no `X-Frame-Options`, a permissive
+`frame-ancestors *` and CORS, so the folder can be embedded by the Inspector
+(`https://inspector.poki.dev/?game=external-<host>%2F`) as well as opened
+directly; `/__status` lists every path the page requested, which is the
+evidence for the external-resources rule. The zip is served from the same
+origin at `/sunbird-poki.zip`.
+
+Two rules of thumb: the tunnel/preview host in front of the server decides
+whether the game can be framed, so test that before relying on URL mode — and
+keep the Poki build off any public host, since the submission is
+Poki-exclusive (`REQ-51`).
+
 ## The gate: `pnpm verify:upload`
 
 `scripts/verify-upload.mjs` runs the Inspector's own first check locally and is
