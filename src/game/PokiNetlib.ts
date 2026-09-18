@@ -25,6 +25,7 @@ import type {
 import { truncate } from "./math";
 import { PROTOCOL_VERSION } from "./protocol/v1";
 import { isPokiMultiplayerAvailable, makePokiRoomCode as makeRoomCode, POKI_NETLIB_GAME_ID as NETLIB_GAME_ID } from "./PokiMpUtils";
+import { normalizeRooms, sortRooms, type LiveRoom } from "./RoomBrowser";
 
 /** Outbound state rate — same 15 Hz cadence as the WS transport. */
 const SEND_HZ = 15;
@@ -119,6 +120,8 @@ export class PokiNetlibClient implements NetTransport {
   private amHost = false;
   /** A finish-order counter used by the host to assign places authoritatively. */
   private finishOrder = 0;
+  /** Last phase published to the public lobby entry (host only). */
+  private announcedPhase: "lobby" | "racing" = "lobby";
   private finishedPeers = new Set<string>();
 
   private net: Network | null = null;
@@ -294,7 +297,7 @@ export class PokiNetlibClient implements NetTransport {
               network.create({
                 public: true,
                 maxPlayers: this.capacity,
-                customData: { seed: this.seed, mode: "sunbird-race", v: PROTOCOL_VERSION },
+                customData: { seed: this.seed, mode: "sunbird-race", v: PROTOCOL_VERSION, phase: "lobby" },
                 codeFormat: "short",
                 codeLength: 5,
               }).then((lobbyCode: string) => {
@@ -813,6 +816,7 @@ export class PokiNetlibClient implements NetTransport {
   }
 
   info(): RoomInfo {
+    this.syncLobbyPhase();
     const count = this.tracks.size + (this.connected || this.isAutonomous ? 1 : 0);
     return {
       code: this.roomCode,
@@ -826,17 +830,38 @@ export class PokiNetlibClient implements NetTransport {
     };
   }
 
-  /** List public lobbies using Netlib's listing API (optional; quick match uses create/join flow). */
-  async listPublic(): Promise<{ code: string; players: number; capacity: number }[]> {
+  /** Public lobbies this client can see right now (shares the room model). */
+  async listPublic(): Promise<LiveRoom[]> {
     if (!this.net || !this.netReady) return [];
     try {
       const lobbies = await this.net.list({ public: true }, { createdAt: -1 }, 20);
-      return lobbies
-        .filter((l) => l.customData?.mode === "sunbird-race" && l.playerCount < l.maxPlayers)
-        .map((l) => ({ code: l.code.toUpperCase(), players: l.playerCount, capacity: l.maxPlayers }));
+      return sortRooms(normalizeRooms(lobbies.map(lobbyToRoomInput)));
     } catch {
       return [];
     }
+  }
+
+  /** Same list, but usable from the menu before anything is connected. */
+  listPublicRooms(): Promise<LiveRoom[]> {
+    return this.net && this.netReady ? this.listPublic() : listPublicLobbies(NETLIB_GAME_ID);
+  }
+
+  /**
+   * Keep the lobby's public description honest: while a race is running the
+   * lobby is NOT an open room, and a pilot browsing the menu must see that.
+   * Best-effort and idempotent — the host publishes, guests read.
+   */
+  private syncLobbyPhase(): void {
+    const phase: "lobby" | "racing" = this.state === "racing" ? "racing" : "lobby";
+    if (phase === this.announcedPhase || !this.amHost || !this.netReady || !this.net?.currentLobby) return;
+    this.announcedPhase = phase;
+    void this.net
+      .setLobbySettings({
+        customData: { seed: this.seed, mode: "sunbird-race", v: PROTOCOL_VERSION, phase },
+      })
+      .catch(() => {
+        /* leadership may have moved; the next host republishes */
+      });
   }
 
   private track(id: string): Track {
@@ -860,6 +885,84 @@ export class PokiNetlibClient implements NetTransport {
     }
     return t;
   }
+}
+
+/** A Netlib lobby entry, in the shape the shared room model expects. */
+function lobbyToRoomInput(l: LobbyListEntry): Record<string, unknown> {
+  return {
+    code: l.code,
+    seated: l.playerCount,
+    capacity: l.maxPlayers,
+    // The host publishes the phase in customData; an un-updated lobby is a
+    // lobby, which is the truthful default for a fresh room.
+    status: l.customData?.phase === "racing" ? "racing" : "lobby",
+    // Password-protected lobbies are visible but not offered to newcomers.
+    joinable: !l.hasPassword && l.playerCount < l.maxPlayers,
+    latency: typeof l.latency === "number" ? l.latency : null,
+    seed: typeof l.customData?.seed === "string" ? l.customData.seed : "",
+    createdAt: typeof l.createdAt === "string" ? l.createdAt : undefined,
+  };
+}
+
+/** Cached signalling connection used only to *browse* public lobbies. */
+let browseNet: Network | null = null;
+let browseReady = false;
+
+/**
+ * Public lobbies, straight from the P2P signalling service's listing API.
+ *
+ * Feeds the menu's live list and the matchmaking search so a pilot can see real
+ * rooms with real seat counts instead of a spinner. Browsing opens its own
+ * short-lived connection and never joins anything; failures are reported as an
+ * empty list so the UI stays honest.
+ */
+export async function listPublicLobbies(
+  gameId: string = NETLIB_GAME_ID,
+  timeoutMs = 8000,
+): Promise<LiveRoom[]> {
+  if (!isPokiMultiplayerAvailable()) return [];
+  const net = browseNet ?? new Network(gameId);
+  browseNet = net;
+  try {
+    if (!browseReady) {
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          net.removeAllListeners("ready");
+          net.removeAllListeners("failed");
+          reject(new Error("Signalling timed out"));
+        }, timeoutMs);
+        net.once("ready", () => {
+          clearTimeout(timer);
+          net.removeAllListeners("failed");
+          browseReady = true;
+          resolve();
+        });
+        net.once("failed", () => {
+          clearTimeout(timer);
+          net.removeAllListeners("ready");
+          reject(new Error("Signalling failed"));
+        });
+      });
+    }
+    const entries = await net.list({ public: true }, { createdAt: -1 }, 20);
+    return sortRooms(normalizeRooms(entries.map(lobbyToRoomInput)));
+  } catch (err) {
+    // Drop the connection so the next attempt starts clean instead of reusing
+    // a network that will never become ready.
+    closeLobbyBrowser();
+    throw err;
+  }
+}
+
+/** Tear the browser connection down (leaving the PvP screen). */
+export function closeLobbyBrowser(): void {
+  try {
+    browseNet?.close("browse");
+  } catch {
+    /* already closed */
+  }
+  browseNet = null;
+  browseReady = false;
 }
 
 /** Room-code helper — re-exported for callers that import from here. */

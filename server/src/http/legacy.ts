@@ -171,6 +171,14 @@ export const LEGACY_ROUTES: Route[] = [
     handler: (ctx, _p, _q, body, actor) => roomCreate(ctx, actor, body, true),
   },
   {
+    // Public room list: what is racing right now (no identities in it).
+    method: "GET",
+    re: /^\/mp\/rooms$/,
+    rl: "read",
+    auth: "optional",
+    handler: (ctx, _p, q) => ({ rooms: ctx.rooms.browse(Number(q.get("limit")) || 40) }),
+  },
+  {
     method: "POST",
     re: /^\/mp\/rooms$/,
     rl: "write",

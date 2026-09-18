@@ -632,3 +632,104 @@ and rejection, junk/oversized records, scalar-only AUDS values, the exact query
 shape, the self-counting lookup, unknown codes, missing-client honesty,
 one-record-per-code publishing with the secret retained on the device, and a
 publish that refuses an invalid code without touching the network.
+
+---
+
+## 16. "It isn't searching for real players" — honest matchmaking, replayable runs, and a UI audit
+
+Three reports from play, all fixed at the source rather than papered over.
+
+### 16.1 The search no longer hands you bots
+
+`Find race` opened an overlay that read **"Searching… AI practice starts in 8s"**
+— and then did exactly that. Nobody asked for the AI flock; the game decided,
+and the player learned the multiplayer button lies.
+
+Now the search has two honest phases:
+
+* **searching** — a real countdown to a *room* start, the live pilot count in
+  the room, and a live summary of public rooms ("3 joinable now · 12 pilots
+  seated") pulled from the room list below. Nothing in the overlay promises a
+  bot race.
+* **waiting** — after the window the search *stays open* and the player chooses:
+  **Keep searching** (another full window, seat held) or **🤖 Race the AI flock
+  instead**. The AI path is now only reachable by pressing that button, or from
+  a build with no transport at all (where the toast says so).
+
+`Fly Again` after an online race also goes back through the search instead of
+dumping the player in the menu, and `Race again` keeps the arena it was flown
+in: an AI-flock race rematches the flock, an online race searches for pilots.
+
+### 16.2 A real room list, on both transports
+
+The menu can now show *who is racing right now*, from either stack:
+
+* `GET /mp/rooms` (legacy) and `GET /mp/v1/rooms` (v1) return sanitised public
+  rooms — code, seed, status, seats/capacity, host **name**, joinable, uptime.
+  No player ids, seat ids, tokens or match ids: asserted by test *and* by the
+  live smoke, which greps the payload for each of them.
+* The P2P edition lists public lobbies through the signalling service's own
+  listing API, and the lobby host publishes its phase (`lobby` / `racing`) so a
+  room mid-race is never advertised as somewhere a newcomer can start.
+* A room mid-race is shown but **not** marked joinable: a seat in a race already
+  under way is not a seat anybody can use. Full rooms and password-protected
+  lobbies are visible but closed.
+
+Client side this is one small model (`src/game/RoomBrowser.ts`): normalise →
+clamp → sort → summarise, plus a polling watcher that keeps the last good list
+when a refresh fails (and says so) instead of blanking a list being read.
+
+### 16.3 The replay replays
+
+A casual run rebuilt the world with a fresh random seed **every time**, and the
+ghost record is stored *per seed* — so the ghost (your replay) could never be
+seen again, and `Fly again` was a different course than the run it replayed.
+
+`RunOptions.replay` now pins the course: `Fly again` replays the exact hills you
+just flew, which is what makes the recorded ghost a real opponent. The results
+screen says so ("race the ghost of the run you just flew"). `shouldRebuildCasualWorld`
+is a pure predicate, tested for replays, fixed-seed modes, duels, events, storms
+and races.
+
+### 16.4 Coin cards that respect a 360px screen
+
+The 3× bonus card, the wingman bundle, the coin piggy bank, the daily stipend,
+the vault and the wheel card all carried their *layout* inline — flex rows with
+fixed gaps and `white-space: nowrap` claim buttons. On a phone-width viewport
+that cannot reflow, so the claim button pushed past the card edge: the exact
+"coin button breaks the layout" report.
+
+Layout moved into `ui.css` (`multiplier-cta-card`, `offer-row`, `offer-claim`,
+`piggy-card`, `shop-stipend-card`, …) with wrap-first rows and full-width claim
+buttons under 420px. The 3× card keeps a one-claim-per-run contract and its test
+now asserts there is **no inline style and no nowrap** left to regress.
+
+### 16.5 The audit that keeps it that way
+
+`pnpm audit:ui` (also a CI step, and part of `pnpm poki:preflight`) walks the HUD
+source and stylesheets for the failures that do not need pixels:
+
+* **dead buttons** — a `data-action` with no handler anywhere;
+* **null refs** — `grab("x")` with no `data-ref="x"` in the markup (the bug this
+  round's overlay work hit, now impossible to land);
+* **unlabelled controls** — a button with no text and no `aria-label`;
+* **inline layout / nowrap** — style that a media query can never override;
+* **unstyled classes and buttons** — including the Pilot Lookup card, which had
+  no CSS at all until this pass (card, presence dot, code chip and actions are
+  now a real component, responsive down to 360px);
+* **responsive gaps** — critical surfaces with neither a narrow-screen rule nor a
+  wrapping layout.
+
+It currently reports 0 errors and 17 warnings (inline one-off widths on progress
+bars, refs used by disclosure helpers) — warnings are printed, not fatal.
+
+### 16.6 Verification for this round
+
+| Gate | Result |
+| --- | --- |
+| `pnpm lint` · `pnpm typecheck` (+server) | clean |
+| `npx vitest run` | **1112 passed** / 8 skipped (87 files) — +21 for the room model, the search overlay contract and the replay policy |
+| `pnpm test:server` | 19 passed (adds the public room list contract) |
+| `pnpm pvp:check` | **4/4**: protocol smoke · live two-client PvP · pilot directory · public room list (13 live checks) |
+| `pnpm audit:ui` | passed — 0 dead buttons, 0 null refs, 0 unlabelled controls |
+| `pnpm isolation:check` · `pnpm build:portals` · `pnpm verify:portals` | passed — the three editions stay their own way |

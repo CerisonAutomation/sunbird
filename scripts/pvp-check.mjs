@@ -125,13 +125,22 @@ try {
     console.log("✔ live client suite passed\n");
   }
 
-  console.log("▶ 3/3 pilot directory (lookup, requests, presence)");
+  console.log("▶ 3/4 pilot directory (lookup, requests, presence)");
   const lookup = await run("node", ["scripts/smoke-pilot-lookup.mjs"], { LOOKUP_BASE: `http://127.0.0.1:${PORT}` });
   if (lookup.code !== 0) {
     failed = true;
     console.log("✖ pilot directory failed");
   } else {
     console.log("✔ pilot directory passed\n");
+  }
+
+  console.log("▶ 4/4 public room list (what the menu shows before you commit)");
+  const rooms = await run("node", ["scripts/smoke-room-list.mjs"], { ROOMS_BASE: `http://127.0.0.1:${PORT}` });
+  if (rooms.code !== 0) {
+    failed = true;
+    console.log("✖ public room list failed");
+  } else {
+    console.log("✔ public room list passed\n");
   }
 } catch (err) {
   failed = true;
@@ -143,6 +152,6 @@ try {
 console.log(
   failed
     ? "\n✖ PvP CHECK FAILED"
-    : "\n✔ PvP CHECK PASSED — server, protocol, two live clients and the pilot directory agree",
+    : "\n✔ PvP CHECK PASSED — server, protocol, two live clients, the pilot directory and the public room list agree",
 );
 process.exit(failed ? 1 : 0);

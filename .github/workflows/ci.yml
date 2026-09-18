@@ -27,6 +27,8 @@ jobs:
 
       - name: Lint
         run: pnpm lint
+      - name: UX/UI audit (dead buttons, null refs, layout hygiene)
+        run: pnpm audit:ui
 
       - name: Typecheck
         run: pnpm typecheck

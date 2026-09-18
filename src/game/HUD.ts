@@ -439,8 +439,12 @@ export class HUD {
   private standingsEl!: HTMLElement;
   private rosterBar!: HTMLElement;
   private matchmakingEl!: HTMLElement;
+  private matchmakingTitle!: HTMLElement;
   private matchmakingCount!: HTMLElement;
   private matchmakingLabel!: HTMLElement;
+  private matchmakingRooms!: HTMLElement;
+  private matchmakingAi!: HTMLElement;
+  private matchmakingKeep!: HTMLElement;
   private draftMeter!: HTMLElement;
   private finishCd!: HTMLElement;
   private lastFinishCd = "";
@@ -638,12 +642,15 @@ export class HUD {
       <div class="toasts" data-ref="toasts"></div>
       <div class="flash" data-ref="flash"></div>
       <div class="impact-popups" data-ref="impactPopups"></div>
-      <div class="matchmaking hidden" data-ref="matchmaking">
+      <div class="matchmaking hidden" data-ref="matchmaking" role="status" aria-live="polite">
         ${flockLoadingMark()}
-        <div class="matchmaking-count" data-ref="matchmakingCount">0 pilots</div>
-        <div class="matchmaking-label" data-ref="matchmakingLabel">Searching for live pilots…</div>
+        <div class="matchmaking-title" data-ref="matchmakingTitle">Searching for live pilots…</div>
+        <div class="matchmaking-count" data-ref="matchmakingCount">0 live pilots</div>
+        <div class="matchmaking-label" data-ref="matchmakingLabel">Reading the sky…</div>
+        <div class="matchmaking-rooms hidden" data-ref="matchmakingRooms"></div>
         <div class="btn-row mm-actions">
-          <button class="primary-btn mm-instant" data-ui data-action="quick-match-instant">Launch Now ▶</button>
+          <button class="primary-btn gold mm-ai hidden" data-ui data-ref="matchmakingAi" data-action="mm-ai">🤖 Race the AI flock instead</button>
+          <button class="soft-btn mm-keep hidden" data-ui data-ref="matchmakingKeep" data-action="mm-keep-search">Keep searching</button>
           <button class="soft-btn mm-cancel" data-ui data-action="mm-cancel">Cancel</button>
         </div>
       </div>
@@ -686,14 +693,39 @@ export class HUD {
   }
 
   /** Matchmaking overlay: live pilot count + honest countdown to backfill. */
-  setMatchmaking(on: boolean, live: number, _field: number, secsLeft: number): void {
+  /**
+   * The search overlay. Two honest phases:
+   *   searching — a live countdown to the room start, never to a bot race;
+   *   waiting   — the window elapsed with nobody here, the search stays open
+   *               and the pilot chooses between waiting and the AI flock.
+   */
+  setMatchmaking(
+    on: boolean,
+    live: number,
+    _field: number,
+    secsLeft: number,
+    phase: "searching" | "waiting" = "searching",
+    rooms = "",
+  ): void {
     this.matchmakingEl.classList.toggle("hidden", !on);
     if (!on) return;
-    this.matchmakingCount.textContent = `${live} live pilot${live === 1 ? "" : "s"}`;
-    this.matchmakingLabel.textContent =
-      secsLeft > 0.5
-        ? `Searching… AI practice starts in ${Math.ceil(secsLeft)}s`
-        : "Launching…";
+    const searching = phase === "searching";
+    this.matchmakingEl.classList.toggle("is-waiting", !searching);
+    this.matchmakingTitle.textContent = searching ? "Searching for live pilots…" : "No live pilots found yet";
+    this.matchmakingCount.textContent = live > 0
+      ? `${live} live pilot${live === 1 ? "" : "s"} in this room`
+      : "Waiting for the first live pilot";
+    this.matchmakingLabel.textContent = searching
+      ? secsLeft > 0.5
+        ? live > 0
+          ? `Race starts when the room is ready · ${Math.ceil(secsLeft)}s left on the clock`
+          : `Looking for pilots on this circuit · ${Math.ceil(secsLeft)}s`
+        : "Starting the room…"
+      : "The search stays open — anyone who arrives can still join this room";
+    this.matchmakingRooms.textContent = rooms;
+    this.matchmakingRooms.classList.toggle("hidden", !rooms);
+    this.matchmakingAi.classList.toggle("hidden", searching);
+    this.matchmakingKeep.classList.toggle("hidden", searching);
   }
 
   onAction(handler: ActionHandler): void {
@@ -1438,8 +1470,12 @@ export class HUD {
     this.countdownEl = grab("countdown");
     this.versusBar = grab("versusBar");
     this.matchmakingEl = grab("matchmaking");
+    this.matchmakingTitle = grab("matchmakingTitle");
     this.matchmakingCount = grab("matchmakingCount");
     this.matchmakingLabel = grab("matchmakingLabel");
+    this.matchmakingRooms = grab("matchmakingRooms");
+    this.matchmakingAi = grab("matchmakingAi");
+    this.matchmakingKeep = grab("matchmakingKeep");
     this.goalStrip = grab("goalStrip");
     this.goalPop = grab("goalPop");
     this.standingsEl = grab("standings");
@@ -1720,9 +1756,9 @@ function renderLive(s: HudSnapshot): string {
       <section class="race-section quick-match-hero" aria-label="Quick Match">
         <div class="race-section-head">
           <h3>⚡ Quick Match</h3>
-          <span class="board-badge live">Instant action</span>
+          <span class="board-badge live">Live search</span>
         </div>
-        <p class="qm-desc">One tap into the skies — 40 pilots, ready now. Shuffle the format and world, or just fly.</p>
+        <p class="qm-desc">Search this circuit for live pilots. If nobody answers, you choose — keep waiting or race the AI flock.</p>
 
         <div class="quick-match-btns">
           <button class="primary-btn gold large-btn" data-ui data-action="quick-match-instant">⚡ ${activeMode.name} on ${activeWorld.name}</button>
@@ -2339,7 +2375,7 @@ function renderProgress(s: HudSnapshot): string {
     ${s.rivalBanner ? renderRivalBanner(s.rivalBanner) : ""}
     ${seedPicker}
 
-    <div class="wheel-card" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb); border:1px solid #90caf9; border-radius:16px; padding:12px 14px; margin:12px 0; display:flex; align-items:center; gap:12px;">
+    <div class="wheel-card">
       <span style="font-size:32px; flex:0 0 36px;">🎡</span>
       <div style="flex:1; min-width:0;">
         <b style="font:600 15px var(--display); color:#0d47a1; display:block;">Daily Lucky Wheel</b>
@@ -2350,7 +2386,7 @@ function renderProgress(s: HudSnapshot): string {
         : `<button class="soft-btn" disabled style="padding:8px 12px; font-size:12px; opacity:0.65;">🎡 Spins again tomorrow</button>`}
     </div>
 
-    <div class="piggy-card" style="background:linear-gradient(135deg,#fff0f5,#ffd1dc); border:1px solid #f8a5c2; border-radius:16px; padding:12px 14px; margin:12px 0; display:flex; align-items:center; gap:12px;">
+    <div class="piggy-card">
       <span style="font-size:32px; flex:0 0 36px;">🐷</span>
       <div style="flex:1; min-width:0;">
         <b style="font:600 15px var(--display); color:#8c1145; display:block;">Coin Piggy Bank</b>
@@ -2550,7 +2586,7 @@ function renderShop(s: HudSnapshot, browse: ShopBrowse): string {
     ${head("Shop", "back", `<span class="pill coin">● ${s.wallet.toLocaleString()}</span>`)}
     <p class="shop-intro">YOUR HANGAR <span>Find your wings. Make them yours.</span></p>
 
-    <div class="shop-stipend-card" style="background:linear-gradient(135deg,#fff8dc,#ffe082); border:1px solid #e0c068; border-radius:16px; padding:12px 16px; margin:10px 0 14px; display:flex; align-items:center; justify-content:space-between; gap:12px; box-shadow:0 3px 6px rgba(0,0,0,0.06);">
+    <div class="shop-stipend-card">
       <div style="display:flex; align-items:center; gap:10px;">
         <span style="font-size:26px;">🪙</span>
         <div>
@@ -2564,7 +2600,7 @@ function renderShop(s: HudSnapshot, browse: ShopBrowse): string {
       }
     </div>
 
-    <div class="shop-flash-card" style="background:linear-gradient(135deg,#ffebee,#ffcdd2); border:1.5px solid #ef9a9a; border-radius:18px; padding:14px; margin:12px 0 16px; box-shadow:0 4px 10px rgba(229,57,53,0.12);">
+    <div class="shop-flash-card">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
         <span style="background:#d32f2f; color:#fff; font:700 11px var(--display); padding:3px 8px; border-radius:6px; letter-spacing:0.5px;">🔥 DAILY FLASH SALE · 40% OFF</span>
         <span style="font-size:11px; color:#c62828; font-weight:600;">Resets at Midnight</span>
@@ -2603,35 +2639,35 @@ function renderShop(s: HudSnapshot, browse: ShopBrowse): string {
     </div>
     <p class="shop-rules">Bird perks are for solo play. Live races use equal flight equipment; your appearance stays yours.</p>
 
-    <div class="shop-bundle-card" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb); border:1.5px solid #90caf9; border-radius:18px; padding:14px; margin:12px 0 16px; box-shadow:0 4px 10px rgba(33,150,243,0.12);">
+    <div class="shop-bundle-card">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
         <span style="background:#1976d2; color:#fff; font:700 11px var(--display); padding:3px 8px; border-radius:6px; letter-spacing:0.5px;">📦 ACE PILOT CRATE · SAVE 54%</span>
         <span style="font-size:11px; color:#1565c0; font-weight:600;">Value Pack</span>
       </div>
-      <div style="display:flex; align-items:center; gap:12px;">
-        <span style="font-size:32px; flex:0 0 40px; text-align:center;">✈️</span>
-        <div style="flex:1; min-width:0;">
-          <b style="font:700 15px var(--display); color:#0d47a1; display:block;">Ace Wingman Bundle</b>
-          <span style="font-size:12px; color:#1976d2; display:block;">3 Boosts (Shield, Flask, Magnet) + Tideglass Trail + 250 Bonus Coins</span>
+      <div class="offer-row">
+        <span class="offer-art">✈️</span>
+        <div class="offer-copy">
+          <b>Ace Wingman Bundle</b>
+          <span>3 Boosts (Shield, Flask, Magnet) + Tideglass Trail + 250 Bonus Coins</span>
         </div>
         ${s.wingmanBundle
-          ? `<span class="tag" style="white-space:nowrap; font-size:12px; font-weight:600; color:#2e7d32; background:#e8f5e9; border-radius:8px; padding:6px 12px;">✓ Unlocked</span>`
+          ? `<span class="tag offer-tag ok">✓ Unlocked</span>`
           : s.wallet >= 240
-            ? `<button class="primary-btn gold" data-ui data-action="buy-bundle" data-id="wingman" style="white-space:nowrap;">Claim · ● 240</button>`
-            : `<span class="tag need" style="white-space:nowrap;">Need ● ${240 - s.wallet}</span>`
+            ? `<button class="primary-btn gold offer-claim" data-ui data-action="buy-bundle" data-id="wingman">Claim · ● 240</button>`
+            : `<span class="tag need offer-tag">Need ● ${240 - s.wallet}</span>`
         }
       </div>
     </div>
 
-    <div class="mystery-vault-card" style="background:linear-gradient(135deg,#fff8dc,#ffe8a0); border:1px solid #e2c070; border-radius:16px; padding:14px; margin:12px 0 16px; display:flex; align-items:center; gap:12px; box-shadow:0 3px 0 #d0a44840;">
-      <span style="font-size:32px; flex:0 0 40px; text-align:center;">🥚</span>
-      <div style="flex:1; min-width:0;">
-        <b style="font:600 16px var(--display); color:#5d3d0f; display:block;">Golden Mystery Vault</b>
-        <span style="font-size:11px; color:#78531e; display:block;">35% Rare Bird · 35% Radiant Trail · 30% Coin Jackpot</span>
+    <div class="mystery-vault-card">
+      <span class="offer-art">🥚</span>
+      <div class="offer-copy vault">
+        <b>Golden Mystery Vault</b>
+        <span>35% Rare Bird · 35% Radiant Trail · 30% Coin Jackpot</span>
       </div>
       ${
         s.wallet >= 150
-          ? `<button class="primary-btn gold" data-ui data-action="buy-vault" style="min-height:42px; padding:8px 14px;">Open · ● 150</button>`
+          ? `<button class="primary-btn gold offer-claim" data-ui data-action="buy-vault">Open · ● 150</button>`
           : `<span class="tag need">Need ● ${150 - s.wallet}</span>`
       }
     </div>
@@ -2949,14 +2985,17 @@ export function renderFlightRecap(path: [number, number][]): string {
 export function renderCoinMultiplierCard(coins: number, claimed: boolean): string {
   if (coins <= 0) return "";
   if (claimed) {
-    return `<div class="multiplier-cta-card" style="background:#e8f5e9; border:1px solid #a5d6a7; border-radius:12px; padding:8px 12px; margin:14px 0; font-size:12px; font-weight:600; color:#2e7d32; text-align:center; white-space:nowrap;">✓ 3× flight bonus applied · +● ${coins * 2}</div>`;
+    return `<div class="multiplier-cta-card is-claimed">✓ 3× flight bonus applied · +● ${coins * 2}</div>`;
   }
-  return `<div class="multiplier-cta-card" style="background:linear-gradient(135deg,#e8f5e9,#c8e6c9); border:1px solid #a5d6a7; border-radius:16px; padding:12px 14px; margin:14px 0; display:flex; align-items:center; gap:12px; box-shadow:0 3px 0 #81c78440;">
-      <div style="flex:1; min-width:0;">
-        <b style="font:600 14px var(--display); color:#1b5e20; display:block; white-space:nowrap;">3× Flight Coin Bonus</b>
-        <span style="font-size:11px; color:#2e7d32; display:block;">Triple this run's ● ${coins} to ● ${coins * 3}!</span>
+  // Layout lives in ui.css: the claim row wraps and the button grows to a full
+  // row on narrow screens. Inline sizing here used to overflow the results card
+  // on phones (the button was nowrap inside a flex row with a fixed font size).
+  return `<div class="multiplier-cta-card">
+      <div class="multiplier-copy">
+        <b>3× Flight Coin Bonus</b>
+        <span>Triple this run's ● ${coins} to ● ${coins * 3}!</span>
       </div>
-      <button class="primary-btn gold" data-ui data-action="multiply-run-coins" style="padding:8px 14px; font-size:13px; white-space:nowrap;">Claim 3× (● +${coins * 2})</button>
+      <button class="primary-btn gold multiplier-claim" data-ui data-action="multiply-run-coins">Claim 3× (● +${coins * 2})</button>
     </div>`;
 }
 
@@ -3036,6 +3075,7 @@ function renderGameOver(s: HudSnapshot): string {
     <h2>${t("hud.gameover.title", undefined, "Flight completed")}</h2>
     <p class="tagline">${s.massRace ? "Your place, your progress, your next race." : "A little farther. A little smoother. One more flight?"}</p>
     <div class="result-actions"><button class="play-again-btn" data-ui data-action="${s.massRace && s.racePlace > 0 && !s.duelWas ? "rematch" : "retry"}">${s.massRace && s.roomCode ? "Back to race lobby" : s.massRace && s.racePlace > 0 ? "Race again · same stakes" : t("hud.gameover.flyAgain", undefined, "Fly Again")}</button><button class="soft-btn" data-ui data-action="menu">${t("hud.gameover.mainMenu", undefined, "Main Menu")}</button></div>
+    ${!s.massRace ? `<p class="fineprint replay-note">Fly again replays this exact course so you can race the ghost of the run you just flew 👻</p>` : ""}
     ${s.newBest ? `<div class="new-best">👑 NEW BEST · ${formatDistance(s.distance)}<small>your farthest flight yet</small></div>` : ""}
     ${s.boardScope === "global" && s.boardMetric === "distance" && s.board && s.board.yourRank > 0 ? `<div class="reward-strip rank-strip">Leaderboard rank · <b>#${s.board.yourRank}</b> of ${s.board.total}</div>` : ""}
 

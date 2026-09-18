@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScreenHistory } from "../ScreenHistory";
 import { copyText, shareText } from "../Clipboard";
-import { replayOptions } from "../Replay";
+import { replayOptions, shouldRebuildCasualWorld } from "../Replay";
 import { shareOrDownload } from "../Social";
 import { hiddenByDisclosure } from "../Disclosure";
 
@@ -77,6 +77,35 @@ describe("replay rules", () => {
     [{ storm: true }, { storm: true }],
   ])("retains unfinished run configuration %j", (run, expected) => {
     expect(replayOptions({ ...base, ...run })).toEqual(expected);
+  });
+});
+
+describe("replay keeps the course (so the ghost is a real opponent)", () => {
+  const base = {
+    replay: false,
+    seedMode: "today",
+    duel: false,
+    challenge: "",
+    event: false,
+    storm: false,
+    raceMode: false,
+  };
+  it("a replay never rebuilds the world — the same hills come back", () => {
+    expect(shouldRebuildCasualWorld({ ...base, replay: true })).toBe(false);
+    expect(shouldRebuildCasualWorld({ ...base })).toBe(true);
+  });
+  it("fixed-seed runs, races and events keep their course with or without replay", () => {
+    for (const run of [
+      { seedMode: "yesterday" },
+      { duel: true },
+      { challenge: "daily" },
+      { event: true },
+      { storm: true },
+      { raceMode: true },
+    ]) {
+      expect(shouldRebuildCasualWorld({ ...base, ...run })).toBe(false);
+      expect(shouldRebuildCasualWorld({ ...base, ...run, replay: true })).toBe(false);
+    }
   });
 });
 

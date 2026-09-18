@@ -67,7 +67,8 @@ Copy `.env.example` → `.env.local`. All variables are optional — the game ru
 | `npm run isolation:check` | Source-level split: the Rust stack stays platform-agnostic, the Poki edition stays Netlib P2P + AUDS, and neither leaks into the other |
 | `npm run typecheck` | TypeScript type-check without emit |
 | `npm test` | Run the full Vitest suite |
-| `npm run pvp:check` | **Online stack, proven end to end**: boots the real room server on a scratch port and runs the protocol smoke, the live two-client PvP suite and the pilot-directory contract against it |
+| `npm run pvp:check` | **Online stack, proven end to end**: boots the real room server on a scratch port and runs the protocol smoke, the live two-client PvP suite, the pilot-directory contract and the public room list against it |
+| `npm run audit:ui` | Static UX/UI audit: dead buttons, null element refs, unlabelled controls, inline layout that media queries cannot override, unstyled classes and missing narrow-screen rules |
 | `npm run test:pvp` / `test:lookup` | The same live suites against an already-running server (`VITE_MULTIPLAYER_URL=ws://127.0.0.1:8790/mp`) |
 | `npm run test:server` | Social-backend suite (routes, storage, rooms) |
 | `npm run verify` | typecheck + test + build |

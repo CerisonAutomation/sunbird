@@ -292,6 +292,13 @@ export const V1_ROUTES: Route[] = [
   },
   {
     method: "GET",
+    re: /^\/mp\/v1\/rooms$/,
+    rl: "read",
+    auth: "optional",
+    handler: (ctx, _p, q) => ({ rooms: ctx.rooms.browse(Number(q.get("limit")) || 40) }),
+  },
+  {
+    method: "GET",
     re: /^\/mp\/v1\/rooms\/(?<code>[A-Z0-9]{5})$/,
     rl: "read",
     auth: "optional",

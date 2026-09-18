@@ -1,6 +1,7 @@
 import type { NetTransport, RemoteSnapshot } from "./MassRace";
 import { truncate } from "./math";
 import { PROTOCOL_VERSION } from "./protocol/v1";
+import { normalizeRooms, roomListUrl, type LiveRoom } from "./RoomBrowser";
 import { POKI_MULTIPLAYER } from "./edition";
 // PokiMpUtils is a tiny, dependency-free module so importing it here does
 // not pull @poki/netlib into non-Poki bundles. The heavy PokiNetlibClient
@@ -125,6 +126,22 @@ export function protocolGatewayInfo(): ProtocolGatewayInfo {
     enabled: true,
     reason: "authoritative-rooms-live",
   };
+}
+
+/**
+ * The relay's public room list — who is racing right now.
+ *
+ * Reads only: the response carries room codes, seat counts and a host *name*,
+ * never player ids, seat ids or tokens. A build with no relay configured gets
+ * an empty list (and the menu says so) rather than a fabricated one.
+ */
+export async function fetchPublicRooms(base: string = URL_BASE, limit = 40): Promise<LiveRoom[]> {
+  const url = roomListUrl(base, limit);
+  if (!url) return [];
+  const res = await fetch(url, { headers: { accept: "application/json" } });
+  if (!res.ok) throw new Error(`Room list unavailable (${res.status})`);
+  const body = (await res.json()) as { rooms?: unknown };
+  return normalizeRooms(body.rooms);
 }
 
 /** Multiplayer is available when either:

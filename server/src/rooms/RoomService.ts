@@ -11,7 +11,7 @@ import type { Ctx } from "../core/ctx.js";
 import { HttpError, cleanText } from "../util/http.js";
 import { dailySeed, makeRoomCode } from "../util/id.js";
 import { RaceSession } from "../realtime/race-session.js";
-import type { RaceResult, RoomView, SeatGrant } from "../types.js";
+import type { PublicRoom, RaceResult, RoomView, SeatGrant } from "../types.js";
 
 const EMPTY_ROOM_TTL_MS = 5 * 60_000;
 const FINISHED_ROOM_TTL_MS = 10 * 60_000;
@@ -108,6 +108,50 @@ export class RoomService {
       }
     }
     return this.create(input);
+  }
+
+  /**
+   * Public room list — what a pilot sees before they commit to a race.
+   *
+   * Deliberately narrow: no playerIds, no seatIds, no reconnect tokens, no
+   * match tokens. A visitor learns that rooms exist and how full they are;
+   * identities stay behind the invite/by-code surface, exactly like the
+   * player lookup.
+   */
+  browse(limit = 40): PublicRoom[] {
+    const now = this.ctx.now();
+    const rows: PublicRoom[] = [];
+    for (const session of this.sessions.values()) {
+      // Rooms that have already resolved (finished/canceled) are not places a
+      // newcomer can race in; they hold seats only for the pilots already in.
+      if (session.status === "finished" || session.status === "canceled") continue;
+      if (session.empty()) continue;
+      const seats = session.seatCount();
+      const host = session.hostSeat;
+      rows.push({
+        code: session.code,
+        seed: session.seed,
+        status: session.status === "lobby" ? "lobby" : "racing",
+        capacity: session.capacity,
+        seated: seats,
+        host: host ? host.name : "",
+        // Only a lobby can take a newcomer into THIS race. A room mid-race is
+        // reported honestly instead of promising a seat nobody can use.
+        joinable: session.status === "lobby" && seats < session.capacity,
+        ageSeconds: Math.max(0, Math.round((now - session.createdAtMs) / 1000)),
+      });
+    }
+    rows.sort(
+      (a, b) =>
+        Number(b.joinable) - Number(a.joinable) ||
+        Number(b.status === "lobby") - Number(a.status === "lobby") ||
+        b.seated - a.seated ||
+        a.code.localeCompare(b.code),
+    );
+    // A missing, zero or negative limit means "the default list", never an
+    // empty one — a caller's bad query string must not blank the menu.
+    const capped = Number.isFinite(limit) && limit > 0 ? Math.min(100, Math.floor(limit)) : 40;
+    return rows.slice(0, capped);
   }
 
   /* --------------------------------------------------------------- queries */

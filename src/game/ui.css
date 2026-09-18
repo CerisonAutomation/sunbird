@@ -4793,3 +4793,215 @@ h1, h2, h3, h4, h5, h6, .heading-art {
     opacity: 0.9;
   }
 }
+
+/* ---------- matchmaking search: two honest phases ---------- */
+.matchmaking {
+  padding: 24px 16px calc(24px + env(safe-area-inset-bottom, 0px));
+  text-align: center;
+}
+.matchmaking-title {
+  font: 800 20px var(--display);
+  color: #fff;
+  letter-spacing: 0.02em;
+  text-align: center;
+  text-wrap: balance;
+}
+.matchmaking.is-waiting .matchmaking-spinner { animation-duration: 2.4s; opacity: 0.7; }
+.matchmaking-count { white-space: nowrap; }
+.matchmaking-label { text-align: center; max-width: min(92vw, 520px); line-height: 1.35; }
+.matchmaking-rooms {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  padding: 6px 14px;
+  text-align: center;
+  max-width: min(92vw, 520px);
+}
+.mm-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.mm-actions button { min-height: 44px; }
+.mm-cancel { width: auto; padding: 8px 22px; }
+@media (max-width: 420px) {
+  .mm-actions { flex-direction: column; width: min(92vw, 320px); }
+  .mm-actions button { width: 100%; }
+  .matchmaking-title { font-size: 18px; }
+}
+
+/* ---------- 3× coin bonus card (results) ---------- */
+/* Layout lives here, not inline, so the claim row can wrap on phones: the old
+   inline nowrap row overflowed the results card at 360px wide. */
+.multiplier-cta-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+  border: 1px solid #a5d6a7;
+  border-radius: 16px;
+  padding: 12px 14px;
+  margin: 14px 0;
+  box-shadow: 0 3px 0 rgba(129, 199, 132, 0.25);
+}
+.multiplier-cta-card.is-claimed {
+  display: block;
+  background: #e8f5e9;
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #2e7d32;
+  text-align: center;
+}
+.multiplier-copy { flex: 1 1 150px; min-width: 0; }
+.multiplier-copy b { display: block; font: 600 14px var(--display); color: #1b5e20; }
+.multiplier-copy span { display: block; font-size: 11px; color: #2e7d32; }
+.multiplier-claim { flex: 0 1 auto; min-height: 44px; }
+@media (max-width: 400px) { .multiplier-claim { flex: 1 1 100%; } }
+.replay-note { text-align: center; margin: 8px 0 0; }
+
+/* ---------- shop offer cards: one source of layout, wrap-first ---------- */
+/* These cards used to carry their whole layout inline (fixed px + nowrap), so
+   they could not reflow on a 360px-wide phone and overflowed the shop card. */
+.offer-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
+.offer-art { font-size: 32px; flex: 0 0 40px; text-align: center; }
+.offer-copy { flex: 1 1 160px; min-width: 0; }
+.offer-copy b { display: block; font: 700 15px var(--display); color: #0d47a1; }
+.offer-copy > span { display: block; font-size: 12px; color: #1976d2; }
+.offer-copy.vault b { font: 600 16px var(--display); color: #5d3d0f; }
+.offer-copy.vault > span { font-size: 11px; color: #78531e; }
+.offer-claim { flex: 0 1 auto; min-height: 44px; }
+.offer-tag { flex: 0 1 auto; }
+.mystery-vault-card {
+  background: linear-gradient(135deg, #fff8dc, #ffe8a0);
+  border: 1px solid #e2c070;
+  border-radius: 16px;
+  padding: 14px;
+  margin: 12px 0 16px;
+  box-shadow: 0 3px 0 rgba(208, 164, 72, 0.25);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+}
+@media (max-width: 400px) {
+  .offer-claim { flex: 1 1 100%; }
+  .offer-row, .mystery-vault-card { flex-direction: column; align-items: flex-start; }
+  .offer-art { flex: 0 0 auto; }
+}
+
+/* ---------- results actions (primary + secondary, stacked on phones) ---------- */
+.result-actions { display: flex; flex-direction: column; gap: 10px; margin: 14px 0 4px; }
+.result-actions > * { width: 100%; }
+@media (min-width: 560px) {
+  .result-actions { flex-direction: row; align-items: stretch; }
+  .result-actions > * { flex: 1 1 0; }
+}
+
+/* ---------- flight emote toggle + pause mute modifier ---------- */
+.emotes-toggle {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(20, 16, 40, 0.5);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.emotes-toggle[aria-expanded="true"] { background: rgba(255, 255, 255, 0.92); color: #241f38; }
+.pause-q.pause-mute[aria-pressed="true"] { background: rgba(255, 107, 74, 0.22); border-color: rgba(255, 107, 74, 0.5); }
+
+/* ---------- season pass free tier modifier ---------- */
+.tier-reward.free { border-color: #a5d6a7; background: linear-gradient(180deg, #f1fbf1, #ddf3de); }
+
+/* ---------- phone-width roster rows ---------- */
+@media (max-width: 460px) {
+  .friend-row { flex-wrap: wrap; }
+  .friend-row .fr-code { flex: 1 1 100%; }
+  .friend-row .mini-btn { min-height: 44px; }
+}
+
+/* ---------- pilot lookup: the card that proves a code is real ---------- */
+.pilot-note {
+  display: block;
+  font-size: 12.5px;
+  line-height: 1.45;
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 10px 0;
+  border: 1px solid var(--hairline);
+  background: #fff8ef;
+  color: #6d5a4a;
+}
+.pilot-note.warn { background: #fff3e2; border-color: #f0cfa2; color: #8a5a1e; }
+.pilot-note.island { background: #eef6ff; border-color: #bcd8f5; color: #2f5b86; }
+.pilot-note b { font-weight: 800; letter-spacing: 0.02em; }
+
+.pilot-card {
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  padding: 12px 14px;
+  margin: 10px 0 14px;
+  background: linear-gradient(180deg, #fffdf9, #fff4e6);
+  box-shadow: var(--elev-1);
+}
+.pilot-card-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; }
+.pilot-card-head b { font: 700 16px var(--display); color: #3a2218; }
+.pilot-dot { font-size: 11.5px; font-weight: 700; color: #8a7a6a; }
+.pilot-dot.on { color: #2e7d32; }
+.pilot-card-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 6px 0 10px; font-size: 12px; color: #6d5a4a; }
+.pilot-code {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: #3a2218;
+  background: rgba(58, 34, 24, 0.06);
+  border-radius: 8px;
+  padding: 2px 8px;
+}
+.pilot-card-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pilot-card-actions .primary-btn { flex: 1 1 160px; min-height: 44px; }
+.pilot-card-actions .mini-btn { min-height: 44px; }
+@media (max-width: 400px) {
+  .pilot-card-actions .primary-btn, .pilot-card-actions .mini-btn { flex: 1 1 100%; }
+}
+
+/* ---------- quick match hero + room presence ---------- */
+.quick-match-hero .qm-desc { font-size: 13px; line-height: 1.45; color: #6d5a4a; margin: 4px 0 10px; text-wrap: pretty; }
+.room-presence { font-size: 12.5px; font-weight: 700; color: #4a8a5a; }
+.rm-count { font-variant-numeric: tabular-nums; }
+.bn { font-weight: 700; }
+
+/* ---------- shop / reward cards: layout in CSS, wrap-first ---------- */
+/* These carried inline flex rows with fixed gaps, so the coin claim buttons
+   could not reflow on a narrow phone and pushed past the shop card edge. */
+.wheel-card, .piggy-card, .shop-stipend-card { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
+.wheel-card { background: linear-gradient(135deg, #e3f2fd, #bbdefb); border: 1px solid #90caf9; border-radius: 16px; padding: 12px 14px; margin: 12px 0; box-shadow: var(--elev-1); }
+.piggy-card { background: linear-gradient(135deg, #fff0f5, #ffd1dc); border: 1px solid #f8a5c2; border-radius: 16px; padding: 12px 14px; margin: 12px 0; box-shadow: var(--elev-1); }
+.shop-stipend-card { background: linear-gradient(135deg, #fff8dc, #ffe082); border: 1px solid #e0c068; border-radius: 16px; padding: 12px 16px; margin: 10px 0 14px; box-shadow: 0 3px 6px rgba(0, 0, 0, 0.06); }
+.shop-flash-card { background: linear-gradient(135deg, #ffebee, #ffcdd2); border: 1.5px solid #ef9a9a; border-radius: 18px; padding: 14px; margin: 12px 0 16px; box-shadow: 0 4px 10px rgba(229, 57, 53, 0.12); }
+.shop-bundle-card { background: linear-gradient(135deg, #e3f2fd, #bbdefb); border: 1.5px solid #90caf9; border-radius: 18px; padding: 14px; margin: 12px 0 16px; box-shadow: 0 4px 10px rgba(33, 150, 243, 0.12); }
+
+@media (max-width: 420px) {
+  .wheel-card, .piggy-card, .shop-stipend-card, .shop-flash-card, .shop-bundle-card { flex-direction: column; align-items: stretch; }
+  .wheel-card > *, .piggy-card > *, .shop-stipend-card > * { min-width: 0; }
+  .shop-stipend-card .mini-btn, .piggy-card .mini-btn, .wheel-card .mini-btn { width: 100%; min-height: 44px; }
+}
+.share-run { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+/* Visually hidden but screen-reader available — an unstyled sr-only legend is
+   read aloud as literal "Squad actions" text in the middle of the panel. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

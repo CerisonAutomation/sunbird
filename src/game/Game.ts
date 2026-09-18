@@ -2,7 +2,7 @@ import { equalizedRace } from "./RaceRules";
 import { terrainCue, landingLookAhead } from "./FlightGuidance";
 import { ScreenHistory } from "./ScreenHistory";
 import { copyText, shareText } from "./Clipboard";
-import { replayOptions, type RunOptions } from "./Replay";
+import { replayOptions, shouldRebuildCasualWorld, type RunOptions } from "./Replay";
 import * as THREE from "three";
 import { Achievements } from "./Achievements";
 import { GameAudio } from "./Audio";
@@ -20,7 +20,8 @@ import { LaunchSystem, ratingLabel, type LaunchResult } from "./LaunchSystem";
 import { isRaceMode, MASS_RACE_FIELD, MODES, modeById, PVP_MODES, PVP_WORLDS, RACE_FINISH, type ModeDef, type ModeId, type PvpWorldCourse } from "./Modes";
 import { MassRace } from "./MassRace";
 import { FinishGate } from "./FinishGate";
-import { isMultiplayerConfigured, makeRoomCode, RealtimeClient, type AnyRealtimeClient } from "./Realtime";
+import { fetchPublicRooms, isMultiplayerConfigured, makeRoomCode, RealtimeClient, type AnyRealtimeClient } from "./Realtime";
+import { RoomWatcher, ROOM_POLL_MS, roomSummaryLine, summarizeRooms, type LiveRoom } from "./RoomBrowser";
 import { Leaderboard, loadPilotName, savePilotName, isLeaderboardOnline, type BoardMetric, type BoardPage, type BoardScope } from "./Leaderboard";
 import { generatePilotName } from "./pilotNameGenerator";
 import { setLocale, type SupportedLocale } from "../i18n";
@@ -112,7 +113,7 @@ import { flag } from "./Flags";
 import { variant } from "./Experiments";
 import { buildRoomInviteUrl, normalizeRoomCode, readRoomInviteFromUrl } from "./RoomInvite";
 import { PORTAL_BANNER_ID, initPlatform, isCoarsePointer, isPortalBuild, portalTarget as getPortalTarget, type PlatformAdapter } from "../sdk/platform";
-import { SQUAD_CHAT } from "./edition";
+import { POKI_MULTIPLAYER, SQUAD_CHAT } from "./edition";
 import { GameplayEventSink } from "./GameplayEvents";
 import { LivingBackground } from "./LivingBackground";
 import { Sky } from "./Sky";
@@ -374,6 +375,13 @@ export class Game {
   private networkStartAt = 0;
   /** Deferred launch options for when the search resolves. */
   private mmOpts: { ranked: boolean; storm: boolean } | null = null;
+  /** Search phase: a live countdown while "searching", then "waiting" — the
+   *  search stays open and the pilot decides, instead of being dropped into an
+   *  AI race they never asked for. */
+  private mmPhase: "searching" | "waiting" = "searching";
+  /** Summary of public rooms seen during the search (real players, no fakes). */
+  private mmRooms = "";
+  private roomWatcher: RoomWatcher | null = null;
   /** The last launched match's options — powers the one-tap Rematch button. */
   private lastMatchOpts: { ranked: boolean; storm: boolean } | null = null;
   /** Stormfront mode: PvE hazards×PvP race hybrid — everyone flies the gauntlet. */
@@ -2488,8 +2496,15 @@ export class Game {
     // explicit Yesterday/Random seed pick is honoured, and date-seeded
     // daily/gauntlet runs plus shared-field races (duels, events, stormfront,
     // mass races) keep their fixed seed so the field stays fair/comparable.
-    const casualRun =
-      this.seedMode === "today" && !opts?.duel && !opts?.challenge && !opts?.event && !opts?.storm && !isRaceMode(this.modeId);
+    const casualRun = shouldRebuildCasualWorld({
+      replay: Boolean(opts?.replay),
+      seedMode: this.seedMode,
+      duel: Boolean(opts?.duel),
+      challenge: typeof opts?.challenge === "string" ? opts.challenge : "",
+      event: Boolean(opts?.event),
+      storm: Boolean(opts?.storm),
+      raceMode: isRaceMode(this.modeId),
+    });
     if (casualRun) {
       this.rebuildWorld(`fly-${Math.random().toString(36).slice(2, 10)}`);
     } else if (opts?.challenge && this.seed !== this.today) {
@@ -3584,6 +3599,13 @@ export class Game {
       case "mm-cancel":
         this.cancelMatchmaking();
         break;
+      case "mm-ai":
+        // Explicit opt-in only: the search never drops a pilot into a bot race.
+        this.takeAiFlock();
+        break;
+      case "mm-keep-search":
+        this.keepSearching();
+        break;
       case "pvp-duel":
         this.roomCode = "";
         this.modeId = "massrace";
@@ -4100,14 +4122,17 @@ export class Game {
         this.telemetry.track("rival_thrown", { distance: dist, mode: this.modeId });
         break;
       }
-      case "rematch":
-        // Same stakes, zero menu round-trips — back through the honest
-        // search so live pilots can seat into the new field.
-        if (this.state === "gameover") {
-          if (this.lastMatchOpts && !this.duelActive && !this.roomCode) this.beginMatchmaking(this.lastMatchOpts);
-          else this.replayRun(true);
-        }
+      case "rematch": {
+        // Same stakes, zero menu round-trips. An online race goes back through
+        // the honest search so live pilots can seat into the next field; a duel
+        // or an AI-flock race replays locally, exactly as it was flown.
+        if (this.state !== "gameover") break;
+        const opts = this.lastMatchOpts ?? { ranked: false, storm: false };
+        if (this.duelActive || this.versus) this.replayRun(true);
+        else if (this.localRace || !isMultiplayerConfigured()) this.launchMatch(opts, true);
+        else this.beginMatchmaking(opts);
         break;
+      }
       case "share":
         void this.shareRun();
         break;
@@ -4984,7 +5009,11 @@ export class Game {
   /** Opt into a public room, ready when connected, and launch only on the
    * server's shared start. A timed-out search explicitly disconnects before
    * starting local AI practice. Browsing or cancelling cannot block a room. */
-  private static readonly MM_WINDOW = 8;
+  /** How long we actively count down before handing the choice to the player.
+   *  Long enough for a real pilot to finish loading and land in the same room. */
+  private static readonly MM_WINDOW = 20;
+  /** After the window: how long we keep the seat and keep listening. */
+  private static readonly MM_KEEPALIVE = 600;
 
   private beginMatchmaking(opts: { ranked: boolean; storm: boolean }): void {
     this.disconnectRace();
@@ -5005,19 +5034,57 @@ export class Game {
       return;
     }
     this.mmOpts = opts;
+    this.mmPhase = "searching";
+    this.mmRooms = "";
     this.mmDeadline = performance.now() + Game.MM_WINDOW * 1000;
     this.preseatLobby();
-    this.hud.setMatchmaking(true, this.liveCount(), this.roomSize, Game.MM_WINDOW);
+    this.startRoomWatch();
+    this.hud.setMatchmaking(true, this.liveCount(), this.roomSize, Game.MM_WINDOW, "searching", "");
     this.bump();
   }
 
   private cancelMatchmaking(): void {
     this.mmDeadline = 0;
     this.mmOpts = null;
+    this.mmPhase = "searching";
+    this.mmRooms = "";
+    this.roomWatcher?.stop();
     this.net?.sendReady(false);
     this.disconnectRace();
     this.hud.setMatchmaking(false, 0, this.roomSize, 0);
     this.bump();
+  }
+
+  /** True while we asked the transport for a public room and have not been
+   *  seated/started yet. */
+  private searching(): boolean {
+    return this.mmDeadline > 0 && this.mmOpts !== null;
+  }
+
+  private startRoomWatch(): void {
+    if (!this.roomWatcher) {
+      this.roomWatcher = new RoomWatcher(
+        () => this.fetchLiveRooms(),
+        ROOM_POLL_MS,
+        (result) => {
+          if (!this.searching()) return;
+          this.mmRooms = result.rooms.length ? roomSummaryLine(summarizeRooms(result.rooms)) : "";
+          this.bump();
+        },
+      );
+    }
+    this.roomWatcher.start();
+  }
+
+  /** What is racing right now, on whichever transport this edition ships. */
+  private async fetchLiveRooms(): Promise<LiveRoom[]> {
+    if (!isMultiplayerConfigured()) return [];
+    if (POKI_MULTIPLAYER) {
+      // Compile-time gated: only the Poki bundle contains the P2P browser.
+      const { listPublicLobbies } = await import("./PokiNetlib");
+      return listPublicLobbies();
+    }
+    return fetchPublicRooms();
   }
 
   private liveCount(): number {
@@ -5028,20 +5095,58 @@ export class Game {
   /** Called every frame while a search is active. */
   private pumpMatchmaking(_raw: number): void {
     if (this.mmDeadline <= 0 || !this.mmOpts) return;
-    const secsLeft = (this.mmDeadline - performance.now()) / 1000;
-    const live = this.liveCount();
-    this.hud.setMatchmaking(true, live, this.roomSize, Math.max(0, secsLeft));
-    // Public entrants opt in by pressing Find race. The server, not each
-    // player's eight-second timer, decides when both pilots may launch.
-    if (this.net?.state === "lobby" && !this.net.info().ready) this.net.sendReady(true);
-    if (secsLeft <= 0) {
-      const opts = this.mmOpts;
+    // If the run already started (a real start frame, or a local launch), the
+    // search is over — the overlay must never sit on top of gameplay.
+    if (this.state !== "menu") {
       this.mmOpts = null;
       this.mmDeadline = 0;
-      this.hud.setMatchmaking(false, live, this.roomSize, 0);
-      this.hud.toast("No shared start received — starting an AI practice race", "info");
-      this.launchMatch(opts, true);
+      this.roomWatcher?.stop();
+      this.hud.setMatchmaking(false, 0, this.roomSize, 0);
+      return;
     }
+    const live = this.liveCount();
+    // Public entrants opt in by pressing Find race. The server, not each
+    // player's timer, decides when the room may launch.
+    if (this.net?.state === "lobby" && !this.net.info().ready) this.net.sendReady(true);
+    // Someone real is in the room — keep the search open until the room starts.
+    if (live > 0 && this.mmPhase === "waiting") this.mmPhase = "searching";
+    if (this.mmPhase === "waiting") {
+      this.hud.setMatchmaking(true, live, this.roomSize, 0, "waiting", this.mmRooms);
+      return;
+    }
+    const secsLeft = (this.mmDeadline - performance.now()) / 1000;
+    this.hud.setMatchmaking(true, live, this.roomSize, Math.max(0, secsLeft), "searching", this.mmRooms);
+    if (secsLeft <= 0) {
+      // The window elapsed with nobody to race. Do NOT launch a bot race — the
+      // pilot asked for live pilots. Keep the room, keep listening, and let
+      // them choose: wait longer, or take the AI flock deliberately.
+      this.mmPhase = "waiting";
+      this.mmDeadline = performance.now() + Game.MM_KEEPALIVE * 1000;
+      this.hud.setMatchmaking(true, live, this.roomSize, 0, "waiting", this.mmRooms);
+      this.hud.toast(this.mmRooms ? `Still searching — ${this.mmRooms}` : "Still searching for live pilots…", "info");
+      this.bump();
+    }
+  }
+
+  /** Leave the search running (another full window) without dropping the room. */
+  private keepSearching(): void {
+    if (!this.mmOpts) return;
+    this.mmPhase = "searching";
+    this.mmDeadline = performance.now() + Game.MM_WINDOW * 1000;
+    this.hud.toast("Searching again — inviting any pilot who is online", "info");
+    this.bump();
+  }
+
+  /** Explicit "race the AI flock" opt-in from the search overlay. */
+  private takeAiFlock(): void {
+    const opts = this.mmOpts ?? this.lastMatchOpts ?? { ranked: false, storm: false };
+    this.mmOpts = null;
+    this.mmDeadline = 0;
+    this.mmPhase = "searching";
+    this.roomWatcher?.stop();
+    this.hud.setMatchmaking(false, 0, this.roomSize, 0);
+    this.hud.toast("Racing the AI flock — offline practice", "info");
+    this.launchMatch(opts, true);
   }
 
   private launchMatch(opts: { ranked: boolean; storm: boolean }, local = false): void {
@@ -5385,16 +5490,31 @@ export class Game {
   private replayRun(allowPortalBreak: boolean): void {
     if (this.versus) { this.startVersus(); return; }
     if (isRaceMode(this.modeId) && this.roomCode && !this.localRace) {
+      // An online race "replay" means going back through the search so the next
+      // round can seat real pilots. Bouncing the player to the menu (what this
+      // used to do) read as a broken replay button.
       this.disconnectRace();
       this.roomCode = "";
+      const opts = this.lastMatchOpts ?? { ranked: false, storm: false };
       this.setState("menu");
       this.setScreen("live");
-      this.hud.toast("Race complete — create or join a new room for the next race", "info");
+      if (isMultiplayerConfigured()) {
+        this.beginMatchmaking(opts);
+        return;
+      }
+      this.hud.toast("Online racing is unavailable here — replaying the AI flock", "info");
+      this.launchMatch(opts, true);
       return;
     }
-    const options = replayOptions({ duel: this.duelActive, challenge: this.challengeRun,
-      dailyDone: this.save.isDailyDone(this.today), gauntletDone: this.save.gauntletDone(weekKey()),
-      event: this.eventRun, storm: this.stormfront });
+    // Local run: replay means the SAME course, so the ghost recorded from the
+    // run that just ended is a real opponent instead of a random island nobody
+    // ever flew. Without this the ghost feature could never be seen.
+    const options: RunOptions = {
+      ...replayOptions({ duel: this.duelActive, challenge: this.challengeRun,
+        dailyDone: this.save.isDailyDone(this.today), gauntletDone: this.save.gauntletDone(weekKey()),
+        event: this.eventRun, storm: this.stormfront }),
+      replay: true,
+    };
     if (allowPortalBreak && this.portalEnabled()) void this.restartWithPortalBreak(options);
     else this.startRun(options);
   }
