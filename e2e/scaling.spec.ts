@@ -16,31 +16,33 @@ const SIZES: { name: string; width: number; height: number }[] = [
 ];
 
 for (const size of SIZES) {
-  test(`covers the full canvas at ${size.name} without errors`, async ({ page }) => {
+  test.describe(`covers the full canvas at ${size.name} without errors`, () => {
     test.use({ viewport: { width: size.width, height: size.height } });
-    test.setTimeout(120000);
-    const app = new SunbirdPage(page);
-    await app.open();
-    await app.ready();
+    test("passes layout and canvas coverage checks", async ({ page }) => {
+      test.setTimeout(120000);
+      const app = new SunbirdPage(page);
+      await app.open();
+      await app.ready();
 
-    // The canvas must cover the entire viewport — no letterbox, no gap.
-    const cover = await page.evaluate(() => {
-      const canvas = document.querySelector("canvas");
-      if (!canvas) return { w: 0, h: 0 };
-      const r = canvas.getBoundingClientRect();
-      return { w: Math.round(r.width), h: Math.round(r.height) };
-    });
-    expect(cover.w, "canvas width covers the viewport").toBeGreaterThanOrEqual(size.width);
-    expect(cover.h, "canvas height covers the viewport").toBeGreaterThanOrEqual(size.height);
+      // The canvas must cover the entire viewport — no letterbox, no gap.
+      const cover = await page.evaluate(() => {
+        const canvas = document.querySelector("canvas");
+        if (!canvas) return { w: 0, h: 0 };
+        const r = canvas.getBoundingClientRect();
+        return { w: Math.round(r.width), h: Math.round(r.height) };
+      });
+      expect(cover.w, "canvas width covers the viewport").toBeGreaterThanOrEqual(size.width);
+      expect(cover.h, "canvas height covers the viewport").toBeGreaterThanOrEqual(size.height);
 
     // The main menu must be visible at this size.
-    await expect(page.locator(".screen-head h2").first()).toBeVisible();
+    await expect(page.locator('[data-ref="menuCard"] h1')).toBeVisible();
     await expect(page.locator('[data-action="open-live"]')).toBeVisible();
 
-    // A race lobby must also fit (the densest screen).
-    await app.openMenu("open-live", "Race Lobby");
-    await expect(page.locator('[data-action="quick-match-instant"]')).toBeVisible();
+      // A race lobby must also fit (the densest screen).
+      await app.openMenu("open-live", "Race Lobby");
+      await expect(page.locator('[data-action="quick-match-instant"]')).toBeVisible();
 
-    expect(app.errors).toEqual([]);
+      expect(app.errors).toEqual([]);
+    });
   });
 }
