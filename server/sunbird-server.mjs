@@ -201,10 +201,23 @@ function findRoom(code, seed) {
     }
     return room;
   }
-  // Public matchmaking: first room with space on the same seed.
+  // Public matchmaking: the fullest open room on the same seed.
+  //
+  // Deliberately NOT filtered on `startedAt`. A pilot whose socket blips
+  // reconnects on the same seed, and matchmaking has to put them back in the
+  // room they were racing in — that is what the Rust `sunbird-server` does
+  // (`find_room` in legacy.rs) and what the botsim resume gate measures.
+  // Filtering started rooms out used to scatter a single flock across two
+  // rooms: the reconnecting pilot landed in a fresh lobby, a second race
+  // started, and that race handed out its own places while the first one was
+  // still running. Finish places then looked duplicated to every peer.
+  const wanted = seed || todayStr();
+  let best = null;
   for (const room of rooms.values()) {
-    if (room.public && !room.startedAt && !room.full && room.seed === (seed || todayStr())) return room;
+    if (!room.public || room.full || room.seed !== wanted) continue;
+    if (!best || room.pilots.size > best.pilots.size) best = room;
   }
+  if (best) return best;
   const created = new Room(newCode(), seed, true);
   rooms.set(created.code, created);
   return created;

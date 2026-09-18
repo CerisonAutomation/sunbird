@@ -91,7 +91,7 @@ For the flight/performance changes and measurement limits, see [Flight & perform
 - **Unit** — `npm test`: pure-function coverage across PvP rating, challenges, mastery, economy, ghost codecs, protocol parsing, and bit-exact `Bird.step()` determinism on seeded terrain.
 - **Stability** — the suite is loop-safe: 100 consecutive runs green with zero flakes (each run is independent; no shared state, no wall-clock dependence — season/week tests are timezone-independent).
 - **Multiplayer smoke** — `npm run test:mp` joins two real WebSocket clients to the same room through the dev proxy and asserts roster visibility plus live state frames (`peers-visible=true`, 5+ frames in 4 s).
-- **Load** — `npm run botsim:40`: 40 real WebSocket pilots on the shipped protocol. Gated in `.github/workflows/botsim.yml`; the Rust job requires cheat containment (`--require-anticheat`), so a regression that lets a teleport through fails the build.
+- **Load** — `npm run botsim:40`: 40 real WebSocket pilots on the shipped protocol. Gated in `.github/workflows/botsim.yml`; the Rust job requires cheat containment (`--require-anticheat`), so a regression that lets a teleport through fails the build. The same harness runs against the Node reference server (`server/sunbird-server.mjs`), where both implementations must agree: a dropped pilot has to come back to the *same room* it was racing in, and finish places must stay unique per race.
 - **Rust** — `cargo fmt --check`, `cargo clippy`, `cargo test` in [rust/](./rust/).
 
 ## Builds & portals

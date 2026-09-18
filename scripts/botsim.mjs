@@ -116,6 +116,8 @@ class Bot {
     this.connected = false;
     this.welcomed = false;
     this.id = "";
+    this.room = "";
+    this.roomChanges = 0;
     this.welcomeIds = new Set();
     this.rosterMax = 0;
     this.stateFrames = 0;
@@ -260,11 +262,18 @@ class Bot {
       case "welcome": {
         this.welcomed = true;
         const prevId = this.id;
+        const prevRoom = this.room;
         this.id = msg.id;
+        this.room = msg.room ?? "";
         this.welcomeIds.add(msg.id);
         // Same identity after a drop is the whole point of the device id:
         // a reconnect must re-seat the SAME seat (same id), not create a new one.
         if (this.dropped && prevId && msg.id === prevId) this.resumed = true;
+        // …and in the SAME room. A reconnect that lands in a different room on
+        // the same seed is a stranded pilot: the flock is racing elsewhere and
+        // this one sits in a fresh lobby that may start its own race (and hand
+        // out its own P1). Both servers must put a blip back in its own race.
+        if (this.dropped && prevRoom && this.room && this.room !== prevRoom) this.roomChanges++;
         // Now that the seat is bound it is safe to start sending state frames
         // and assert ready. Initial connect uses a short staggered ready so
         // not every bot presses "GO!" on the same tick; reconnect fires ready
@@ -430,6 +439,7 @@ async function main() {
 
   const droppedBots = bots.filter((b) => b.role === "resumer" && b.dropped);
   const resumed = droppedBots.filter((b) => b.resumed).length;
+  const sameRoom = droppedBots.filter((b) => b.resumed && b.roomChanges === 0).length;
 
   const leaks = bots.flatMap((b) => b.leaks.map((l) => ({ observer: b.name, ...l })));
   const leakByReason = {};
@@ -461,7 +471,7 @@ async function main() {
       p95: Number(percentile(allGaps, 95).toFixed(1)),
     },
     finish: { count: finished.length, unique: uniquePlaces.size },
-    resume: { dropped: droppedBots.length, resumed },
+    resume: { dropped: droppedBots.length, resumed, sameRoom },
     bandwidth: { totalKB: Number((bytesRx / 1024).toFixed(1)), perClientKBps: Number(perClientKBps.toFixed(2)) },
     cheatContainment: {
       leaks: leaks.length,
@@ -510,6 +520,11 @@ async function main() {
       detail: `${resumed}/${droppedBots.length} dropped and re-seated`,
     },
     {
+      name: "dropped pilots resume into the same room",
+      pass: droppedBots.length === 0 || sameRoom / droppedBots.length >= GATE.resumeRatio,
+      detail: `${sameRoom}/${droppedBots.length} back in the room they were racing in`,
+    },
+    {
       name: "no socket or protocol errors",
       pass: errors.length <= GATE.maxErrors,
       detail: errors.length === 0 ? "clean" : errors.slice(0, 3).join(" | "),
@@ -540,7 +555,10 @@ async function main() {
   console.log(
     `  finish      ${report.finish.count} finishes, ${report.finish.unique} unique places`,
   );
-  console.log(`  resume      ${resumed}/${droppedBots.length} re-seated after a mid-race drop`);
+  console.log(
+    `  resume      ${resumed}/${droppedBots.length} re-seated after a mid-race drop ` +
+      `(${sameRoom} in the same room)`,
+  );
   console.log(`  bandwidth   ${report.bandwidth.perClientKBps} KB/s per client`);
   console.log(
     `  cheats      ${leaks.length === 0 ? "contained" : `${leaks.length} LEAKED`} ` +
