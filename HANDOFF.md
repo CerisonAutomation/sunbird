@@ -177,8 +177,10 @@ Re-verified against the current Poki docs (developers.poki.com, 2026-09-16):
 
 - AI rival emotes are generated locally per client (two players see different AI emotes) —
   fixing needs server-side AI emotes; cosmetic only.
-- Cloud save on portals is wrapped localStorage today; the AUDS per-user sync paths
-  ship behind `VITE_POKI_GAME_ID` and activate once Poki issues a game id.
+- Cloud save on portals is wrapped localStorage today; the AUDS per-user sync,
+  share-code and pilot-directory paths ship behind `VITE_POKI_GAME_ID` and activate
+  once Poki issues a game id. Until then the Poki build's Pilot Lookup says
+  "unavailable" rather than inventing anyone.
 - Poki multiplayer is Netlib P2P (no external-server approval needed); the self-hosted
   WebSocket room server stays on the direct/crazy/generic builds and never enters the
   Poki bundle. If Poki later requires an external-server approval for anything, only that

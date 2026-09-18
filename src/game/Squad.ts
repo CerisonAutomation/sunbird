@@ -8,7 +8,7 @@
  * All calls are fire-and-forget tolerant: a dead server degrades to the
  * offline UI rather than breaking the menu.
  */
-
+import { directoryAvailable, lookupDirectoryPilot, publishPilot, type DirectoryPilot } from "./PilotDirectory";
 import { SQUAD_CHAT } from "./edition";
 
 const ENV: Record<string, string | undefined> = (import.meta as unknown as { env?: Record<string, string> }).env ?? {};
@@ -297,6 +297,34 @@ export class SquadClient {
 
   private call<T>(path: string, init?: RequestInit): Promise<T> { return call<T>(path, this.token, init, this.lifetime.signal); }
 
+  /** Honest one-liner for a directory hit: when the record was last updated. */
+  private describeDirectoryHit(found: DirectoryPilot, seenMs: number): string {
+    const parts = ["Found in the platform pilot directory"];
+    if (found.bestDistance > 0) parts.push(`best ${Math.round(found.bestDistance).toLocaleString()} m`);
+    if (seenMs > 0) {
+      const mins = Math.round(seenMs / 60000);
+      parts.push(mins < 60 ? `updated ${Math.max(1, mins)} min ago` : `updated ${Math.round(mins / 60)} h ago`);
+    }
+    parts.push("wingman requests need the online service");
+    return parts.join(" · ");
+  }
+
+  /**
+   * Publish this device's own public record (name + best distance) so other
+   * players can find the code. Only the platform edition has a directory, and
+   * only the device's own code is ever written.
+   */
+  async publishDirectoryRecord(stats: { bestDistance: number; skin: string }): Promise<boolean> {
+    if (!directoryAvailable() || !this.state.myCode) return false;
+    const ok = await publishPilot({
+      code: this.state.myCode,
+      name: this.nameOf(),
+      bestDistance: stats.bestDistance,
+      skin: stats.skin,
+    });
+    return ok;
+  }
+
   private async mutate<T>(work: () => Promise<T>, fallback: T): Promise<T> {
     if (this.lifetime.signal.aborted || this.state.busy || this.state.loading) return fallback;
     this.state.busy = true;
@@ -317,6 +345,9 @@ export class SquadClient {
     this.onChange();
   }
 
+  /** Latest numbers for the public record; set by the game each save change. */
+  private publishStats: { bestDistance: number; skin: string } | null = null;
+
   setOnChange(fn: () => void): void {
     this.onChange = fn;
   }
@@ -325,10 +356,24 @@ export class SquadClient {
   async refresh(): Promise<void> {
     if (this.isAutonomous) {
       this.enableAutonomous();
+      this.publishSelf();
       return;
     }
     if (this.state.busy) return; // a mutation owns its reconciliation
     await this.load();
+    this.publishSelf();
+  }
+
+  /** Ask the game for this pilot's current mark and republish the record. */
+  private publishSelf(): void {
+    if (!directoryAvailable()) return;
+    this.publishStats ??= { bestDistance: 0, skin: "" };
+    void this.publishDirectoryRecord(this.publishStats);
+  }
+
+  /** The game hands over the numbers only it knows (best distance, skin). */
+  setPublishStats(stats: { bestDistance: number; skin: string }): void {
+    this.publishStats = stats;
   }
 
   private async load(): Promise<void> {
@@ -417,8 +462,43 @@ export class SquadClient {
     }
 
     if (!this.hasService()) {
-      // No social service in this build. Say so, and point at the real list
-      // of pilots this device has actually flown with.
+      // No self-hosted social service in this build. On the platform edition
+      // there is still a real directory — the public pilot records other
+      // players published under their codes — so try that before saying
+      // "unavailable". A code that is not there is reported as unknown; a code
+      // is never turned into a name locally.
+      if (directoryAvailable()) {
+        const found = await lookupDirectoryPilot(query);
+        if (this.lifetime.signal.aborted) return fail("unavailable", "");
+        if (found) {
+          const seen = found.at > 0 ? Math.max(0, Date.now() - found.at) : 0;
+          const result: PilotLookup = {
+            status: "ok",
+            query,
+            name: found.name || "A pilot",
+            code: found.code,
+            // The directory is storage, not presence: it cannot tell whether
+            // someone is flying right now, so it does not pretend to.
+            online: false,
+            club: "",
+            bestDistance: found.bestDistance,
+            rank: 0,
+            friend: this.state.friends.some((f) => f.code === found.code),
+            outgoing: this.state.requestsOut.some((r) => r.code === found.code),
+            incoming: this.state.requestsIn.some((r) => r.code === found.code),
+            message: this.describeDirectoryHit(found, seen),
+          };
+          this.state.lookup = result;
+          this.onChange();
+          return result;
+        }
+        const unknown = fail("unknown", `No pilot has published the code ${query}. Codes are case-insensitive — check it and try again.`);
+        this.state.lookup = unknown;
+        this.onChange();
+        return unknown;
+      }
+      // Neither a social service nor a directory: say exactly that, and point
+      // at the real list of pilots this device has actually flown with.
       const result = fail(
         "unavailable",
         "Pilot lookup needs the online service, which this build does not have. Pilots you have actually raced with are listed below.",

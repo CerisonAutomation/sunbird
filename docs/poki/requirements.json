@@ -1076,7 +1076,7 @@
         "type": "file",
         "path": "src/sdk/auds.ts"
       },
-      "evidence": "Implemented: score boards, ghost shares, per-user sync and \u2014 for non-real-time multiplayer \u2014 run share codes (src/sdk/auds.ts, src/game/SharedRun.ts: publish a run, race a friend's code, count plays through the public _increment endpoint)."
+      "evidence": "Implemented: score boards, ghost shares, per-user sync, a public pilot directory (src/game/PilotDirectory.ts \u2014 code-only lookup, one record per pilot, no presence claims) and \u2014 for non-real-time multiplayer \u2014 run share codes (src/sdk/auds.ts, src/game/SharedRun.ts: publish a run, race a friend's code, count plays through the public _increment endpoint)."
     },
     {
       "id": "TOOL-08",

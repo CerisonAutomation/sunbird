@@ -109,7 +109,7 @@ Every portal zip is self-contained (`index.html` + `icons/` + `fonts/`), uses on
 
 | Build | Transport | Backend |
 |---|---|---|
-| Poki | **Netlib P2P** (`@poki/netlib` over WebRTC datachannels, code-split + dynamically imported) | none of ours — signalling is Poki's; player data uses **AUDS** (boards, ghost shares, run share codes) |
+| Poki | **Netlib P2P** (`@poki/netlib` over WebRTC datachannels, code-split + dynamically imported) | none of ours — signalling is Poki's; player data uses **AUDS** (boards, ghost shares, run share codes, the pilot directory behind Pilot Lookup) |
 | Direct / CrazyGames / generic | Self-hosted **authoritative WebSocket room server** (`VITE_MULTIPLAYER_URL` → TS `server/` or the Rust `rust/` workspace) | ours |
 | Any build without WebRTC / a backend | Local AI flock (the UI says so) | none |
 

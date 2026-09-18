@@ -1,6 +1,6 @@
 # Poki compliance report
 
-**Generated:** 2026-09-17 by `pnpm poki:audit` — do not edit by hand.
+**Generated:** 2026-09-18 by `pnpm poki:audit` — do not edit by hand.
 **Result:** ✅ every satisfied rule verified · 99/113 rules verified · 72 of them hard requirements.
 
 **Scope:** the extracted guide corpus in this folder (`requirements.json`, version 2026-09-17). Rules marked *action* are human/submission steps, *deferred* are accepted gaps with a recorded reason — both are listed so nothing is silently skipped.
@@ -287,7 +287,7 @@
 | `TOOL-04` | Client implemented behind a code-split. |
 | `TOOL-05` | docs/poki/08-game-dev-tools.md |
 | `TOOL-06` | P2P is selected only when the build targets Poki AND RTCPeerConnection/crypto are present (PokiMpUtils.isPokiMultiplayerAvailable); WebSocket and local paths remain for every other build. |
-| `TOOL-07` | Implemented: score boards, ghost shares, per-user sync and — for non-real-time multiplayer — run share codes (src/sdk/auds.ts, src/game/SharedRun.ts: publish a run, race a friend's code, count plays through the public _increment endpoint). |
+| `TOOL-07` | Implemented: score boards, ghost shares, per-user sync, a public pilot directory (src/game/PilotDirectory.ts — code-only lookup, one record per pilot, no presence claims) and — for non-real-time multiplayer — run share codes (src/sdk/auds.ts, src/game/SharedRun.ts: publish a run, race a friend's code, count plays through the public _increment endpoint). |
 | `TOOL-08` | src/sdk/auds.ts (dormant without VITE_POKI_GAME_ID), scripts/verify-isolation.mjs, scripts/portal-markers.mjs |
 | `REQ-01` | e2e asserts canvas coverage, visible menu/lobby and zero page errors at each size. |
 | `REQ-02` | Rejection guard installed before anything else; overlay-only UI; share flow uses the platform share API. |

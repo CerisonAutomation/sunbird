@@ -533,6 +533,9 @@ export class Game {
     this.seed = this.today;
     this.squad = new SquadClient(this.save.state.deviceId, () => this.pilotName);
     this.squad.setOnChange(() => this.bump());
+    // The public pilot record needs the mark and the bird; the game is the only
+    // thing that knows them. Refresh it whenever a run might have improved it.
+    this.squad.setPublishStats({ bestDistance: this.save.state.bestDistance, skin: this.skin.id });
 
     host.classList.add("game-root");
     const canvas = document.createElement("canvas");
@@ -2803,6 +2806,7 @@ export class Game {
     // the just-earned rank. Local rows were already updated synchronously, so
     // this resolves to the new standing without a network round-trip.
     void this.refreshBoard(true);
+    this.squad?.setPublishStats({ bestDistance: this.save.state.bestDistance, skin: this.skin.id });
     const improvedCups = this.cups.submit(this.modeId, {
       distance: stats.distance,
       altitude: this.maxAltitude,

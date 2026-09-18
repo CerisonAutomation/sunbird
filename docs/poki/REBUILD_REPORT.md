@@ -588,3 +588,47 @@ Two things the isolation work exposed, both worth remembering:
   (no `checks: write`), so `rust.yml` now grants `checks: write` **and** emits
   the diff as workflow annotations — the path that actually came back over the
   API and let the last two fixes land.
+
+---
+
+## 15. Player lookup that is real on *every* edition
+
+Round 5 made the Pilot Lookup panel honest: a code either resolves to a real
+pilot from the social service, or the panel says why it cannot. That left one
+edition stuck on "why it cannot" — the **Poki build has no self-hosted service
+at all**, so on the platform the game is actually judged by, every code
+answered "lookup needs the online service, which this build does not have".
+
+AUDS closes that gap, and it is the use case the docs name first
+("levels, leaderboards, even non-real-time multiplayer"). `src/game/PilotDirectory.ts`
+turns the store into a **public pilot directory**:
+
+* **One record per code.** `publishPilot()` writes `{code, name, bestDistance,
+  skin, at, lookup-count}` under `sb:pilot:v1` with `putSingleton`, so the
+  write secret stays on the device and a later publish *updates* the pilot's
+  record instead of leaving duplicates behind the same code.
+* **Lookup is code-only.** `lookupDirectoryPilot()` asks
+  `GET …/sb:pilot:v1?q=code:SUN-9F3K2A&limit=1&includedata` — no name search,
+  no browse, no "players near you" list. That mirrors the privacy contract the
+  self-hosted service documents (`IdentityService.byCode`: "the ONLY
+  third-party search surface").
+* **A hit counts itself** through the public `POST …/_increment?key=lookup-count`
+  endpoint (no secret, best-effort — the card never waits on a counter).
+* **Honest outcomes only.** A code nobody published is `unknown` ("No pilot has
+  published the code …"), a build without the store is `unavailable`, and a
+  malformed code never leaves the device. The record carries *when it was last
+  updated*, never a presence claim: storage is not presence.
+* **Hostile payloads are contained**: names get control characters stripped and
+  clamp to 14 chars, marks to 500 km, counts to sane integers, and records
+  without a valid `SUN-XXXXXX` code are rejected outright.
+
+Wiring: `SquadClient` publishes on refresh (autonomous *and* live paths), the
+game hands over the numbers only it knows (`setPublishStats({bestDistance,
+skin})` on boot and at the results screen), and `lookupPilot()` walks
+self-hosted service → platform directory → honest "unavailable", in that order.
+
+Tests: `src/game/__tests__/pilot-directory.test.ts` (11) — code normalisation
+and rejection, junk/oversized records, scalar-only AUDS values, the exact query
+shape, the self-counting lookup, unknown codes, missing-client honesty,
+one-record-per-code publishing with the secret retained on the device, and a
+publish that refuses an invalid code without touching the network.

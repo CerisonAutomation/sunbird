@@ -41,7 +41,8 @@ export const FOREIGN_MARKERS = {
 };
 
 /**
- * Markers that must not appear in ANY portal edition.
+ * Markers that must not appear in ANY portal edition: chat (Poki REQ-31) and
+ * the self-hosted backend.
  *
  * Chat (Poki REQ-31: "no chat in multiplayer product surfaces — emotes are the
  * recommended alternative"). The club chat surface is a direct-build feature:
