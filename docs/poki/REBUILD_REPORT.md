@@ -733,3 +733,64 @@ bars, refs used by disclosure helpers) — warnings are printed, not fatal.
 | `pnpm pvp:check` | **4/4**: protocol smoke · live two-client PvP · pilot directory · public room list (13 live checks) |
 | `pnpm audit:ui` | passed — 0 dead buttons, 0 null refs, 0 unlabelled controls |
 | `pnpm isolation:check` · `pnpm build:portals` · `pnpm verify:portals` | passed — the three editions stay their own way |
+
+---
+
+## 17. Poki PvP, proven on the transport Poki players actually get
+
+The Poki edition has no room server: multiplayer is WebRTC P2P over
+`@poki/netlib`. Everything below is exercised by
+`src/game/__tests__/poki-pvp.test.ts` (15 tests) driving **two real clients**
+through an in-process stand-in for the signaller, whose behaviour was read out
+of the shipped `netlib` dist rather than guessed: the socket connects eagerly and
+emits `ready` on the server's welcome packet, `list()` returns the public lobby
+rows, `create()`/`join()` connect you to the peers already inside, and
+`setLobbySettings()` merges into the row everyone else's `list()` sees.
+
+**Writing that harness found four real defects — all fixed:**
+
+1. **Infinite hello ping-pong.** Both peers answered *every* hello, and a hello
+   reply is a hello, so two pilots in one room traded greetings forever: a
+   permanent 100 %-CPU loop on the datachannel (the stand-in reproduced it as an
+   out-of-memory crash). Each peer now answers the *first* hello it receives from
+   a peer and only that one; later hellos are identity updates.
+2. **The "different room, different course" event never fired.** `onLobby`
+   adopts the room's seed before `join()` resolves, so the old
+   `incoming !== prevSeed` comparison was always false — a guest quick-matching
+   into a room running another circuit never got the welcome event the game uses
+   to switch course/format (and never told the player). The comparison now uses
+   the seed we *asked for*.
+3. **Finish places were never recorded.** The P2P roster hard-coded
+   `place: 0`, so every rival's position stayed blank in the room's own roster
+   (the WebSocket transport reports real ones). The host's assignment is now kept
+   on the track and broadcast places are stored on receipt.
+4. **First finisher got P2.** The host's counter added an extra `+1` ("because
+   host also counts"), so when a guest crossed the line first they were P2 — and
+   the host, finishing later, took P2 as well. Two pilots, nobody P1. The next
+   finisher now takes the next place, whoever they are.
+
+**What the tests pin, in plain terms:**
+
+| Behaviour | Assertion |
+| --- | --- |
+| Quick match | the first pilot creates one public lobby (seed, `sunbird-race` mode, `phase: lobby`) |
+| No fragmentation | a second pilot with a different local seed joins *that* lobby, and adopts its course with a welcome event |
+| Real names | both rosters carry the other pilot's real name — never `Pilot` |
+| Invite by code | connecting with a room code joins that lobby and takes the room's seed |
+| Ready-up | the host broadcasts the authoritative start; both clients enter `racing` at the same instant |
+| Lone host | starts immediately instead of waiting for pilots who will never come |
+| Finish order | guest-first ⇒ P1/P2 the right way round on **both** clients; host-first likewise |
+| Flight state | 15 Hz snapshots arrive on the unreliable channel and interpolate into `poll()` |
+| Lobby phase | the host publishes `racing` so the menu never advertises a race in progress as open — and a guest never overwrites the host's entry |
+| Room list | real seats/phase/joinability from the signaller; a full lobby is closed; an unreachable signaller fails loudly (no hang) and the next attempt reconnects |
+| No WebRTC | the client degrades to the honest local flock instead of a dead lobby |
+
+The browse connection that powers the menu's live list is now closed when the
+search ends, is cancelled, or takes the AI route (`closeLobbyBrowser`), so a
+lobby screen does not leave a signalling socket open behind it.
+
+**Verification for this round:** `npx vitest run` **1127 passed** / 8 skipped
+(88 files) · `pnpm test:server` 19 · `pnpm pvp:check` 4/4 ·
+`pnpm poki:preflight` green (UI audit · portals · isolation · zips · upload ·
+thumbnail · compliance) · artifact carries the P2P signalling URL, AUDS and the
+SDK, and nothing else's.

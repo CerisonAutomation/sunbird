@@ -5049,10 +5049,20 @@ export class Game {
     this.mmPhase = "searching";
     this.mmRooms = "";
     this.roomWatcher?.stop();
+    this.closeRoomBrowser();
     this.net?.sendReady(false);
     this.disconnectRace();
     this.hud.setMatchmaking(false, 0, this.roomSize, 0);
     this.bump();
+  }
+
+  /** Releases the P2P browse connection (Poki only; a WS build has nothing to
+   *  release). Called when a search ends or is cancelled. */
+  private closeRoomBrowser(): void {
+    if (!POKI_MULTIPLAYER) return;
+    void import("./PokiNetlib").then((m) => m.closeLobbyBrowser()).catch(() => {
+      /* the connection is best-effort */
+    });
   }
 
   /** True while we asked the transport for a public room and have not been
@@ -5101,6 +5111,7 @@ export class Game {
       this.mmOpts = null;
       this.mmDeadline = 0;
       this.roomWatcher?.stop();
+      this.closeRoomBrowser();
       this.hud.setMatchmaking(false, 0, this.roomSize, 0);
       return;
     }
@@ -5144,6 +5155,7 @@ export class Game {
     this.mmDeadline = 0;
     this.mmPhase = "searching";
     this.roomWatcher?.stop();
+    this.closeRoomBrowser();
     this.hud.setMatchmaking(false, 0, this.roomSize, 0);
     this.hud.toast("Racing the AI flock — offline practice", "info");
     this.launchMatch(opts, true);
@@ -5373,6 +5385,8 @@ export class Game {
             this.mmOpts = null;
             this.mmDeadline = 0;
             this.hud.setMatchmaking(false, this.liveCount(), this.roomSize, 0);
+            this.roomWatcher?.stop();
+            this.closeRoomBrowser();
             // Adopt the host/server seed as authoritative. When we joined a
             // friend's private code this is the host's format+course; without
             // parsing it the guest would rebuild Emerald/Sprint and fly the
