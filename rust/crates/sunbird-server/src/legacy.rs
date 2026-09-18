@@ -78,6 +78,8 @@ enum In {
     Ready { ready: bool },
     #[serde(rename = "finish")]
     Finish { time: f64, d: f64 },
+    #[serde(rename = "leave")]
+    Leave,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -264,6 +266,13 @@ impl LegacyRooms {
 
     /// Dispatch an inbound legacy frame against a seated pilot.
     fn on_message(&self, code: &str, id: &str, msg: In) {
+        // An explicit `leave` is not a drop: free the seat now so peers see the
+        // room shrink, exactly like the TypeScript gateway. Handled before the
+        // registry lock is taken because `leave` acquires it itself.
+        if let In::Leave = &msg {
+            self.leave(code, id);
+            return;
+        }
         let mut reg = self.inner.write();
         let Some(room) = reg.rooms.get_mut(code) else {
             return;
@@ -323,6 +332,8 @@ impl LegacyRooms {
                 maybe_start(room);
             }
             In::Finish { time, d } => finish(room, id, time, d),
+            // Handled at the top of this function, before the registry lock.
+            In::Leave => {}
         }
     }
 
@@ -705,6 +716,54 @@ mod tests {
         assert!(
             b > a,
             "epoch_seconds_ms should advance with sub-second precision"
+        );
+    }
+
+    #[test]
+    fn explicit_leave_frees_the_seat_and_tells_the_room() {
+        let rooms = LegacyRooms::new();
+        let (tx_a, _rx_a) = mpsc::channel(16);
+        let (tx_b, mut rx_b) = mpsc::channel(16);
+        let a = Identity {
+            id: "p1".into(),
+            name: "A".into(),
+            skin: "s".into(),
+            hue: 0.0,
+            code: "ROOM".into(),
+            seed: "2026-09-11".into(),
+        };
+        let b = Identity {
+            id: "p2".into(),
+            name: "B".into(),
+            skin: "s".into(),
+            hue: 0.0,
+            code: "ROOM".into(),
+            seed: "2026-09-11".into(),
+        };
+        let code = rooms.join(&a, tx_a).unwrap();
+        rooms.join(&b, tx_b).unwrap();
+
+        rooms.on_message(&code, &a.id, In::Leave);
+
+        // The remaining pilot is told about it without waiting for a socket close.
+        let mut frames: Vec<String> = Vec::new();
+        while let Ok(Outbox::Frame(text)) = rx_b.try_recv() {
+            frames.push(text);
+        }
+        let mut told = false;
+        for text in &frames {
+            if text.contains("left") && text.contains("p1") {
+                told = true;
+            }
+        }
+        assert!(told, "peers are told about the leave, got {frames:?}");
+
+        let reg = rooms.inner.read();
+        let room = reg.rooms.get(&code).expect("room outlives its seats");
+        assert!(!room.pilots.contains_key("p1"), "the leaver's seat is free");
+        assert!(
+            room.pilots.contains_key("p2"),
+            "the other pilot keeps their seat"
         );
     }
 

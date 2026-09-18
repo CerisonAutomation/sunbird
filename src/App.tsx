@@ -3,6 +3,7 @@ import { Component, type ErrorInfo, type ReactNode, useEffect, useRef, useState 
 // Three.js) into the initial bundle. The runtime module is fetched by the
 // dynamic import inside the mount effect, behind the inline boot loader.
 import type { Game } from "./game/Game";
+import { bootStage } from "./game/BootProgress";
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
   state = { error: null as string | null };
@@ -67,7 +68,7 @@ export default function App() {
   // into this container once the SDK is ready. Rendered only when a banner
   // placement id is configured (portal builds), so direct/PWA builds carry
   // no extra node.
-  const bannerId = import.meta.env.VITE_CRAZY_BANNER_ID ?? "";
+  const bannerId = import.meta.env.VITE_PORTAL_BANNER_ID ?? "";
 
   useEffect(() => {
     const el = ref.current;
@@ -83,9 +84,14 @@ export default function App() {
       try {
         const { Game: GameCtor } = await import("./game/Game");
         if (cancelled) return;
+        // EA-04/EA-05: the code chunk is the single most expensive thing the
+        // player waits for, so the boot bar reports it the moment it lands.
+        bootStage("chunk");
         game = new GameCtor(el);
         readyFrame = requestAnimationFrame(() => {
           if (cancelled) return;
+          // First flyable frame: the shell comes down and the bar is complete.
+          bootStage("ready");
           document.getElementById("boot-shell")?.remove();
           window.dispatchEvent(new Event("sunbird-ready"));
         });

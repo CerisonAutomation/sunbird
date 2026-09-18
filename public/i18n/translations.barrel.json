@@ -17,7 +17,9 @@
         "ar": "Sunbird",
         "zh-CN": "太陽鳥",
         "ja": "サンバード",
-        "mt": "Sunbird"
+        "mt": "Sunbird",
+        "tr": "Sunbird",
+        "ru": "Sunbird"
       }
     },
     "hud.menu.play": {
@@ -37,7 +39,9 @@
         "ar": "ابدأ السباق",
         "zh-CN": "開始比賽",
         "ja": "レーススタート",
-        "mt": "Ilgħab It-Tluq"
+        "mt": "Ilgħab It-Tluq",
+        "tr": "Yarışı Oyna",
+        "ru": "Играть гонку"
       }
     },
     "hud.menu.pvp": {
@@ -57,7 +61,9 @@
         "ar": "منافسة PvP",
         "zh-CN": "PvP 競技",
         "ja": "PvP ライバル戦",
-        "mt": "Rivalità PvP"
+        "mt": "Rivalità PvP",
+        "tr": "PvP Rekabeti",
+        "ru": "PvP-соперничество"
       }
     },
     "hud.menu.leaderboard": {
@@ -77,7 +83,9 @@
         "ar": "لوحة الصدارة والجوائز",
         "zh-CN": "排行榜與獎勵",
         "ja": "リーダーボードと賞品",
-        "mt": "Klassifiki u Premji"
+        "mt": "Klassifiki u Premji",
+        "tr": "Liderlik Tabloları ve Ödüller",
+        "ru": "Таблицы лидеров и призы"
       }
     },
     "hud.menu.settings": {
@@ -97,7 +105,9 @@
         "ar": "الإعدادات",
         "zh-CN": "設置",
         "ja": "設定",
-        "mt": "Settings"
+        "mt": "Settings",
+        "tr": "Ayarlar",
+        "ru": "Настройки"
       }
     },
     "hud.menu.account": {
@@ -117,7 +127,9 @@
         "ar": "الحساب",
         "zh-CN": "帳戶",
         "ja": "アカウント",
-        "mt": "Kont"
+        "mt": "Kont",
+        "tr": "Hesap",
+        "ru": "Аккаунт"
       }
     },
     "hud.pilot.name": {
@@ -137,7 +149,9 @@
         "ar": "اسم الطيار",
         "zh-CN": "飛行員名稱",
         "ja": "パイロット名",
-        "mt": "Isem il-Pilota"
+        "mt": "Isem il-Pilota",
+        "tr": "Pilot Adı",
+        "ru": "Имя пилота"
       }
     },
     "hud.pilot.autogenerate": {
@@ -157,7 +171,9 @@
         "ar": "توليد تلقائي 🎲",
         "zh-CN": "自動生成 🎲",
         "ja": "自動生成 🎲",
-        "mt": "Ġenera Awtomatikament 🎲"
+        "mt": "Ġenera Awtomatikament 🎲",
+        "tr": "Otomatik oluştur 🎲",
+        "ru": "Сгенерировать 🎲"
       }
     },
     "pvp.division.fledgling": {
@@ -177,7 +193,9 @@
         "ar": "مبتدئ",
         "zh-CN": "雛鳥",
         "ja": "ひよこ",
-        "mt": "Mubtddi"
+        "mt": "Mubtddi",
+        "tr": "Yeni Uçucu",
+        "ru": "Птенец"
       }
     },
     "pvp.division.glider": {
@@ -197,7 +215,9 @@
         "ar": "تحليق",
         "zh-CN": "滑翔者",
         "ja": "グライダー",
-        "mt": "Gliżatur"
+        "mt": "Gliżatur",
+        "tr": "Süzülücü",
+        "ru": "Планер"
       }
     },
     "pvp.division.racer": {
@@ -217,7 +237,9 @@
         "ar": "متسابق السماء",
         "zh-CN": "天空競速者",
         "ja": "スカイレーサー",
-        "mt": "Racer tas-Sema"
+        "mt": "Racer tas-Sema",
+        "tr": "Gökyüzü Yarışçısı",
+        "ru": "Небесный гонщик"
       }
     },
     "pvp.division.ace": {
@@ -237,7 +259,9 @@
         "ar": "بطل السماء",
         "zh-CN": "王牌飛行員",
         "ja": "スカイエース",
-        "mt": "As tas-Sema"
+        "mt": "As tas-Sema",
+        "tr": "Gökyüzü Ası",
+        "ru": "Небесный ас"
       }
     },
     "pvp.division.legend": {
@@ -257,7 +281,9 @@
         "ar": "أسطورة طائر الشمس",
         "zh-CN": "太陽鳥傳奇",
         "ja": "サンバードレジェンド",
-        "mt": "Legġenda Sunbird"
+        "mt": "Legġenda Sunbird",
+        "tr": "Sunbird Efsanesi",
+        "ru": "Легенда Sunbird"
       }
     },
     "pvp.draft.boost": {
@@ -279,7 +305,9 @@
         "ar": "تيار السحب +{{boost}}% سرعة!",
         "zh-CN": "尾流加速 +{{boost}}% 速度！",
         "ja": "スリップストリーム +{{boost}}% スピード！",
-        "mt": "DRAFFT FIS-SIA +{{boost}}% VELOĊITÀ!"
+        "mt": "DRAFFT FIS-SIA +{{boost}}% VELOĊITÀ!",
+        "tr": "SLIPSTREAM RÜZGÂRI +{{boost}}% HIZ!",
+        "ru": "СПУТНЫЙ ПОТОК +{{boost}}% К СКОРОСТИ!"
       }
     },
     "pvp.overtake.notice": {
@@ -302,7 +330,9 @@
         "ar": "تجاوزت {{name}} للمركز #{{place}}!",
         "zh-CN": "超越了 {{name}} 升至第 {{place}} 名！",
         "ja": "{{name}} を抜いて #{{place}} 位に！",
-        "mt": "Għaddejt lil {{name}} għal rebaħ #{{place}}!"
+        "mt": "Għaddejt lil {{name}} għal rebaħ #{{place}}!",
+        "tr": "{{name}} geçildi — sıra #{{place}}!",
+        "ru": "Обгон: {{name}} — место #{{place}}!"
       }
     },
     "hud.leaderboard.claim": {
@@ -322,7 +352,9 @@
         "ar": "استلام جائزة الترتيب",
         "zh-CN": "領取排名獎勵",
         "ja": "ランク賞品を受け取る",
-        "mt": "Ikseb il-Premju tal-Klassi"
+        "mt": "Ikseb il-Premju tal-Klassi",
+        "tr": "Sıralama Ödülünü Al",
+        "ru": "Забрать приз за ранг"
       }
     },
     "hud.prizes.title": {
@@ -342,7 +374,9 @@
         "ar": "جوائز بطولة لوحة الصدارة",
         "zh-CN": "排行榜錦標賽獎勵",
         "ja": "リーダーボード大会賞品",
-        "mt": "Premji tat-Tornament tal-Klassifika"
+        "mt": "Premji tat-Tornament tal-Klassifika",
+        "tr": "Liderlik Turnuva Ödülleri",
+        "ru": "Призы турнира таблицы лидеров"
       }
     },
     "onboarding.holdToDive": {
@@ -362,7 +396,9 @@
         "ar": "اضغط مع الاستمرار للغوص أسفل التل",
         "zh-CN": "按住俯冲下山",
         "ja": "長押しで丘を急降下",
-        "mt": "ŻOMM meħud biex tinżel l-għoljiet"
+        "mt": "ŻOMM meħud biex tinżel l-għoljiet",
+        "tr": "TEPEDEN DALIŞ İÇİN BASILI TUT",
+        "ru": "УДЕРЖИВАЙ, ЧТОБЫ СПИКИРОВАТЬ С ХОЛМА"
       }
     },
     "onboarding.releaseToLaunch": {
@@ -382,7 +418,9 @@
         "ar": "اترك عند القمة للانطلاق",
         "zh-CN": "松开冲向高空",
         "ja": "頂上で離して大ジャンプ",
-        "mt": "ITLAQ mill-quċċata biex ttir"
+        "mt": "ITLAQ mill-quċċata biex ttir",
+        "tr": "FIRLAMAK İÇİN ZİRVEDE BIRAK",
+        "ru": "ОТПУСТИ НА ВЕРШИНЕ, ЧТОБЫ ВЗЛЕТЕТЬ"
       }
     },
     "onboarding.soarInAir": {
@@ -402,7 +440,9 @@
         "ar": "حلّق — ابقَ في الهواء!",
         "zh-CN": "翱翔 — 保持飞行！",
         "ja": "滑空 — 空中に留まろう！",
-        "mt": "ITROQ — ibqa fl-arja!"
+        "mt": "ITROQ — ibqa fl-arja!",
+        "tr": "BIRAK VE SÜZÜL — HAVADA KAL!",
+        "ru": "ОТПУСТИ И ПАРИ — ДЕРЖИСЬ В ВОЗДУХЕ!"
       }
     },
     "onboarding.launchSub": {
@@ -422,7 +462,9 @@
         "ar": "اضغط للغوص · اترك للتحليق",
         "zh-CN": "按住俯冲 · 松开滑翔",
         "ja": "長押しで急降下 · 離して滑空",
-        "mt": "Żomm biex tinżel · itlaq biex ttir"
+        "mt": "Żomm biex tinżel · itlaq biex ttir",
+        "tr": "Dalmak için basılı tut · süzülmek için bırak",
+        "ru": "Удерживай — пикировать · отпусти — парить"
       }
     },
     "onboarding.skyIsYours": {
@@ -442,7 +484,9 @@
         "ar": "السماء ملكك",
         "zh-CN": "天空属于你",
         "ja": "大空はあなたのもの",
-        "mt": "IS-SEMA HU TIEGĦEK"
+        "mt": "IS-SEMA HU TIEGĦEK",
+        "tr": "GÖKYÜZÜ SENİN",
+        "ru": "НЕБО ТВОЁ"
       }
     },
     "onboarding.buildSpeed": {
@@ -462,7 +506,9 @@
         "ar": "اضغط · زِد السرعة في المنحدر",
         "zh-CN": "按住 · 俯冲下坡加速",
         "ja": "長押し · 急坂で加速",
-        "mt": "ŻOMM · żid il-veloċità fl-inżul"
+        "mt": "ŻOMM · żid il-veloċità fl-inżul",
+        "tr": "BASILI TUT · BÜYÜK İNİŞTE HIZLAN",
+        "ru": "УДЕРЖИВАЙ · РАЗГОНЯЙСЯ НА СПУСКЕ"
       }
     },
     "onboarding.rideRamp": {
@@ -482,7 +528,9 @@
         "ar": "اترك · استغل المنحدر للانطلاق",
         "zh-CN": "松开 · 利用坡道飞翔",
         "ja": "離して · 坂で飛躍",
-        "mt": "ITLAQ · uża r-rampa biex ttir"
+        "mt": "ITLAQ · uża r-rampa biex ttir",
+        "tr": "BIRAK · RAMPAYI KULLAN VE FIRLA",
+        "ru": "ОТПУСТИ · ПРОЙДИ ПО ТРАМПЛИНУ"
       }
     },
     "onboarding.catchDownslope": {
@@ -502,7 +550,9 @@
         "ar": "اضغط · استغل المنحدر",
         "zh-CN": "按住 · 顺着下坡着陆",
         "ja": "長押し · 下り坂に着地",
-        "mt": "ŻOMM · uża l-inżul"
+        "mt": "ŻOMM · uża l-inżul",
+        "tr": "BASILI TUT · İNİŞ EĞİMİNİ YAKALA",
+        "ru": "УДЕРЖИВАЙ · ПОЙМАЙ СКЛОН"
       }
     },
     "onboarding.softenLanding": {
@@ -522,7 +572,9 @@
         "ar": "اترك · لتهبيط سلس",
         "zh-CN": "松开 · 缓冲着陆",
         "ja": "離して · 着陸を和らげる",
-        "mt": "ITLAQ · tnaqqas l-impatt tal-inżul"
+        "mt": "ITLAQ · tnaqqas l-impatt tal-inżul",
+        "tr": "BIRAK · İNİŞİ YUMUŞAT",
+        "ru": "ОТПУСТИ · СМЯГЧИ ПОСАДКУ"
       }
     },
     "onboarding.holdToDescend": {
@@ -542,7 +594,9 @@
         "ar": "اضغط للهبوط · ابحث عن منحدر",
         "zh-CN": "按住下降 · 寻找下坡着陆",
         "ja": "長押しで下降 · 下り坂を探そう",
-        "mt": "ŻOMM biex tinżel · fittex għoljiet"
+        "mt": "ŻOMM biex tinżel · fittex għoljiet",
+        "tr": "ALÇALMAK İÇİN BASILI TUT · İNİŞ EĞİMİ ARA",
+        "ru": "УДЕРЖИВАЙ, ЧТОБЫ СНИЖАТЬСЯ · ИЩИ СКЛОН ДЛЯ ПОСАДКИ"
       }
     },
     "hud.menu.chooseAdventure": {
@@ -562,7 +616,9 @@
         "ar": "اختر مغامرتك",
         "zh-CN": "选择你的冒险",
         "ja": "冒険を選ぼう",
-        "mt": "Agħżel l-avventura tiegħek"
+        "mt": "Agħżel l-avventura tiegħek",
+        "tr": "Macaranı seç",
+        "ru": "Выбери приключение"
       }
     },
     "hud.menu.makeItYours": {
@@ -582,7 +638,9 @@
         "ar": "اجعلها ملكك",
         "zh-CN": "打造个性定制",
         "ja": "自分好みにカスタマイズ",
-        "mt": "Kustomizza kif trid"
+        "mt": "Kustomizza kif trid",
+        "tr": "Kendine göre yap",
+        "ru": "Сделай своим"
       }
     },
     "hud.menu.everyFlightCounts": {
@@ -602,7 +660,9 @@
         "ar": "كل رحلة تحسب",
         "zh-CN": "每次飞行都有意义",
         "ja": "すべてのフライトが大切",
-        "mt": "Kull tluq huwa importanti"
+        "mt": "Kull tluq huwa importanti",
+        "tr": "Her uçuş önemli",
+        "ru": "Каждый полёт важен"
       }
     },
     "hud.menu.personalBest": {
@@ -622,7 +682,9 @@
         "ar": "أفضل رقم شخصي",
         "zh-CN": "个人最佳记录",
         "ja": "自己ベスト",
-        "mt": "L-aħjar rekord tiegħek"
+        "mt": "L-aħjar rekord tiegħek",
+        "tr": "Kişisel rekor",
+        "ru": "Личный рекорд"
       }
     },
     "hud.menu.coinBalance": {
@@ -642,7 +704,9 @@
         "ar": "رصيد العملات",
         "zh-CN": "硬币余额",
         "ja": "コイン残高",
-        "mt": "bilanċ tal-muniti"
+        "mt": "bilanċ tal-muniti",
+        "tr": "para bakiyesi",
+        "ru": "баланс монет"
       }
     },
     "hud.stat.distance": {
@@ -662,7 +726,9 @@
         "ar": "المسافة",
         "zh-CN": "距离",
         "ja": "距離",
-        "mt": "Distanza"
+        "mt": "Distanza",
+        "tr": "Mesafe",
+        "ru": "Дистанция"
       }
     },
     "hud.stat.coins": {
@@ -682,7 +748,9 @@
         "ar": "العملات",
         "zh-CN": "金币",
         "ja": "コイン",
-        "mt": "Muniti"
+        "mt": "Muniti",
+        "tr": "Para",
+        "ru": "Монеты"
       }
     },
     "hud.stat.daylight": {
@@ -702,7 +770,9 @@
         "ar": "ضوء النهار",
         "zh-CN": "日光",
         "ja": "日光",
-        "mt": "dawl tal-jum"
+        "mt": "dawl tal-jum",
+        "tr": "gün ışığı",
+        "ru": "дневной свет"
       }
     },
     "hud.progress.title": {
@@ -722,7 +792,9 @@
         "ar": "تقدمك",
         "zh-CN": "你的进度",
         "ja": "あなたの進捗",
-        "mt": "Il-progress tiegħek"
+        "mt": "Il-progress tiegħek",
+        "tr": "İlerlemen",
+        "ru": "Твой прогресс"
       }
     },
     "hud.settings.title": {
@@ -742,7 +814,9 @@
         "ar": "الإعدادات",
         "zh-CN": "设置",
         "ja": "設定",
-        "mt": "Settings"
+        "mt": "Settings",
+        "tr": "Ayarlar",
+        "ru": "Настройки"
       }
     },
     "hud.settings.sound": {
@@ -762,7 +836,9 @@
         "ar": "المؤثرات الصوتية",
         "zh-CN": "音效",
         "ja": "効果音",
-        "mt": "Effetti tal-ħoss"
+        "mt": "Effetti tal-ħoss",
+        "tr": "Ses Efektleri",
+        "ru": "Звуковые эффекты"
       }
     },
     "hud.settings.music": {
@@ -782,7 +858,9 @@
         "ar": "مستوى الموسيقى",
         "zh-CN": "音乐音量",
         "ja": "BGM音量",
-        "mt": "Volum tal-mużika"
+        "mt": "Volum tal-mużika",
+        "tr": "Müzik Sesi",
+        "ru": "Громкость музыки"
       }
     },
     "hud.settings.reduceMotion": {
@@ -802,7 +880,9 @@
         "ar": "تقليل الحركة",
         "zh-CN": "减少动作",
         "ja": "視覚効果を軽減",
-        "mt": "Naqqas il-moviment"
+        "mt": "Naqqas il-moviment",
+        "tr": "Hareketi Azalt",
+        "ru": "Меньше движения"
       }
     },
     "hud.account.title": {
@@ -822,7 +902,9 @@
         "ar": "حساب الطيار",
         "zh-CN": "飞行员账户",
         "ja": "パイロットアカウント",
-        "mt": "Kont tal-Pilota"
+        "mt": "Kont tal-Pilota",
+        "tr": "Pilot Hesabı",
+        "ru": "Аккаунт пилота"
       }
     },
     "hud.gameover.title": {
@@ -842,7 +924,9 @@
         "ar": "اكتملت الرحلة",
         "zh-CN": "飞行结束",
         "ja": "フライト完了",
-        "mt": "It-Tluq Lest"
+        "mt": "It-Tluq Lest",
+        "tr": "Uçuş Tamamlandı",
+        "ru": "Полёт завершён"
       }
     },
     "hud.gameover.flyAgain": {
@@ -862,7 +946,9 @@
         "ar": "طِر مجدداً",
         "zh-CN": "再次飞行",
         "ja": "もう一度飛ぶ",
-        "mt": "Ttir mill-ġdid"
+        "mt": "Ttir mill-ġdid",
+        "tr": "Tekrar Uç",
+        "ru": "Лететь снова"
       }
     },
     "hud.gameover.mainMenu": {
@@ -882,7 +968,9 @@
         "ar": "القائمة الرئيسية",
         "zh-CN": "主菜单",
         "ja": "メインメニュー",
-        "mt": "Menu Prinċipali"
+        "mt": "Menu Prinċipali",
+        "tr": "Ana Menü",
+        "ru": "Главное меню"
       }
     }
   },

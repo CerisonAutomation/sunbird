@@ -71,3 +71,4 @@ dist-dev/
 poki-upload/
 sunbird-poki.zip
 scripts-tmp/
+*.tsbuildinfo

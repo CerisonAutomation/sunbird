@@ -106,6 +106,18 @@ export type InvitePermission = { canInvite: boolean; reason: string };
 
 export type RoomStatus = "lobby" | "racing" | "finished" | "canceled";
 
+/** Public room row — safe for any visitor, carries no pilot identity. */
+export type PublicRoom = {
+  code: string;
+  seed: string;
+  status: RoomStatus;
+  capacity: number;
+  seated: number;
+  host: string;
+  joinable: boolean;
+  ageSeconds: number;
+};
+
 export type RoomView = {
   roomId: string;
   code: string;

@@ -133,6 +133,13 @@ export class RaceSession {
   private seats = new Map<string, RaceSeat>();
   private order: string[] = [];
   private finishOrder: string[] = [];
+  /**
+   * The next finish place to hand out. Monotonic on purpose: `finishOrder` is
+   * pruned when a seat leaves, and places derived from its length could then be
+   * handed out twice in one race (two pilots both finishing "P1"). The Rust
+   * service never reuses a place; this keeps the two servers agreeing.
+   */
+  private nextPlace = 1;
   private sink: Sink | null = null;
   private timer: NodeJS.Timeout | null = null;
   private graceTimer: NodeJS.Timeout | null = null;
@@ -304,7 +311,7 @@ export class RaceSession {
     if (this.status === "racing" && !seat.finish) {
       seat.dnf = true;
       seat.finish = {
-        place: this.finishOrder.length + 1,
+        place: this.nextPlace++,
         timeMs: this.opts.now() - this.startAtMs,
         distance: Math.round(seat.state?.distance ?? 0),
         score: 0,
@@ -444,7 +451,7 @@ export class RaceSession {
     // (server clock wins) but never poisons other pilots.
     void claimedTimeMs;
     seat.finish = {
-      place: this.finishOrder.length + 1,
+      place: this.nextPlace++,
       timeMs,
       distance: Math.round(serverDistance),
       score: serverScoreFor(serverDistance),
@@ -478,7 +485,7 @@ export class RaceSession {
           // the way out.
           seat.dnf = true;
           seat.finish = {
-            place: this.finishOrder.length + 1,
+            place: this.nextPlace++,
             timeMs: now - this.startAtMs,
             distance: Math.round(seat.state?.distance ?? 0),
             score: 0,
@@ -498,7 +505,7 @@ export class RaceSession {
         for (const seat of dnfOrder) {
           seat.dnf = true;
           seat.finish = {
-            place: this.finishOrder.length + 1,
+            place: this.nextPlace++,
             timeMs: now - this.startAtMs,
             distance: Math.round(seat.state?.distance ?? 0),
             score: 0,
@@ -535,6 +542,9 @@ export class RaceSession {
   }
 
   private beginCountdown(): void {
+    // One race, one numbering: no place survives into the next start.
+    this.nextPlace = 1;
+    this.finishOrder = [];
     this.startAtMs = this.opts.now() + this.opts.startCountdownMs;
     // Issue short-lived match tokens the moment the race is committed.
     for (const seat of this.seats.values()) {

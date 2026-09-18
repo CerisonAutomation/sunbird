@@ -16,6 +16,7 @@
  * scripts/verify-portal.mjs); only the build target's URL is ever injected.
  */
 import { LocalAdapter } from "./local";
+import { runLoadingNet } from "./net";
 // Portal adapters are statically imported below but routed through the
 // compile-time TARGET constant. The Vite resolve-alias shim (see
 // vite.config.ts) replaces non-target adapters with `./_shim.ts`, whose
@@ -181,7 +182,7 @@ export interface PlatformAdapter {
 // (which made the "crazygames" alias look unreachable) while still being a
 // compile-time constant for minification.
 const TARGET = (import.meta.env.VITE_PORTAL_TARGET ?? "none") as string;
-const CRAZY_BANNER_ID = import.meta.env.VITE_CRAZY_BANNER_ID ?? "";
+const PORTAL_BANNER_ID = import.meta.env.VITE_PORTAL_BANNER_ID ?? "";
 // URL constants are gated to the matching build target via a compile-time
 // constant so Rollup's dead-code elimination strips them from non-target
 // bundles entirely — a non-Poki build never contains the Poki SDK URL
@@ -228,26 +229,48 @@ export function preloadPortalSdk(): void {
     // Hard safety net: if the Game never mounts (WebGL crash, sandbox, a
     // misbehaving browser) and therefore never calls adapter.loadingFinished(),
     // release the portal's loading screen ourselves after a generous timeout.
-    // A healthy build clears this the moment the first adapter fires finish.
+    // The release is idempotent with the adapter's own finish, so a healthy
+    // boot is not signalled twice.
     scheduleFailsafeFinish();
   });
 }
 
+/** The newest adapter (see `initPlatform`). The entry-point failsafe routes
+ *  through it so a late safety net can never re-send a loading phase that the
+ *  adapter — the one-shot owner of `gameLoadingFinished` — already sent. */
+let activeAdapter: PlatformAdapter | null = null;
+
 /** Releases the portal loading screen as a last resort, so a crash or
  *  headless-sandbox WebGL failure can never leave the portal stuck on its
- *  loading splash. One-shot, never fires on a healthy boot. */
+ *  loading splash.
+ *
+ *  It is a NET, not a second signal: when an adapter exists the release goes
+ *  through it, and `PokiAdapter.loadingFinished()` is one-shot, so a healthy
+ *  boot is never signalled twice. (Sending the raw SDK global here — as this
+ *  used to — added a second `gameLoadingFinished` 1.5 s after window load on
+ *  every healthy Poki boot, which the Inspector flags as an invalid event
+ *  sequence. Caught by e2e/poki-artifact.spec.ts.)
+ *
+ *  The net body is portal specific and lives in the target adapter module
+ *  (see sdk/net.ts) — this file names no portal SDK, so no build can inherit
+ *  another portal's global, and there is no `TARGET` guard left for the
+ *  minifier to fail to fold. */
 let failsafeScheduled = false;
 function scheduleFailsafeFinish(): void {
   if (failsafeScheduled) return;
   failsafeScheduled = true;
   const release = (): void => {
-    try {
-      if (TARGET === "poki") {
-        const s = (window as unknown as { PokiSDK?: { gameLoadingFinished?: () => void; signalGameReady?: () => void } }).PokiSDK;
-        s?.gameLoadingFinished?.();
-        s?.signalGameReady?.();
-      }
-    } catch { /* ignore */ }
+    const adapter = activeAdapter;
+    if (adapter) {
+      // Preferred path: the adapter owns the phase markers and dedupes them.
+      adapter.loadingFinished();
+      adapter.signalGameReady();
+      return;
+    }
+    // No adapter exists at all — the Game never reached initPlatform (crash,
+    // CSP, headless WebGL failure). Nothing has been sent yet, so run the
+    // target's net, which is a no-op in builds that have no portal splash.
+    runLoadingNet();
   };
   // Prefer window.load (fires after all subresources), then cap with a timer.
   if (document.readyState === "complete") {
@@ -258,12 +281,12 @@ function scheduleFailsafeFinish(): void {
   }
 }
 
-export { CRAZY_BANNER_ID };
+export { PORTAL_BANNER_ID };
 
 /* ------------------------------------------------------------- SDK loading */
 
 let loadPromise: Promise<PlatformName> | null = null;
-let sdkBootPromise: Promise<{ name: PlatformName; crazyEnvironment: string | null }> | null = null;
+let sdkBootPromise: Promise<{ name: PlatformName; platformEnvironment: string | null }> | null = null;
 /**
  * Forwards portal settings/pause events to the newest adapter's events. SDK
  * listeners are singletons (registered once at boot), but Game instances come
@@ -363,14 +386,14 @@ function ensureSdk(): Promise<PlatformName> {
 }
 
 /** Boot the portal SDK once; adapters stay per-Game so callbacks are fresh after remounts. */
-function bootstrapSdk(): Promise<{ name: PlatformName; crazyEnvironment: string | null }> {
+function bootstrapSdk(): Promise<{ name: PlatformName; platformEnvironment: string | null }> {
   if (sdkBootPromise) return sdkBootPromise;
   // Hard cap: a hanging/blocked SDK script must never hold the game hostage.
-  const timeout = new Promise<{ name: PlatformName; crazyEnvironment: string | null }>((resolve) => {
-    window.setTimeout(() => resolve({ name: "none", crazyEnvironment: null }), SDK_LOAD_TIMEOUT_MS);
+  const timeout = new Promise<{ name: PlatformName; platformEnvironment: string | null }>((resolve) => {
+    window.setTimeout(() => resolve({ name: "none", platformEnvironment: null }), SDK_LOAD_TIMEOUT_MS);
   });
 
-  let boot: Promise<{ name: PlatformName; crazyEnvironment: string | null }>;
+  let boot: Promise<{ name: PlatformName; platformEnvironment: string | null }>;
   if (TARGET === "poki") {
     type PokiGlobal = {
       init?: () => Promise<void>;
@@ -380,7 +403,7 @@ function bootstrapSdk(): Promise<{ name: PlatformName; crazyEnvironment: string 
     };
     const getPoki = (): PokiGlobal | undefined => (window as unknown as { PokiSDK?: PokiGlobal }).PokiSDK;
     boot = ensureSdk().then(async (loaded) => {
-      if (loaded !== "poki") return { name: "none", crazyEnvironment: null };
+      if (loaded !== "poki") return { name: "none", platformEnvironment: null };
       try {
         if (import.meta.env.DEV) getPoki()?.setDebug?.(true);
         await getPoki()?.init?.();
@@ -393,7 +416,7 @@ function bootstrapSdk(): Promise<{ name: PlatformName; crazyEnvironment: string 
       // the score/altitude/distance chips. The 0,0 default has it in the
       // top-left which clashes with our HUD, so nudge it to a safer spot.
       try { getPoki()?.movePill?.(50, -4); } catch { /* cosmetic */ }
-      return { name: "poki", crazyEnvironment: null };
+      return { name: "poki", platformEnvironment: null };
     });
   } else if (TARGET === "crazy" || TARGET === "crazygames") {
     type CrazyGlobal = {
@@ -411,7 +434,7 @@ function bootstrapSdk(): Promise<{ name: PlatformName; crazyEnvironment: string 
     };
     const getCrazy = (): CrazyGlobal | undefined => (window as unknown as { CrazyGames?: CrazyGlobal }).CrazyGames;
     boot = ensureSdk().then(async (loaded) => {
-      if (loaded !== "crazy") return { name: "none", crazyEnvironment: null };
+      if (loaded !== "crazy") return { name: "none", platformEnvironment: null };
       try {
         const sdk = getCrazy()?.SDK;
         await sdk?.init?.();
@@ -428,13 +451,13 @@ function bootstrapSdk(): Promise<{ name: PlatformName; crazyEnvironment: string 
           game.onPause?.(() => portalEventSink?.onPause?.());
           game.onResume?.(() => portalEventSink?.onResume?.());
         }
-        return { name: "crazy", crazyEnvironment: environment };
+        return { name: "crazy", platformEnvironment: environment };
       } catch {
-        return { name: "none", crazyEnvironment: null };
+        return { name: "none", platformEnvironment: null };
       }
     });
   } else {
-    boot = Promise.resolve({ name: TARGET === "generic" ? "generic" : "none", crazyEnvironment: null });
+    boot = Promise.resolve({ name: TARGET === "generic" ? "generic" : "none", platformEnvironment: null });
   }
 
   sdkBootPromise = Promise.race([boot, timeout]);
@@ -466,18 +489,20 @@ export async function initPlatform(events: PlatformEvents): Promise<PlatformAdap
     await bootstrapSdk();
     adapter = new PokiAdapter(events);
   } else if (TARGET === "crazy" || TARGET === "crazygames") {
-    const { crazyEnvironment } = await bootstrapSdk();
+    const { platformEnvironment } = await bootstrapSdk();
     // Runtime fallback: if the SDK never loads (outside the Crazy portal)
     // use a local adapter so cloud saves still work. Gated behind the
     // compile-time "crazy" target so the global reference never appears
     // in other builds.
     type CGlobal = { SDK?: unknown };
     const cg = (window as unknown as { CrazyGames?: CGlobal }).CrazyGames;
-    if (crazyEnvironment === "disabled" || !cg?.SDK) {
-      return new LocalAdapter("none");
+    if (platformEnvironment === "disabled" || !cg?.SDK) {
+      activeAdapter = new LocalAdapter("none");
+      return activeAdapter;
     }
-    adapter = new CrazyGamesAdapter(events, CRAZY_BANNER_ID);
+    adapter = new CrazyGamesAdapter(events, PORTAL_BANNER_ID);
     adapter.syncSettings();
+    activeAdapter = adapter;
     return adapter;
   } else {
     // generic / none
@@ -488,5 +513,6 @@ export async function initPlatform(events: PlatformEvents): Promise<PlatformAdap
   }, 6000);
   const originalFinish = adapter.loadingFinished.bind(adapter);
   adapter.loadingFinished = () => { window.clearTimeout(safety); originalFinish(); };
+  activeAdapter = adapter;
   return adapter;
 }

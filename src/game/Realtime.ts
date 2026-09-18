@@ -1,7 +1,8 @@
 import type { NetTransport, RemoteSnapshot } from "./MassRace";
 import { truncate } from "./math";
 import { PROTOCOL_VERSION } from "./protocol/v1";
-import { portalTarget } from "../sdk/platform";
+import { normalizeRooms, roomListUrl, type LiveRoom } from "./RoomBrowser";
+import { POKI_MULTIPLAYER } from "./edition";
 // PokiMpUtils is a tiny, dependency-free module so importing it here does
 // not pull @poki/netlib into non-Poki bundles. The heavy PokiNetlibClient
 // class lives in PokiNetlib.ts and is loaded only via dynamic import from
@@ -91,6 +92,8 @@ type Track = {
   distance: number;
   finished: boolean;
   finishTime: number;
+  /** Server-assigned finish place (0 until this pilot finishes). */
+  place: number;
   emote: string;
   emoteAt: number;
   ready: boolean;
@@ -125,6 +128,22 @@ export function protocolGatewayInfo(): ProtocolGatewayInfo {
   };
 }
 
+/**
+ * The relay's public room list — who is racing right now.
+ *
+ * Reads only: the response carries room codes, seat counts and a host *name*,
+ * never player ids, seat ids or tokens. A build with no relay configured gets
+ * an empty list (and the menu says so) rather than a fabricated one.
+ */
+export async function fetchPublicRooms(base: string = URL_BASE, limit = 40): Promise<LiveRoom[]> {
+  const url = roomListUrl(base, limit);
+  if (!url) return [];
+  const res = await fetch(url, { headers: { accept: "application/json" } });
+  if (!res.ok) throw new Error(`Room list unavailable (${res.status})`);
+  const body = (await res.json()) as { rooms?: unknown };
+  return normalizeRooms(body.rooms);
+}
+
 /** Multiplayer is available when either:
  *   • a WebSocket relay URL is configured (VITE_MULTIPLAYER_URL, the
  *     Rust-authoritative server used by direct/crazy builds), OR
@@ -135,14 +154,16 @@ export function protocolGatewayInfo(): ProtocolGatewayInfo {
  */
 export function isMultiplayerConfigured(): boolean {
   if (URL_BASE.length > 0) return true;
-  if (portalTarget() === "poki") return isPokiMultiplayerAvailable();
+  // `POKI_MULTIPLAYER` is a compile-time per-target constant (edition module),
+  // so the Poki transport never reaches — or names — another build's bundle.
+  if (POKI_MULTIPLAYER) return isPokiMultiplayerAvailable();
   return false;
 }
 
 /** Short, unambiguous room codes — no 0/O or 1/I confusion when read aloud.
  * Uses the same alphabet on both transports so invite codes are interchangeable. */
 export function makeRoomCode(): string {
-  if (portalTarget() === "poki") return makePokiRoomCode();
+  if (POKI_MULTIPLAYER) return makePokiRoomCode();
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let out = "";
   for (let i = 0; i < 5; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
@@ -372,6 +393,12 @@ export class RealtimeClient implements NetTransport {
 
   disconnect(): void {
     this.clearConnectTimer();
+    // Tell the room we are leaving on purpose. Without this the server can
+    // only see a dropped socket, so it holds the seat for the reconnect grace
+    // window (30 s) and every other pilot still counts us as "connected" —
+    // the room showed a ghost where a player had just left. A drop (crash,
+    // tunnel change) still gets the grace window and is reaped by the server.
+    this.push({ type: "leave" });
     this.closedByUs = true;
     if (this.retryTimer !== null) {
       window.clearTimeout(this.retryTimer);
@@ -446,7 +473,22 @@ export class RealtimeClient implements NetTransport {
         }
         this.joinedByCode = false;
         break;
-      case "peers":
+      case "peers": {
+        // `peers` is the room's authoritative roster, so anyone missing from it
+        // has left. Dropping them here (not only on an explicit `left` frame)
+        // keeps the lobby truthful: pilots still saw a departed player as
+        // "connected" whenever the server's leave notice was coalesced,
+        // missed during a reconnect, or the pilot switched rooms.
+        const present = new Set<string>();
+        for (const p of msg.peers) {
+          if (typeof p.id === "string" && p.id !== this.selfId) present.add(p.id);
+        }
+        for (const id of [...this.tracks.keys()]) {
+          if (present.has(id)) continue;
+          const gone = this.tracks.get(id);
+          if (gone && gone.name && gone.name !== "Pilot") this.pendingEvents.push({ type: "leave", name: gone.name });
+          this.tracks.delete(id);
+        }
         for (const p of msg.peers) {
           if (typeof p.id !== "string" || p.id === this.selfId) continue;
           const existing = this.tracks.get(p.id);
@@ -465,6 +507,7 @@ export class RealtimeClient implements NetTransport {
           }
         }
         break;
+      }
       case "left": {
         const t = this.tracks.get(msg.id);
         if (t && t.name && t.name !== "Pilot") {
@@ -514,7 +557,11 @@ export class RealtimeClient implements NetTransport {
         const t = this.track(msg.id);
         t.finished = true;
         t.finishTime = msg.time;
-        this.pendingEvents.push({ type: "finish", name: t.name, place: msg.place ?? 0 });
+        // Keep the rival's official place. Without this `roster()` reported
+        // place 0 for every peer, so the lobby could never show who came in
+        // where — the room flock said "finished" and nothing more.
+        t.place = Number.isFinite(msg.place) ? msg.place : 0;
+        this.pendingEvents.push({ type: "finish", name: t.name, place: t.place });
         break;
       }
       case "start":
@@ -523,6 +570,16 @@ export class RealtimeClient implements NetTransport {
         this.startsAt = msg.at;
         this.seed = msg.seed || this.seed;
         this.state = "racing";
+        // A new race clears the previous round: without this, a rematch in the
+        // same room kept every pilot's old finish time/place on the roster and
+        // the lobby showed last race's results as if they were live.
+        for (const t of this.tracks.values()) {
+          t.finished = false;
+          t.finishTime = 0;
+          t.place = 0;
+          t.distance = 0;
+          t.buffer.length = 0;
+        }
         this.pendingEvents.push({ type: "start" });
         break;
       case "error":
@@ -545,6 +602,7 @@ export class RealtimeClient implements NetTransport {
         distance: 0,
         finished: false,
         finishTime: 0,
+        place: 0,
         emote: "",
         emoteAt: -99,
         ready: false,
@@ -722,7 +780,7 @@ export class RealtimeClient implements NetTransport {
         hue: t.hue,
         skin: t.skin,
         distance: t.distance,
-        place: 0,
+        place: t.place,
         finished: t.finished,
         finishTime: t.finishTime,
         emote: this.clock - t.emoteAt < 2.5 ? t.emote : "",

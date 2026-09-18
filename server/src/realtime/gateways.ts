@@ -536,6 +536,19 @@ function handleLegacyFrame(ctx: Ctx, client: GatewayClient, msg: Record<string, 
       }
       return;
     }
+    case "leave": {
+      // Explicit departure ("Leave room" / switching rooms): free the seat now
+      // instead of holding it for the reconnect grace window, so the room's
+      // roster and pilot count tell the truth immediately.
+      if (!client.session || !client.seatId) return;
+      try {
+        client.session.leave(client.seatId);
+      } catch {
+        /* seat already gone */
+      }
+      client.seatId = null;
+      return;
+    }
     default:
       return;
   }

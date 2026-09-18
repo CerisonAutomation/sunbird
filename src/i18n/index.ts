@@ -2,7 +2,24 @@ import type { BarrelEntry, BarrelRoot } from "./barrel.types";
 import translationsBarrel from "./translations.barrel.json";
 import { storage } from "../game/Storage";
 
-export type SupportedLocale = "en" | "mt" | "it" | "fr" | "de" | "es" | "pt-BR" | "ar" | "zh-CN" | "ja";
+/**
+ * Locale set, ordered and grouped the way the Poki localization guide
+ * recommends (LOC-04): EFIGS + Turkish first, CJK second, then Brazilian
+ * Portuguese and Russian; plus Arabic (RTL) and Maltese.
+ */
+export type SupportedLocale =
+  | "en"
+  | "es"
+  | "de"
+  | "fr"
+  | "it"
+  | "tr"
+  | "pt-BR"
+  | "ru"
+  | "ar"
+  | "zh-CN"
+  | "ja"
+  | "mt";
 
 export const SUPPORTED_LOCALES: { code: SupportedLocale; name: string; flag: string; rtl?: boolean }[] = [
   { code: "en", name: "English", flag: "🇺🇸" },
@@ -10,7 +27,9 @@ export const SUPPORTED_LOCALES: { code: SupportedLocale; name: string; flag: str
   { code: "de", name: "Deutsch", flag: "🇩🇪" },
   { code: "fr", name: "Français", flag: "🇫🇷" },
   { code: "it", name: "Italiano", flag: "🇮🇹" },
+  { code: "tr", name: "Türkçe", flag: "🇹🇷" },
   { code: "pt-BR", name: "Português (Brasil)", flag: "🇧🇷" },
+  { code: "ru", name: "Русский", flag: "🇷🇺" },
   { code: "ar", name: "العربية", flag: "🇸🇦", rtl: true },
   { code: "zh-CN", name: "简体中文", flag: "🇨🇳" },
   { code: "ja", name: "日本語", flag: "🇯🇵" },
@@ -18,6 +37,31 @@ export const SUPPORTED_LOCALES: { code: SupportedLocale; name: string; flag: str
 ];
 
 const LOCALE_STORAGE_KEY = "sunbird.i18n.locale";
+
+/**
+ * Match a BCP-47 browser tag against the shipped set (LOC-05: "ideally detect
+ * the player's browser language and serve the content accordingly").
+ *
+ * Exact tag → same-language region variant → base language, so a Brazilian
+ * player sending `pt` or `pt-PT` still lands on `pt-BR`, `zh-Hant` lands on
+ * `zh-CN` rather than English, and `ru-RU` lands on `ru`. Returns null when
+ * nothing matches (the caller falls back to English).
+ */
+export function matchLocale(tag: string | null | undefined): SupportedLocale | null {
+  if (!tag) return null;
+  const normalized = tag.trim().replace(/_/g, "-").toLowerCase();
+  if (!normalized) return null;
+  const exact = SUPPORTED_LOCALES.find((l) => l.code.toLowerCase() === normalized);
+  if (exact) return exact.code;
+  const prefix = SUPPORTED_LOCALES.find((l) => normalized.startsWith(`${l.code.toLowerCase()}-`));
+  if (prefix) return prefix.code;
+  const base = normalized.split("-")[0];
+  const sameLanguage = SUPPORTED_LOCALES.find((l) => l.code.toLowerCase().split("-")[0] === base);
+  if (sameLanguage) return sameLanguage.code;
+  // Regional spellings the base tag does not cover directly.
+  if (base === "nb" || base === "nn" || base === "no") return null;
+  return null;
+}
 
 let currentLocale: SupportedLocale = "en";
 
@@ -27,11 +71,11 @@ function initLocale(): SupportedLocale {
     if (saved && SUPPORTED_LOCALES.some((l) => l.code === saved)) {
       return saved as SupportedLocale;
     }
-    // Fallback to browser language if available
-    const navLang = typeof navigator !== "undefined" ? navigator.language : "";
-    if (navLang) {
-      const match = SUPPORTED_LOCALES.find((l) => navLang.startsWith(l.code));
-      if (match) return match.code;
+    const nav = typeof navigator !== "undefined" ? navigator : undefined;
+    const candidates = [nav?.language, ...(nav?.languages ?? [])].filter(Boolean) as string[];
+    for (const candidate of candidates) {
+      const match = matchLocale(candidate);
+      if (match) return match;
     }
   } catch {
     /* private mode */

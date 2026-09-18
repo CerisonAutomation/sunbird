@@ -17,6 +17,7 @@ import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { foreignMarkersIn, missingMarkersIn } from "./portal-markers.mjs";
 
 const root = join(fileURLToPath(import.meta.url), "..", "..");
 const PORTALS = ["poki", "crazy", "generic"];
@@ -59,18 +60,23 @@ if (PORTALS.every((p) => zips[p])) {
   }
 
   const sdkHost = { poki: "game-cdn.poki.com", crazy: "sdk.crazygames.com" };
-  const otherSdk = { poki: "sdk.crazygames.com", crazy: "game-cdn.poki.com", generic: null };
   for (const p of PORTALS) {
     const own = sdkHost[p];
     if (own && !zips[p].html.includes(own)) fail(p, `own SDK host ${own} missing from bundle.`);
-    const foreign = otherSdk[p];
-    if (foreign) {
-      // Inert string literals of the OTHER portal's SDK URL ship in every
-      // bundle (platform.ts keeps both constants; scriptFor() gates loading).
-      // What must be true: the foreign URL never appears as a loadable tag.
-      const foreignStatic = new RegExp(`<script[^>]+src=["']https?://[^"']*${foreign}`, "i");
-      if (foreignStatic.test(zips[p].html)) fail(p, `foreign SDK ${foreign} appears as a loadable <script> — portal cross-wiring.`);
-      else if (zips[p].html.includes(foreign)) note(`${p}: foreign SDK literal ${foreign} present but inert (not in any <script>/<link> tag) — expected.`);
+  }
+  // Cross-portal isolation — the machine-checked form of "every version is its
+  // own way" (REQ-51: separate artifacts per portal). Every bundle carries its
+  // OWN SDK/branding and none of another portal's. This used to be a `note`:
+  // the foreign SDK literal shipped in every bundle behind a negative
+  // `TARGET !== "poki"` guard the minifier could not fold. Target-only code now
+  // lives in target-only modules (see scripts/portal-markers.mjs), so a foreign
+  // marker is a hard failure — not an accepted inert string.
+  for (const p of PORTALS) {
+    for (const missed of missingMarkersIn(zips[p].html, p)) {
+      fail(p, `required platform marker missing: ${missed}`);
+    }
+    for (const hit of foreignMarkersIn(zips[p].html, p)) {
+      fail(p, `foreign portal marker in bundle — ${hit}. Portals must not cross-contaminate.`);
     }
   }
 }
@@ -89,8 +95,16 @@ for (const portal of PORTALS) {
     const m = line.match(/^\s*\d+\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+(\S.*)$/);
     if (m) files.push(m[1].trim());
   }
-  const badFile = files.find((f) => !f.startsWith("icons/") && !f.startsWith("fonts/") && f !== "index.html");
-  if (badFile) fail(portal, `unexpected zip entry "${badFile}" (portals want ONLY index.html + icons/ + fonts/).`);
+  // Allowed anatomy: the single-file game, its icons and fonts, plus the
+  // bundled locale barrel (`i18n/`, ~12 KB). The barrel is the artifact the
+  // poki-upload folder and the host-side tooling consume, it is loaded from a
+  // relative path, and shipping it inside the zip keeps the bundle
+  // self-contained in the guide's sense (no external resource requests). Any
+  // OTHER entry is a packaging mistake.
+  const badFile = files.find(
+    (f) => !f.startsWith("icons/") && !f.startsWith("fonts/") && !f.startsWith("i18n/") && f !== "index.html",
+  );
+  if (badFile) fail(portal, `unexpected zip entry "${badFile}" (portals want ONLY index.html + icons/ + fonts/ + i18n/).`);
   const icons = files.filter((f) => f.startsWith("icons/")).length;
   const fonts = files.filter((f) => f.startsWith("fonts/")).length;
   if (!files.includes("index.html")) fail(portal, "index.html missing from zip.");
@@ -118,8 +132,17 @@ for (const portal of PORTALS) {
     [/navigator\.serviceWorker/, "service worker API usage (portals forbid workers in their iframes)"],
     [/\bsw\.js\b/, "service worker script reference (the portal zip ships no sw.js)"],
     [/(https?|wss?):\/\/(localhost|127\.0\.0\.1|\[::1\])/, "requestable loopback URL"],
-    [/\bws:\/\/|\bwss:\/\//, "hardcoded WebSocket backend URL (multiplayer must be blank in portal builds)"],
-    [/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/, "raw IP address"],
+    // Our own multiplayer backend must never appear: the portal edition ships
+    // with VITE_MULTIPLAYER_URL blanked. The ONE WebSocket URL that may ship is
+    // the platform's own Netlib signaling endpoint (`wss://netlib.poki.io/…`),
+    // which the guide recommends for P2P multiplayer (TOOL-04) and which the
+    // vendor library carries as its default — it is not game infrastructure we
+    // control, and it is unreachable unless a player opts into a race.
+    [/\bws:\/\/(?!netlib\.poki\.io)|(?<!\bws:\/\/)\bwss:\/\/(?!netlib\.poki\.io)/, "hardcoded WebSocket backend URL (multiplayer must be blank in portal builds)"],
+    // Loopback/private addresses are allowed: they appear inside the vendored
+    // WebRTC candidate filtering (loopback candidates are dropped on purpose).
+    // A public IP literal in the bundle would still be a finding.
+    [/\b(?!127\.|10\.|192\.168\.|0\.0\.0\.0)\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/, "public IP address literal"],
     [/sourceMappingURL/, "source map reference (build ships sourcemap:false)"],
     [/window\.open\(/, "window.open (popups are banned on portals)"],
     [/document\.write\(/, "document.write"],
@@ -151,21 +174,43 @@ for (const portal of PORTALS) {
   if (staticRemote.length) fail(portal, `static remote reference(s): ${[...new Set(staticRemote)].join(", ")}`);
 
   /* ------------------------------------------------- lifecycle + fixes */
-  const mustHave = [
-    ["gameLoadingFinished", "Poki loading-finished signal"],
-    ["gameplayStart", "gameplay-start signal"],
-    ["gameplayStop", "gameplay-stop signal"],
-    ["commercialBreak", "commercial-break API"],
-    ["rewardedBreak", "rewarded-break API"],
+  // Every portal edition must ship the storage facade and the gameplay-event
+  // signals *of its own SDK*: the Poki adapter is compiled out of the
+  // crazy/generic bundles (and vice versa) by design, so the SDK-specific
+  // markers are checked against the bundle that is supposed to contain them.
+  const mustHaveEverywhere = [
     ["sunbird.storage.probe", "cross-safe Storage facade (sandboxed-iframe fix)"],
     ["sessionStorage", "sessionStorage fallback of the Storage facade"],
     ["sunbird.cloud.", "cloud-save key prefix"],
+    ["gameplayStart", "gameplay-start signal"],
+    ["gameplayStop", "gameplay-stop signal"],
+    ["commercialBreak", "commercial-break lifecycle (both SDKs expose it)"],
   ];
-  for (const [needle, why] of mustHave) {
+  for (const [needle, why] of mustHaveEverywhere) {
     if (!html.includes(needle)) fail(portal, `missing required string: "${needle}" — ${why}`);
   }
-  if (portal === "poki" && !html.includes("gameLoadingStart")) {
-    fail(portal, 'missing "gameLoadingStart" — the P0 loading-start fix did not ship.');
+  const mustHavePerPortal = {
+    poki: [
+      ["gameLoadingStart", "Poki loading-start signal (the P0 pre-asset marker)"],
+      ["gameLoadingFinished", "Poki loading-finished signal"],
+      ["rewardedBreak", "Poki rewarded-break API"],
+      ["game-cdn.poki.com", "Poki SDK loader"],
+    ],
+    crazy: [
+      ["sdk.crazygames.com", "CrazyGames SDK loader"],
+      ["rewardedBreak", "rewarded-break API (CrazyGames adapter)"],
+    ],
+    generic: [
+      // Generic builds ship no SDK at all, so there is no portal marker to look
+      // for; the meaningful assertion is the opposite one (no reachable SDK —
+      // checked above) plus proof the local adapter is what handles the
+      // platform surface. `cloudSaveLocal` is the LocalAdapter capability set.
+      ['"cloudSaveLocal"', "local platform adapter (generic builds run with no SDK)"],
+      ["sunbird.cloud.", "local cloud-save fallback"],
+    ],
+  };
+  for (const [needle, why] of mustHavePerPortal[portal] ?? []) {
+    if (!html.includes(needle)) fail(portal, `missing required string: "${needle}" — ${why}`);
   }
   if (portal === "generic" && (html.includes("game-cdn.poki.com") || html.includes("sdk.crazygames.com"))) {
     // Allowed ONLY as inert literals; verified above against <script> tags.

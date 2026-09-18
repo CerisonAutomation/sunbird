@@ -2,7 +2,18 @@ import { hiddenByDisclosure } from "./Disclosure";
 /** Native dialog keyboard behavior for the game's DOM overlays. */
 export class OverlayNavigation {
   private active: HTMLElement | null = null;
+
+  /**
+   * Interactive controls that consume Space/Enter themselves.
+   */
+  private static readonly ACTIVATABLE =
+    'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary, [role="button"], [tabindex="0"]';
+
   private readonly onKey = (event: KeyboardEvent): void => {
+    if (event.key === "Enter" || event.key === " " || event.key === "Spacebar") {
+      this.activatePrimary(event);
+      return;
+    }
     if (event.key !== "Tab" || !this.active) return;
     const controls = [...this.active.querySelectorAll<HTMLElement>(
       'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary, [tabindex="0"]',
@@ -20,6 +31,32 @@ export class OverlayNavigation {
       event.preventDefault(); first.focus();
     }
   };
+
+  /**
+   * Poki EN-02: "use the space bar or return key for primary menu actions".
+   * A focused native button already does this, but these overlays deliberately
+   * move focus to the dialog heading for screen readers — so a bare Space or
+   * Return lands on nothing. Route it to the overlay's primary action (the
+   * `.primary-btn` when one exists, else the first visible control) instead.
+   *
+   * Skipped when: there is no open overlay, the event was already handled, the
+   * key is auto-repeating, an IME composition is in flight, or focus sits on a
+   * control that activates itself (button/link/input/select/summary).
+   */
+  private activatePrimary(event: KeyboardEvent): void {
+    const active = this.active;
+    if (!active || event.defaultPrevented || event.repeat || event.isComposing) return;
+    const target = event.target;
+    if (target instanceof Element && target.closest(OverlayNavigation.ACTIVATABLE)) return;
+    if (target instanceof HTMLElement && target.isContentEditable) return;
+    const controls = [...active.querySelectorAll<HTMLElement>(OverlayNavigation.ACTIVATABLE)].filter(
+      (el) => !hiddenByDisclosure(el) && el.getClientRects().length > 0 && !el.closest("[inert]"),
+    );
+    const primary = controls.find((el) => el.classList.contains("primary-btn")) ?? controls[0];
+    if (!primary) return;
+    event.preventDefault();
+    primary.click();
+  }
 
   constructor(private readonly root: HTMLElement) { root.addEventListener("keydown", this.onKey); }
 

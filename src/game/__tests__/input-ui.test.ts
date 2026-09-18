@@ -221,3 +221,51 @@ describe("mobile touchscreen responsiveness and gesture protection", () => {
     expect(p2Ripple).not.toBeNull();
   });
 });
+
+/**
+ * Poki EN-02: "use WASD or arrow keys for movement and the space bar or return
+ * key for primary menu actions". This game's single movement control is the
+ * dive/hold action, so both clusters must drive it — and the arrow cluster must
+ * not scroll the host page inside an embedded portal frame.
+ */
+describe("standardised movement keys (Poki EN-02)", () => {
+  it.each(["Space", "KeyA", "KeyW", "KeyS", "KeyD", "ArrowUp", "ArrowDown"])(
+    "accepts %s as the dive / primary action",
+    (code) => {
+      const { host, input, mark } = fixture();
+      const event = key(host, code);
+      expect(event.defaultPrevented).toBe(true);
+      expect(input.diving).toBe(true);
+      expect(mark).toHaveBeenCalledOnce();
+      key(host, code, "keyup");
+      expect(input.diving).toBe(false);
+    },
+  );
+
+  it("releases the action only when every held alias is up", () => {
+    const { host, input } = fixture();
+    key(host, "KeyW");
+    key(host, "ArrowDown");
+    key(host, "KeyW", "keyup");
+    expect(input.diving).toBe(true);
+    key(host, "ArrowDown", "keyup");
+    expect(input.diving).toBe(false);
+  });
+
+  it("keeps Return as the second player's standard confirm key", () => {
+    const { host, input } = fixture();
+    key(host, "Enter");
+    expect(input.p2Key).toBe(true);
+    key(host, "Enter", "keyup");
+    expect(input.p2Key).toBe(false);
+  });
+
+  it("never steals the standard keys from a focused menu control", () => {
+    const { host } = fixture();
+    const button = document.createElement("button");
+    host.append(button);
+    for (const code of ["Space", "Enter", "KeyW", "ArrowDown"]) {
+      expect(key(button, code).defaultPrevented).toBe(false);
+    }
+  });
+});

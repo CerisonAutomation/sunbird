@@ -20,6 +20,7 @@
  *      must not survive into any portal zip.
  */
 import { execFileSync } from "node:child_process";
+import { foreignMarkersIn, missingMarkersIn } from "./portal-markers.mjs";
 import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -109,6 +110,17 @@ for (const portal of PORTALS) {
     if (new RegExp(marker, "i").test(html)) {
       failures.push(`${portal}: third-party backend marker "${marker}" in bundle (portals are self-contained).`);
     }
+  }
+  // Cross-portal isolation ("every version is its own way"): this bundle may
+  // name only its OWN portal. A foreign SDK global, CDN URL or edition string
+  // here means a shared module leaked target-only code — see portal-markers.mjs.
+  for (const hit of foreignMarkersIn(html, portal)) {
+    failures.push(`${portal}: foreign portal marker in bundle — ${hit}.`);
+  }
+  // …and the bundle must still carry its OWN platform integration. Isolation
+  // cuts both ways: no foreign markers in, no lost netlib/AUDS/PokiSDK out.
+  for (const missed of missingMarkersIn(html, portal)) {
+    failures.push(`${portal}: required platform marker missing — ${missed}.`);
   }
   console.log(`✓ sunbird-${portal}.zip  ${(zipBytes / 1024).toFixed(0)} KB  ${(Buffer.byteLength(html) / 1024).toFixed(0)} KB html`);
 }

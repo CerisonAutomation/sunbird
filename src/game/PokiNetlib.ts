@@ -25,6 +25,7 @@ import type {
 import { truncate } from "./math";
 import { PROTOCOL_VERSION } from "./protocol/v1";
 import { isPokiMultiplayerAvailable, makePokiRoomCode as makeRoomCode, POKI_NETLIB_GAME_ID as NETLIB_GAME_ID } from "./PokiMpUtils";
+import { normalizeRooms, sortRooms, type LiveRoom } from "./RoomBrowser";
 
 /** Outbound state rate — same 15 Hz cadence as the WS transport. */
 const SEND_HZ = 15;
@@ -82,6 +83,8 @@ type Track = {
   distance: number;
   finished: boolean;
   finishTime: number;
+  /** Finish place as agreed in this room (0 until the host assigns one). */
+  place: number;
   emote: string;
   emoteAt: number;
   ready: boolean;
@@ -119,6 +122,8 @@ export class PokiNetlibClient implements NetTransport {
   private amHost = false;
   /** A finish-order counter used by the host to assign places authoritatively. */
   private finishOrder = 0;
+  /** Last phase published to the public lobby entry (host only). */
+  private announcedPhase: "lobby" | "racing" = "lobby";
   private finishedPeers = new Set<string>();
 
   private net: Network | null = null;
@@ -134,6 +139,8 @@ export class PokiNetlibClient implements NetTransport {
   private lastSent = { x: 0, y: 0, rot: 0, d: 0 };
   private peerInfo = new Map<string, { name: string; hue: number; skin: string }>();
   private connectedPeers = new Set<string>();
+  /** Peers we have already answered a hello to (one reply per peer, ever). */
+  private readonly greeted = new Set<string>();
   private boundHandlers: Array<() => void> = [];
   private closedByUs = false;
 
@@ -223,7 +230,12 @@ export class PokiNetlibClient implements NetTransport {
                 this.roomCode = this.requestedCode.toUpperCase();
                 this.capacity = info.maxPlayers || MAX_CAPACITY;
                 this.amHost = info.leader === network.id;
-                const prevSeed = this.seed;
+                // Compare against what we ASKED for: onLobby has already
+                // adopted the room's seed by the time join() resolves, so the
+                // old comparison could never differ and the "welcome" event
+                // (which is what tells the game to switch course/format) never
+                // fired on this transport.
+                const prevSeed = this.requestedSeed || this.seed;
                 const incoming = String(info.customData?.seed ?? this.seed);
                 // Announce a seed change only when we are NOT the host —
                 // i.e. we joined a friend's room whose format/course differs
@@ -274,7 +286,9 @@ export class PokiNetlibClient implements NetTransport {
                   this.roomCode = candidate.code.toUpperCase();
                   this.capacity = info.maxPlayers || candidate.maxPlayers || MAX_CAPACITY;
                   this.amHost = info.leader === network.id;
-                  const prevSeed = this.seed;
+                  // Same as the by-code path: the seed we asked for, not the
+                  // one onLobby just adopted, is the thing to compare against.
+                  const prevSeed = this.requestedSeed || this.seed;
                   const incoming = String(info.customData?.seed ?? candidate.customData?.seed ?? this.seed);
                   // Quick-match found a public lobby running a different
                   // format/world than we asked for — adopt it.
@@ -294,7 +308,7 @@ export class PokiNetlibClient implements NetTransport {
               network.create({
                 public: true,
                 maxPlayers: this.capacity,
-                customData: { seed: this.seed, mode: "sunbird-race", v: PROTOCOL_VERSION },
+                customData: { seed: this.seed, mode: "sunbird-race", v: PROTOCOL_VERSION, phase: "lobby" },
                 codeFormat: "short",
                 codeLength: 5,
               }).then((lobbyCode: string) => {
@@ -350,6 +364,7 @@ export class PokiNetlibClient implements NetTransport {
 
       const onDisconnected = (peer: Peer) => {
         this.connectedPeers.delete(peer.id);
+        this.greeted.delete(peer.id);
         const t = this.tracks.get(peer.id);
         if (t && t.name) {
           this.pendingEvents.push({ type: "leave", name: t.name });
@@ -422,6 +437,8 @@ export class PokiNetlibClient implements NetTransport {
               const hue = Number.isFinite(m.hue) ? m.hue : Math.random();
               const skin = String(m.skin ?? "sunbird");
               this.peerInfo.set(peer.id, { name, hue, skin });
+              const first = !this.greeted.has(peer.id);
+              this.greeted.add(peer.id);
               const existing = this.tracks.get(peer.id);
               const t = this.track(peer.id);
               t.name = name;
@@ -430,10 +447,16 @@ export class PokiNetlibClient implements NetTransport {
               if (!existing) {
                 this.pendingEvents.push({ type: "join", name });
               }
-              // Reply with our own hello so both sides sync identity.
-              try {
-                network.send("reliable", peer.id, JSON.stringify({ type: "hello", name: this.name, hue: this.hue, skin: this.skin, v: PROTOCOL_VERSION }));
-              } catch { /* ignore */ }
+              // Answer the FIRST hello from a peer so both sides sync identity
+              // even if we missed their "connected" event (a reconnect). Every
+              // later hello is just an identity update and must NOT be answered:
+              // a reply to a reply is an endless ping-pong that burns the
+              // datachannel for the whole session.
+              if (first) {
+                try {
+                  network.send("reliable", peer.id, JSON.stringify({ type: "hello", name: this.name, hue: this.hue, skin: this.skin, v: PROTOCOL_VERSION }));
+                } catch { /* ignore */ }
+              }
               break;
             }
             case "ready": {
@@ -465,25 +488,32 @@ export class PokiNetlibClient implements NetTransport {
               const t = this.track(peer.id);
               if (!this.finishedPeers.has(peer.id)) {
                 this.finishedPeers.add(peer.id);
+                t.finished = true;
+                t.finishTime = m.time;
                 if (this.amHost) {
-                  this.finishOrder++;
-                  const place = this.finishOrder + 1; // +1 because host also counts
+                  // The next finisher takes the next place — including the very
+                  // first one. (An extra +1 here used to hand the guest P2 when
+                  // they finished first, and then the host took P2 as well:
+                  // two pilots, nobody P1.)
+                  const place = ++this.finishOrder;
+                  t.place = place;
                   this.broadcastReliable({ type: "place", id: peer.id, place });
-                  t.finished = true;
-                  t.finishTime = m.time;
                   this.pendingEvents.push({ type: "finish", name: t.name || "Pilot", place });
                 }
               }
               break;
             }
             case "place": {
-              // Host-assigned place for a peer (or us if id matches self).
+              // Host-assigned place for a peer (or us if id matches self). The
+              // place is kept on the track so the roster reports what really
+              // happened, exactly like the server's roster does.
               if (m.id === this.id) {
                 this.myPlace = m.place;
               } else {
                 const t = this.tracks.get(m.id);
                 if (t) {
                   t.finished = true;
+                  t.place = m.place;
                   this.pendingEvents.push({ type: "finish", name: t.name || "Pilot", place: m.place });
                 }
               }
@@ -584,6 +614,7 @@ export class PokiNetlibClient implements NetTransport {
     this.netReady = false;
     this.connectedPeers.clear();
     this.peerInfo.clear();
+    this.greeted.clear();
   }
 
   startNow(): void {
@@ -723,11 +754,9 @@ export class PokiNetlibClient implements NetTransport {
   sendFinish(time: number, distance: number): void {
     if (this.isAutonomous) return;
     if (this.amHost) {
-      // As the host, record our own finish before broadcasting so we count
-      // ourselves in the ordering (previously host always got P2 because
-      // finishOrder was incremented but the place wasn't assigned to self).
-      this.finishOrder++;
-      this.myPlace = this.finishOrder;
+      // As the host, record our own finish before broadcasting so we take the
+      // next place in the same ordering as everybody else.
+      this.myPlace = ++this.finishOrder;
       this.finishedPeers.add(this.id);
       this.broadcastReliable({ type: "place", id: this.id, place: this.myPlace });
       this.broadcastReliable({ type: "finish", time: Math.round(time * 100) / 100, d: Math.round(distance) });
@@ -800,7 +829,7 @@ export class PokiNetlibClient implements NetTransport {
         hue: t.hue,
         skin: t.skin,
         distance: t.distance,
-        place: 0,
+        place: t.place,
         finished: t.finished,
         finishTime: t.finishTime,
         emote: this.clock - t.emoteAt < 2.5 ? t.emote : "",
@@ -813,6 +842,7 @@ export class PokiNetlibClient implements NetTransport {
   }
 
   info(): RoomInfo {
+    this.syncLobbyPhase();
     const count = this.tracks.size + (this.connected || this.isAutonomous ? 1 : 0);
     return {
       code: this.roomCode,
@@ -826,17 +856,33 @@ export class PokiNetlibClient implements NetTransport {
     };
   }
 
-  /** List public lobbies using Netlib's listing API (optional; quick match uses create/join flow). */
-  async listPublic(): Promise<{ code: string; players: number; capacity: number }[]> {
+  /** Public lobbies this client can see right now (shares the room model). */
+  async listPublic(): Promise<LiveRoom[]> {
     if (!this.net || !this.netReady) return [];
     try {
       const lobbies = await this.net.list({ public: true }, { createdAt: -1 }, 20);
-      return lobbies
-        .filter((l) => l.customData?.mode === "sunbird-race" && l.playerCount < l.maxPlayers)
-        .map((l) => ({ code: l.code.toUpperCase(), players: l.playerCount, capacity: l.maxPlayers }));
+      return sortRooms(normalizeRooms(lobbies.map(lobbyToRoomInput)));
     } catch {
       return [];
     }
+  }
+
+  /**
+   * Keep the lobby's public description honest: while a race is running the
+   * lobby is NOT an open room, and a pilot browsing the menu must see that.
+   * Best-effort and idempotent — the host publishes, guests read.
+   */
+  private syncLobbyPhase(): void {
+    const phase: "lobby" | "racing" = this.state === "racing" ? "racing" : "lobby";
+    if (phase === this.announcedPhase || !this.amHost || !this.netReady || !this.net?.currentLobby) return;
+    this.announcedPhase = phase;
+    void this.net
+      .setLobbySettings({
+        customData: { seed: this.seed, mode: "sunbird-race", v: PROTOCOL_VERSION, phase },
+      })
+      .catch(() => {
+        /* leadership may have moved; the next host republishes */
+      });
   }
 
   private track(id: string): Track {
@@ -851,6 +897,7 @@ export class PokiNetlibClient implements NetTransport {
         distance: 0,
         finished: false,
         finishTime: 0,
+        place: 0,
         emote: "",
         emoteAt: -99,
         ready: false,
@@ -860,6 +907,84 @@ export class PokiNetlibClient implements NetTransport {
     }
     return t;
   }
+}
+
+/** A Netlib lobby entry, in the shape the shared room model expects. */
+function lobbyToRoomInput(l: LobbyListEntry): Record<string, unknown> {
+  return {
+    code: l.code,
+    seated: l.playerCount,
+    capacity: l.maxPlayers,
+    // The host publishes the phase in customData; an un-updated lobby is a
+    // lobby, which is the truthful default for a fresh room.
+    status: l.customData?.phase === "racing" ? "racing" : "lobby",
+    // Password-protected lobbies are visible but not offered to newcomers.
+    joinable: !l.hasPassword && l.playerCount < l.maxPlayers,
+    latency: typeof l.latency === "number" ? l.latency : null,
+    seed: typeof l.customData?.seed === "string" ? l.customData.seed : "",
+    createdAt: typeof l.createdAt === "string" ? l.createdAt : undefined,
+  };
+}
+
+/** Cached signalling connection used only to *browse* public lobbies. */
+let browseNet: Network | null = null;
+let browseReady = false;
+
+/**
+ * Public lobbies, straight from the P2P signalling service's listing API.
+ *
+ * Feeds the menu's live list and the matchmaking search so a pilot can see real
+ * rooms with real seat counts instead of a spinner. Browsing opens its own
+ * short-lived connection and never joins anything; failures are reported as an
+ * empty list so the UI stays honest.
+ */
+export async function listPublicLobbies(
+  gameId: string = NETLIB_GAME_ID,
+  timeoutMs = 8000,
+): Promise<LiveRoom[]> {
+  if (!isPokiMultiplayerAvailable()) return [];
+  const net = browseNet ?? new Network(gameId);
+  browseNet = net;
+  try {
+    if (!browseReady) {
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          net.removeAllListeners("ready");
+          net.removeAllListeners("failed");
+          reject(new Error("Signalling timed out"));
+        }, timeoutMs);
+        net.once("ready", () => {
+          clearTimeout(timer);
+          net.removeAllListeners("failed");
+          browseReady = true;
+          resolve();
+        });
+        net.once("failed", () => {
+          clearTimeout(timer);
+          net.removeAllListeners("ready");
+          reject(new Error("Signalling failed"));
+        });
+      });
+    }
+    const entries = await net.list({ public: true }, { createdAt: -1 }, 20);
+    return sortRooms(normalizeRooms(entries.map(lobbyToRoomInput)));
+  } catch (err) {
+    // Drop the connection so the next attempt starts clean instead of reusing
+    // a network that will never become ready.
+    closeLobbyBrowser();
+    throw err;
+  }
+}
+
+/** Tear the browser connection down (leaving the PvP screen). */
+export function closeLobbyBrowser(): void {
+  try {
+    browseNet?.close("browse");
+  } catch {
+    /* already closed */
+  }
+  browseNet = null;
+  browseReady = false;
 }
 
 /** Room-code helper — re-exported for callers that import from here. */

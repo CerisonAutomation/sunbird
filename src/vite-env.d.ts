@@ -7,7 +7,7 @@ interface ImportMetaEnv {
   /** `none` for direct/PWA builds, `poki` or `crazy` for a portal export. */
   readonly VITE_PORTAL_TARGET?: "none" | "poki" | "crazy" | "crazygames";
   /** Optional CrazyGames dashboard banner placement id. */
-  readonly VITE_CRAZY_BANNER_ID?: string;
+  readonly VITE_PORTAL_BANNER_ID?: string;
   /** Optional HTTPS base URL for the global leaderboard (see LEADERBOARD_API.md). */
   readonly VITE_LEADERBOARD_URL?: string;
   /** Optional WebSocket URL enabling real networked rivals in Mass Race. */

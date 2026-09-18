@@ -338,7 +338,11 @@ describe("3× coin bonus card (one claim per run)", () => {
     expect(html).toContain("data-action=\"multiply-run-coins\"");
     expect(html).toContain("Claim 3× (● +500)");
     expect(html).not.toContain("📺");
-    expect(html).toContain("white-space:nowrap");
+    // Layout lives in ui.css so the claim row can wrap on a 360px-wide phone.
+    // Inline `white-space:nowrap` here is what used to overflow the results card.
+    expect(html).toContain("multiplier-claim");
+    expect(html).not.toContain("style=");
+    expect(html).not.toContain("nowrap");
   });
 
   it("flips to a claimed chip and can never re-arm", () => {

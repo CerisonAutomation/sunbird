@@ -1,6 +1,6 @@
 # Sunbird — Handoff Document
 
-_Last verified: 2026-09-16 · branch `arena/01a0a95f-sunbird` · full gate green (949 tests, portal zips, production gate) · CI green_
+_Last verified: 2026-09-18 · branch `arena/01a0b118-sunbird` · full gate green (1051 browser tests + 14 server tests, 7-case live PvP suite, portal zips, preflight, production gate) · CI green_
 
 Sunbird is a one-button arcade glider (procedural islands, hold-to-dive). Single codebase,
 five build targets, one shared game core.
@@ -12,13 +12,16 @@ five build targets, one shared game core.
 ```bash
 pnpm install
 pnpm dev                 # Vite on :5173 (pnpm via corepack: `corepack enable` once)
-pnpm test                # 949 unit suites (Vitest, jsdom)
+pnpm test                # full Vitest suite (1051 tests + the live PvP suite, skipped without a server)
 pnpm typecheck           # tsc --noEmit
 pnpm build:portals       # dist-poki / dist-crazy / dist-generic + the three submission zips
 pnpm build:itch          # dist-itch (single-file)
 node scripts/verify-portal.mjs   # shippability gate on the zips (8 MB Poki budget, etc.)
 node scripts/audit-zips.mjs      # forensic zip audit (bundle separation, URL inventory)
 node scripts/verify-prod.mjs     # production gate (lint+typecheck+tests+build, budgets, debug-artifact ban)
+pnpm pvp:check                   # boots the real room server on a scratch port and proves online play:
+                                 # protocol smoke + two live RealtimeClient instances + pilot directory
+pnpm test:lookup                 # the pilot-directory contract alone (against a running server)
 ```
 
 ### Build targets (`VITE_PORTAL_TARGET`)
@@ -26,13 +29,23 @@ node scripts/verify-prod.mjs     # production gate (lint+typecheck+tests+build, 
 | Target | What it ships | Notes |
 |---|---|---|
 | `poki` | Poki SDK only; multiplayer/leaderboard/telemetry/social/Stripe URLs all blanked | coin economy only; localStorage save |
-| `crazy` | CrazyGames SDK v3 (banner container `VITE_CRAZY_BANNER_ID`) | same blanking |
+| `crazy` | CrazyGames SDK v3 (banner container `VITE_PORTAL_BANNER_ID`) | same blanking |
 | `generic` | no SDK; portal-safe restrictions still apply | for itch.io, GameDistribution, Yandex… |
 | `vercel` (default) | full social build: WS multiplayer, leaderboard, social server | needs the backend env vars |
 | `itch` (`VITE_SINGLEFILE`) | one self-contained HTML file | |
 
 The SDK script URL for each portal ships in **every** bundle as an inert string literal;
 only the build target's URL is ever injected (enforced by `scripts/verify-portal.mjs`).
+
+### Online play & pilot lookup (verified 2026-09-18)
+
+| Piece | Where | Notes |
+|---|---|---|
+| Client transport | `src/game/Realtime.ts` | `VITE_MULTIPLAYER_URL` (absolute `ws://…/mp`) or the dev proxy; explicit `leave` frame on disconnect, authoritative `peers` roster, real finish places |
+| Room server (dev/CI) | `server/` (`node --import tsx server/src/index.ts`, PORT default 8790) | CI reference implementation: `server/sunbird-server.mjs` |
+| Room server (authoritative) | `rust/crates/sunbird-server` | `/ws`, frees the seat when the socket closes |
+| Live proof | `scripts/pvp-check.mjs` (`pnpm pvp:check`), `src/game/__tests__/pvp-live.test.ts` | CI job `pvp-live` on every push |
+| Pilot lookup | `src/game/pilots.ts`, `Squad.ts`, `server/src/http/legacy.ts` | real directory + local "flew with" history; **no fabricated pilots anywhere** (see REBUILD_REPORT §13) |
 
 ## 2. Architecture (honest version)
 
@@ -116,11 +129,23 @@ Re-verified against the current Poki docs (developers.poki.com, 2026-09-16):
 2. Upload static + animated thumbnails.
 3. Confirm **web exclusivity** for the Poki build at submission (the `generic` zip is a
    separate artifact, which is what makes the pledge possible).
-4. Keep the social/WS build out of the Poki artifact (already true — bundle-verified).
-5. Post-launch: AUDS (cross-device save), Netlib (portal multiplayer), optional `login()` button.
+4. Keep the social/WS build out of the Poki artifact — `pnpm isolation:check` plus the
+   portal markers (`verify:portals`, `audit:zips`, `verify:upload` `ROOT-07`/`ROOT-08`) prove
+   it at source *and* bundle level on every push.
+5. Supply the Poki-issued ids at build time: `VITE_POKI_GAME_ID` (AUDS) and
+   `VITE_POKI_NETLIB_GAME_ID` (Netlib). Both integrations already ship — without the ids
+   they stay dormant rather than broken. Optional `login()` button after that.
 
 ## 5. Recent significant work (git log, newest first)
 
+- (this session, Poki platform pass) Poki multiplayer proven to be the Netlib P2P path
+  end-to-end; AUDS completed (public `_increment` counter) and used for its documented
+  non-real-time-multiplayer case — **run share codes** (`src/game/SharedRun.ts`: publish a
+  finished run, race a friend's code on the same seed, count plays); race lobby no longer
+  pads itself with invented rivals (`lobbyRivals(roster)` is truth-only); `VITE_POKI_NETLIB_GAME_ID`
+  override for the Poki-issued id; new `pnpm isolation:check` proves the Rust stack stays
+  platform-agnostic and Poki stays P2P + AUDS (with the mirror-image required-marker checks
+  in every build gate); Rust legacy gateway learned the `leave` frame for parity.
 - (this session) PVP/slipstream hardening + results-economy audit: time-based draft
   smoothing (frame-rate independent), per-mode name-tag draft zones, **one-shot 3× coin
   bonus** (was re-claimable forever from the live snapshot), removed the false 📺 "ad
@@ -140,7 +165,7 @@ Re-verified against the current Poki docs (developers.poki.com, 2026-09-16):
 
 ## 6. Test gate (what "ready" means)
 
-- `pnpm test` — 949 tests: unit (jsdom), deterministic-sim (same seed ⇒ bit-identical player
+- `pnpm test` — 1051 tests (+ 8 skipped, incl. the live PvP suite without a server): unit (jsdom), deterministic-sim (same seed ⇒ bit-identical player
   physics), network-boundary (hostile frames), PVP end-of-race audit, slipstream stress,
   perf guards.
 - `pnpm test:server` + `pnpm typecheck:server` — Node reference server.
@@ -152,10 +177,14 @@ Re-verified against the current Poki docs (developers.poki.com, 2026-09-16):
 
 - AI rival emotes are generated locally per client (two players see different AI emotes) —
   fixing needs server-side AI emotes; cosmetic only.
-- Cloud save on portals is wrapped localStorage (no Poki AUDS yet) — cross-device saves
-  are a post-launch item.
-- Portal multiplayer is deferred (Poki Netlib / external-server approval) — the social
-  build is separate and works independently.
+- Cloud save on portals is wrapped localStorage today; the AUDS per-user sync,
+  share-code and pilot-directory paths ship behind `VITE_POKI_GAME_ID` and activate
+  once Poki issues a game id. Until then the Poki build's Pilot Lookup says
+  "unavailable" rather than inventing anyone.
+- Poki multiplayer is Netlib P2P (no external-server approval needed); the self-hosted
+  WebSocket room server stays on the direct/crazy/generic builds and never enters the
+  Poki bundle. If Poki later requires an external-server approval for anything, only that
+  path is affected.
 - No headless browser in the dev sandbox — runtime verification there is unit + e2e-in-CI +
   Inspector. If a device-specific issue is reported, reproduce in the Inspector first.
 

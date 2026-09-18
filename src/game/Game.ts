@@ -2,7 +2,7 @@ import { equalizedRace } from "./RaceRules";
 import { terrainCue, landingLookAhead } from "./FlightGuidance";
 import { ScreenHistory } from "./ScreenHistory";
 import { copyText, shareText } from "./Clipboard";
-import { replayOptions, type RunOptions } from "./Replay";
+import { replayOptions, shouldRebuildCasualWorld, type RunOptions } from "./Replay";
 import * as THREE from "three";
 import { Achievements } from "./Achievements";
 import { GameAudio } from "./Audio";
@@ -20,7 +20,8 @@ import { LaunchSystem, ratingLabel, type LaunchResult } from "./LaunchSystem";
 import { isRaceMode, MASS_RACE_FIELD, MODES, modeById, PVP_MODES, PVP_WORLDS, RACE_FINISH, type ModeDef, type ModeId, type PvpWorldCourse } from "./Modes";
 import { MassRace } from "./MassRace";
 import { FinishGate } from "./FinishGate";
-import { isMultiplayerConfigured, makeRoomCode, RealtimeClient, type AnyRealtimeClient } from "./Realtime";
+import { fetchPublicRooms, isMultiplayerConfigured, makeRoomCode, RealtimeClient, type AnyRealtimeClient } from "./Realtime";
+import { RoomWatcher, ROOM_POLL_MS, roomSummaryLine, summarizeRooms, type LiveRoom } from "./RoomBrowser";
 import { Leaderboard, loadPilotName, savePilotName, isLeaderboardOnline, type BoardMetric, type BoardPage, type BoardScope } from "./Leaderboard";
 import { generatePilotName } from "./pilotNameGenerator";
 import { setLocale, type SupportedLocale } from "../i18n";
@@ -39,6 +40,10 @@ import {
 } from "./Challenges";
 import { bankMasteryRun, masteryPerks, masteryViews, NO_MASTERY_PERKS, type MasteryPerks } from "./Mastery";
 import { FirstFlight } from "./FirstFlight";
+import { bootStage, defer } from "./BootProgress";
+import { continueOffer, continuePlacementLabel, type ContinueOffer } from "./ContinueOffer";
+import { createWakeLock, type ScreenWakeLock } from "./WakeLock";
+import { detectDeviceProfile, describeDeviceProfile, deviceProfileTelemetry, type DeviceProfile } from "../sdk/device-report";
 import { campaignProgress, campaignViews, CAMPAIGN } from "./Campaign";
 import { monthKey, monthlyTheme, THEME_TRAIL_CLEARS, weeklyEvent } from "./Events";
 import { emptySquadState, SquadClient } from "./Squad";
@@ -83,7 +88,10 @@ import { nextWings, wingsFor, wingsProgress, wingsPromotion } from "./Career";
 import { GhostPlayer, GhostRecorder } from "./Ghost";
 import { fetchRivalGhost, publishGhost } from "./GhostNet";
 import { HUD, type CalendarCard, type CheckoutMode, type DailyCard, type GauntletCard, type HudSnapshot, type LoadoutView, type RivalCard, type SeedMode, type UiScreen, type UiState } from "./HUD";
-import { divisionFor, duelOpponent, duelSkillFor, featuredRivals, nextDivision, rankSeasonId, seasonReward } from "./pvp";
+import { divisionFor, duelOpponent, duelSkillFor, lobbyRivals, nextDivision, rankSeasonId, seasonReward } from "./pvp";
+import { PilotBook } from "./pilots";
+import { launchIntentFor, pvpCircuitFor } from "./launchRouting";
+import { countSharePlay, loadSharedRun, shareRun, sharingAvailable, type SharedRun } from "./SharedRun";
 import { Input } from "./Input";
 import { clamp, dateSeed, formatDatePretty, lerp, SeededRandom } from "./math";
 import { Missions, type MissionView, type QuestReward, type QuestView, type RunStats } from "./Missions";
@@ -104,7 +112,8 @@ import { buildChallengeUrl, readChallengeFromUrl, type RivalChallenge } from "./
 import { flag } from "./Flags";
 import { variant } from "./Experiments";
 import { buildRoomInviteUrl, normalizeRoomCode, readRoomInviteFromUrl } from "./RoomInvite";
-import { CRAZY_BANNER_ID, initPlatform, isCoarsePointer, isPortalBuild, portalTarget as getPortalTarget, type PlatformAdapter } from "../sdk/platform";
+import { PORTAL_BANNER_ID, initPlatform, isCoarsePointer, isPortalBuild, portalTarget as getPortalTarget, type PlatformAdapter } from "../sdk/platform";
+import { POKI_MULTIPLAYER, SQUAD_CHAT } from "./edition";
 import { GameplayEventSink } from "./GameplayEvents";
 import { LivingBackground } from "./LivingBackground";
 import { Sky } from "./Sky";
@@ -234,6 +243,21 @@ export class Game {
   private readonly onContextLost: (e: Event) => void;
   private readonly onContextRestored: () => void;
 
+  /**
+   * Measured capability baseline (Poki Player Device Report, DEV-03). Probed
+   * once, before the renderer exists, and read for every quality decision —
+   * shadows, pixel ratio, particle budget. Never inferred from the UA alone.
+   */
+  private readonly deviceProfile: DeviceProfile = detectDeviceProfile();
+  /**
+   * Keeps the phone screen awake for the duration of a run (DEV-14: WakeLock is
+   * one of the APIs the Device Report tracks; a dimming screen mid-flight is
+   * the most common non-bug drop-off on mobile). No-op where unsupported.
+   */
+  private readonly wakeLock: ScreenWakeLock = createWakeLock();
+  /** Context-driven rewarded framing for the continue screen (MON-19). */
+  private continueOfferView: ContinueOffer | null = null;
+
   private daylight = DAYLIGHT_MAX;
   private startX = 64;
   private island = 0;
@@ -325,7 +349,9 @@ export class Game {
   private roomSize = 40;
   private roomSkill: "chill" | "sharp" | "ace" = "sharp";
   private roomMuted = false;
-  private lastEmoteAt = 0;
+  private lastEmoteWallAt = 0;
+  /** Run-clock stamp for the automatic crown emote on a personal best. */
+  private lastEmoteRunAt = 0;
   private draftBanner = 0;
   private wasDrafting = false;
   /** Rival tracking: who beat you last time, for the revenge prompt. */
@@ -349,6 +375,13 @@ export class Game {
   private networkStartAt = 0;
   /** Deferred launch options for when the search resolves. */
   private mmOpts: { ranked: boolean; storm: boolean } | null = null;
+  /** Search phase: a live countdown while "searching", then "waiting" — the
+   *  search stays open and the pilot decides, instead of being dropped into an
+   *  AI race they never asked for. */
+  private mmPhase: "searching" | "waiting" = "searching";
+  /** Summary of public rooms seen during the search (real players, no fakes). */
+  private mmRooms = "";
+  private roomWatcher: RoomWatcher | null = null;
   /** The last launched match's options — powers the one-tap Rematch button. */
   private lastMatchOpts: { ranked: boolean; storm: boolean } | null = null;
   /** Stormfront mode: PvE hazards×PvP race hybrid — everyone flies the gauntlet. */
@@ -365,6 +398,14 @@ export class Game {
   private goldenHour = false;
   private nextMilestone = 500;
   private rivalBeatenToast = false;
+
+  /* ---- AUDS shared runs: async multiplayer by code (Poki builds) ---- */
+  /** The code published for the run on screen, "" until the player shares. */
+  private shareCode = "";
+  private runShareBusy = false;
+  private shareError = "";
+  /** The friend's run loaded from a code, waiting to be raced. */
+  private sharedRun: SharedRun | null = null;
   /** True once the DO's official finish place has been folded in this race. */
   private serverPlaceApplied = false;
   private duelResult: "" | "won" | "lost" = "";
@@ -381,6 +422,8 @@ export class Game {
   private eventRun = false;
   /** Squad (friends/clubs/chat) client + last action notice. */
   private squad: SquadClient | null = null;
+  /** The real pilots this device has flown with (see pilots.ts). */
+  private readonly pilots = new PilotBook();
   private squadNotice = "";
   private squadPoll = 0;
   private readonly flow = new FlowTuner();
@@ -498,6 +541,9 @@ export class Game {
     this.seed = this.today;
     this.squad = new SquadClient(this.save.state.deviceId, () => this.pilotName);
     this.squad.setOnChange(() => this.bump());
+    // The public pilot record needs the mark and the bird; the game is the only
+    // thing that knows them. Refresh it whenever a run might have improved it.
+    this.squad.setPublishStats({ bestDistance: this.save.state.bestDistance, skin: this.skin.id });
 
     host.classList.add("game-root");
     const canvas = document.createElement("canvas");
@@ -557,12 +603,18 @@ export class Game {
     // but lets the hills hold their colour instead of turning milky.
     this.renderer.toneMappingExposure = 1.16;
     // Software renderer: disable shadows and cap pixel ratio to keep it usable.
-    this.renderer.shadowMap.enabled = !softwareMode;
+    // The device baseline does the same for measured-lite hardware (≤2 cores,
+    // ≤2 GB, no WebGL) — DEV-03 is "pick tiers from the probe", not from taste.
+    this.renderer.shadowMap.enabled = !softwareMode && this.deviceProfile.tier !== "lite";
     // PCFSoftShadowMap was removed in three r165+ — PCF with a slightly larger
     // shadow map is the soft look without the console warning every load.
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.dpr = softwareMode ? 1 : this.preferredDpr();
     this.renderer.setPixelRatio(this.dpr);
+
+    // EA-04/EA-05: the renderer (the expensive object) exists — the loading
+    // screen can now say so truthfully.
+    bootStage("engine");
 
     this.scene = new THREE.Scene();
     // Fog pushed well past the action: at near=62 the hills the bird is about
@@ -621,6 +673,7 @@ export class Game {
 
     this.terrain = new TerrainSystem(this.seed);
     this.scene.add(this.terrain.group);
+    bootStage("world");
 
     this.bird = new Bird();
     this.bird.addTo(this.scene);
@@ -681,7 +734,7 @@ export class Game {
         void this.audio.resumeExisting();
       }
       if (this.checkoutWaiting && this.screen === "checkout") {
-        this.telemetry.track("stripe_return_focus", { sku: this.checkoutSku });
+        this.telemetry.track("checkout_return_focus", { sku: this.checkoutSku });
         this.hud.toast("Welcome back — confirm below if you finished paying", "info");
       }
     };
@@ -767,6 +820,16 @@ export class Game {
       runs: this.save.state.runsPlayed,
       streak: this.save.state.streak.days,
     });
+    // Player Device Report (DEV-03): report the measured baseline once per
+    // session so our own quality-tier decisions can be compared against the
+    // platform's published distribution. Aggregate capability data only — no
+    // identifiers (REQ-32).
+    this.telemetry.track("device_profile", deviceProfileTelemetry(this.deviceProfile));
+    // The human-readable line rides along as a `summary` field: telemetry's
+    // debug channel prints it on localhost, which is where a tier surprise
+    // should be noticed (the production gate forbids console.* in shipped
+    // client code, so this is the sanctioned observability surface).
+    this.telemetry.track("device_summary", { summary: describeDeviceProfile(this.deviceProfile) });
     // Portal SDK initialization is intentionally late: the first interactive
     // menu frame should never wait on a third-party CDN.
     void initPlatform({
@@ -824,16 +887,25 @@ export class Game {
       });
 
       // Portal ad banner: the host div is rendered by App for portal builds.
-      if (CRAZY_BANNER_ID) {
-        const host = document.getElementById(CRAZY_BANNER_ID);
+      if (PORTAL_BANNER_ID) {
+        const host = document.getElementById(PORTAL_BANNER_ID);
         if (host) adapter.mountBanner(host);
       }
       this.bump();
     });
     if (seasonEnd) this.hud.toast(`⚔ Ranked season over · ${seasonEnd.division} reward +${seasonEnd.coins} coins`, "gold");
     // Warm the embedded main-menu leaderboard on boot so it isn't empty on
-    // the first frame (serves the cache first, so this never blocks paint).
-    void this.refreshBoard();
+    // the first frame. EA-05: this is background work — it is queued as idle
+    // work so the first interactive frame (and the boot bar's last stage) does
+    // not wait on a network round trip. The board serves its cache first, so
+    // arriving late costs the player nothing.
+    defer("menu-board-warmup", () => this.refreshBoard());
+    // EA-05: same for the music bus — the synth graph is created on the first
+    // gesture anyway (autoplay policy), so priming it here is pure headroom.
+    defer("audio-warmup", () => this.audio.setMusicEnabled(this.save.state.settings.music));
+    // The first flyable frame is what the player is actually waiting for: the
+    // world exists, the menu is interactive, and the loop is about to start.
+    bootStage("flight");
     this.bump();
     this.pushHud();
   }
@@ -856,6 +928,7 @@ export class Game {
     window.removeEventListener("focus", this.onFocus);
     window.removeEventListener("blur", this.onBlur);
     window.removeEventListener("orientationchange", this.onOrientationChange);
+    this.wakeLock.dispose();
     this.telemetry.flush();
     this.squad?.dispose();
     this.telemetry.dispose();
@@ -907,8 +980,10 @@ export class Game {
       this.hud.toast(`🎟 Invited to room ${code} — ready up together to race`, "gold");
       this.telemetry.track("room_invite_opened", { room: code });
     }
-    // Club chat: light polling only while the Squad screen is on screen.
-    if (this.screen === "squad" && (this.state === "menu" || this.state === "gameover") && this.squad?.live) {
+    // Club chat: light polling only while the Squad screen is on screen, and
+    // only in editions that have a chat surface at all (portal builds do not —
+    // Poki REQ-31). No dead network traffic, no chat endpoint in the log.
+    if (SQUAD_CHAT && this.screen === "squad" && (this.state === "menu" || this.state === "gameover") && this.squad?.live) {
       this.squadPoll += raw;
       if (this.squadPoll >= 4) {
         this.squadPoll = 0;
@@ -1341,7 +1416,8 @@ export class Game {
             this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
             this.audio.purchase();
             this.haptic([25, 15, 45]);
-            if (this.elapsed - this.lastEmoteAt >= 2.0) {
+            if (this.elapsed - this.lastEmoteRunAt >= 2.0) {
+              this.lastEmoteRunAt = this.elapsed;
               this.sendEmote("👑");
             }
           } else if (gain >= 3) {
@@ -2420,8 +2496,15 @@ export class Game {
     // explicit Yesterday/Random seed pick is honoured, and date-seeded
     // daily/gauntlet runs plus shared-field races (duels, events, stormfront,
     // mass races) keep their fixed seed so the field stays fair/comparable.
-    const casualRun =
-      this.seedMode === "today" && !opts?.duel && !opts?.challenge && !opts?.event && !opts?.storm && !isRaceMode(this.modeId);
+    const casualRun = shouldRebuildCasualWorld({
+      replay: Boolean(opts?.replay),
+      seedMode: this.seedMode,
+      duel: Boolean(opts?.duel),
+      challenge: typeof opts?.challenge === "string" ? opts.challenge : "",
+      event: Boolean(opts?.event),
+      storm: Boolean(opts?.storm),
+      raceMode: isRaceMode(this.modeId),
+    });
     if (casualRun) {
       this.rebuildWorld(`fly-${Math.random().toString(36).slice(2, 10)}`);
     } else if (opts?.challenge && this.seed !== this.today) {
@@ -2612,10 +2695,30 @@ export class Game {
     const maxContinues = gold ? 99 : this.save.isVipActive() ? 2 : 1;
     if (this.continuesUsed < maxContinues && (gold || canCoins || canAd)) {
       this.continueTimer = CONTINUE_TIMEOUT;
+      // MON-19: the offer is context-driven, not a static button — the framing
+      // is chosen from what the run just did (record / near-best / streak /
+      // momentum) and falls back to the neutral card. It never changes what is
+      // on offer, only why the player might care; the standard non-ad options
+      // are rendered beside it either way (MON-05…MON-08).
+      const distance = this.lastRunDistance();
+      this.continueOfferView = continueOffer({
+        distance,
+        runCoins: this.runCoins,
+        personalBest: this.save.state.bestDistance,
+        streakDays: this.save.state.streak.days,
+        nearBest: this.save.state.bestDistance > 0 && distance >= this.save.state.bestDistance * 0.85,
+        isRecord: this.save.state.bestDistance > 0 && distance > this.save.state.bestDistance,
+        altitude: this.bird.y,
+        adAvailable: canAd,
+      });
       this.setState("continue");
       // Poki game-events: measure the rewarded offer's exposure (visible) so
-      // the dashboard can compare it against `interact` when tapped.
-      if (this.portalEnabled() && canAd) this.platform?.measure("button", "continue-ad", "visible");
+      // the dashboard can compare it against `interact` when tapped. The label
+      // carries the offer kind so placement usage is measurable per context.
+      if (this.portalEnabled() && canAd) {
+        this.platform?.measure("button", continuePlacementLabel(this.continueOfferView.kind), "visible");
+      }
+      this.telemetry.track("continue_offer", { kind: this.continueOfferView.kind, distance: Math.round(distance) });
     } else {
       this.finishRun();
     }
@@ -2718,6 +2821,7 @@ export class Game {
     // the just-earned rank. Local rows were already updated synchronously, so
     // this resolves to the new standing without a network round-trip.
     void this.refreshBoard(true);
+    this.squad?.setPublishStats({ bestDistance: this.save.state.bestDistance, skin: this.skin.id });
     const improvedCups = this.cups.submit(this.modeId, {
       distance: stats.distance,
       altitude: this.maxAltitude,
@@ -3135,13 +3239,47 @@ export class Game {
       case "mode-select":
         this.setScreen("modes");
         break;
-      case "pick-mode":
-        if (id === "massrace") { this.setScreen("live"); break; }
+      case "pick-mode": {
+        // Route by intent (see launchRouting.ts): solo modes start a run, the
+        // mass race opens the lobby, and a PvP circuit opens the PvP OPTIONS
+        // with that circuit preselected. A card labelled PvP must never drop
+        // the player straight into an offline AI race.
+        const intent = launchIntentFor(id);
+        if (intent === "lobby") { this.setScreen("live"); break; }
+        if (intent === "pvp-options") {
+          const circuit = pvpCircuitFor(id);
+          if (circuit) {
+            this.selectedPvpMode = circuit;
+            this.mode = modeById(circuit);
+            this.hud.toast(`${this.mode.icon} ${this.mode.name} selected — ranked, casual, a room, or the AI flock`, "gold");
+          }
+          this.setScreen("live");
+          this.bump();
+          break;
+        }
         this.modeId = (id || "daytrip") as ModeId;
         this.mode = modeById(this.modeId);
         this.exitVersus();
         this.startRun();
         break;
+      }
+      case "ai-pvp": {
+        // The explicit offline route: race the neural flock right now, on the
+        // card's circuit when it names one, otherwise on the last selection.
+        const circuit = pvpCircuitFor(id) ?? this.selectedPvpMode;
+        const m = modeById(circuit);
+        this.selectedPvpMode = m.id;
+        this.modeId = m.id;
+        this.mode = m;
+        this.exitVersus();
+        this.cancelMatchmaking();
+        this.disconnectRace();
+        this.roomCode = "";
+        this.rankedRace = false;
+        this.hud.toast(`🤖 AI PvP · ${m.icon} ${m.name} vs the flock`, "info");
+        this.launchMatch({ ranked: false, storm: m.id === "pvp_typhoon" }, true);
+        break;
+      }
       case "versus":
         this.startVersus();
         break;
@@ -3407,13 +3545,19 @@ export class Game {
         this.bump();
         break;
       }
-      case "quick-match-instant":
-        this.cancelMatchmaking();
-        this.disconnectRace();
-        this.modeId = this.selectedPvpMode;
-        this.mode = modeById(this.selectedPvpMode);
-        this.launchMatch({ ranked: true, storm: this.modeId === "pvp_typhoon" }, true);
+      case "quick-match-instant": {
+        // "Quick Match" is the one-tap ONLINE path: it seats the player in
+        // public matchmaking for the chosen circuit. It used to force a local
+        // AI race (launchMatch(..., true)) while sitting under a "40 pilots,
+        // ready now" hero — the player asked for a PvP race and got bots.
+        // beginMatchmaking falls back to the AI flock only when no transport
+        // exists in this runtime, and now says so when it does.
+        const mode = modeById(this.selectedPvpMode);
+        this.modeId = mode.id;
+        this.mode = mode;
+        this.beginMatchmaking({ ranked: true, storm: mode.id === "pvp_typhoon" });
         break;
+      }
       case "start-room-now":
         if (this.net) this.net.startNow();
         this.modeId = this.selectedPvpMode;
@@ -3454,6 +3598,13 @@ export class Game {
         break;
       case "mm-cancel":
         this.cancelMatchmaking();
+        break;
+      case "mm-ai":
+        // Explicit opt-in only: the search never drops a pilot into a bot race.
+        this.takeAiFlock();
+        break;
+      case "mm-keep-search":
+        this.keepSearching();
         break;
       case "pvp-duel":
         this.roomCode = "";
@@ -3640,8 +3791,149 @@ export class Game {
         this.squadNotice = "";
         void this.squad?.refresh();
         break;
+      case "share-run": {
+        // Publish this run so a friend can race the same hills against our
+        // mark. AUDS is Poki's store (it needs a Poki game id), so elsewhere
+        // the button is not rendered and this is unreachable.
+        if (this.runShareBusy) break;
+        this.runShareBusy = true;
+        this.shareError = "";
+        this.bump();
+        const run: SharedRun = {
+          v: 1,
+          name: this.racedName(),
+          seed: this.seed,
+          mode: this.modeId,
+          distance: Math.round(this.bird.x - this.startX),
+          timeMs: Math.round((this.raceFinishTime || this.runTime) * 1000),
+          place: this.racePlace,
+          bird: this.skin.id,
+        };
+        void shareRun(run).then((code) => {
+          if (this.disposed) return;
+          this.runShareBusy = false;
+          if (code) {
+            this.shareCode = code;
+            this.hud.toast("🔗 Run shared — send the code to a friend", "gold");
+          } else {
+            // Platform-neutral copy: this string ships in every edition, and
+            // the isolation gates reject the platform's name in other builds.
+            this.shareError = "Sharing isn't available in this build — no platform store is configured.";
+          }
+          this.bump();
+        });
+        break;
+      }
+      case "copy-share": {
+        if (!this.shareCode) break;
+        const code = this.shareCode;
+        void copyText(code).then((ok) => {
+          if (this.disposed) return;
+          this.hud.toast(ok ? `Run code ${code} copied` : `Run code: ${code}`, ok ? "gold" : "info");
+        });
+        break;
+      }
+      case "load-run": {
+        const code = this.hud.readValue("shareCode").trim();
+        if (!code) break;
+        this.runShareBusy = true;
+        this.shareError = "";
+        this.bump();
+        void loadSharedRun(code).then((run) => {
+          if (this.disposed) return;
+          this.runShareBusy = false;
+          if (!run) {
+            this.shareError = sharingAvailable()
+              ? "No shared run with that code — check the code and try again."
+              : "Run codes aren't available in this build — no platform store is configured.";
+            this.bump();
+            return;
+          }
+          this.sharedRun = run;
+          // Same hills, same mode, their mark: this is the existing rival
+          // challenge path, just delivered by code instead of a URL.
+          this.rival = { seed: run.seed, distance: run.distance, name: run.name, mode: run.mode };
+          this.rebuildWorld(run.seed);
+          this.seedMode = "random";
+          if (MODES.some((m) => m.id === run.mode)) {
+            this.modeId = run.mode as ModeId;
+            this.mode = modeById(this.modeId);
+          }
+          // Count the play — the AUDS counter endpoint is public by design.
+          void countSharePlay(code);
+          this.hud.toast(`🥊 ${run.name} flew ${run.distance.toLocaleString()} m here — beat it`, "quest");
+          this.telemetry.track("shared_run_loaded", { mode: this.modeId, distance: run.distance });
+          this.bump();
+        });
+        break;
+      }
+      case "race-share": {
+        if (!this.sharedRun) break;
+        this.exitVersus();
+        this.startRun();
+        break;
+      }
+      case "pilot-lookup": {
+        // Real lookup: the panel shows the directory's answer, including
+        // "no pilot with that code" and "this build is offline".
+        const code = this.hud.readValue("pilotCode").trim().toUpperCase();
+        void this.squad?.lookupPilot(code).then(() => this.bump());
+        break;
+      }
+      case "pilot-add": {
+        const code = id || this.squad?.state.lookup?.code || this.hud.readValue("pilotCode");
+        void this.squad?.addFriend(code).then((msg) => {
+          this.squadNotice = msg;
+          this.bump();
+        });
+        break;
+      }
+      case "pilot-copy": {
+        const code = id || this.squad?.state.lookup?.code || "";
+        if (!code) break;
+        void copyText(code).then((ok) => {
+          if (this.disposed) return;
+          this.hud.toast(ok ? `Pilot code ${code} copied` : "Copy the code from the field", "info");
+        });
+        break;
+      }
+      case "pilot-invite":
+      case "mate-invite": {
+        // Inviting a wingman is the same real artefact as inviting anyone:
+        // the room's invite link. No room yet → say so instead of pretending.
+        const who = id || "your wingman";
+        if (!this.roomCode) {
+          this.hud.toast("Create a private room first — then invites are one tap", "info");
+          break;
+        }
+        void this.invitePilot(this.roomCode, who);
+        break;
+      }
+      case "mate-wingman": {
+        const name = id;
+        if (name) this.squadNotice = this.squad?.rememberWingman(name) ?? "";
+        this.bump();
+        break;
+      }
+      case "mate-forget": {
+        if (id && this.pilots.forget(id)) {
+          this.hud.toast(`Forgot ${id}`, "info");
+          this.bump();
+        }
+        break;
+      }
+      case "req-accept":
+        void this.squad?.respondRequest(id, true);
+        break;
+      case "req-decline":
+        void this.squad?.respondRequest(id, false);
+        break;
+      case "req-cancel":
+        void this.squad?.cancelRequest(id);
+        break;
       case "squad-add": {
-        const code = this.hud.readValue("squadCode").trim().toUpperCase();
+        // Kept for older builds/links that still post a bare code.
+        const code = (this.hud.readValue("squadCode") || this.hud.readValue("pilotCode")).trim().toUpperCase();
         if (!code) break;
         void this.squad?.addFriend(code).then((msg) => {
           this.squadNotice = msg;
@@ -3674,6 +3966,11 @@ export class Game {
         void this.squad?.leaveClub();
         break;
       case "squad-chat": {
+        // Portal editions ship without a chat surface (Poki REQ-31: no chat in
+        // multiplayer surfaces; emotes are the sanctioned alternative). The
+        // action stays for the direct build; here it can only be reached by a
+        // stale DOM node.
+        if (!SQUAD_CHAT) break;
         const text = this.hud.readValue("chatText");
         void this.squad?.sendChat(text).then(sent => {
           if (sent && this.hud.readValue("chatText") === text) this.hud.clearValue("chatText");
@@ -3825,14 +4122,17 @@ export class Game {
         this.telemetry.track("rival_thrown", { distance: dist, mode: this.modeId });
         break;
       }
-      case "rematch":
-        // Same stakes, zero menu round-trips — back through the honest
-        // search so live pilots can seat into the new field.
-        if (this.state === "gameover") {
-          if (this.lastMatchOpts && !this.duelActive && !this.roomCode) this.beginMatchmaking(this.lastMatchOpts);
-          else this.replayRun(true);
-        }
+      case "rematch": {
+        // Same stakes, zero menu round-trips. An online race goes back through
+        // the honest search so live pilots can seat into the next field; a duel
+        // or an AI-flock race replays locally, exactly as it was flown.
+        if (this.state !== "gameover") break;
+        const opts = this.lastMatchOpts ?? { ranked: false, storm: false };
+        if (this.duelActive || this.versus) this.replayRun(true);
+        else if (this.localRace || !isMultiplayerConfigured()) this.launchMatch(opts, true);
+        else this.beginMatchmaking(opts);
         break;
+      }
       case "share":
         void this.shareRun();
         break;
@@ -3845,8 +4145,10 @@ export class Game {
       case "continue-ad":
         if (this.state === "continue") {
           if (this.portalEnabled()) {
-            // Poki game-events: the player chose the rewarded option.
-            this.platform?.measure("button", "continue-ad", "interact");
+            // Poki game-events: the player chose the rewarded option. The label
+            // matches the `visible` event for the same offer kind (REQ-14).
+            const kind = this.continueOfferView?.kind ?? "standard";
+            this.platform?.measure("button", continuePlacementLabel(kind), "interact");
             void this.continueWithPortalReward();
           } else {
             this.adReason = "continue";
@@ -4178,7 +4480,7 @@ export class Game {
         sku === "sunbird_gold" ? this.save.state.gold
         : sku === "sunbird_vip" ? this.save.isVipActive()
         : this.save.state.starterPack;
-      if (!owned) this.grantSku(sku, "stripe_webhook");
+      if (!owned) this.grantSku(sku, "payment_webhook");
     }
   }
 
@@ -4523,7 +4825,8 @@ export class Game {
     this.particles.setBudget(this.particleBudget);
     // Soft shadows are the single priciest feature on mobile GPUs — keep them
     // only when the user asked for high quality (auto tiers shed them first).
-    const wantShadows = !this.isMobile && (s.quality === "high" || (s.quality === "auto" && this.frameEma < 1 / 30));
+    const wantShadows =
+      this.deviceProfile.tier !== "lite" && !this.isMobile && (s.quality === "high" || (s.quality === "auto" && this.frameEma < 1 / 30));
     if (this.renderer.shadowMap.enabled !== wantShadows) this.renderer.shadowMap.enabled = wantShadows;
     this.resize();
     this.bump();
@@ -4535,7 +4838,9 @@ export class Game {
     // Wings-style clarity comes from a stable frame rate, so cap phones at
     // 1x keeps the fill-rate stable on phones; native DPR is reserved for
     // desktop/high quality settings where the GPU budget is predictable.
-    if (this.save.state.settings.quality === "low") return 1;
+    // DEV-03: a measured-lite device never gets a 2x buffer, whatever its UA
+    // claims — fill-rate is the first thing that dies on those GPUs.
+    if (this.deviceProfile.tier === "lite" || this.save.state.settings.quality === "low") return 1;
     return this.isMobile ? 1 : dev;
   }
 
@@ -4591,7 +4896,12 @@ export class Game {
         this.particleBudget = Math.max(0.3, this.particleBudget - 0.2);
         this.particles.setBudget(this.particleBudget);
       }
-    } else if (this.frameEma < 1 / 58 && !this.isMobile && this.renderer.shadowMap.enabled === false) {
+    } else if (
+      this.frameEma < 1 / 58 &&
+      !this.isMobile &&
+      this.deviceProfile.tier !== "lite" &&
+      this.renderer.shadowMap.enabled === false
+    ) {
       // Headroom is back — restore soft shadows (they were only shed under load).
       this.renderer.shadowMap.enabled = true;
       this.particleBudget = Math.min(1, this.particleBudget + 0.2);
@@ -4699,7 +5009,11 @@ export class Game {
   /** Opt into a public room, ready when connected, and launch only on the
    * server's shared start. A timed-out search explicitly disconnects before
    * starting local AI practice. Browsing or cancelling cannot block a room. */
-  private static readonly MM_WINDOW = 8;
+  /** How long we actively count down before handing the choice to the player.
+   *  Long enough for a real pilot to finish loading and land in the same room. */
+  private static readonly MM_WINDOW = 20;
+  /** After the window: how long we keep the seat and keep listening. */
+  private static readonly MM_KEEPALIVE = 600;
 
   private beginMatchmaking(opts: { ranked: boolean; storm: boolean }): void {
     this.disconnectRace();
@@ -4712,23 +5026,75 @@ export class Game {
     this.modeId = this.selectedPvpMode;
     this.mode = modeById(this.selectedPvpMode);
     if (!isMultiplayerConfigured()) {
+      // No transport in this runtime (e.g. a Poki iframe without WebRTC, or a
+      // direct build without VITE_MULTIPLAYER_URL). Say so instead of silently
+      // starting an offline race the player believes is online.
+      this.hud.toast("Online racing is unavailable here — starting an AI flock race", "info");
       this.launchMatch(opts, true);
       return;
     }
     this.mmOpts = opts;
+    this.mmPhase = "searching";
+    this.mmRooms = "";
     this.mmDeadline = performance.now() + Game.MM_WINDOW * 1000;
     this.preseatLobby();
-    this.hud.setMatchmaking(true, this.liveCount(), this.roomSize, Game.MM_WINDOW);
+    this.startRoomWatch();
+    this.hud.setMatchmaking(true, this.liveCount(), this.roomSize, Game.MM_WINDOW, "searching", "");
     this.bump();
   }
 
   private cancelMatchmaking(): void {
     this.mmDeadline = 0;
     this.mmOpts = null;
+    this.mmPhase = "searching";
+    this.mmRooms = "";
+    this.roomWatcher?.stop();
+    this.closeRoomBrowser();
     this.net?.sendReady(false);
     this.disconnectRace();
     this.hud.setMatchmaking(false, 0, this.roomSize, 0);
     this.bump();
+  }
+
+  /** Releases the P2P browse connection (Poki only; a WS build has nothing to
+   *  release). Called when a search ends or is cancelled. */
+  private closeRoomBrowser(): void {
+    if (!POKI_MULTIPLAYER) return;
+    void import("./PokiNetlib").then((m) => m.closeLobbyBrowser()).catch(() => {
+      /* the connection is best-effort */
+    });
+  }
+
+  /** True while we asked the transport for a public room and have not been
+   *  seated/started yet. */
+  private searching(): boolean {
+    return this.mmDeadline > 0 && this.mmOpts !== null;
+  }
+
+  private startRoomWatch(): void {
+    if (!this.roomWatcher) {
+      this.roomWatcher = new RoomWatcher(
+        () => this.fetchLiveRooms(),
+        ROOM_POLL_MS,
+        (result) => {
+          if (!this.searching()) return;
+          this.mmRooms = result.rooms.length ? roomSummaryLine(summarizeRooms(result.rooms)) : "";
+          this.bump();
+        },
+      );
+    }
+    this.roomWatcher.start();
+  }
+
+  /** What is racing right now, on whichever transport this edition ships. */
+  private async fetchLiveRooms(): Promise<LiveRoom[]> {
+    if (!isMultiplayerConfigured()) return [];
+    if (POKI_MULTIPLAYER) {
+      // Compile-time gated: only the Poki bundle contains the P2P browser.
+      const { listPublicLobbies } = await import("./PokiNetlib");
+      return listPublicLobbies();
+    }
+    return fetchPublicRooms();
   }
 
   private liveCount(): number {
@@ -4739,20 +5105,60 @@ export class Game {
   /** Called every frame while a search is active. */
   private pumpMatchmaking(_raw: number): void {
     if (this.mmDeadline <= 0 || !this.mmOpts) return;
-    const secsLeft = (this.mmDeadline - performance.now()) / 1000;
-    const live = this.liveCount();
-    this.hud.setMatchmaking(true, live, this.roomSize, Math.max(0, secsLeft));
-    // Public entrants opt in by pressing Find race. The server, not each
-    // player's eight-second timer, decides when both pilots may launch.
-    if (this.net?.state === "lobby" && !this.net.info().ready) this.net.sendReady(true);
-    if (secsLeft <= 0) {
-      const opts = this.mmOpts;
+    // If the run already started (a real start frame, or a local launch), the
+    // search is over — the overlay must never sit on top of gameplay.
+    if (this.state !== "menu") {
       this.mmOpts = null;
       this.mmDeadline = 0;
-      this.hud.setMatchmaking(false, live, this.roomSize, 0);
-      this.hud.toast("No shared start received — starting an AI practice race", "info");
-      this.launchMatch(opts, true);
+      this.roomWatcher?.stop();
+      this.closeRoomBrowser();
+      this.hud.setMatchmaking(false, 0, this.roomSize, 0);
+      return;
     }
+    const live = this.liveCount();
+    // Public entrants opt in by pressing Find race. The server, not each
+    // player's timer, decides when the room may launch.
+    if (this.net?.state === "lobby" && !this.net.info().ready) this.net.sendReady(true);
+    // Someone real is in the room — keep the search open until the room starts.
+    if (live > 0 && this.mmPhase === "waiting") this.mmPhase = "searching";
+    if (this.mmPhase === "waiting") {
+      this.hud.setMatchmaking(true, live, this.roomSize, 0, "waiting", this.mmRooms);
+      return;
+    }
+    const secsLeft = (this.mmDeadline - performance.now()) / 1000;
+    this.hud.setMatchmaking(true, live, this.roomSize, Math.max(0, secsLeft), "searching", this.mmRooms);
+    if (secsLeft <= 0) {
+      // The window elapsed with nobody to race. Do NOT launch a bot race — the
+      // pilot asked for live pilots. Keep the room, keep listening, and let
+      // them choose: wait longer, or take the AI flock deliberately.
+      this.mmPhase = "waiting";
+      this.mmDeadline = performance.now() + Game.MM_KEEPALIVE * 1000;
+      this.hud.setMatchmaking(true, live, this.roomSize, 0, "waiting", this.mmRooms);
+      this.hud.toast(this.mmRooms ? `Still searching — ${this.mmRooms}` : "Still searching for live pilots…", "info");
+      this.bump();
+    }
+  }
+
+  /** Leave the search running (another full window) without dropping the room. */
+  private keepSearching(): void {
+    if (!this.mmOpts) return;
+    this.mmPhase = "searching";
+    this.mmDeadline = performance.now() + Game.MM_WINDOW * 1000;
+    this.hud.toast("Searching again — inviting any pilot who is online", "info");
+    this.bump();
+  }
+
+  /** Explicit "race the AI flock" opt-in from the search overlay. */
+  private takeAiFlock(): void {
+    const opts = this.mmOpts ?? this.lastMatchOpts ?? { ranked: false, storm: false };
+    this.mmOpts = null;
+    this.mmDeadline = 0;
+    this.mmPhase = "searching";
+    this.roomWatcher?.stop();
+    this.closeRoomBrowser();
+    this.hud.setMatchmaking(false, 0, this.roomSize, 0);
+    this.hud.toast("Racing the AI flock — offline practice", "info");
+    this.launchMatch(opts, true);
   }
 
   private launchMatch(opts: { ranked: boolean; storm: boolean }, local = false): void {
@@ -4890,6 +5296,19 @@ export class Game {
   }
 
   /** Per-frame network pump: cadence, inbound emotes, outbound state. */
+  /**
+   * Remember the real pilots sharing our room: real names, the room code and
+   * how far they flew. This is the local, honest source behind the "Flew with"
+   * list in Pilot Lookup — it never invents anyone.
+   */
+  private recordRoomPilots(): void {
+    const net = this.net;
+    if (!net?.connected) return;
+    const code = net.info().code;
+    if (!code) return;
+    if (this.pilots.remember(net.roster(), code, Date.now())) this.bump();
+  }
+
   private pumpNetwork(raw: number): void {
     const net = this.net;
     if (!net) return;
@@ -4919,6 +5338,7 @@ export class Game {
         case "join":
           this.hud.toast(`🕊 ${e.name} joined the race`, "island");
           this.audio.chirp();
+          this.recordRoomPilots();
           break;
         case "leave":
           this.hud.toast(`👋 ${e.name} left`, "warn");
@@ -4965,6 +5385,8 @@ export class Game {
             this.mmOpts = null;
             this.mmDeadline = 0;
             this.hud.setMatchmaking(false, this.liveCount(), this.roomSize, 0);
+            this.roomWatcher?.stop();
+            this.closeRoomBrowser();
             // Adopt the host/server seed as authoritative. When we joined a
             // friend's private code this is the host's format+course; without
             // parsing it the guest would rebuild Emerald/Sprint and fly the
@@ -4989,10 +5411,18 @@ export class Game {
       this.hud.toast("Emotes muted in this room", "info");
       return;
     }
-    if (this.elapsed - this.lastEmoteAt < 1.2) return; // simple spam guard
-    this.lastEmoteAt = this.elapsed;
+    // Rate-limit on wall-clock, not the run clock: the run clock is frozen in
+    // the menu, where the emote wheel is also visible.
+    const now = performance.now();
+    if (now - this.lastEmoteWallAt < 1200) return;
+    this.lastEmoteWallAt = now;
+    // Sender feedback is immediate: the flight HUD pops your own bubble and the
+    // floating nametag shows it, regardless of whether a net transport exists.
     this.massRace.showEmote("you", text);
+    this.hud.pulseEmote(text);
     this.net?.sendEmote(text);
+    // No toast here: the toast layer renders above the wheel and swallowed the
+    // click that sent the emote (feedback is the bubble, not a banner).
     this.audio.chirp();
     this.bump();
   }
@@ -5074,16 +5504,31 @@ export class Game {
   private replayRun(allowPortalBreak: boolean): void {
     if (this.versus) { this.startVersus(); return; }
     if (isRaceMode(this.modeId) && this.roomCode && !this.localRace) {
+      // An online race "replay" means going back through the search so the next
+      // round can seat real pilots. Bouncing the player to the menu (what this
+      // used to do) read as a broken replay button.
       this.disconnectRace();
       this.roomCode = "";
+      const opts = this.lastMatchOpts ?? { ranked: false, storm: false };
       this.setState("menu");
       this.setScreen("live");
-      this.hud.toast("Race complete — create or join a new room for the next race", "info");
+      if (isMultiplayerConfigured()) {
+        this.beginMatchmaking(opts);
+        return;
+      }
+      this.hud.toast("Online racing is unavailable here — replaying the AI flock", "info");
+      this.launchMatch(opts, true);
       return;
     }
-    const options = replayOptions({ duel: this.duelActive, challenge: this.challengeRun,
-      dailyDone: this.save.isDailyDone(this.today), gauntletDone: this.save.gauntletDone(weekKey()),
-      event: this.eventRun, storm: this.stormfront });
+    // Local run: replay means the SAME course, so the ghost recorded from the
+    // run that just ended is a real opponent instead of a random island nobody
+    // ever flew. Without this the ghost feature could never be seen.
+    const options: RunOptions = {
+      ...replayOptions({ duel: this.duelActive, challenge: this.challengeRun,
+        dailyDone: this.save.isDailyDone(this.today), gauntletDone: this.save.gauntletDone(weekKey()),
+        event: this.eventRun, storm: this.stormfront }),
+      replay: true,
+    };
     if (allowPortalBreak && this.portalEnabled()) void this.restartWithPortalBreak(options);
     else this.startRun(options);
   }
@@ -5156,6 +5601,10 @@ export class Game {
       this.timeScale = 1;
       this.zenithTimer = 0;
     }
+    // Wake lock follows gameplay exactly: held while flying, released the
+    // moment the player is in a menu, paused, asleep, or watching a break.
+    if (s === "playing") this.wakeLock.acquire();
+    else this.wakeLock.release();
     if (s === "menu" || s === "ad") this.audio.setMusicMode("menu");
     else if (s === "gameover" || s === "continue") this.audio.setMusicMode("sleep");
     else if (s === "paused") this.audio.duckMusic(0.55, 3);
@@ -5266,6 +5715,17 @@ export class Game {
   }
 
   /** Copies the room invite link, preferring the native share sheet. */
+  /** Share the room invite link with a named pilot (real link, real toast). */
+  private async invitePilot(room: string, who: string): Promise<void> {
+    const link = `${location.origin}${location.pathname}?room=${encodeURIComponent(room)}`;
+    const ok = await copyText(link);
+    if (this.disposed) return;
+    this.hud.toast(
+      ok ? `Invite link for room ${room} copied — send it to ${who}` : `Room ${room} — copy the link from the lobby`,
+      ok ? "gold" : "info",
+    );
+  }
+
   private copyRoomInvite(code: string): void {
     const url = buildRoomInviteUrl(code);
     const text = `Join my Sunbird race room ${code}: ${url}`;
@@ -5564,6 +6024,8 @@ export class Game {
       ghostDelta: this.state === "playing" || this.state === "gameover" ? this.ghostDelta() : null,
       newBest: this.newBest,
       continueTimer: this.continueTimer,
+      continueReason: this.continueOfferView?.reason ?? "",
+      continueHighlight: this.continueOfferView?.highlight ?? false,
       continueCost: CONTINUE_COST,
       canAffordContinue: st.wallet >= CONTINUE_COST,
       adAvailable: this.portalEnabled() ? Boolean(this.platform && this.platform.name !== "none") : this.ads.isAvailable(),
@@ -5720,21 +6182,10 @@ export class Game {
       // and on the results card, where no one renders it.
       lobbyRivals:
         this.state === "menu" && this.screen === "live"
-          ? (() => {
-              // Real pilots seated in the room always outrank seeded flavor text.
-              const live = (this.net?.roster() ?? [])
-                .slice(0, 39)
-                .map((p) => ({ name: p.name, tag: "in room · live", ready: p.ready, skin: p.skin }));
-              if (live.length) return live;
-              // Next best: time-shifted doubles of real leaderboard players.
-              const page = this.board.peek("global", "distance");
-              const ghosts = (page?.entries ?? [])
-                .filter((en) => !en.you && en.name)
-                .slice(0, 3)
-                .map((en) => ({ name: en.name, tag: `best ${Math.round(en.distance).toLocaleString()} m` }));
-              if (ghosts.length) return ghosts;
-              return featuredRivals(`${this.seed}:massrace`);
-            })()
+          // Truth only: the pilots actually seated in this room. No padded
+          // name-pool rivals, no borrowed leaderboard names — an empty room
+          // renders as an empty room.
+          ? lobbyRivals(this.net?.roster() ?? [])
           : [],
       raceRated: this.rankedRace,
       raceVerified: this.serverPlaceApplied,
@@ -5759,6 +6210,14 @@ export class Game {
       campaignDone: campaignProgress(st.campaignClaimed).done,
       campaignTotal: campaignProgress(st.campaignClaimed).total,
       squad: this.squad?.state ?? emptySquadState(),
+      recentPilots: this.pilots.all(),
+      share: {
+        available: sharingAvailable(),
+        code: this.shareCode,
+        busy: this.runShareBusy,
+        error: this.shareError,
+        loaded: this.sharedRun,
+      },
       squadNotice: this.squadNotice,
       dailyFlash: dailyFlashBird(this.today),
       stipendClaimed: this.save.state.lastStipendClaimed === this.today,

@@ -30,6 +30,7 @@ import type {
   PlatformSystemInfo,
 } from "./platform";
 import { localCloudFallback } from "./local";
+import { setLoadingNet } from "./net";
 
 type PokiUser = { username: string; avatarUrl?: string | null } | null;
 type PokiShareableData = Record<string, string | number | boolean>;
@@ -98,6 +99,19 @@ const EMPTY_INFO: PlatformSystemInfo = {
 function shareDismissed(error: unknown): boolean {
   return error instanceof DOMException && (error.name === "AbortError" || error.name === "NotAllowedError");
 }
+
+/**
+ * Last-resort loading-screen release, registered into the shared net
+ * (sdk/net.ts). This is the ONLY place in the codebase that may call the raw
+ * `PokiSDK` global behind the adapter's back, and it only ever runs when no
+ * adapter was constructed — i.e. nothing has signalled the portal yet. On a
+ * healthy boot the adapter owns both markers, one-shot, and this never fires.
+ */
+setLoadingNet(() => {
+  const sdk = (window as unknown as { PokiSDK?: PokiSdk }).PokiSDK;
+  sdk?.gameLoadingFinished?.();
+  sdk?.signalGameReady?.();
+});
 
 export class PokiAdapter implements PlatformAdapter {
   readonly name = "poki" as const;

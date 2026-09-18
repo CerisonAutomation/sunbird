@@ -1051,6 +1051,22 @@ h2 {
   animation: floaty 2s ease-in-out infinite;
 }
 
+/* Context-driven reason line on the continue card (Poki MON-19). Deliberately
+   quiet: it explains why the run is worth resuming, it does not sell the ad.
+   The highlighted variant only raises contrast — it never changes layout, so
+   the standard non-ad options keep the primary position (MON-07). */
+.continue-reason {
+  margin: -2px 0 2px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: #6a5a72;
+}
+
+.continue-reason.is-highlight {
+  color: #3f3350;
+  font-weight: 700;
+}
+
 .toasts {
   position: absolute;
   left: 50%;
@@ -1461,6 +1477,28 @@ h2 {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
 }
 .flight-footer .emote-options.hidden { display:none; }
+/* The sender's own emote — pops the instant the wheel button is pressed, so
+   the button never reads as dead (the in-world bubble needs the sim clock,
+   which is frozen in the lobby). */
+.emote-bubble {
+  position: absolute;
+  left: 18px;
+  bottom: calc(84px + env(safe-area-inset-bottom));
+  padding: 7px 14px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+  font-size: 24px;
+  line-height: 1;
+  pointer-events: none;
+  z-index: 6;
+}
+.emote-bubble.pop { animation: emoteBubblePop 0.36s cubic-bezier(0.2, 1.5, 0.3, 1); }
+@keyframes emoteBubblePop {
+  from { transform: scale(0.4) translateY(10px); opacity: 0; }
+  to { transform: scale(1) translateY(0); opacity: 1; }
+}
+.play-hud.versus .emote-bubble { display: none; }
 .versus-guide { display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px 10px; font:600 11px/1.5 system-ui,sans-serif; padding:5px 8px; border-radius:9px; color:#263446; background:#fff6e9; text-shadow:none; }
 .versus-guide span { white-space:nowrap; }
 

@@ -107,7 +107,7 @@ npm run build:crazy       # → sunbird-crazy.zip
 
 Upload via the CrazyGames developer portal. Uses SDK v3 (`game.loadingStart/
 Stop`, `gameplayStart/Stop`, `ad.requestAd`, optional `banner.requestBanner`
-via `VITE_CRAZY_BANNER_ID`). Same graceful-degradation guarantees as Poki.
+via `VITE_PORTAL_BANNER_ID`). Same graceful-degradation guarantees as Poki.
 
 ## 4. Self-hosted / itch.io style
 
@@ -131,7 +131,7 @@ this is deliberate and tested; do not make the font link render-blocking.
 |---|---|---|---|
 | `VITE_PORTAL_TARGET` | unset | `poki` | `crazy` |
 | `VITE_MULTIPLAYER_URL` | `/mp` (dev) or verified `wss://…` | unset until portal-safe WSS is approved | unset until portal Full Launch multiplayer is approved |
-| `VITE_CRAZY_BANNER_ID` | — | — | optional |
+| `VITE_PORTAL_BANNER_ID` | — | — | optional |
 
 ## 5. Stripe webhook entitlements (server-authoritative purchases)
 
