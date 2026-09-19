@@ -53,7 +53,8 @@ export type UiScreen =
   | "rank"
   | "challenges"
   | "campaign"
-  | "squad";
+  | "squad"
+  | "nameEntry";
 
 export type RivalCard = {
   rating: number;
@@ -1418,6 +1419,8 @@ export class HUD {
         return renderCampaign(s);
       case "squad":
         return renderSquad(s);
+      case "nameEntry":
+        return renderNameEntry(s);
       default:
         return renderMain(s);
     }
@@ -2328,6 +2331,28 @@ function renderAtlas(s: HudSnapshot): string {
 
 function menuLinks(items: MenuDestination[]): string {
   return items.map(item => `<button class="destination" data-ui data-action="${item.action}" data-icon="${item.icon}"><span class="destination-art">${menuIcon(item.icon)}</span><span class="destination-copy"><b>${item.title}</b><span>${item.detail}</span></span><span class="destination-arrow" aria-hidden="true">↗</span></button>`).join("");
+}
+
+function renderNameEntry(_s: HudSnapshot): string {
+  return `
+    ${head(t("identity.welcome", undefined, "Welcome to Sunbird"))}
+    <p class="tagline">Every pilot has a name. What's yours?</p>
+    <div class="name-entry-form">
+      <input
+        type="text"
+        data-ui
+        data-ref="pilotNameInput"
+        class="name-input"
+        placeholder="Enter your pilot name"
+        maxlength="14"
+        aria-label="Pilot name"
+      />
+      <button class="primary-btn wide" data-ui data-action="confirm-pilot-name">
+        Take to the skies
+      </button>
+    </div>
+    <p class="fineprint">You can change your name anytime in Settings.</p>
+  `;
 }
 
 function renderMain(s: HudSnapshot): string {

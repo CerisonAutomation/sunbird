@@ -917,6 +917,10 @@ export class Game {
     bootStage("flight");
     this.bump();
     this.pushHud();
+    // Show name entry on first use
+    if (!this.save.state.pilotNameCustomized && this.state === "menu") {
+      this.setScreen("nameEntry");
+    }
   }
 
   private createNetTransport(deviceId: string, pilotName: string, skinId: string): RealtimeClient {
@@ -3459,6 +3463,22 @@ export class Game {
         }
         break;
       }
+      case "confirm-pilot-name": {
+        const nameInput = this.hud.readValue("pilotNameInput");
+        if (!nameInput || !nameInput.trim()) {
+          this.hud.toast("Please enter a pilot name", "warn");
+          break;
+        }
+        const next = savePilotName(nameInput);
+        this.pilotName = next;
+        this.save.state.pilotName = next;
+        this.save.state.pilotNameCustomized = true;
+        this.save.persist();
+        this.audio.fanfare();
+        this.hud.toast(`Welcome, ${next}!`, "info");
+        this.setScreen("main");
+        break;
+      }
       case "claim-rank-prize": {
         // One prize per monthly season: the board re-renders from the live
         // snapshot, so an unguarded claim button was an infinite coin loop.
@@ -4395,7 +4415,9 @@ export class Game {
     this.demoTime = 0;
     this.demoStuck = 0;
     this.setState("menu");
-    this.setScreen("main");
+    // Show name entry on first use
+    const screen = !this.save.state.pilotNameCustomized ? "nameEntry" : "main";
+    this.setScreen(screen);
     this.camera.setIntro(1);
   }
 
