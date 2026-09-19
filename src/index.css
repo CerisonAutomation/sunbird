@@ -1021,6 +1021,51 @@ h2 {
   font-size: 16px;
 }
 
+/* ============ Coin multiplier card (game-over results) ============ */
+.multiplier-cta-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+  border: 1.5px solid #a5d6a7;
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin: 14px 0;
+  box-shadow: 0 3px 0 #81c78440;
+}
+
+.multiplier-cta-card.claimed {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1b5e20;
+  gap: 0;
+  box-shadow: none;
+}
+
+.multiplier-cta-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.multiplier-cta-text b {
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 700;
+  color: #1b5e20;
+  line-height: 1.2;
+}
+
+.multiplier-cta-text span {
+  font-size: 12px;
+  color: #2e7d32;
+  font-weight: 500;
+}
+
 .table-title {
   margin: 12px 0 6px;
   font-size: 13px;

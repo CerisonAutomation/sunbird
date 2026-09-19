@@ -3052,17 +3052,14 @@ export function renderFlightRecap(path: [number, number][]): string {
 export function renderCoinMultiplierCard(coins: number, claimed: boolean): string {
   if (coins <= 0) return "";
   if (claimed) {
-    return `<div class="multiplier-cta-card is-claimed">✓ 3× flight bonus applied · +● ${coins * 2}</div>`;
+    return `<div class="multiplier-cta-card claimed">✓ 3× bonus applied &nbsp;+● ${coins * 2} extra coins</div>`;
   }
-  // Layout lives in ui.css: the claim row wraps and the button grows to a full
-  // row on narrow screens. Inline sizing here used to overflow the results card
-  // on phones (the button was nowrap inside a flex row with a fixed font size).
   return `<div class="multiplier-cta-card">
-      <div class="multiplier-copy">
+      <div class="multiplier-cta-text">
         <b>3× Flight Coin Bonus</b>
-        <span>Triple this run's ● ${coins} to ● ${coins * 3}!</span>
+        <span>Triple ● ${coins} → ● ${coins * 3}</span>
       </div>
-      <button class="primary-btn gold multiplier-claim" data-ui data-action="multiply-run-coins">Claim 3× (● +${coins * 2})</button>
+      <button class="primary-btn gold wide" data-ui data-action="multiply-run-coins">Claim 3× &nbsp;+● ${coins * 2}</button>
     </div>`;
 }
 
