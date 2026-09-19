@@ -114,12 +114,21 @@ import { variant } from "./Experiments";
 import { buildRoomInviteUrl, normalizeRoomCode, readRoomInviteFromUrl } from "./RoomInvite";
 import { PORTAL_BANNER_ID, attachPortalErrorReporters, initPlatform, isCoarsePointer, isPortalBuild, portalTarget as getPortalTarget, type PlatformAdapter } from "../sdk/platform";
 import { CUSTOM_PILOT_NAMES, POKI_MULTIPLAYER, SQUAD_CHAT } from "./edition";
+import type { PokiNetlibClient } from "./PokiNetlib";
 import { GameplayEventSink } from "./GameplayEvents";
 import { LivingBackground } from "./LivingBackground";
 import { Sky } from "./Sky";
 import { Telemetry } from "./Telemetry";
 import { TerrainSystem } from "./TerrainSystem";
 import { Weather } from "./Weather";
+
+// On Poki builds, eagerly fetch the PokiNetlib module so createNetTransport
+// can instantiate PokiNetlibClient synchronously when the player first taps PvP.
+// The dynamic import keeps @poki/netlib out of non-Poki bundles (Rollup DCE).
+let _PokiNetlibClass: typeof PokiNetlibClient | null = null;
+if (POKI_MULTIPLAYER) {
+  void import("./PokiNetlib").then((m) => { _PokiNetlibClass = m.PokiNetlibClient; }).catch(() => { /* best-effort */ });
+}
 
 export type GameState = UiState;
 type AdReason = "continue" | "interstitial";
@@ -938,8 +947,10 @@ export class Game {
     }
   }
 
-  private createNetTransport(deviceId: string, pilotName: string, skinId: string): RealtimeClient {
-    // For now: Poki uses local multiplayer (AI rivals). Netlib P2P can be added post-launch.
+  private createNetTransport(deviceId: string, pilotName: string, skinId: string): AnyRealtimeClient {
+    if (POKI_MULTIPLAYER && _PokiNetlibClass) {
+      return new _PokiNetlibClass(deviceId, pilotName, skinId, 0.06);
+    }
     return new RealtimeClient(deviceId, pilotName, skinId, 0.06);
   }
 
