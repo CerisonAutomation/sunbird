@@ -2,11 +2,14 @@
  * Procedurally renders the app icons (no external assets, no AI images):
  *   public/icons/icon-192.png, icon-512.png, apple-touch-icon.png,
  *   favicon-32.png, favicon-64.png
+ *   public/animated/sunbird-animated.gif — Poki-style animated tile icon
  * Run: node scripts/gen-icons.mjs
  *
  * Design: golden-hour sky, huge low sun half-set behind layered hills,
  * and the sunbird mid-DIVE (the game's core verb) with a comet trail —
- * big silhouette, high contrast, readable at 32px.
+ * big silhouette, high contrast, readable at 32px. The animated icon
+ * shows the bird banking around the sun in a 24-frame loop with flapping
+ * wings, matching the static icon's palette and pose.
  */
 import { deflateSync } from "node:zlib";
 import { writeFileSync, mkdirSync } from "node:fs";
@@ -286,4 +289,14 @@ for (const [name, size, opts] of [
   const buf = encodePng(size, paint(size, opts));
   writeFileSync(join(outDir, name), buf);
   console.log(`${name}: ${size}x${size} · ${(buf.length / 1024).toFixed(1)} KB`);
+}
+
+console.log("---");
+
+// Generate the animated icon (Poki-style animated tile)
+import { execSync } from "node:child_process";
+try {
+  execSync("node scripts/gen-animated-icon.mjs", { stdio: "inherit", cwd: join(__dirname, "..") });
+} catch {
+  console.warn("Animated icon generation skipped (ImageMagick convert required).");
 }

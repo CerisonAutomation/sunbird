@@ -133,7 +133,7 @@ if (existsSync(manifestPath)) {
 
 /* ROOT-04 (folder half) ----------------------------------------------- */
 if (existsSync(UPLOAD)) {
-  const allowedTop = new Set(["index.html", "icons", "fonts", "i18n", "upload-manifest.json"]);
+  const allowedTop = new Set(["index.html", "icons", "fonts", "i18n", "animated", "upload-manifest.json"]);
   const top = readdirSync(UPLOAD);
   const unexpected = top.filter((e) => !allowedTop.has(e));
   if (unexpected.length) bad("ROOT-04", `${UPLOAD}/ has unexpected entries: ${unexpected.join(", ")}`);

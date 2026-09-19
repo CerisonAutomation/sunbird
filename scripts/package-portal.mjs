@@ -66,7 +66,7 @@ function stageHtml() {
 }
 
 /** `index.html` + the directories that ship beside it (and nothing else). */
-const ENTRY_DIRS = ["icons", "fonts", "i18n"];
+const ENTRY_DIRS = ["icons", "fonts", "i18n", "animated"];
 const ENTRIES = ["index.html", ...ENTRY_DIRS];
 
 /** Write a staged bundle into `target` (fresh every run). */
