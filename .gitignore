@@ -57,6 +57,7 @@ botsim-*.json
 *.png  # screenshot artifacts — do not version
 
 # Browser test artifacts
+test-artifacts/
 test-results/
 playwright-report/
 

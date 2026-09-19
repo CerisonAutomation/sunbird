@@ -10,7 +10,9 @@ test("cold boot keeps the canonical bird visible until the game is ready", async
   await expect(page.locator(".boot-bird")).toBeVisible();
   const bootPaths = await page.locator(".boot-bird path").evaluateAll(paths => paths.map(p => p.getAttribute("d")));
   expect(bootPaths.length).toBeGreaterThan(4);
-  await expect(page.locator(".boot-orbit")).toHaveCSS("animation-name", "boot-orbit");
+  // index.html names the keyframes `boot-bird-orbit` (the `.boot-orbit` span
+  // carries them); the reduced-motion block below must be able to cancel them.
+  await expect(page.locator(".boot-orbit")).toHaveCSS("animation-name", "boot-bird-orbit");
   release();
   await app.ready();
   expect(await page.locator(".hero-bird path").evaluateAll(paths => paths.map(p => p.getAttribute("d")))).toEqual(bootPaths);
