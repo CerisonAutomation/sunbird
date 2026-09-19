@@ -135,6 +135,7 @@ let scoreSubmit: ((leaderboard: string, score: number) => void) | null = null;
 /** Options for the boot path's `PokiSDK.init()` — the leaderboard handshake. */
 export function pokiInitOptions(): PokiInitOptions {
   return {
+    ...(import.meta.env.DEV ? { debug: true, logging: true } : {}),
     submitScore: (submit) => {
       scoreSubmit = typeof submit === "function" ? submit : null;
     },

@@ -2316,21 +2316,12 @@ function menuLinks(items: MenuDestination[]): string {
   return items.map(item => `<button class="destination" data-ui data-action="${item.action}" data-icon="${item.icon}"><span class="destination-art">${menuIcon(item.icon)}</span><span class="destination-copy"><b>${item.title}</b><span>${item.detail}</span></span><span class="destination-arrow" aria-hidden="true">↗</span></button>`).join("");
 }
 
-function renderNameEntry(_s: HudSnapshot): string {
-  return `
-    <div class="name-entry-hero">
-      ${sunSVG({ size: 48, className: "name-entry-sun" })}
-      ${sunbirdSVG({ width: 72, className: "name-entry-bird", animateWings: true, title: "Sunbird" })}
-    </div>
-
-    <div class="name-entry-headline">
-      <h2 class="name-entry-title">Welcome, Pilot</h2>
-      <p class="name-entry-sub">We picked a name for you — change it or fly right now.</p>
-    </div>
-
-    <div class="name-entry-form">
-      <label class="name-entry-label" for="pilot-name-input">Your call sign</label>
-      <div class="name-input-row">
+function renderNameEntry(s: HudSnapshot): string {
+  // Portal builds (CUSTOM_PILOT_NAMES=false) use auto-generated call signs;
+  // free-text entry is replaced with a read-only display + dice button so no
+  // player-authored text enters the multiplayer name broadcasts.
+  const nameField = CUSTOM_PILOT_NAMES
+    ? `<div class="name-input-row">
         <div class="name-input-wrapper">
           <input
             type="text"
@@ -2345,14 +2336,33 @@ function renderNameEntry(_s: HudSnapshot): string {
           <div class="name-char-count"><span>0</span>/14</div>
         </div>
         <button class="name-random-btn" data-ui data-action="randomize-pilot-name" title="Suggest a name" aria-label="Random name">🎲</button>
-      </div>
+      </div>`
+    : `<div class="name-input-row">
+        <span class="pilot-name-readonly" aria-label="Pilot name">${escapeHtml(s.pilotName)}</span>
+        <button class="name-random-btn" data-ui data-action="randomize-pilot-name" title="Roll a new call sign" aria-label="Random name">🎲</button>
+      </div>`;
+
+  return `
+    <div class="name-entry-hero">
+      ${sunSVG({ size: 48, className: "name-entry-sun" })}
+      ${sunbirdSVG({ width: 72, className: "name-entry-bird", animateWings: true, title: "Sunbird" })}
+    </div>
+
+    <div class="name-entry-headline">
+      <h2 class="name-entry-title">Welcome, Pilot</h2>
+      <p class="name-entry-sub">We picked a name for you — ${CUSTOM_PILOT_NAMES ? "change it or " : ""}fly right now.</p>
+    </div>
+
+    <div class="name-entry-form">
+      <label class="name-entry-label" for="pilot-name-input">Your call sign</label>
+      ${nameField}
 
       <button class="primary-btn name-entry-cta" data-ui data-action="confirm-pilot-name">
         Let's Fly ›
       </button>
     </div>
 
-    <p class="name-entry-footer">You can rename yourself anytime in Settings.</p>
+    <p class="name-entry-footer">You can ${CUSTOM_PILOT_NAMES ? "rename yourself anytime in Settings" : "roll a new name anytime"}.</p>
   `;
 }
 
