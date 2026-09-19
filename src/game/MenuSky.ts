@@ -31,6 +31,9 @@ type Flocker = {
 
 const FLOCK_SIZE = 7;
 
+/** One golden spark in the hero bird's trail. */
+type Spark = { x: number; y: number; vx: number; vy: number; life: number; maxLife: number; r: number };
+
 export class MenuSky {
   readonly host: HTMLDivElement;
   /** Transparent overlay canvas that draws the hero bird ABOVE the UI card. */
@@ -57,7 +60,11 @@ export class MenuSky {
   private skyGrad: CanvasGradient | null = null;
   private hazeGrad: CanvasGradient | null = null;
   private hillFar: Path2D | null = null;
+  private hillMid: Path2D | null = null;
   private hillNear: Path2D | null = null;
+
+  // Golden particle trail behind the hero bird.
+  private readonly sparks: Spark[] = [];
 
   constructor() {
     this.reduceMotion =
@@ -173,26 +180,44 @@ export class MenuSky {
 
   /** Gradients + hill silhouettes are rebuilt only on a real resize. */
   private buildScenery(): void {
-    const { ctx, height: h } = this;
+    const { ctx, width: w, height: h } = this;
     if (!ctx) return;
 
+    // Warm Poki sunset palette: purple-grey top → burnt orange middle → warm peach horizon
     const sky = ctx.createLinearGradient(0, 0, 0, h);
-    sky.addColorStop(0, "#1d3f6b");
-    sky.addColorStop(0.36, "#4f86bd");
-    sky.addColorStop(0.62, "#9cc9e6");
-    sky.addColorStop(0.82, "#f0c9a0");
-    sky.addColorStop(1, "#f6b96f");
+    sky.addColorStop(0,    "#4a3d6e");   // cool dusk purple at zenith
+    sky.addColorStop(0.28, "#8a6070");   // mauve mid-sky
+    sky.addColorStop(0.55, "#d4845a");   // burnt orange near horizon
+    sky.addColorStop(0.78, "#e8a87c");   // warm amber
+    sky.addColorStop(1,    "#f2c99a");   // peach glow at ground
     this.skyGrad = sky;
 
-    // No painted sun here — the paper card's own hero-sun disc is the one sun
-    // on the title screen. A second bloom at the top-right read as a stray sun.
-    const haze = ctx.createLinearGradient(0, h * 0.55, 0, h);
-    haze.addColorStop(0, "rgba(255, 214, 160, 0)");
-    haze.addColorStop(1, "rgba(255, 198, 138, 0.22)");
+    // Haze bloom near the ground (warm golden ground fog)
+    const haze = ctx.createLinearGradient(0, h * 0.6, 0, h);
+    haze.addColorStop(0, "rgba(255, 210, 140, 0)");
+    haze.addColorStop(1, "rgba(255, 195, 120, 0.30)");
     this.hazeGrad = haze;
 
-    this.hillFar = this.buildHill(0.66, 1.1, 2.1);
-    this.hillNear = this.buildHill(0.76, 0.8, 4.3);
+    // Sun radial: placed at 62% across, 42% down (off-centre, matches Poki video)
+    const sx = w * 0.62;
+    const sy = h * 0.42;
+    const sunR = Math.min(w, h) * 0.18;
+    const sunGrad = ctx.createRadialGradient(sx, sy, sunR * 0.1, sx, sy, sunR * 2.2);
+    sunGrad.addColorStop(0,   "rgba(255, 252, 230, 1.0)");
+    sunGrad.addColorStop(0.2, "rgba(255, 240, 180, 0.95)");
+    sunGrad.addColorStop(0.5, "rgba(255, 210, 100, 0.45)");
+    sunGrad.addColorStop(0.8, "rgba(255, 185, 80,  0.18)");
+    sunGrad.addColorStop(1,   "rgba(255, 160, 60,  0)");
+    // Store for draw() — gradient can't be cached as a field; rebuild is free.
+    (this as any)._sunGrad = sunGrad;
+    (this as any)._sunX = sx;
+    (this as any)._sunY = sy;
+    (this as any)._sunR = sunR;
+
+    // Rolling hills: three layers with Poki video palette
+    this.hillFar  = this.buildHill(0.60, 1.4, 1.9);   // back: purple moors
+    this.hillMid  = this.buildHill(0.68, 1.2, 2.6);   // mid: teal meadow
+    this.hillNear = this.buildHill(0.78, 1.0, 3.8);   // front: dark green
   }
 
   private buildHill(baseY: number, amp: number, freq: number): Path2D | null {
@@ -201,9 +226,12 @@ export class MenuSky {
     const p = new Path2D();
     const y0 = h * baseY;
     p.moveTo(0, h);
-    for (let x = 0; x <= w; x += 14) {
+    for (let x = 0; x <= w; x += 12) {
       const t = x / w;
-      const y = y0 - Math.sin(t * Math.PI * freq + freq) * (h * 0.03 * amp) - Math.sin(t * 9.1) * (h * 0.012 * amp);
+      const y =
+        y0 -
+        Math.sin(t * Math.PI * freq + freq * 0.7) * (h * 0.045 * amp) -
+        Math.sin(t * 7.3 + freq) * (h * 0.016 * amp);
       p.lineTo(x, y);
     }
     p.lineTo(w, h);
@@ -218,29 +246,81 @@ export class MenuSky {
     if (!ctx) return;
     if (!this.skyGrad) this.buildScenery();
 
+    // Sky background
     if (this.skyGrad) {
       ctx.fillStyle = this.skyGrad;
       ctx.fillRect(0, 0, w, h);
     }
 
-    this.band(ctx, w, h, 0.4, 0.16, "rgba(255,255,255,0.30)", 0.16);
-    this.band(ctx, w, h, 0.3, 0.2, "rgba(255,255,255,0.22)", 0.3);
-    this.band(ctx, w, h, 0.2, 0.24, "rgba(255,255,255,0.16)", 0.5);
+    // Sun glow (behind everything else)
+    const sx: number = (this as any)._sunX ?? w * 0.62;
+    const sy: number = (this as any)._sunY ?? h * 0.42;
+    const sunR: number = (this as any)._sunR ?? Math.min(w, h) * 0.18;
+    const sunGrad = (this as any)._sunGrad as CanvasGradient | undefined;
+    if (sunGrad) {
+      ctx.fillStyle = sunGrad;
+      ctx.fillRect(0, 0, w, h);
+    }
 
+    // Sun disc
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(sx, sy, sunR, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255, 252, 210, 0.97)";
+    ctx.fill();
+    ctx.restore();
+
+    // God-rays: 12 rotating beams radiating from the sun
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(this.time * 0.018);
+    const rayCount = 12;
+    const rayLen = Math.min(w, h) * 0.85;
+    for (let i = 0; i < rayCount; i++) {
+      const angle = (i / rayCount) * Math.PI * 2;
+      const halfW = (0.04 + (i % 3) * 0.018) * Math.PI;
+      ctx.save();
+      ctx.rotate(angle);
+      const ray = ctx.createLinearGradient(sunR, 0, rayLen, 0);
+      ray.addColorStop(0,   "rgba(255, 240, 180, 0.22)");
+      ray.addColorStop(0.5, "rgba(255, 220, 120, 0.10)");
+      ray.addColorStop(1,   "rgba(255, 200,  80, 0)");
+      ctx.beginPath();
+      ctx.moveTo(sunR, 0);
+      ctx.arc(0, 0, rayLen, -halfW, halfW);
+      ctx.closePath();
+      ctx.fillStyle = ray;
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+
+    // Warm cloud bands (drift slowly)
+    this.band(ctx, w, h, 0.33, 0.14, "rgba(255, 220, 170, 0.22)", 0.09);
+    this.band(ctx, w, h, 0.25, 0.16, "rgba(255, 210, 155, 0.16)", 0.14);
+    this.band(ctx, w, h, 0.44, 0.12, "rgba(230, 180, 140, 0.18)", 0.07);
+
+    // Rolling hills — three layers matching the Poki video palette
     if (this.hillFar) {
-      ctx.fillStyle = "rgba(40,74,92,0.55)";
+      ctx.fillStyle = "#5e4878";   // back: cool purple moors
       ctx.fill(this.hillFar);
     }
+    if (this.hillMid) {
+      ctx.fillStyle = "#3a6b5a";   // mid: teal meadow
+      ctx.fill(this.hillMid);
+    }
     if (this.hillNear) {
-      ctx.fillStyle = "rgba(24,48,64,0.78)";
+      ctx.fillStyle = "#2e5445";   // front: deep forest green
       ctx.fill(this.hillNear);
     }
 
+    // Ground haze bloom
     if (this.hazeGrad) {
       ctx.fillStyle = this.hazeGrad;
-      ctx.fillRect(0, h * 0.55, w, h * 0.45);
+      ctx.fillRect(0, h * 0.6, w, h * 0.4);
     }
 
+    // Distant flock
     for (const bird of this.birds) {
       if (dt > 0) this.step(bird, dt);
       this.drawFlocker(ctx, bird, w, h);
@@ -254,12 +334,9 @@ export class MenuSky {
 
   /**
    * The hero canvas (z-index 3, above the paper card) carries ONE big
-   * canonical sunbird drifting through the OPEN part of the title screen —
-   * the card is docked right on wide viewports, so the left sky is free;
-   * on narrow viewports the card is centred and the hero uses the strip
-   * above it. The card's own small SVG bird stays in the header; this one
-   * is the "alive" background element. Under reduced motion the ambient
-   * loop never runs, so this renders a single graceful static pose.
+   * canonical sunbird flying left→right across the sky, passing in front of
+   * the sun, trailing golden sparks — matching the Poki promotional video.
+   * Under reduced motion: renders a single graceful static pose, no particles.
    */
   private drawHero(): void {
     const w = this.width;
@@ -268,19 +345,72 @@ export class MenuSky {
     if (!ctx) return;
     ctx.clearRect(0, 0, w, h);
     if (!this.heroActive || w < 2 || h < 2) return;
+
     const t = this.heroT;
-    const wide = w >= 840; // same breakpoint that docks the card to the right
-    const cx = wide
-      ? w * (0.27 + 0.15 * Math.sin(t * 0.11))
-      : w * (0.5 + 0.28 * Math.sin(t * 0.09));
+    const wide = w >= 840;
+
+    // Continuous left→right flight path with gentle sinusoidal drift,
+    // passing at sun height (~40% down) on the wide layout.
+    const speed = 0.04;                          // viewport-widths per second
+    const xFrac = ((t * speed) % 1.24) - 0.12;  // wraps [-0.12 … 1.12]
+    const cx = w * xFrac;
     const cy = wide
-      ? h * (0.36 + 0.09 * Math.sin(t * 0.07 + 1.3))
-      : h * (0.08 + 0.035 * Math.sin(t * 0.13 + 2.1));
-    const size = Math.min(w, h) * (wide ? 0.17 : 0.095);
-    const flap = FLAP_NEUTRAL + Math.sin(t * 2.1) * 0.55;
+      ? h * (0.40 + 0.06 * Math.sin(t * 0.18 + 1.1))
+      : h * (0.14 + 0.04 * Math.sin(t * 0.22 + 0.8));
+    const size = Math.min(w, h) * (wide ? 0.16 : 0.11);
+    const flap = FLAP_NEUTRAL + Math.sin(t * 2.3) * 0.52;
+
+    // Store position for the particle emitter (called per-frame after draw).
+    const tailX = cx - size * 0.55;   // tail is behind the body
+    const tailY = cy + size * 0.18;
+
+    // Emit new sparks from the tail (skip under reduced motion).
+    if (!this.reduceMotion && xFrac > -0.05 && xFrac < 1.05) {
+      for (let i = 0; i < 3; i++) {
+        const angle = Math.PI + (Math.random() - 0.5) * 0.9;
+        const spd = (1.5 + Math.random() * 2.5) * (size / 60);
+        this.sparks.push({
+          x: tailX + (Math.random() - 0.5) * size * 0.12,
+          y: tailY + (Math.random() - 0.5) * size * 0.08,
+          vx: Math.cos(angle) * spd,
+          vy: Math.sin(angle) * spd - 0.4 * (size / 60),
+          life: 1,
+          maxLife: 0.55 + Math.random() * 0.45,
+          r: (1.2 + Math.random() * 2.0) * (size / 60),
+        });
+      }
+    }
+
+    // Update + draw sparks
+    for (let i = this.sparks.length - 1; i >= 0; i--) {
+      const sp = this.sparks[i]!;
+      const dt = 1 / 30;
+      sp.x += sp.vx;
+      sp.y += sp.vy;
+      sp.vy += 0.08 * (size / 60);  // gentle gravity
+      sp.life -= dt / sp.maxLife;
+      if (sp.life <= 0) { this.sparks.splice(i, 1); continue; }
+      const alpha = sp.life * 0.9;
+      const frac = 1 - sp.life;
+      // Colour: white-hot → golden → amber → fades out
+      const r = 255;
+      const g = Math.round(230 - frac * 90);
+      const b = Math.round(120 - frac * 100);
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, sp.r * (0.7 + sp.life * 0.5), 0, Math.PI * 2);
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.shadowColor = `rgba(255,180,40,${alpha * 0.8})`;
+      ctx.shadowBlur = sp.r * 3;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Draw the bird on top of the sparks
     ctx.save();
     ctx.translate(cx, cy);
-    drawSunbird(ctx, size, flap, 0.92);
+    drawSunbird(ctx, size, flap, 0.95);
     ctx.restore();
   }
 

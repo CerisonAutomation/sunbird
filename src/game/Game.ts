@@ -5208,13 +5208,14 @@ export class Game {
     // If the run already started (a real start frame, or a local launch), the
     // search is over — the overlay must never sit on top of gameplay.
     if (this.state !== "menu") {
+      const opts = this.mmOpts;
       this.mmOpts = null;
       this.mmDeadline = 0;
       this.roomWatcher?.stop();
       this.closeRoomBrowser();
       this.hud.setMatchmaking(false, 0, this.roomSize, 0);
       this.hud.toast("No players found — starting AI race", "info");
-      this.launchMatch(opts!, true);
+      if (opts) this.launchMatch(opts, true);
       return;
     }
     const live = this.liveCount();
@@ -5287,14 +5288,6 @@ export class Game {
    *  dead-code-eliminated along with the dynamic import, so @poki/netlib
    *  (~34 KB gz, with WebRTC + the wss:// signalling URL) is NEVER
    *  emitted into direct/crazy/generic/none bundles. */
-  private async makeNet(): Promise<AnyRealtimeClient> {
-    if (import.meta.env.VITE_PORTAL_TARGET === "poki") {
-      const { PokiNetlibClient } = await import("./PokiNetlib");
-      return new PokiNetlibClient(this.save.state.deviceId, this.pilotName, this.skin.id, 0.06);
-    }
-    return new RealtimeClient(this.save.state.deviceId, this.pilotName, this.skin.id, 0.06);
-  }
-
   /** Pre-seats the lobby so the Race screen shows live pilots immediately. */
   private preseatLobby(): void {
     // Warm the ghost source too so the next grid can seat real names.
@@ -5354,14 +5347,14 @@ export class Game {
 
   /** Opens (or reuses) a realtime seat for the current race seed. */
   private connectRace(): void {
-    if (!isMultiplayerConfigured() && portalTarget() !== "poki") return;
+    if (!isMultiplayerConfigured() && getPortalTarget() !== "poki") return;
     if (this.net?.connected) { this.massRace.attachTransport(this.net); return; }
     if (!this.net) {
       this.net = this.createNetTransport(this.save.state.deviceId, this.pilotName, this.skin.id);
       this.massRace.attachTransport(this.net);
     }
     this.net.setIdentity(this.racedName(), this.skin.id, 0.06);
-    this.net.connect(this.roomCode, seed, remote);
+    this.net.connect(this.roomCode, this.currentMatchSeed(), this.joiningRemoteRoom);
   }
 
   private disconnectRace(): void {

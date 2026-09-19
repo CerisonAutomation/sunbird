@@ -411,12 +411,12 @@ function ensureSdk(): Promise<PlatformName> {
       const script = document.createElement("script");
       script.src = CRAZY_SRC;
       script.async = true;
-      script.dataset.sunbirdSdk = target;
+      script.dataset.sunbirdSdk = "crazy";
       script.onload = () => {
-        const isReady = target === "poki" ? Boolean(window.PokiSDK) : Boolean(window.CrazyGames?.SDK);
+        const isReady = Boolean(window.CrazyGames?.SDK);
         if (isReady) {
           script.dataset.loaded = "true";
-          resolve(target);
+          resolve("crazy");
         } else {
           // Script loaded but SDK wasn't defined; treat as load failure
           resolve("none");

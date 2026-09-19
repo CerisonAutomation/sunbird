@@ -194,27 +194,8 @@ setLoadingNet(() => {
 export class PokiAdapter implements PlatformAdapter {
   readonly name = "poki" as const;
   readonly ready = true;
-  private submitScoreFn: ((leaderboard: string, score: number) => void) | null = null;
 
-  constructor(private readonly events: PlatformEvents) {
-    // Wire Poki's leaderboard submitScore callback
-    void this.setupLeaderboardSubmit();
-  }
-
-  private async setupLeaderboardSubmit(): Promise<void> {
-    const sdk = this.sdk;
-    if (!sdk?.init) return;
-
-    try {
-      await sdk.init({
-        submitScore: (fn) => {
-          this.submitScoreFn = fn;
-        },
-      });
-    } catch {
-      // SDK init may fail in local sandbox; that's OK
-    }
-  }
+  constructor(private readonly events: PlatformEvents) {}
 
   private get sdk(): PokiSdk | undefined {
     return window.PokiSDK;
