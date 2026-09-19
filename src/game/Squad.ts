@@ -377,7 +377,13 @@ export class SquadClient {
   }
 
   private async load(): Promise<void> {
-    if (this.lifetime.signal.aborted || !this.state.live || this.state.loading) return;
+    // No social service in this build: portal editions blank VITE_SOCIAL_URL,
+    // so `${API}${path}` would be a *relative* fetch against whatever origin
+    // hosts the game — on Poki that is a 404 in the Inspector's Warnings tab
+    // and a console error for the player. Stay in the honest offline state
+    // (live UI shows "unavailable") instead of asking a host that has no such
+    // endpoint.
+    if (this.lifetime.signal.aborted || !this.state.live || this.state.loading || !API) return;
     this.state.loading = true;
     this.state.error = "";
     this.onChange();

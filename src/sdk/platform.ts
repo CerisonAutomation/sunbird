@@ -25,7 +25,7 @@ import { runLoadingNet } from "./net";
 // vice-versa for non-Crazy builds. The shim also means the dynamic import
 // is unnecessary; we can instantiate directly and let Rollup DCE the
 // unused branch completely.
-import { PokiAdapter } from "./poki";
+import { PokiAdapter, pokiInitOptions } from "./poki";
 import { CrazyGamesAdapter } from "./crazygames";
 
 export type PlatformName = "poki" | "crazy" | "generic" | "none";
@@ -118,6 +118,22 @@ export interface PlatformAdapter {
   getSystemInfo(): PlatformSystemInfo;
   /** Portal leaderboard submission (`user.addScore`) — best-effort, never throws. */
   submitPlatformScore(score: number): Promise<void>;
+  /**
+   * Open the portal's own leaderboard overlay (Poki `showLeaderboard`).
+   * No-op on platforms without one — gated in the UI by `capabilities()`.
+   */
+  showLeaderboard(id?: number | null): void;
+  /**
+   * Register the gameplay canvas with the portal's playtest recorder
+   * (Poki `playtestSetCanvas`): Level-2 playtest recordings need it.
+   */
+  playtestSetCanvas(canvas: HTMLCanvasElement | HTMLCanvasElement[] | null): void;
+  /** Report a runtime error to the portal's dashboard. Never throws. */
+  captureError(err: string | Error): void;
+  /** Device class as the portal reports it; null when unavailable. */
+  deviceCategory(): "mobile" | "tablet" | "desktop" | null;
+  /** Open an external URL through the portal (required instead of navigating). */
+  openExternalLink(url: string): void;
   /** Account linking prompt (identity upgrade flow). True when completed. */
   requestAccountLink(): Promise<boolean>;
   /**
@@ -191,6 +207,27 @@ const POKI_SRC = TARGET === "poki" ? "https://game-cdn.poki.com/scripts/v2/poki-
 const CRAZY_SRC = TARGET === "crazy" || TARGET === "crazygames" ? "https://sdk.crazygames.com/crazygames-sdk-v3.js" : "";
 /** If the portal SDK can't load in this long, boot the game without it. */
 const SDK_LOAD_TIMEOUT_MS = 6000;
+
+/**
+ * Route runtime failures to the portal's error dashboard (`captureError`).
+ * Poki surfaces these in the developer console for the game, which is the only
+ * crash signal a portal build ever gets — the player's console is unreachable.
+ * Returns the detacher so a disposed Game leaves no listeners behind.
+ */
+export function attachPortalErrorReporters(adapter: PlatformAdapter): () => void {
+  const onError = (event: ErrorEvent): void => {
+    adapter.captureError(event.error instanceof Error ? event.error : event.message || "window error");
+  };
+  const onRejection = (event: PromiseRejectionEvent): void => {
+    adapter.captureError(event.reason instanceof Error ? event.reason : String(event.reason));
+  };
+  window.addEventListener("error", onError);
+  window.addEventListener("unhandledrejection", onRejection);
+  return () => {
+    window.removeEventListener("error", onError);
+    window.removeEventListener("unhandledrejection", onRejection);
+  };
+}
 
 export function portalTarget(): PlatformName {
   // The TARGET constant is a compile-time string; these branches are
@@ -396,7 +433,7 @@ function bootstrapSdk(): Promise<{ name: PlatformName; platformEnvironment: stri
   let boot: Promise<{ name: PlatformName; platformEnvironment: string | null }>;
   if (TARGET === "poki") {
     type PokiGlobal = {
-      init?: () => Promise<void>;
+      init?: (options?: { submitScore?: (submit: (leaderboard: string, score: number) => void) => void }) => Promise<void>;
       setDebug?: (v: boolean) => void;
       gameLoadingStart?: () => void;
       movePill?: (x: number, y: number) => void;
@@ -406,7 +443,11 @@ function bootstrapSdk(): Promise<{ name: PlatformName; platformEnvironment: stri
       if (loaded !== "poki") return { name: "none", platformEnvironment: null };
       try {
         if (import.meta.env.DEV) getPoki()?.setDebug?.(true);
-        await getPoki()?.init?.();
+        // init({ submitScore }) is Poki's leaderboard handshake: the SDK hands
+        // back the submitter, which the adapter then uses for
+        // submitPlatformScore(). Passing no options would silently leave the
+        // portal leaderboards unwired.
+        await getPoki()?.init?.(pokiInitOptions());
         // gameLoadingStart() fires exactly once, right after init, before
         // any asset/3D scene work begins. Game.loadingFinished() is called
         // by the Game constructor once the renderer/HUD/terrain are ready.

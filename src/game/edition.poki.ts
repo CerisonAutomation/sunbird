@@ -15,3 +15,9 @@ export const POKI_MULTIPLAYER = true;
 
 /** Poki forbids chat in multiplayer surfaces (REQ-31) — emotes only. */
 export const SQUAD_CHAT = false;
+
+/** No unmoderated player text or personal data (content & player safety). */
+export const CUSTOM_PILOT_NAMES = false;
+
+/** Poki owns ad scheduling and forbids in-app purchases (REQ-20). */
+export const SELL_AD_REMOVAL = false;

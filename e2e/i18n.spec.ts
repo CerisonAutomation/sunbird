@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { SunbirdPage } from "./SunbirdPage";
+import { SUPPORTED_LOCALES } from "../src/i18n";
 
 /**
  * Localization (Poki requirement: multiple languages, layouts adapt to
@@ -69,14 +70,17 @@ test("long-translation locale: the home menu still fits its card", async ({ page
   expect(app.errors).toEqual([]);
 });
 
-test("all ten locales are selectable and each round-trips its selection", async ({ page }) => {
+test("every supported locale is selectable and round-trips its selection", async ({ page }) => {
   const app = new SunbirdPage(page);
   await app.open();
   await app.ready();
   await app.openMenu("open-settings", "Settings");
   const select = page.locator("#language-select");
   const options = await select.locator("option").evaluateAll(opts => opts.map(o => (o as HTMLOptionElement).value));
-  expect(options).toHaveLength(10);
+  // Asserted against the source of truth, not a hardcoded count: locales have
+  // been added twice since this test was written (ja, mt) and a stale number
+  // here reads as a product bug.
+  expect(options).toEqual(SUPPORTED_LOCALES.map((l) => l.code));
   for (const code of options) {
     await select.selectOption(code);
     await expect(select).toHaveValue(code);

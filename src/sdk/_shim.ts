@@ -40,6 +40,11 @@ class StubAdapter implements PlatformAdapter {
     return { countryCode: null, locale: null, deviceType: null, osName: null, osVersion: null, browserName: null, browserVersion: null, applicationType: null };
   }
   async submitPlatformScore(_score: number): Promise<void> {}
+  showLeaderboard(_id?: number | null): void {}
+  playtestSetCanvas(_canvas: HTMLCanvasElement | HTMLCanvasElement[] | null): void {}
+  captureError(_err: string | Error): void {}
+  deviceCategory(): "mobile" | "tablet" | "desktop" | null { return null; }
+  openExternalLink(_url: string): void {}
   async requestAccountLink(): Promise<boolean> { return false; }
   async getIapToken(): Promise<string | null> { return null; }
   isInstantMultiplayer(): boolean { return false; }
@@ -58,6 +63,24 @@ class StubAdapter implements PlatformAdapter {
 
 /** Named to match the real exports so TypeScript stays happy. Neither
  *  class reaches the browser at runtime for non-target builds. */
+/**
+ * Non-Poki stand-ins for the Poki leaderboard handshake. `vite.config.ts`
+ * aliases `./poki` to this module for the crazy/generic/direct builds, so every
+ * export platform.ts imports must exist here too — otherwise those bundles fail
+ * to build ("pokiInitOptions is not exported by src/sdk/_shim.ts").
+ */
+export function pokiInitOptions(): { submitScore?: (submit: (leaderboard: string, score: number) => void) => void } {
+  return {};
+}
+
+export function pokiLeaderboardReady(): boolean {
+  return false;
+}
+
+export function pokiSubmitScore(_score: number, _leaderboard?: string): boolean {
+  return false;
+}
+
 export class PokiAdapter extends StubAdapter {
   constructor(events: PlatformEvents) { super(events, "poki"); }
 }

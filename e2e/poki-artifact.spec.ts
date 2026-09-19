@@ -39,7 +39,7 @@ const MIME: Record<string, string> = {
   ".ico": "image/x-icon",
 };
 
-type Call = { name: string; at: number };
+type Call = { name: string; at: number; canvas?: boolean; id?: string; leaderboard?: string; score?: number };
 
 /** Serves the artifact exactly like a static host would — no rewriting, no
  *  build step, no SPA fallback: a missing file must be a real 404. */
@@ -78,7 +78,18 @@ window.PokiSDK = (function () {
     };
   }
   return {
-    init: function () { record("init")(); return Promise.resolve(); },
+    init: function (options) {
+      record("init")();
+      window.__pokiInitCalls = (window.__pokiInitCalls || []);
+      window.__pokiInitCalls.push(options && typeof options.submitScore === "function" ? "submitScore" : "none");
+      if (options && !window.__pokiInitOptions) window.__pokiInitOptions = options;
+      if (options && typeof options.submitScore === "function") {
+        options.submitScore(function (leaderboard, score) {
+          window.__pokiCalls.push({ name: "submitScore", at: Date.now(), leaderboard: leaderboard, score: score });
+        });
+      }
+      return Promise.resolve();
+    },
     setDebug: record("setDebug"),
     gameLoadingStart: record("gameLoadingStart"),
     gameLoadingFinished: record("gameLoadingFinished"),
@@ -86,6 +97,13 @@ window.PokiSDK = (function () {
     gameplayStop: record("gameplayStop"),
     signalGameReady: record("signalGameReady"),
     movePill: record("movePill"),
+    showLeaderboard: function (id) { window.__pokiCalls.push({ name: "showLeaderboard", at: Date.now(), id: id === undefined ? "undefined" : String(id) }); },
+    captureError: record("captureError"),
+    getDeviceInfo: function () { record("getDeviceInfo")(); return { category: "desktop" }; },
+    openExternalLink: record("openExternalLink"),
+    playtestSetCanvas: function (canvas) {
+      window.__pokiCalls.push({ name: "playtestSetCanvas", at: Date.now(), canvas: Boolean(canvas && canvas.getContext) });
+    },
     hasAdBlock: function () { record("hasAdBlock")(); return false; },
     getURLParam: function () { record("getURLParam")(); return null; },
     getUser: function () { record("getUser")(); return Promise.resolve({ username: "Inspector QA", isSignedIn: false }); },
@@ -168,6 +186,23 @@ test("the shipping folder boots, plays, and emits the Poki event contract", asyn
   const boot = (await callsOf(page)).map((c) => c.name);
   console.log("Poki SDK boot sequence:", boot.join(" → "));
 
+  /* ------------------------------- surfaces the portal expects us to wire */
+  // Both of these fail SILENTLY if unwired — no console error, no failed
+  // request — so the artifact test is the only place they can be caught:
+  //   • playtestSetCanvas: Level-2 playtest recordings capture this canvas.
+  //   • init({ submitScore }): Poki's leaderboard handshake.
+  expect(boot).toContain("playtestSetCanvas");
+  const canvasCall = (await callsOf(page)).find((c) => c.name === "playtestSetCanvas");
+  expect(canvasCall?.canvas, "playtestSetCanvas must be handed the game canvas").toBe(true);
+  const initCalls = await page.evaluate(
+    () => (window as unknown as { __pokiInitCalls?: string[] }).__pokiInitCalls ?? [],
+  );
+  expect(
+    initCalls,
+    "PokiSDK.init() must be handed the submitScore handshake (Poki leaderboards stay unwired without it)",
+  ).toContain("submitScore");
+
+
   expect(boot).toContain("init");
   expect(boot).toContain("gameLoadingStart");
   expect(boot).toContain("gameLoadingFinished");
@@ -216,4 +251,22 @@ test("boots and plays inside the cross-origin iframe the Inspector uses", async 
   );
   expect(played).toContain("gameLoadingFinished");
   expect(played).toContain("gameplayStart");
+});
+
+test("the Poki leaderboard overlay is offered once the SDK reports it", async ({ page }) => {
+  const app = new SunbirdPage(page);
+  await app.open();
+  await app.ready();
+
+  await page.locator('[data-ref="menuCard"] [data-action="open-board"]').first().click();
+  const button = page.locator('[data-action="open-portal-leaderboard"]');
+  await expect(button, "the stub SDK exposes showLeaderboard, so the button must render").toBeVisible({
+    timeout: 20_000,
+  });
+
+  await button.click();
+  await expect
+    .poll(async () => (await callsOf(page)).some((c) => c.name === "showLeaderboard"), { timeout: 15_000 })
+    .toBe(true);
+  expect(app.errors).toEqual([]);
 });

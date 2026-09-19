@@ -112,8 +112,8 @@ import { buildChallengeUrl, readChallengeFromUrl, type RivalChallenge } from "./
 import { flag } from "./Flags";
 import { variant } from "./Experiments";
 import { buildRoomInviteUrl, normalizeRoomCode, readRoomInviteFromUrl } from "./RoomInvite";
-import { PORTAL_BANNER_ID, initPlatform, isCoarsePointer, isPortalBuild, portalTarget as getPortalTarget, type PlatformAdapter } from "../sdk/platform";
-import { POKI_MULTIPLAYER, SQUAD_CHAT } from "./edition";
+import { PORTAL_BANNER_ID, attachPortalErrorReporters, initPlatform, isCoarsePointer, isPortalBuild, portalTarget as getPortalTarget, type PlatformAdapter } from "../sdk/platform";
+import { CUSTOM_PILOT_NAMES, POKI_MULTIPLAYER, SQUAD_CHAT } from "./edition";
 import { GameplayEventSink } from "./GameplayEvents";
 import { LivingBackground } from "./LivingBackground";
 import { Sky } from "./Sky";
@@ -163,6 +163,8 @@ export class Game {
   private readonly mockPayments = new CoinPaymentProvider();
   private readonly ads: AdProvider = new MockAdProvider();
   private platform: PlatformAdapter | null = null;
+  /** Detaches the window error → `captureError` reporters (see platform boot). */
+  private detachPortalErrorReporters: (() => void) | null = null;
   /**
    * Every gameplayStart/gameplayStop that reaches a portal funnels through
    * this sink — Poki forbids a gameplay event following an identical one.
@@ -852,6 +854,13 @@ export class Game {
     }).then((adapter) => {
       if (this.disposed) return;
       this.platform = adapter;
+      // Level-2 playtest recordings capture whatever canvas the SDK is pointed
+      // at (Poki `playtestSetCanvas`). Without this the recordings Poki sends
+      // back have no gameplay in them.
+      adapter.playtestSetCanvas(this.renderer.domElement);
+      // Surface runtime failures in the portal's error dashboard, not only in
+      // a console nobody watches on a portal.
+      this.detachPortalErrorReporters = attachPortalErrorReporters(adapter);
       adapter.loadingFinished();
       adapter.signalGameReady();
       // Late-landing sync: if the player is already mid-flight when the
@@ -928,6 +937,8 @@ export class Game {
     window.removeEventListener("focus", this.onFocus);
     window.removeEventListener("blur", this.onBlur);
     window.removeEventListener("orientationchange", this.onOrientationChange);
+    this.detachPortalErrorReporters?.();
+    this.detachPortalErrorReporters = null;
     this.wakeLock.dispose();
     this.telemetry.flush();
     this.squad?.dispose();
@@ -2939,6 +2950,10 @@ export class Game {
     }
     const lifetimeBefore = this.save.state.lifetime.distance;
     this.save.recordRun(stats.distance, this.runCoins, score, this.today, this.island, this.terrain.biomeAt(this.bird.x).id);
+    // Poki's own leaderboards (the SDK's init({ submitScore }) handshake) get
+    // the same run distance — best-effort, alongside the AUDS board the game
+    // UI reads. A platform without the handshake ignores it.
+    if (this.platform) void this.platform.submitPlatformScore(stats.distance);
     // CAREER WINGS promotion — a lifetime rank-up is rare; make it land.
     const promo = wingsPromotion(lifetimeBefore, this.save.state.lifetime.distance);
     if (promo) {
@@ -3389,11 +3404,31 @@ export class Game {
       case "board-refresh":
         void this.refreshBoard(true);
         break;
+      case "open-portal-leaderboard": {
+        // Poki's own leaderboard overlay (SDK showLeaderboard) — the platform
+        // renders and owns it, so there is nothing to guard beyond offering the
+        // button only when the capability is reported.
+        this.platform?.showLeaderboard();
+        this.telemetry.track("portal_leaderboard_open", { portal: this.platform?.name ?? "none" });
+        break;
+      }
       case "rename-pilot": {
-        const next = savePilotName(this.hud.readValue("pilotName") || this.pilotName);
+        // Portal builds broadcast the pilot name to real players (netlib rooms,
+        // floating name tags, rosters). Free text there would be an unmoderated
+        // channel into a kids' platform, so those editions ship no text field at
+        // all (edition CUSTOM_PILOT_NAMES) and only ever fly curated generated
+        // names. This case stays tolerant of a stale button: it cannot be
+        // reached on a portal, and if it ever were it would still not accept
+        // player-typed text. The direct/web build owns its own surfaces and
+        // keeps free rename.
+        const freeText = CUSTOM_PILOT_NAMES;
+        const requested = this.hud.readValue("pilotName") || this.pilotName;
+        const chosen = freeText ? requested : generatePilotName();
+        const next = savePilotName(chosen);
         this.pilotName = next;
         this.save.state.pilotName = next;
         this.save.state.pilotNameCustomized = true;
+        if (freeText) this.hud.setValue("pilotName", next);
         this.save.persist();
         this.hud.toast(`Flying as ${next}`, "info");
         void this.refreshBoard(true);
@@ -5995,6 +6030,9 @@ export class Game {
       screen: this.screen,
       checkoutSku: this.checkoutSku,
       portalName: this.platform?.name ?? getPortalTarget(),
+      // Poki can render its own leaderboard overlay; the button only appears
+      // when the deployed SDK actually offers it.
+      portalLeaderboard: this.platform?.capabilities().includes("leaderboard") ?? false,
       version: this.uiVersion,
       distance: stats.distance,
       coins: this.runCoins,
@@ -6224,7 +6262,17 @@ export class Game {
       stipendClaimed: this.save.state.lastStipendClaimed === this.today,
       rankPrizeClaimed: this.save.state.rankPrizeSeason === rankSeasonId(),
       wingmanBundle: this.save.state.wingmanBundle === true,
-      showTutorialHand: this.state === "playing" && st.tutorialRuns < 2 && this.hintTimer < 2.6 && !this.input.diving,
+      showTutorialHand:
+        this.state === "playing" &&
+        !this.input.diving &&
+        // First-flight coach: a brand-new player who has not held yet gets the
+        // demonstrative press hand for the whole "dive" step, not just the old
+        // 2.6 s — a static text line for up to two minutes is exactly the
+        // dead-air the baseline probe measured. The hand hides the instant the
+        // player dives (they've got it) and never outstays a completed coach.
+        (this.coach && !this.coach.done && this.coach.view().step === 0
+          ? true
+          : st.tutorialRuns < 2 && this.hintTimer < 2.6),
       pvpModes: PVP_MODES,
       pvpWorlds: PVP_WORLDS,
       selectedPvpMode: this.selectedPvpMode,

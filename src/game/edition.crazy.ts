@@ -15,3 +15,9 @@ export const POKI_MULTIPLAYER = false;
 
 /** Portal submissions ship no chat surface (Poki REQ-31, same policy everywhere). */
 export const SQUAD_CHAT = false;
+
+/** No unmoderated player text or personal data (same policy as Poki). */
+export const CUSTOM_PILOT_NAMES = false;
+
+/** Portal ad scheduling belongs to the platform; no ad-removal purchase. */
+export const SELL_AD_REMOVAL = false;

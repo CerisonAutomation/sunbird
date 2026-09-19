@@ -148,6 +148,12 @@ export class LocalAdapter implements PlatformAdapter {
     return { ...EMPTY_INFO };
   }
   async submitPlatformScore(_score: number): Promise<void> {}
+  /* No portal UI, recorder, error dashboard or external-link broker locally. */
+  showLeaderboard(_id?: number | null): void {}
+  playtestSetCanvas(_canvas: HTMLCanvasElement | HTMLCanvasElement[] | null): void {}
+  captureError(_err: string | Error): void {}
+  deviceCategory(): "mobile" | "tablet" | "desktop" | null { return null; }
+  openExternalLink(_url: string): void {}
   async requestAccountLink(): Promise<boolean> {
     return false;
   }

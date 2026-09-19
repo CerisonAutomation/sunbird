@@ -18,7 +18,7 @@
  *
  * Usage: node scripts/gen-animated-icon.mjs
  */
-import { writeFileSync, mkdirSync, readFileSync, unlinkSync, readdirSync, rmdirSync, existsSync } from "node:fs";
+import { writeFileSync, mkdirSync, readFileSync, unlinkSync, readdirSync, rmdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execSync } from "node:child_process";
@@ -83,23 +83,6 @@ function lerpColor(a, b, t) {
 function tp(u, v, scale, angle, tx, ty) {
   const c = Math.cos(angle), s = Math.sin(angle);
   return [u * scale * c - v * scale * s + tx, u * scale * s + v * scale * c + ty];
-}
-
-/** Transform hero-unit point about a pivot (for wings) */
-function tpPivot(u, v, pivot, scale, wingAngle, tx, ty) {
-  // Translate so pivot is origin, rotate, then translate to screen position
-  const dx = (u - pivot[0]) * scale;
-  const dy = (v - pivot[1]) * scale;
-  const c = Math.cos(wingAngle), s = Math.sin(wingAngle);
-  const px = pivot[0] * scale * Math.cos(0) - pivot[1] * scale * Math.sin(0); // no, this is wrong
-  // Actually: pivot in hero space → screen space first
-  const ptCx = pivot[0] * scale;
-  const ptCy = pivot[1] * scale;
-  // Rotate the offset about origin
-  const rx = dx * c - dy * s;
-  const ry = dx * s + dy * c;
-  // Add body translation + pivot screen position
-  return [rx + ptCx + tx, ry + ptCy + ty];
 }
 
 /** Draw the sky gradient */
@@ -261,7 +244,6 @@ function drawSunbird(px, flap, scale, angle, tx, ty) {
   fillEllipse(px, tx, ty, 17 * scale, 11 * scale, P.body);
 
   // Belly (offset (3, 4) in hero space)
-  const bx = Tpt(3, 4);
   // Actually belly is relative to body center, so:
   const bx2 = tx + (3 * scale * Math.cos(angle) - 4 * scale * Math.sin(angle));
   const by2 = ty + (3 * scale * Math.sin(angle) + 4 * scale * Math.cos(angle));

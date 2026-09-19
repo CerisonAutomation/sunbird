@@ -1,3 +1,5 @@
+import { SELL_AD_REMOVAL } from "./edition";
+
 export type SkinRarity = "starter" | "common" | "rare" | "epic" | "legendary" | "mythic";
 export type CollectionId = "starter" | "nature" | "elements" | "cosmic" | "seasonal" | "premium" | "tournament" | "achievement";
 
@@ -625,20 +627,29 @@ export function dailyFlashBird(dateStr: string): { id: string; price: number; or
   return { id: def.id, price, originalPrice: def.price, discountPct: 40 };
 }
 
+/**
+ * The Gold pitch. The ad-removal bullet only exists in editions that are
+ * allowed to sell ad removal (`SELL_AD_REMOVAL`): portal editions let the
+ * platform own ad frequency and forbid in-app purchases (Poki REQ-20), so
+ * there the ternary folds to `[]` and the claim never reaches the bundle —
+ * `scripts/portal-markers.mjs` fails the build if that ever regresses.
+ */
+const GOLD_FEATURES = [
+  "Phoenix skin — permanent coin magnet & ember trail",
+  "2× coins on every flight",
+  "+10 s longer days",
+  ...(SELL_AD_REMOVAL ? ["No sponsored breaks, ever"] : []),
+  "Unlimited free second winds — the sun never wins",
+  "Fly yesterday's hills or wild random seeds",
+  "Unlocks the Nest Pass premium reward track",
+];
+
 export const GOLD = {
   sku: "sunbird_gold" as const,
   price: "● 500",
   coinPrice: 500,
   name: "Sunbird Gold",
-  features: [
-    "Phoenix skin — permanent coin magnet & ember trail",
-    "2× coins on every flight",
-    "+10 s longer days",
-    "No sponsored breaks, ever",
-    "Unlimited free second winds — the sun never wins",
-    "Fly yesterday's hills or wild random seeds",
-    "Unlocks the Nest Pass premium reward track",
-  ],
+  features: GOLD_FEATURES,
 };
 
 /** One-time starter pack: the classic >90%-of-first-purchases offer. Shown

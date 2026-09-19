@@ -35,9 +35,18 @@ import { setLoadingNet } from "./net";
 type PokiUser = { username: string; avatarUrl?: string | null } | null;
 type PokiShareableData = Record<string, string | number | boolean>;
 
+/**
+ * The Poki SDK global, typed against `@poki/sdk` (github.com/poki/npm-sdk,
+ * v0.0.5) — the official wrapper around
+ * `https://game-cdn.poki.com/scripts/v2/poki-sdk.js`. Every member is optional
+ * because the CDN script owns the runtime: a method that is absent on the
+ * deployed version must degrade to a no-op, never a TypeError.
+ */
 type PokiSdk = {
-  init?: () => Promise<void>;
+  init?: (options?: PokiInitOptions) => Promise<void>;
   setDebug?: (on: boolean) => void;
+  setLogging?: (on: boolean) => void;
+  enableEventTracking?: () => void;
   /**
    * Marks the start of the loading phase. Poki's loading pipeline is
    * `gameLoadingStart()` → (assets load) → `gameLoadingFinished()`; calling
@@ -49,10 +58,15 @@ type PokiSdk = {
   gameplayStop?: () => void;
   signalGameReady?: () => void;
   commercialBreak?: (onStart?: () => void) => Promise<void>;
-  rewardedBreak?: (onStart?: () => void) => Promise<boolean>;
-  /** Display ad (banner placement) — Poki's IAB display ad API. */
-  displayAd?: (adType: string, size?: string, cb?: () => void) => Promise<void>;
-  destroyAd?: (adType: string) => void;
+  rewardedBreak?: (onStart?: (() => void) | { onStart?: () => void; size?: "small" | "medium" | "large" }) => Promise<boolean>;
+  /** Gamebar display ad rendered into a container the game owns. */
+  displayAd?: (
+    container: HTMLElement,
+    size: string,
+    onCanDestroy?: () => void,
+    onDisplayRendered?: (isEmpty: boolean) => void,
+  ) => void;
+  destroyAd?: (container?: HTMLElement) => void;
   /** Celebratory overlay (personal best, level complete). */
   happytime?: () => Promise<void>;
   /** Mute / unmute gameplay audio on portal request. */
@@ -63,20 +77,84 @@ type PokiSdk = {
   hasAdBlock?: () => boolean;
   /** Language tag for the current player (e.g. "en", "es-MX"). */
   getLanguage?: () => string;
+  /** Device class as the portal sees it — tablets report "tablet", not "mobile". */
+  getDeviceInfo?: () => { category: "mobile" | "tablet" | "desktop" } | null;
   getUser?: () => Promise<PokiUser>;
   /** Short-lived JWT for backend verification (expires in 1 minute). */
   getToken?: () => Promise<string | null>;
+  login?: () => Promise<void>;
   /** Signed shareable URL carrying the given game data. */
   shareableURL?: (data: PokiShareableData) => Promise<string>;
   /** Read a parameter from the page query string (portal share deep-links). */
   getURLParam?: (key: string) => string | null;
+  /** Poki's own leaderboard overlay. `null`/`false` closes it. */
+  showLeaderboard?: (id?: number | null | false) => void;
+  /** Report a runtime error to the portal's error dashboard. */
+  captureError?: (err: string | Error) => void;
   /** Game-events measurement: `measure("level", "1", "start")`. */
   measure?: (category: string, label: string, action: string) => void;
   /** Reposition the mobile Poki Pill: (0–50)% from top + px offset. */
   movePill?: (topPercent: number, topPx: number) => void;
   /** Tracking events for custom analytics. */
   sendUserEvent?: (name: string, params?: Record<string, unknown>) => void;
+  /** Any external navigation MUST go through this, never `location.href`. */
+  openExternalLink?: (url: string) => void;
+  /**
+   * Register the gameplay canvas with the playtest recorder. Without this the
+   * Level-2 playtest recordings have nothing to capture.
+   */
+  playtestSetCanvas?: (canvas: HTMLCanvasElement | HTMLCanvasElement[] | null) => void;
+  playtestCaptureHtmlOnce?: () => void;
+  playtestCaptureHtmlForce?: () => void;
+  playtestCaptureHtmlOn?: () => void;
+  playtestCaptureHtmlOff?: () => void;
 };
+
+/**
+ * `init({ submitScore })` is Poki's leaderboard handshake: the SDK hands us a
+ * submit function, which we then call per leaderboard name. Kept optional —
+ * older CDN builds init with no arguments.
+ */
+type PokiInitOptions = {
+  debug?: boolean;
+  logging?: boolean;
+  submitScore?: (submit: (leaderboard: string, score: number) => void) => void;
+};
+
+/** Leaderboard the run score is submitted to (Poki dashboard leaderboard name). */
+const POKI_LEADERBOARD = "distance";
+
+/**
+ * The submit function Poki hands us during `init({ submitScore })`. Held at
+ * module scope because init runs on the boot path (sdk/platform.ts) long
+ * before the adapter is constructed.
+ */
+let scoreSubmit: ((leaderboard: string, score: number) => void) | null = null;
+
+/** Options for the boot path's `PokiSDK.init()` — the leaderboard handshake. */
+export function pokiInitOptions(): PokiInitOptions {
+  return {
+    submitScore: (submit) => {
+      scoreSubmit = typeof submit === "function" ? submit : null;
+    },
+  };
+}
+
+/** True once the SDK has handed over its score submitter. */
+export function pokiLeaderboardReady(): boolean {
+  return scoreSubmit !== null;
+}
+
+/** Submit one score to a Poki leaderboard. False when unavailable. */
+export function pokiSubmitScore(score: number, leaderboard: string = POKI_LEADERBOARD): boolean {
+  if (!scoreSubmit || !Number.isFinite(score)) return false;
+  try {
+    scoreSubmit(leaderboard, Math.round(score));
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 declare global {
   interface Window {
@@ -124,7 +202,14 @@ export class PokiAdapter implements PlatformAdapter {
   }
 
   capabilities(): string[] {
-    return ["lifecycle", "ads", "cloudSaveLocal", "identity", "iap", "urlParams", "share", "measure"];
+    const caps = ["lifecycle", "ads", "cloudSaveLocal", "identity", "iap", "urlParams", "share", "measure"];
+    // Reported from what the deployed SDK actually exposes, so the UI never
+    // offers a portal surface that isn't there.
+    if (typeof this.sdk?.showLeaderboard === "function" || pokiLeaderboardReady()) caps.push("leaderboard");
+    if (typeof this.sdk?.playtestSetCanvas === "function") caps.push("playtestCanvas");
+    if (typeof this.sdk?.openExternalLink === "function") caps.push("externalLink");
+    if (typeof this.sdk?.getDeviceInfo === "function") caps.push("deviceInfo");
+    return caps;
   }
 
   environment(): string | null {
@@ -294,8 +379,50 @@ export class PokiAdapter implements PlatformAdapter {
     return { ...EMPTY_INFO, locale, deviceType };
   }
 
-  async submitPlatformScore(_score: number): Promise<void> {
-    /* Poki has no in-SDK score API — the social server's board covers it */
+  async submitPlatformScore(score: number): Promise<void> {
+    // Poki's own leaderboards: the SDK handed us a submitter during
+    // init({ submitScore }). Best-effort — the in-game board (AUDS) is the
+    // authoritative surface, so a missing handle is not an error.
+    pokiSubmitScore(score);
+  }
+
+  /* ------------------------------------------- Poki-native UI & diagnostics */
+
+  /** Poki's own leaderboard overlay (`PokiSDK.showLeaderboard`). */
+  showLeaderboard(id?: number | null): void {
+    try {
+      this.sdk?.showLeaderboard?.(id ?? null);
+    } catch { /* never break the menu over a portal overlay */ }
+  }
+
+  /** Register the gameplay canvas so playtest recordings capture the game. */
+  playtestSetCanvas(canvas: HTMLCanvasElement | HTMLCanvasElement[] | null): void {
+    try {
+      this.sdk?.playtestSetCanvas?.(canvas);
+    } catch { /* recorder optional */ }
+  }
+
+  /** Forward a runtime error to the portal's error dashboard. */
+  captureError(err: string | Error): void {
+    try {
+      this.sdk?.captureError?.(err);
+    } catch { /* diagnostics must never throw */ }
+  }
+
+  /** Device class as the portal sees it (tablets are "tablet", not "mobile"). */
+  deviceCategory(): "mobile" | "tablet" | "desktop" | null {
+    try {
+      return this.sdk?.getDeviceInfo?.()?.category ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** External navigation must go through the portal, never `location.href`. */
+  openExternalLink(url: string): void {
+    try {
+      this.sdk?.openExternalLink?.(url);
+    } catch { /* no external links are shipped today; stay inert */ }
   }
 
   async requestAccountLink(): Promise<boolean> {

@@ -9,7 +9,7 @@
  *   - ffmpeg + ImageMagick installed
  */
 import WebSocket from "ws";
-import { writeFileSync, mkdirSync, readdirSync, statSync } from "node:fs";
+import { writeFileSync, mkdirSync, statSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { join } from "node:path";
 
@@ -91,7 +91,6 @@ async function cdpCapture(wsUrl) {
       const now = Date.now();
       if (startTime && (now - startTime) >= 500) {
         const frameData = msg.params.data;
-        const sessionId = msg.params.sessionId;
         const path = join(FRAME_DIR, `frame_${String(frameCount).padStart(4, "0")}.jpg`);
         writeFileSync(path, Buffer.from(frameData, "base64"));
         frameFiles.push(path);

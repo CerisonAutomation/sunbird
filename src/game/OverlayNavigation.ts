@@ -55,6 +55,10 @@ export class OverlayNavigation {
     const primary = controls.find((el) => el.classList.contains("primary-btn")) ?? controls[0];
     if (!primary) return;
     event.preventDefault();
+    // Move focus onto the control being activated, not just fire its click:
+    // a keyboard player gets the focus ring on the thing that happened, and
+    // the next Tab continues from there instead of from the heading.
+    if (document.activeElement !== primary) primary.focus({ preventScroll: true });
     primary.click();
   }
 

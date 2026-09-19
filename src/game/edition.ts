@@ -28,3 +28,21 @@ export const POKI_MULTIPLAYER = false;
  * own surfaces and keeps it.
  */
 export const SQUAD_CHAT = true;
+
+/**
+ * Free-text pilot names. OFF in every portal edition: the name is broadcast to
+ * real players (netlib rooms, race rosters, floating name tags), and Poki's
+ * content & player-safety policy allows no unmoderated player-authored text and
+ * no collection of personal data. Portal pilots pick a curated generated name
+ * with 🎲 Random instead, so the text field is not in those bundles at all.
+ * The direct/web/itch build owns its own surfaces and keeps free rename.
+ */
+export const CUSTOM_PILOT_NAMES = true;
+
+/**
+ * Selling ad removal. OFF in every portal edition: the platform owns ad
+ * scheduling and forbids in-app purchases, including any "remove ads" offer
+ * (Poki rule REQ-20). Portal builds never inject interstitials of their own, so
+ * on a portal the claim would be non-compliant *and* untrue.
+ */
+export const SELL_AD_REMOVAL = true;
