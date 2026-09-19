@@ -89,7 +89,10 @@ export const AUDSPREFIX = {
 /*  Secret storage — private data is bound to the device + Poki user id       */
 /* -------------------------------------------------------------------------- */
 
-const SECRET_STORAGE_PREFIX = "auds-secret:";
+// poki_ignore prefix ensures these keys are excluded from Poki's automatic
+// cloud-save sync (localStorage is auto-synced for logged-in users; internal
+// AUDS credentials must not bloat the 1 MB cloud-save payload).
+const SECRET_STORAGE_PREFIX = "poki_ignore-auds-secret:";
 
 function readSecret(key: string, userId?: string): string | null {
   try {
@@ -375,7 +378,7 @@ export class PokiAuds {
     if (!created) return null;
     // Remember the singleton id for next time.
     try {
-      localStorage.setItem("auds-singleton:" + (opts.userId ?? "anon") + ":" + key, created.id);
+      localStorage.setItem("poki_ignore-auds-singleton:" + (opts.userId ?? "anon") + ":" + key, created.id);
     } catch { /* ignore */ }
     return { id: created.id, created: true };
   }
@@ -383,7 +386,7 @@ export class PokiAuds {
   /** Read the singleton id previously stored by putSingleton. */
   static readSingletonId(key: string, userId?: string): string | null {
     try {
-      return localStorage.getItem("auds-singleton:" + (userId ?? "anon") + ":" + key);
+      return localStorage.getItem("poki_ignore-auds-singleton:" + (userId ?? "anon") + ":" + key);
     } catch {
       return null;
     }
@@ -397,10 +400,11 @@ export class PokiAuds {
 /** Lazily resolve a Poki JWT from the Poki SDK User Accounts API when present. */
 async function pokiBearerToken(): Promise<string | null> {
   try {
-    // Poki SDK is loaded dynamically in src/sdk/poki.ts — access via window.
-    const sdk = (window as unknown as { PokiSDK?: { user?: { isSignedIn: boolean; getToken(): Promise<string> } } }).PokiSDK;
-    if (sdk?.user?.isSignedIn && typeof sdk.user.getToken === "function") {
-      return await sdk.user.getToken();
+    // PokiSDK.getToken() — per docs — returns a 1-minute JWT for the
+    // current logged-in user, or null if no user is signed in.
+    const sdk = (window as unknown as { PokiSDK?: { getToken?(): Promise<string | null> } }).PokiSDK;
+    if (typeof sdk?.getToken === "function") {
+      return await sdk.getToken();
     }
   } catch { /* ignore */ }
   return null;
