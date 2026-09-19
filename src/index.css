@@ -1526,6 +1526,46 @@ h2 {
   }
 }
 
+/* ============ First-use name entry screen ============ */
+.name-entry-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 20px 0 16px;
+}
+
+.name-entry-form input[data-ref="pilotNameInput"],
+.name-entry-form input[type="text"] {
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 16px;
+  font-family: var(--body);
+  border: 2px solid #e8d4c4;
+  border-radius: 12px;
+  background: #fff9f3;
+  color: #2a1c28;
+  transition: all var(--transition-normal);
+}
+
+.name-entry-form input[data-ref="pilotNameInput"]:hover:not(:disabled),
+.name-entry-form input[type="text"]:hover:not(:disabled) {
+  border-color: #dcc0ae;
+  background: #fffbf8;
+}
+
+.name-entry-form input[data-ref="pilotNameInput"]:focus,
+.name-entry-form input[type="text"]:focus {
+  outline: none;
+  border-color: #ff7a45;
+  background: #fffbf8;
+  box-shadow: 0 0 0 4px rgba(255, 122, 69, 0.1);
+}
+
+.name-entry-form input[data-ref="pilotNameInput"]::placeholder,
+.name-entry-form input[type="text"]::placeholder {
+  color: #b8907a;
+}
+
 /* ============ Mobile performance optimization (< 640px) ============ */
 @media (max-width: 640px) {
   /* Disable all non-critical animations for speed */
