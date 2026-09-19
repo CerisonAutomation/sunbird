@@ -1538,11 +1538,10 @@ h2 {
 
 .name-entry-sun {
   position: absolute;
-  opacity: 0.55;
+  opacity: 0.6;
   top: 4px;
   left: 50%;
   transform: translateX(-50%);
-  animation: sun-breathe 4s ease-in-out infinite;
 }
 
 .name-entry-bird {

@@ -5076,9 +5076,7 @@ export class Game {
   /** Opt into a public room, ready when connected, and launch only on the
    * server's shared start. A timed-out search explicitly disconnects before
    * starting local AI practice. Browsing or cancelling cannot block a room. */
-  /** How long we actively count down before handing the choice to the player.
-   *  Long enough for a real pilot to finish loading and land in the same room. */
-  private static readonly MM_WINDOW = 20;
+  private static readonly MM_WINDOW = 15;
   /** After the window: how long we keep the seat and keep listening. */
   private static readonly MM_KEEPALIVE = 600;
 
@@ -5180,6 +5178,8 @@ export class Game {
       this.roomWatcher?.stop();
       this.closeRoomBrowser();
       this.hud.setMatchmaking(false, 0, this.roomSize, 0);
+      this.hud.toast("No players found — starting AI race", "info");
+      this.launchMatch(opts!, true);
       return;
     }
     const live = this.liveCount();
