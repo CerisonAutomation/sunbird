@@ -2207,3 +2207,33 @@ label { font-size: 12px; font-weight: 600; color: #666; margin-bottom: 6px; }
 ::-webkit-scrollbar-track { background: #f1f1f1; }
 ::-webkit-scrollbar-thumb { background: #bbb; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #888; }
+
+/* ============ Portrait-mode gate ============
+   Poki HIGH: mobile browsers in portrait must show a "rotate device" prompt.
+   CSS-only — zero JS, works before React mounts, works in iframes.
+   Only fires on devices narrower than 640 px AND shorter than wide (portrait).
+   Desktops and landscape phones are unaffected. */
+@media screen and (orientation: portrait) and (max-width: 640px) {
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: linear-gradient(160deg, #0a1628 0%, #1a2e4a 100%);
+  }
+  body::after {
+    content: "↺  Rotate your phone to play Sunbird";
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 32px;
+    font: 700 20px/1.4 "Fredoka", "Trebuchet MS", sans-serif;
+    color: #ffe0b2;
+    letter-spacing: 0.02em;
+    pointer-events: none;
+  }
+}
