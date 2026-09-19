@@ -2351,7 +2351,7 @@ function renderMain(s: HudSnapshot): string {
       <div class="hero-title">
         <span class="hero-kicker">chase the daylight</span>
         <h1>SUNBIRD</h1>
-        <p class="hero-sub">Little wings.<br>Extraordinary adventures.</p>
+        <p class="hero-sub">Hold to dive. Release to soar.<br>Master the glide across endless islands.</p>
       </div>
     </header>
 
