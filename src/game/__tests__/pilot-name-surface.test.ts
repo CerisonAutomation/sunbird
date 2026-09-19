@@ -15,14 +15,17 @@
  * scripts/portal-markers.mjs.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { HudSnapshot } from "../HUD";
 
 /**
  * A snapshot stand-in: the HUD reads far more fields than the board page
  * needs, so anything unlisted answers as an empty value of whatever shape is
  * asked for (string "", list [], callable, nested object).
  */
-function snapshotStub(): any {
-  const target: any = function () {};
+type LooseSnapshot = Record<string, unknown>;
+
+function snapshotStub(): LooseSnapshot {
+  const target = function () {} as unknown as LooseSnapshot;
   return new Proxy(target, {
     get(t, prop, recv) {
       if (Reflect.has(t, prop)) return Reflect.get(t, prop, recv);
@@ -34,8 +37,7 @@ function snapshotStub(): any {
       return snapshotStub();
     },
     set(t, prop, value) {
-      t[prop] = value;
-      return true;
+      return Reflect.set(t, prop, value);
     },
   });
 }
@@ -51,7 +53,7 @@ async function renderBoardPage(): Promise<HTMLElement> {
     version: 1,
     settings: { reduceMotion: false },
   });
-  hud.update(snap);
+  hud.update(snap as unknown as HudSnapshot);
   const root = document.querySelector<HTMLElement>(".hud-root")!;
   expect(root.querySelector(".pilot-name-row")).not.toBeNull();
   return root;
