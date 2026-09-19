@@ -23,7 +23,7 @@ import { FinishGate } from "./FinishGate";
 import { fetchPublicRooms, isMultiplayerConfigured, makeRoomCode, RealtimeClient, type AnyRealtimeClient } from "./Realtime";
 import { RoomWatcher, ROOM_POLL_MS, roomSummaryLine, summarizeRooms, type LiveRoom } from "./RoomBrowser";
 import { Leaderboard, loadPilotName, savePilotName, isLeaderboardOnline, type BoardMetric, type BoardPage, type BoardScope } from "./Leaderboard";
-import { generatePilotName } from "./pilotNameGenerator";
+import { generatePilotName, isPilotNameClean } from "./pilotNameGenerator";
 import { setLocale, type SupportedLocale } from "../i18n";
 import { Tournaments, TRAILS, weekKey, type PrizeGrant } from "./Tournaments";
 import {
@@ -3444,6 +3444,7 @@ export class Game {
         // renders and owns it, so there is nothing to guard beyond offering the
         // button only when the capability is reported.
         this.platform?.showLeaderboard();
+        this.platform?.measure("button", "portal-leaderboard", "interact");
         this.telemetry.track("portal_leaderboard_open", { portal: this.platform?.name ?? "none" });
         break;
       }
@@ -3458,6 +3459,10 @@ export class Game {
         // keeps free rename.
         const freeText = CUSTOM_PILOT_NAMES;
         const requested = this.hud.readValue("pilotName") || this.pilotName;
+        if (freeText && !isPilotNameClean(requested)) {
+          this.hud.toast("That name isn't allowed — try another", "warn");
+          break;
+        }
         const chosen = freeText ? requested : generatePilotName();
         const next = savePilotName(chosen);
         this.pilotName = next;
@@ -3499,9 +3504,13 @@ export class Game {
         break;
       }
       case "confirm-pilot-name": {
-        const nameInput = this.hud.readValue("pilotNameInput");
+        const nameInput = this.hud.readValue("pilotNameInput") || this.pilotName;
         if (!nameInput || !nameInput.trim()) {
           this.hud.toast("Please enter a pilot name", "warn");
+          break;
+        }
+        if (CUSTOM_PILOT_NAMES && !isPilotNameClean(nameInput)) {
+          this.hud.toast("That name isn't allowed — try another", "warn");
           break;
         }
         const next = savePilotName(nameInput);
@@ -4178,6 +4187,7 @@ export class Game {
         this.save.equipSkin(id);
         this.applySkin();
         this.audio.ding();
+        this.platform?.measure("cosmetic", id ?? "skin", "interact");
         this.bump();
         break;
       case "buy-boost":
