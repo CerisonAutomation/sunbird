@@ -1,11 +1,17 @@
 import type { BarrelEntry, BarrelRoot } from "./barrel.types";
-import translationsBarrel from "./translations.barrel.json";
+// The import attribute is required: Node (which is what Playwright uses to
+// load the e2e specs) refuses a bare JSON import in an ES module, and the
+// failure mode was silent — `e2e/i18n.spec.ts` loaded as "0 tests" instead
+// of erroring, so the locale coverage assertions never ran.
+import translationsBarrel from "./translations.barrel.json" with { type: "json" };
 import { storage } from "../game/Storage";
 
 /**
  * Locale set, ordered and grouped the way the Poki localization guide
- * recommends (LOC-04): EFIGS + Turkish first, CJK second, then Brazilian
- * Portuguese and Russian; plus Arabic (RTL) and Maltese.
+ * recommends (LOC-04): EFIGS + Turkish first, CJK second (zh-CN, ja, ko), then
+ * Brazilian Portuguese and Russian. The remaining Poki locales — Arabic (RTL),
+ * Dutch, Polish, Swedish, Hindi, Indonesian, Vietnamese and Thai — follow, with
+ * Maltese last so the two long-tail scripts close the list.
  */
 export type SupportedLocale =
   | "en"
@@ -19,6 +25,14 @@ export type SupportedLocale =
   | "ar"
   | "zh-CN"
   | "ja"
+  | "ko"
+  | "nl"
+  | "pl"
+  | "sv"
+  | "hi"
+  | "id"
+  | "vi"
+  | "th"
   | "mt";
 
 export const SUPPORTED_LOCALES: { code: SupportedLocale; name: string; flag: string; rtl?: boolean }[] = [
@@ -33,6 +47,14 @@ export const SUPPORTED_LOCALES: { code: SupportedLocale; name: string; flag: str
   { code: "ar", name: "العربية", flag: "🇸🇦", rtl: true },
   { code: "zh-CN", name: "简体中文", flag: "🇨🇳" },
   { code: "ja", name: "日本語", flag: "🇯🇵" },
+  { code: "ko", name: "한국어", flag: "🇰🇷" },
+  { code: "nl", name: "Nederlands", flag: "🇳🇱" },
+  { code: "pl", name: "Polski", flag: "🇵🇱" },
+  { code: "sv", name: "Svenska", flag: "🇸🇪" },
+  { code: "hi", name: "हिन्दी", flag: "🇮🇳" },
+  { code: "id", name: "Indonesia", flag: "🇮🇩" },
+  { code: "vi", name: "Tiếng Việt", flag: "🇻🇳" },
+  { code: "th", name: "ไทย", flag: "🇹🇭" },
   { code: "mt", name: "Malti", flag: "🇲🇹" },
 ];
 

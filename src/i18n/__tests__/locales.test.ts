@@ -14,7 +14,7 @@ import barrel from "../translations.barrel.json";
 const entries = Object.entries((barrel as { barrel: Record<string, { placeholders: string[]; translations: Record<string, string> }> }).barrel);
 
 const PHASE_1 = ["en", "fr", "it", "de", "es", "tr"];
-const PHASE_2_CJK = ["zh-CN", "ja"];
+const PHASE_2_CJK = ["zh-CN", "ja", "ko"];
 const PHASE_3 = ["pt-BR", "ru"];
 
 describe("translation barrel (LOC-02)", () => {
@@ -90,7 +90,7 @@ describe("browser-language detection (LOC-05)", () => {
   });
 
   it("returns null for languages the game does not ship", () => {
-    expect(matchLocale("sv-SE")).toBeNull();
+    expect(matchLocale("fi-FI")).toBeNull();
     expect(matchLocale("")).toBeNull();
     expect(matchLocale(null)).toBeNull();
     expect(matchLocale(undefined)).toBeNull();
