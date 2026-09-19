@@ -12,8 +12,9 @@ import * as THREE from "three";
  * with per-bird wingbeat phase so the flock never strobes in unison.
  */
 
-const FLOCKS = 3;
-const BIRDS_PER_FLOCK = 5;
+// One tighter flock: enough life in the sky without cluttering the backdrop with dots.
+const FLOCKS = 1;
+const BIRDS_PER_FLOCK = 4;
 const TOTAL = FLOCKS * BIRDS_PER_FLOCK;
 
 type FlockState = {
@@ -38,14 +39,6 @@ export class LivingBackground extends THREE.Group {
   private readonly bodyGeo: THREE.BufferGeometry;
   private readonly wingGeo: THREE.BufferGeometry;
   private readonly birdMat: THREE.MeshBasicMaterial;
-  // Extra sky life: hot-air balloons + stunt kites + paper lanterns.
-  // Each is ONE InstancedMesh (3 extra draw calls total), all wrapping.
-  private readonly balloonMesh: THREE.InstancedMesh;
-  private readonly kiteMesh: THREE.InstancedMesh;
-  private readonly lanternMesh: THREE.InstancedMesh;
-  private readonly balloons: { ox: number; oy: number; depth: number; speed: number; phase: number; scale: number; hue: number }[] = [];
-  private readonly kites: { ox: number; oy: number; depth: number; speed: number; phase: number; scale: number; hue: number }[] = [];
-  private readonly lanterns: { ox: number; oy: number; depth: number; speed: number; phase: number; scale: number; hue: number }[] = [];
   private readonly shooters: THREE.Sprite[] = [];
   private shootT = 5;
   private reducedMotion = false;
@@ -105,7 +98,8 @@ export class LivingBackground extends THREE.Group {
       const mat = new THREE.SpriteMaterial({
         map: this.cloudTex,
         transparent: true,
-        opacity: 0.07 + (i / 5) * 0.09,
+        // Menu depth cue only: keep the sky airy instead of overcast.
+        opacity: 0.018 + (i / 5) * 0.028,
         depthWrite: false,
         fog: false,
       });
@@ -121,71 +115,15 @@ export class LivingBackground extends THREE.Group {
       this.add(sp);
     }
 
-    // Three flocks at different depths and drift speeds.
-    for (let f = 0; f < FLOCKS; f++) {
-      this.flocks.push({
-        x: f * 90 - 40,
-        y: 34 + f * 12,
-        speed: 2.2 + f * 0.7,
-        depth: f / (FLOCKS - 1),
-        phase: f * 2.1,
-        wobble: 0.6 + f * 0.3,
-      });
-    }
-
-    // Balloons: slow, high, colorful — 7 instances, 1 draw call
-    {
-      const g = new THREE.SphereGeometry(1.6, 10, 8);
-      g.scale(1, 1.18, 1);
-      const m = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.92 });
-      this.balloonMesh = new THREE.InstancedMesh(g, m, 7);
-      this.balloonMesh.frustumCulled = false;
-      this.balloonMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      this.add(this.balloonMesh);
-      for (let i = 0; i < 7; i++) {
-        this.balloons.push({
-          ox: i * 47 - 80, oy: 42 + (i % 3) * 14, depth: 0.08 + (i % 3) * 0.07,
-          speed: 0.7 + (i % 4) * 0.25, phase: i * 1.31, scale: 0.9 + (i % 3) * 0.5,
-          hue: (i * 0.13) % 1,
-        });
-      }
-    }
-    // Kites: fast darts with figure-eight wobble — 8 instances, 1 draw call
-    {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute("position", new THREE.Float32BufferAttribute([0, 0.9, 0, -0.7, -0.5, 0, 0.7, -0.5, 0], 3));
-      g.setIndex([0, 1, 2]);
-      g.computeVertexNormals();
-      const m = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
-      this.kiteMesh = new THREE.InstancedMesh(g, m, 8);
-      this.kiteMesh.frustumCulled = false;
-      this.kiteMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      this.add(this.kiteMesh);
-      for (let i = 0; i < 8; i++) {
-        this.kites.push({
-          ox: i * 37 - 60, oy: 26 + (i % 4) * 9, depth: 0.15 + (i % 3) * 0.09,
-          speed: 3.2 + (i % 3) * 1.1, phase: i * 2.17, scale: 0.8 + (i % 2) * 0.5,
-          hue: (0.02 + i * 0.11) % 1,
-        });
-      }
-    }
-    // Lanterns: warm rising drift — 12 instances, 1 draw call
-    {
-      const g = new THREE.SphereGeometry(0.55, 8, 6);
-      g.scale(1, 1.25, 1);
-      const m = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.95 });
-      this.lanternMesh = new THREE.InstancedMesh(g, m, 12);
-      this.lanternMesh.frustumCulled = false;
-      this.lanternMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      this.add(this.lanternMesh);
-      for (let i = 0; i < 12; i++) {
-        this.lanterns.push({
-          ox: i * 29 - 90, oy: 18 + (i % 5) * 7, depth: 0.2 + (i % 4) * 0.08,
-          speed: 1.1 + (i % 3) * 0.4, phase: i * 0.97, scale: 0.7 + (i % 3) * 0.3,
-          hue: 0.08 + (i % 3) * 0.03,
-        });
-      }
-    }
+    // One flock — single depth layer, keeps the sky clean.
+    this.flocks.push({
+      x: -40,
+      y: 34,
+      speed: 2.6,
+      depth: 0.5,
+      phase: 0,
+      wobble: 0.8,
+    });
     // Shooting-star streaks (pooled sprites)
     for (let i = 0; i < 3; i++) {
       const mat = new THREE.SpriteMaterial({ map: this.cloudTex, color: 0xfff6d8, transparent: true, opacity: 0, depthWrite: false, fog: false });
@@ -219,55 +157,8 @@ export class LivingBackground extends THREE.Group {
     this.writeTraffic(this.t, camX, camY, dt);
   }
 
-  private wrapX(ox: number, drift: number, span: number): number {
-    const wx = ox - drift;
-    return ((wx - this.anchorX + span * 0.5) % span + span) % span - span * 0.5;
-  }
-
-  private writeTraffic(time: number, camX: number, camY: number, dt: number): void {
+  private writeTraffic(_time: number, camX: number, camY: number, dt: number): void {
     const still = this.reducedMotion;
-    for (let i = 0; i < this.balloons.length; i++) {
-      const b = this.balloons[i]!;
-      const wx = this.wrapX(b.ox, still ? 0 : time * b.speed * 2.2, 320);
-      const bob = Math.sin(time * 0.6 + b.phase) * 1.6;
-      dummy.position.set(camX + wx, b.oy + bob + camY * 0.06, -58 - b.depth * 40);
-      dummy.rotation.set(0, Math.sin(time * 0.4 + b.phase) * 0.12, 0);
-      dummy.scale.setScalar(b.scale);
-      dummy.updateMatrix();
-      this.balloonMesh.setMatrixAt(i, dummy.matrix);
-      tmpColor.setHSL(b.hue, 0.72, 0.58);
-      this.balloonMesh.setColorAt(i, tmpColor);
-    }
-    this.balloonMesh.instanceMatrix.needsUpdate = true;
-    if (this.balloonMesh.instanceColor) this.balloonMesh.instanceColor.needsUpdate = true;
-    for (let i = 0; i < this.kites.length; i++) {
-      const k = this.kites[i]!;
-      const wx = this.wrapX(k.ox, still ? 0 : time * k.speed * 4.5, 240);
-      const wy = k.oy + Math.sin(time * 2.1 + k.phase) * 3.2 + Math.sin(time * 0.7 + k.phase * 2) * 1.5;
-      dummy.position.set(camX + wx, wy + camY * 0.08, -44 - k.depth * 30);
-      dummy.rotation.set(0.3, still ? 0 : time * 1.2 + k.phase, Math.sin(time * 3 + k.phase) * 0.5);
-      dummy.scale.setScalar(k.scale);
-      dummy.updateMatrix();
-      this.kiteMesh.setMatrixAt(i, dummy.matrix);
-      tmpColor.setHSL(k.hue, 0.85, 0.6);
-      this.kiteMesh.setColorAt(i, tmpColor);
-    }
-    this.kiteMesh.instanceMatrix.needsUpdate = true;
-    if (this.kiteMesh.instanceColor) this.kiteMesh.instanceColor.needsUpdate = true;
-    for (let i = 0; i < this.lanterns.length; i++) {
-      const l = this.lanterns[i]!;
-      const wx = this.wrapX(l.ox, still ? 0 : time * l.speed * 1.6, 280);
-      const rise = still ? 0 : ((time * 0.9 + l.phase * 4) % 14);
-      dummy.position.set(camX + wx, l.oy + rise * 0.7 + camY * 0.04, -52 - l.depth * 34);
-      dummy.rotation.set(0, 0, Math.sin(time + l.phase) * 0.1);
-      dummy.scale.setScalar(l.scale * (1 - rise * 0.012));
-      dummy.updateMatrix();
-      this.lanternMesh.setMatrixAt(i, dummy.matrix);
-      tmpColor.setHSL(l.hue, 0.95, 0.62 + Math.sin(time * 2 + l.phase) * 0.05);
-      this.lanternMesh.setColorAt(i, tmpColor);
-    }
-    this.lanternMesh.instanceMatrix.needsUpdate = true;
-    if (this.lanternMesh.instanceColor) this.lanternMesh.instanceColor.needsUpdate = true;
     if (!still) {
       this.shootT -= dt;
       if (this.shootT <= 0) {
@@ -360,15 +251,6 @@ export class LivingBackground extends THREE.Group {
     this.wingR.dispose();
     this.cloudTex.dispose();
     for (const sp of this.clouds) sp.material.dispose();
-    this.balloonMesh.geometry.dispose();
-    (this.balloonMesh.material as THREE.Material).dispose();
-    this.balloonMesh.dispose();
-    this.kiteMesh.geometry.dispose();
-    (this.kiteMesh.material as THREE.Material).dispose();
-    this.kiteMesh.dispose();
-    this.lanternMesh.geometry.dispose();
-    (this.lanternMesh.material as THREE.Material).dispose();
-    this.lanternMesh.dispose();
     for (const sp of this.shooters) sp.material.dispose();
   }
 }

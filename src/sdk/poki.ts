@@ -1,0 +1,568 @@
+/**
+ * PokiAdapter — full Poki HTML5 SDK surface (sdk.poki.com/html5):
+ *
+ *   init, gameLoadingStart, gameLoadingFinished, gameplayStart/Stop,
+ *   commercialBreak,
+ *   rewardedBreak, getUser, getToken (1-minute backend-verification JWT),
+ *   shareableURL, getURLParam, measure (game events).
+ *
+ * Poki-specific contracts honored here:
+ *   • `init()` rejects in the local sandbox → the game still boots
+ *     (handled in platform.ts, "load your game anyway").
+ *   • `setDebug(true)` is enabled in DEV only — never shipped.
+ *   • `getToken()` expires in one minute: it is verified server-side
+ *     immediately, never stored (exposed as `getIapToken`).
+ *   • `shareableURL({...})` yields a signed, embeddable game link; it is
+ *     handed to the Web Share API (or clipboard) so the player chooses the
+ *     destination.
+ *   • `measure(category, label, action)` follows the start → complete|fail
+ *     contract (one outcome per attempt).
+ *
+ * What Poki does NOT expose: banners, in-SDK score submission, room state,
+ * pause hooks, and a data module. Those are honest no-ops; cloud save falls
+ * back to localStorage so the save pipeline still works on the Poki build.
+ */
+import type {
+  InviteParams,
+  PlatformAdapter,
+  PlatformEvents,
+  PlatformIdentity,
+  PlatformSystemInfo,
+} from "./platform";
+import { localCloudFallback } from "./local";
+import { setLoadingNet } from "./net";
+
+type PokiUser = { username: string; avatarUrl?: string | null } | null;
+type PokiShareableData = Record<string, string | number | boolean>;
+
+/**
+ * The Poki SDK global, typed against `@poki/sdk` (github.com/poki/npm-sdk,
+ * v0.0.5) — the official wrapper around
+ * `https://game-cdn.poki.com/scripts/v2/poki-sdk.js`. Every member is optional
+ * because the CDN script owns the runtime: a method that is absent on the
+ * deployed version must degrade to a no-op, never a TypeError.
+ */
+type PokiSdk = {
+  init?: (options?: PokiInitOptions) => Promise<void>;
+  setDebug?: (on: boolean) => void;
+  setLogging?: (on: boolean) => void;
+  enableEventTracking?: () => void;
+  /**
+   * Marks the start of the loading phase. Poki's loading pipeline is
+   * `gameLoadingStart()` → (assets load) → `gameLoadingFinished()`; calling
+   * only the finished side mis-handles the portal's loading screen.
+   */
+  gameLoadingStart?: () => void;
+  gameLoadingFinished?: () => void;
+  gameplayStart?: () => void;
+  gameplayStop?: () => void;
+  signalGameReady?: () => void;
+  commercialBreak?: (onStart?: () => void) => Promise<void>;
+  rewardedBreak?: (onStart?: (() => void) | { onStart?: () => void; size?: "small" | "medium" | "large" }) => Promise<boolean>;
+  /** Gamebar display ad rendered into a container the game owns. */
+  displayAd?: (
+    container: HTMLElement,
+    size: string,
+    onCanDestroy?: () => void,
+    onDisplayRendered?: (isEmpty: boolean) => void,
+  ) => void;
+  destroyAd?: (container?: HTMLElement) => void;
+  /** Celebratory overlay (personal best, level complete). */
+  happytime?: () => Promise<void>;
+  /** Mute / unmute gameplay audio on portal request. */
+  mute?: (muted?: boolean) => void;
+  isMuted?: () => boolean;
+  /** Detect ad blockers so the game can avoid gating content behind ads. */
+  setAdBlockActive?: (active: boolean) => void;
+  hasAdBlock?: () => boolean;
+  /** Language tag for the current player (e.g. "en", "es-MX"). */
+  getLanguage?: () => string;
+  /** Device class as the portal sees it — tablets report "tablet", not "mobile". */
+  getDeviceInfo?: () => { category: "mobile" | "tablet" | "desktop" } | null;
+  getUser?: () => Promise<PokiUser>;
+  /** Short-lived JWT for backend verification (expires in 1 minute). */
+  getToken?: () => Promise<string | null>;
+  login?: () => Promise<void>;
+  /** Signed shareable URL carrying the given game data. */
+  shareableURL?: (data: PokiShareableData) => Promise<string>;
+  /** Read a parameter from the page query string (portal share deep-links). */
+  getURLParam?: (key: string) => string | null;
+  /** Poki's own leaderboard overlay. `null`/`false` closes it. */
+  showLeaderboard?: (id?: number | null | false) => void;
+  /** Report a runtime error to the portal's error dashboard. */
+  captureError?: (err: string | Error) => void;
+  /** Game-events measurement: `measure("level", "1", "start")`. */
+  measure?: (category: string, label: string, action: string) => void;
+  /** Reposition the mobile Poki Pill: (0–50)% from top + px offset. */
+  movePill?: (topPercent: number, topPx: number) => void;
+  /** Tracking events for custom analytics. */
+  sendUserEvent?: (name: string, params?: Record<string, unknown>) => void;
+  /** Any external navigation MUST go through this, never `location.href`. */
+  openExternalLink?: (url: string) => void;
+  /**
+   * Register the gameplay canvas with the playtest recorder. Without this the
+   * Level-2 playtest recordings have nothing to capture.
+   */
+  playtestSetCanvas?: (canvas: HTMLCanvasElement | HTMLCanvasElement[] | null) => void;
+  playtestCaptureHtmlOnce?: () => void;
+  playtestCaptureHtmlForce?: () => void;
+  playtestCaptureHtmlOn?: () => void;
+  playtestCaptureHtmlOff?: () => void;
+};
+
+/**
+ * `init({ submitScore })` is Poki's leaderboard handshake: the SDK hands us a
+ * submit function, which we then call per leaderboard name. Kept optional —
+ * older CDN builds init with no arguments.
+ */
+type PokiInitOptions = {
+  debug?: boolean;
+  logging?: boolean;
+  submitScore?: (submit: (leaderboard: string, score: number) => void) => void;
+};
+
+/** Leaderboard the run score is submitted to (Poki dashboard leaderboard name). */
+const POKI_LEADERBOARD = "distance";
+
+/**
+ * The submit function Poki hands us during `init({ submitScore })`. Held at
+ * module scope because init runs on the boot path (sdk/platform.ts) long
+ * before the adapter is constructed.
+ */
+let scoreSubmit: ((leaderboard: string, score: number) => void) | null = null;
+
+/** Options for the boot path's `PokiSDK.init()` — the leaderboard handshake. */
+export function pokiInitOptions(): PokiInitOptions {
+  return {
+    submitScore: (submit) => {
+      scoreSubmit = typeof submit === "function" ? submit : null;
+    },
+  };
+}
+
+/** True once the SDK has handed over its score submitter. */
+export function pokiLeaderboardReady(): boolean {
+  return scoreSubmit !== null;
+}
+
+/** Submit one score to a Poki leaderboard. False when unavailable. */
+export function pokiSubmitScore(score: number, leaderboard: string = POKI_LEADERBOARD): boolean {
+  if (!scoreSubmit || !Number.isFinite(score)) return false;
+  try {
+    scoreSubmit(leaderboard, Math.round(score));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+declare global {
+  interface Window {
+    PokiSDK?: PokiSdk;
+  }
+}
+
+const EMPTY_INFO: PlatformSystemInfo = {
+  countryCode: null,
+  locale: null,
+  deviceType: null,
+  osName: null,
+  osVersion: null,
+  browserName: null,
+  browserVersion: null,
+  applicationType: null,
+};
+
+/** Dismissed share sheet = the surface was shown; report it as handled. */
+function shareDismissed(error: unknown): boolean {
+  return error instanceof DOMException && (error.name === "AbortError" || error.name === "NotAllowedError");
+}
+
+/**
+ * Last-resort loading-screen release, registered into the shared net
+ * (sdk/net.ts). This is the ONLY place in the codebase that may call the raw
+ * `PokiSDK` global behind the adapter's back, and it only ever runs when no
+ * adapter was constructed — i.e. nothing has signalled the portal yet. On a
+ * healthy boot the adapter owns both markers, one-shot, and this never fires.
+ */
+setLoadingNet(() => {
+  const sdk = (window as unknown as { PokiSDK?: PokiSdk }).PokiSDK;
+  sdk?.gameLoadingFinished?.();
+  sdk?.signalGameReady?.();
+});
+
+export class PokiAdapter implements PlatformAdapter {
+  readonly name = "poki" as const;
+  readonly ready = true;
+
+  constructor(private readonly events: PlatformEvents) {}
+
+  private get sdk(): PokiSdk | undefined {
+    return window.PokiSDK;
+  }
+
+  capabilities(): string[] {
+    const caps = ["lifecycle", "ads", "cloudSaveLocal", "identity", "iap", "urlParams", "share", "measure"];
+    // Reported from what the deployed SDK actually exposes, so the UI never
+    // offers a portal surface that isn't there.
+    if (typeof this.sdk?.showLeaderboard === "function" || pokiLeaderboardReady()) caps.push("leaderboard");
+    if (typeof this.sdk?.playtestSetCanvas === "function") caps.push("playtestCanvas");
+    if (typeof this.sdk?.openExternalLink === "function") caps.push("externalLink");
+    if (typeof this.sdk?.getDeviceInfo === "function") caps.push("deviceInfo");
+    return caps;
+  }
+
+  environment(): string | null {
+    return null;
+  }
+
+  /* lifecycle */
+  loadingStart(): void {
+    // Poki marks the loading phase with gameLoadingStart(). bootstrapSdk()
+    // already fired it right after init (before the game's asset work), so
+    // this delegate exists for interface symmetry — re-sending a phase
+    // marker is harmless.
+    this.sdk?.gameLoadingStart?.();
+  }
+
+  private loadingFinishedSent = false;
+
+  loadingFinished(): void {
+    // Phase markers are one-shot: Poki's "no consecutive duplicates" rule
+    // (enforced by the Inspector) is applied to the loading signal too.
+    if (this.loadingFinishedSent) return;
+    this.loadingFinishedSent = true;
+    this.sdk?.gameLoadingFinished?.();
+  }
+
+  signalGameReady(): void {
+    this.loadingFinished();
+  }
+
+  gameplayStart(): void {
+    this.sdk?.gameplayStart?.();
+  }
+
+  gameplayStop(): void {
+    this.sdk?.gameplayStop?.();
+  }
+
+  pause(): void {
+    /* no portal pause hook on Poki — visibility handling covers it. */
+  }
+
+  happytime(): void {
+    // PokiSDK.happytime() triggers a celebratory confetti overlay for
+    // personal bests and other milestone moments. Fire-and-forget so it
+    // never blocks gameplay even when the SDK is unavailable in an
+    // off-portal preview.
+    try {
+      void this.sdk?.happytime?.();
+    } catch {
+      /* celebrate locally — the game already emits its own confetti */
+    }
+  }
+
+  /* ads */
+  async commercialBreak(): Promise<void> {
+    const sdk = this.sdk;
+    if (!sdk?.commercialBreak) return;
+    let opened = false;
+    try {
+      await sdk.commercialBreak(() => {
+        opened = true;
+        this.events.onAdOpened?.();
+      });
+    } catch {
+      // The portal decides whether an ad is available. A rejected opportunity
+      // is not a game error and must never block a restart.
+    } finally {
+      if (opened) this.events.onAdClosed?.();
+    }
+  }
+
+  async rewardedBreak(): Promise<boolean> {
+    const sdk = this.sdk;
+    if (!sdk?.rewardedBreak) return false;
+    let opened = false;
+    try {
+      const rewarded = await sdk.rewardedBreak(() => {
+        opened = true;
+        this.events.onAdOpened?.();
+      });
+      return Boolean(rewarded);
+    } catch {
+      return false;
+    } finally {
+      if (opened) this.events.onAdClosed?.();
+    }
+  }
+
+  async showMidgameAd(): Promise<void> {
+    await this.commercialBreak();
+  }
+
+  async showRewardedAd(): Promise<boolean> {
+    return this.rewardedBreak();
+  }
+
+  mountBanner(_container: HTMLElement): void {
+    // Poki intentionally does not expose a banner placement API.
+  }
+
+  /** Cached ad-block detection result (probed once at boot). */
+  private adBlockProbed = false;
+  private cachedAdBlock = false;
+
+  private probeAdBlock(): void {
+    if (this.adBlockProbed) return;
+    this.adBlockProbed = true;
+    try {
+      if (this.sdk?.hasAdBlock) this.cachedAdBlock = Boolean(this.sdk.hasAdBlock());
+    } catch { /* ignore */ }
+  }
+
+  /* cloud save — localStorage fallback (Poki has no public data module) */
+  saveCloud<T>(key: string, value: T): Promise<void> {
+    return localCloudFallback.save(key, value);
+  }
+  loadCloud<T>(key: string): Promise<T | null> {
+    return localCloudFallback.load<T>(key);
+  }
+  removeCloud(key: string): Promise<void> {
+    return localCloudFallback.remove(key);
+  }
+  clearCloud(): Promise<void> {
+    return localCloudFallback.clear();
+  }
+  hasCloud(key: string): Promise<boolean> {
+    return localCloudFallback.has(key);
+  }
+
+  /* identity / portal leaderboard / IAP */
+  async getIdentity(): Promise<PlatformIdentity | null> {
+    const sdk = this.sdk;
+    if (!sdk?.getUser) return null;
+    try {
+      const u = await sdk.getUser();
+      if (!u || !u.username) return null;
+      return {
+        id: u.username,
+        name: u.username,
+        avatarUrl: typeof u.avatarUrl === "string" && u.avatarUrl ? u.avatarUrl : null,
+        countryCode: null,
+        platform: "poki",
+      };
+    } catch {
+      return null; // user accounts unavailable or user opted out
+    }
+  }
+
+  getSystemInfo(): PlatformSystemInfo {
+    // Poki exposes locale via getLanguage() but does not expose device/OS
+    // descriptors to the game (the portal abstracts them). Provide what we
+    // can detect locally, leave the rest null.
+    const locale = (() => {
+      try { return this.sdk?.getLanguage?.() ?? navigator.language ?? null; } catch { return null; }
+    })();
+    const deviceType: PlatformSystemInfo["deviceType"] = (() => {
+      try {
+        const coarse = window.matchMedia?.("(pointer: coarse)")?.matches;
+        const narrow = window.innerWidth < 700;
+        const ipad = /Macintosh/i.test(navigator.userAgent) && coarse;
+        const tablet = /iPad|Android(?!.*Mobile)/i.test(navigator.userAgent) || ipad;
+        if (tablet) return "tablet";
+        if (coarse || narrow || /Mobi|Android|iPhone|iPod/i.test(navigator.userAgent)) return "mobile";
+        return "desktop";
+      } catch { return null; }
+    })();
+    return { ...EMPTY_INFO, locale, deviceType };
+  }
+
+  async submitPlatformScore(score: number): Promise<void> {
+    // Poki's own leaderboards: the SDK handed us a submitter during
+    // init({ submitScore }). Best-effort — the in-game board (AUDS) is the
+    // authoritative surface, so a missing handle is not an error.
+    pokiSubmitScore(score);
+  }
+
+  /* ------------------------------------------- Poki-native UI & diagnostics */
+
+  /** Poki's own leaderboard overlay (`PokiSDK.showLeaderboard`). */
+  showLeaderboard(id?: number | null): void {
+    try {
+      this.sdk?.showLeaderboard?.(id ?? null);
+    } catch { /* never break the menu over a portal overlay */ }
+  }
+
+  /** Register the gameplay canvas so playtest recordings capture the game. */
+  playtestSetCanvas(canvas: HTMLCanvasElement | HTMLCanvasElement[] | null): void {
+    try {
+      this.sdk?.playtestSetCanvas?.(canvas);
+    } catch { /* recorder optional */ }
+  }
+
+
+  /** Device class as the portal sees it (tablets are "tablet", not "mobile"). */
+  deviceCategory(): "mobile" | "tablet" | "desktop" | null {
+    try {
+      return this.sdk?.getDeviceInfo?.()?.category ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** External navigation must go through the portal, never `location.href`. */
+  openExternalLink(url: string): void {
+    try {
+      this.sdk?.openExternalLink?.(url);
+    } catch { /* no external links are shipped today; stay inert */ }
+  }
+
+  async requestAccountLink(): Promise<boolean> {
+    return false; // Poki has no account-link prompt
+  }
+
+  async getIapToken(): Promise<string | null> {
+    const sdk = this.sdk;
+    if (!sdk?.getToken) return null;
+    try {
+      const token = await sdk.getToken();
+      return typeof token === "string" && token ? token : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /* invites / rooms / share */
+  isInstantMultiplayer(): boolean {
+    return false;
+  }
+
+  getInviteParam(name: string): string | null {
+    const sdk = this.sdk;
+    if (!sdk?.getURLParam) return null;
+    try {
+      const value = sdk.getURLParam(name);
+      return typeof value === "string" && value ? value : null;
+    } catch {
+      return null;
+    }
+  }
+
+  getInviteParams(): InviteParams | null {
+    return null;
+  }
+
+  onJoinRoom(_listener: (params: InviteParams) => void): () => void {
+    return () => undefined;
+  }
+
+  async inviteFriends(_params: InviteParams): Promise<string | null> {
+    return null;
+  }
+
+  updateRoom(_opts: { roomId?: string; isJoinable?: boolean; inviteParams?: InviteParams }): void {
+    /* no portal room state on Poki */
+  }
+
+  leftRoom(): void {
+    /* no portal room state on Poki */
+  }
+
+  /**
+   * Portal-native share: ask the SDK for a signed shareable URL carrying the
+   * share params (each key is prefixed `gd` on poki.com and readable again
+   * with `getURLParam`), then hand URL + message to the Web Share API
+   * (clipboard fallback when the sheet is unavailable).
+   */
+  async share(message: string, params?: InviteParams): Promise<boolean> {
+    let url: string | null = null;
+    const sdk = this.sdk;
+    if (sdk?.shareableURL) {
+      try {
+        const data: PokiShareableData = { id: "sunbird" };
+        for (const [key, value] of Object.entries(params ?? {})) {
+          data[key] = value.slice(0, 64);
+        }
+        const built = await sdk.shareableURL(data);
+        if (typeof built === "string" && built) url = built;
+      } catch {
+        /* fall through to a plain share */
+      }
+    }
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: "Sunbird", text: message, url: url ?? undefined });
+        return true;
+      } catch (error) {
+        return shareDismissed(error);
+      }
+    }
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(url ?? message);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  }
+
+  /* game events */
+  measure(category: string, label: string, action: string): void {
+    try {
+      this.sdk?.measure?.(category, label, action);
+    } catch {
+      /* measurement must never break gameplay */
+    }
+  }
+
+  /* ad-block state */
+  hasAdBlock(): boolean {
+    this.probeAdBlock();
+    return this.cachedAdBlock;
+  }
+
+  setAdBlockActive(active: boolean): void {
+    // Called by the SDK's ad-block-detection probe; remember the value so
+    // later ad-breaks can short-circuit gracefully instead of hanging.
+    this.cachedAdBlock = Boolean(active);
+    this.adBlockProbed = true;
+    try { this.sdk?.setAdBlockActive?.(active); } catch { /* ignore */ }
+  }
+
+  /* settings */
+  syncSettings(): void {
+    // On Poki the game must respect the portal's mute preference. There is
+    // no settings change event, so poll once at boot and relay the current
+    // state to the event sink so audio starts muted when the player muted
+    // the site through Poki.
+    this.probeAdBlock();
+    try {
+      this.sdk?.setAdBlockActive?.(this.cachedAdBlock);
+    } catch { /* ignore */ }
+    try {
+      const muted = Boolean(this.sdk?.isMuted?.());
+      this.events.onPortalMute?.(muted);
+    } catch { /* ignore */ }
+  }
+  isMuted(): boolean {
+    try { return Boolean(this.sdk?.isMuted?.()); } catch { return false; }
+  }
+  getSettings(): { muteAudio: boolean; disableChat: boolean } {
+    return { muteAudio: this.isMuted(), disableChat: false };
+  }
+
+  /* error reporting */
+  captureError(err: string | Error): void {
+    const sdk = this.sdk;
+    if (!sdk?.captureError) return;
+    try {
+      sdk.captureError(err);
+    } catch {
+      /* Poki error capture is best-effort */
+    }
+  }
+}

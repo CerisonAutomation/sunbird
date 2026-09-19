@@ -7,7 +7,15 @@ import { flag, setFlag } from "../Flags";
  * force-enabled without a redeploy.
  */
 describe("feature flags", () => {
-  beforeEach(() => localStorage.clear());
+  // localStorage.clear() alone is NOT a reset: Flags.ts caches overrides in
+  // module state, so a bare clear leaves the previous test's values live and
+  // the file passes only in order. Re-assert every default up front instead.
+  beforeEach(() => {
+    localStorage.clear();
+    setFlag("challengeShare", true);
+    setFlag("nativeShare", true);
+    setFlag("modeAwareChallenge", true);
+  });
 
   it("defaults on", () => {
     expect(flag("challengeShare")).toBe(true);

@@ -3,6 +3,7 @@ mod config;
 mod legacy;
 mod metrics;
 mod rooms;
+mod validate;
 mod ws;
 
 use anyhow::Context;
@@ -145,15 +146,22 @@ fn init_tracing() {
 
 fn build_app(shared: SharedState, shutdown_rx: watch::Receiver<bool>) -> Router {
     let cors = cors_layer(&shared.config);
-    // The WebSocket route carries its own state (the room registry) so the
-    // socket task never needs the whole Shared config.
+    let ws_socket_state = ws::SocketState {
+        rooms: shared.rooms.clone(),
+        issuer: Arc::new(shared.issuer.clone()),
+        allowed_origins: shared.config.public_origins.clone(),
+    };
+    let legacy_socket_state = legacy::LegacySocketState {
+        rooms: shared.legacy_rooms.clone(),
+        allowed_origins: shared.config.public_origins.clone(),
+    };
     let ws_router = Router::new()
         .route("/v1/ws", get(ws::ws_handler))
-        .with_state(shared.rooms.clone());
+        .with_state(ws_socket_state);
     // The legacy simple-protocol socket the browser ships with today.
     let legacy_router = Router::new()
         .route("/ws", get(legacy::legacy_ws_handler))
-        .with_state(shared.legacy_rooms.clone());
+        .with_state(legacy_socket_state);
     Router::new()
         .merge(ws_router)
         .merge(legacy_router)
@@ -316,6 +324,25 @@ async fn issue_reconnect_token(
     Json(request): Json<ReconnectTokenRequest>,
 ) -> Result<Json<SeatGrant>, ApiError> {
     metrics::note_join_intent();
+    // Ownership check: the seat must exist AND the requested generation
+    // must be the seat's CURRENT generation. Seat ids are public (roster
+    // broadcasts), so issuing for an arbitrary (seat, generation) pair
+    // would let any room member mint a hijack token for a disconnected
+    // pilot.
+    match shared
+        .rooms
+        .seat_generation(request.room_id, request.seat_id)
+    {
+        None => Err(ApiError {
+            status: StatusCode::NOT_FOUND,
+            error: ProtocolError::SeatNotFound,
+        })?,
+        Some(current) if current != request.generation => Err(ApiError {
+            status: StatusCode::CONFLICT,
+            error: ProtocolError::InvalidReconnectToken,
+        })?,
+        Some(_) => {}
+    }
     let token = shared
         .issuer
         .issue(
@@ -434,10 +461,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn token_issue_returns_grant() {
+    async fn token_issue_requires_a_real_seat() {
         let shared = test_shared();
-        let response = issue_reconnect_token(
-            State(shared),
+        // Random seat ids must be rejected — seat ids are public and an
+        // unchecked issuer would mint hijack tokens.
+        let unknown = issue_reconnect_token(
+            State(shared.clone()),
             Json(ReconnectTokenRequest {
                 player_id: Uuid::new_v4(),
                 room_id: Uuid::new_v4(),
@@ -446,9 +475,59 @@ mod tests {
             }),
         )
         .await;
+        let response = unknown.into_response();
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        let body = axum::body::to_bytes(response.into_body(), 4096)
+            .await
+            .unwrap();
+        assert!(String::from_utf8_lossy(&body).contains("seatNotFound"));
+
+        // A real seat: join, then mint for its current generation.
+        let outcome = shared
+            .rooms
+            .join("TOK1", "2026-09-16", "Pilot", "sunbird", None)
+            .unwrap();
+        let grant = outcome.grant;
+        let response = issue_reconnect_token(
+            State(shared.clone()),
+            Json(ReconnectTokenRequest {
+                player_id: grant.player_id,
+                room_id: grant.room_id,
+                seat_id: grant.seat_id,
+                generation: grant.generation,
+            }),
+        )
+        .await;
         let Json(grant) = response.expect("token grant");
-        assert_eq!(grant.generation, 3);
+        assert_eq!(grant.generation, 1);
         assert!(grant.reconnect_token.starts_with("sb1."));
+    }
+
+    #[tokio::test]
+    async fn token_issue_rejects_stale_generation() {
+        let shared = test_shared();
+        let grant = shared
+            .rooms
+            .join("TOK2", "2026-09-16", "Pilot", "sunbird", None)
+            .unwrap()
+            .grant;
+        // After a reattach the generation bumps; the old generation must
+        // no longer mint tokens.
+        shared
+            .rooms
+            .reconnect(grant.room_id, grant.seat_id)
+            .unwrap();
+        let stale = issue_reconnect_token(
+            State(shared),
+            Json(ReconnectTokenRequest {
+                player_id: grant.player_id,
+                room_id: grant.room_id,
+                seat_id: grant.seat_id,
+                generation: 1,
+            }),
+        )
+        .await;
+        assert_eq!(stale.into_response().status(), StatusCode::CONFLICT);
     }
 
     #[test]

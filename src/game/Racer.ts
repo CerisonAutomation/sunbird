@@ -223,7 +223,7 @@ export class Racer {
   }
 
   updateCamera(dt: number, playing: boolean, terrain: TerrainSystem): void {
-    this.camera.update(dt, this.bird, playing, terrain.heightAt(this.bird.x));
+    this.camera.update(dt, this.bird, playing, terrain.landingGround(this.bird.x, this.bird.vx));
   }
 
   dispose(scene: THREE.Scene): void {

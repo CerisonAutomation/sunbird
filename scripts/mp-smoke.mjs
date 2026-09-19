@@ -15,11 +15,20 @@ const a = mk("Alice");
 const b = mk("Bob");
 let sawBob = false;
 let liveFrames = 0;
+let sawStart = false;
 
 a.on("message", (d) => {
   const m = JSON.parse(d.toString());
   if (m.type === "peers" && m.peers.some((p) => p.name === "Bob")) sawBob = true;
+  if (m.type === "start") sawStart = true;
   if (m.type === "state" && m.pilots.length > 0) liveFrames++;
+});
+b.on("message", (d) => {
+  const m = JSON.parse(d.toString());
+  if (m.type === "start") sawStart = true;
+});
+b.on("open", () => {
+  b.send(JSON.stringify({ type: "ready", ready: true }));
 });
 b.on("open", () => {
   // Field names must match the wire protocol: { x, y, r, d } (see
@@ -28,10 +37,11 @@ b.on("open", () => {
   const t = setInterval(() => b.send(JSON.stringify({ type: "state", x: Math.random() * 500, y: 30, r: 0, d: 100 })), 100);
   b.on("close", () => clearInterval(t));
 });
+a.on("open", () => a.send(JSON.stringify({ type: "ready", ready: true })));
 
 setTimeout(() => {
-  const ok = sawBob && liveFrames >= 5;
-  console.log(`peers-visible=${sawBob} live-frames=${liveFrames} → ${ok ? "PASS" : "FAIL"}`);
+  const ok = sawBob && sawStart && liveFrames >= 5;
+  console.log(`peers-visible=${sawBob} start-broadcast=${sawStart} live-frames=${liveFrames} → ${ok ? "PASS" : "FAIL"}`);
   a.close(); b.close();
   process.exit(ok ? 0 : 1);
 }, 4000);

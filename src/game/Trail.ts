@@ -1,3 +1,4 @@
+import { uploadDensePrefix } from "./bufferUpdates";
 import * as THREE from "three";
 
 const TRAIL_MAX = 48;
@@ -175,8 +176,8 @@ export class TrailRibbon {
     }
 
     this.geo.setDrawRange(0, vi);
-    (this.geo.getAttribute("position") as THREE.BufferAttribute).needsUpdate = true;
-    (this.geo.getAttribute("aAlpha") as THREE.BufferAttribute).needsUpdate = true;
+    uploadDensePrefix(this.geo.getAttribute("position") as THREE.BufferAttribute, vi);
+    uploadDensePrefix(this.geo.getAttribute("aAlpha") as THREE.BufferAttribute, vi);
   }
 
   private setVert(i: number, x: number, y: number, a: number): void {

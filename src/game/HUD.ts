@@ -1,24 +1,41 @@
+import { browseSkins, newShopBrowse, nextBird, type ShopBrowse } from "./ShopBrowse";
+import { flightTakeaway } from "./FlightGuidance";
+import { menuIcon, menuHorizon } from "./MenuIcons";
+import { paginate } from "./Pagination";
+import { flockLoadingMark } from "./FlockLoading";
+import { PLAY_DESTINATIONS, COLLECTION_DESTINATIONS, PROGRESS_DESTINATIONS, type MenuDestination } from "./MenuCatalog";
+import { OverlayNavigation } from "./OverlayNavigation";
+import { MenuContinuity } from "./MenuContinuity";
+import { MenuSky } from "./MenuSky";
+import { feedbackSlot } from "./HudFeedback";
 import type { AchievementView } from "./Achievements";
 import type { ActivePower } from "./PowerUps";
 import type { SessionGoal } from "./Engagement";
-import type { ModeDef } from "./Modes";
+import { PVP_MODES, type ModeDef, type PvpWorldCourse, type ModeId } from "./Modes";
 import type { RacerStats } from "./Racer";
+import { CUSTOM_PILOT_NAMES, LEADERBOARD_CLOUD_LABEL, PORTAL_DISPLAY_NAME, PORTAL_EDITION_NOTE, SELL_AD_REMOVAL, SQUAD_CHAT } from "./edition";
+import { leaderboardBackend } from "./Leaderboard";
 import type { BoardMetric, BoardPage, BoardScope } from "./Leaderboard";
 import type { TournamentView } from "./Tournaments";
-import type { RosterBird, Standing } from "./MassRace";
+import type { RosterBird, Standing, RivalNameTag } from "./MassRace";
+import { SUPPORTED_LOCALES, getLocale, t } from "../i18n";
+import * as THREE from "three";
 import { VIP_DAILY_GIFT } from "./constants";
-import { COLLECTIONS, type BoostView, type ShopTrailView, type SkinView } from "./Economy";
-import { MenuSky } from "./MenuSky";
+import { COLLECTIONS, dailyFlashBird, GOLD, skinById, STARTER_PACK, VIP, type BoostView, type ShopTrailView, type SkinView } from "./Economy";
+import { rivalPalette, skinPalette, sunSVG, sunbirdSVG } from "./Sunbird";
 import { formatDistance } from "./math";
 import type { MissionView, QuestReward, QuestView } from "./Missions";
 import type { CampaignChapterView } from "./Campaign";
 import type { MonthlyTheme, WeeklyEvent } from "./Events";
-import type { SquadState } from "./Squad";
+import { SQUAD_QUESTS, type SquadState } from "./Squad";
+import { seenAgo, type FlightMate } from "./pilots";
 import type { HighScore, Settings } from "./SaveData";
 import { TRACK_NAMES } from "./Music";
 import type { TierView } from "./SeasonPass";
 
 export type UiScreen =
+  | "progress"
+  | "practice"
   | "main"
   | "shop"
   | "paywall"
@@ -36,7 +53,8 @@ export type UiScreen =
   | "rank"
   | "challenges"
   | "campaign"
-  | "squad";
+  | "squad"
+  | "nameEntry";
 
 export type RivalCard = {
   rating: number;
@@ -70,7 +88,7 @@ export type AtlasEntry = {
 };
 export type UiState = "menu" | "playing" | "paused" | "continue" | "ad" | "gameover";
 export type SeedMode = "today" | "yesterday" | "random";
-export type CheckoutMode = "stripe" | "demo";
+export type CheckoutMode = "demo";
 export type PortalName = "none" | "poki" | "crazy" | "generic";
 
 export type HudSnapshot = {
@@ -81,6 +99,8 @@ export type HudSnapshot = {
   version: number;
   distance: number;
   coins: number;
+  /** True once this run's 3× coin bonus has been claimed (one claim per run). */
+  multiplierClaimed: boolean;
   daylight: number;
   daylightMax: number;
   fever: number;
@@ -104,10 +124,16 @@ export type HudSnapshot = {
   vipDaysLeft: number;
   vipExpiredNotice: boolean;
   adsLeftToday: number;
+  /** True when the portal offers its own leaderboard overlay. */
+  portalLeaderboard: boolean;
   ghostDelta: number | null;
   /** True when this finished run beat the previous personal-best distance. */
   newBest: boolean;
   continueTimer: number;
+  /** Context-driven reason line for the continue card (Poki MON-19). */
+  continueReason: string;
+  /** True when the offer context is worth a little extra emphasis (still optional). */
+  continueHighlight: boolean;
   continueCost: number;
   canAffordContinue: boolean;
   adAvailable: boolean;
@@ -189,6 +215,7 @@ export type HudSnapshot = {
   modeIcon: string;
   countdown: number;
   versus: boolean;
+  splitLayout: "off" | "vertical" | "horizontal";
   versusWinner: number;
   p1Stats: RacerStats | null;
   p2Stats: RacerStats | null;
@@ -225,6 +252,8 @@ export type HudSnapshot = {
   roomCode: string;
   roomCount: number;
   roomCapacity: number;
+  roomReady: boolean;
+  roomReadyCount: number;
   roomSize: number;
   roomSkill: string;
   roomMuted: boolean;
@@ -237,7 +266,7 @@ export type HudSnapshot = {
   photoFinish: string;
   rival: RivalCard;
   loadout: LoadoutView;
-  lobbyRivals: { name: string; tag: string }[];
+  lobbyRivals: { name: string; tag: string; ready?: boolean; skin?: string }[];
   raceRated: boolean;
   /** True when the room server (single-threaded referee) confirmed the place. */
   raceVerified: boolean;
@@ -265,7 +294,33 @@ export type HudSnapshot = {
   campaignDone: number;
   campaignTotal: number;
   squad: SquadState;
+  /** Real pilots from rooms this device shared — see src/game/pilots.ts. */
+  recentPilots: FlightMate[];
+  /** AUDS shared-run state (async multiplayer by code, Poki platform only). */
+  share: {
+    available: boolean;
+    code: string;
+    busy: boolean;
+    error: string;
+    loaded: { name: string; seed: string; mode: string; distance: number; timeMs: number; place: number; bird: string } | null;
+  };
   squadNotice: string;
+  dailyFlash?: { id: string; price: number; originalPrice: number; discountPct: number };
+  stipendClaimed?: boolean;
+  /** This month's rank prize has already been claimed (one per season). */
+  rankPrizeClaimed: boolean;
+  /** The one-time Ace Wingman crate was bought (it pays 250 for 240 — no re-claims). */
+  wingmanBundle: boolean;
+  /* --- monetization max value & portal loops --- */
+  piggyCoins: number;
+  prestigeLevel: number;
+  prestigeMult: number;
+  canFreeSpin: boolean;
+  /* --- pvp modes & worlds catalog --- */
+  pvpModes: ModeDef[];
+  pvpWorlds: PvpWorldCourse[];
+  selectedPvpMode: ModeId;
+  selectedPvpWorld: string;
 };
 
 export type DailyCard = {
@@ -314,8 +369,20 @@ export type MasteryRow = {
 
 type ActionHandler = (action: string, id: string) => void;
 
+/**
+ * Emote wheel visibility. Deliberately a function of the race field ONLY —
+ * there is no `state` argument, because the old `state === "playing"` gate hid
+ * the wheel in the lobby, where a room's players actually gather. Emotes are
+ * the platform-sanctioned alternative to chat (Poki REQ-31), so they must be
+ * reachable wherever a field of racers exists.
+ */
+export function emoteWheelVisible(s: Pick<HudSnapshot, "massRace">): boolean {
+  return Boolean(s.massRace);
+}
+
 export class HUD {
   readonly root: HTMLDivElement;
+  private readonly menuSky: MenuSky;
   private playHud!: HTMLElement;
   private distanceEl!: HTMLElement;
   private coinsEl!: HTMLElement;
@@ -332,10 +399,23 @@ export class HUD {
   private feverFill!: HTMLElement;
   private hintEl!: HTMLElement;
   private menuEl!: HTMLElement;
-  private readonly menuSky = new MenuSky();
   private menuCard!: HTMLElement;
   private pauseEl!: HTMLElement;
   private pauseBtnEl!: HTMLElement;
+  private muteBtnEl!: HTMLButtonElement;
+  /** Live run-stats shown on the pause card (updated every frame while paused). */
+  private pauseDistanceEl!: HTMLElement;
+  private pauseAltitudeEl!: HTMLElement;
+  private pauseComboEl!: HTMLElement;
+  private pauseMuteBtn!: HTMLButtonElement;
+  private pauseMuteIco!: HTMLElement;
+  private pauseMuteLbl!: HTMLElement;
+  /** Menu-sheet mute control. The play HUD's button only exists mid-flight, so
+   *  the shell needs its own always-reachable toggle. */
+  private menuMuteEl: HTMLButtonElement | null = null;
+  private menuMuteShown: boolean | null = null;
+  private playMuteShown: boolean | null = null;
+  private pauseMuteShown: boolean | null = null;
   private contEl!: HTMLElement;
   private contCard!: HTMLElement;
   private adEl!: HTMLElement;
@@ -362,12 +442,19 @@ export class HUD {
   private standingsEl!: HTMLElement;
   private rosterBar!: HTMLElement;
   private matchmakingEl!: HTMLElement;
+  private matchmakingTitle!: HTMLElement;
   private matchmakingCount!: HTMLElement;
   private matchmakingLabel!: HTMLElement;
+  private matchmakingRooms!: HTMLElement;
+  private matchmakingAi!: HTMLElement;
+  private matchmakingKeep!: HTMLElement;
   private draftMeter!: HTMLElement;
   private finishCd!: HTMLElement;
   private lastFinishCd = "";
   private emoteWheel!: HTMLElement;
+  private emoteBubble!: HTMLElement;
+  private emoteBubbleTimer = 0;
+  private impactPopupsEl!: HTMLElement;
   private lastStandings = "";
   private lastRoster = "";
   private lastRosterAt = 0;
@@ -383,6 +470,16 @@ export class HUD {
   /** Per-frame text write memoization: DOM writes only when content changes. */
   private readonly textCache = new Map<string, string>();
   private readonly styleCache = new Map<string, string>();
+
+  private paintMute(button: HTMLButtonElement, muted: boolean): void {
+    const label = muted ? "Unmute sound" : "Mute sound";
+    const waves = muted ? '<path d="m16 9 6 6m0-6-6 6"/>'
+      : '<path d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>';
+    button.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m11 4-6 5H2v6h3l6 5z"/>${waves}</svg>`;
+    button.setAttribute("aria-pressed", String(muted));
+    button.setAttribute("aria-label", label);
+    button.title = label;
+  }
 
   private setText(el: HTMLElement, key: string, value: string): void {
     if (this.textCache.get(key) === value) return;
@@ -407,16 +504,24 @@ export class HUD {
   private adSkipEl: HTMLButtonElement | null = null;
   private lastKey = "";
   private lastHint = "";
+  private readonly shopBrowse = newShopBrowse();
+  private shopSnapshot: HudSnapshot | null = null;
+  private currentSnapshot: HudSnapshot | null = null;
   private lastChips = "";
+  private readonly tmpNameTagVec = new THREE.Vector3();
+  /** Live nametag elements, reused per frame (see updateNameTags). */
+  private readonly nameTagEls = new Map<string, HTMLDivElement>();
+  private readonly nameTagKeys = new Map<string, string>();
 
   constructor(parent: HTMLElement) {
+    this.menuSky = new MenuSky();
     this.root = document.createElement("div");
     this.root.className = "hud-root";
     this.root.innerHTML = `
       <div class="play-hud hidden" data-ref="playHud">
         <div class="top-bar">
           <div class="stat-block">
-            <div class="stat-label">Distance</div>
+            <div class="stat-label">${t("hud.stat.distance", undefined, "Distance")}</div>
             <div class="stat-value" data-ref="distance">0 m</div>
             <div class="stat-sub">best <span data-ref="best">0</span></div>
           </div>
@@ -425,10 +530,10 @@ export class HUD {
               <div class="sun-fill" data-ref="sunFill"></div>
               <div class="sun-knob" data-ref="sunKnob">☀</div>
             </div>
-            <div class="sun-caption">daylight</div>
+            <div class="sun-caption">${t("hud.stat.daylight", undefined, "daylight")}</div>
           </div>
           <div class="stat-block right">
-            <div class="stat-label">Coins</div>
+            <div class="stat-label">${t("hud.stat.coins", undefined, "Coins")}</div>
             <div class="stat-value coin" data-ref="coins">0</div>
           </div>
         </div>
@@ -445,22 +550,18 @@ export class HUD {
         <div class="launch-banner" data-ref="launchBanner"></div>
         <div class="power-strip" data-ref="powerStrip"></div>
         <div class="goal-strip" data-ref="goalStrip"></div>
-        <div class="goal-pop" data-ref="goalPop"></div>
+        <div class="goal-pop" data-ref="goalPop" role="status" aria-live="polite" aria-atomic="true"></div>
         <div class="countdown" data-ref="countdown"></div>
         <div class="versus-bar hidden" data-ref="versusBar"></div>
         <div class="standings hidden" data-ref="standings"></div>
         <div class="roster-bar hidden" data-ref="rosterBar"></div>
+        <div class="rival-nametag-container" data-ref="nametags"></div>
         <div class="draft-meter hidden" data-ref="draftMeter"><i></i><span>SLIPSTREAM</span></div>
         <div class="finish-countdown hidden" data-ref="finishCd"></div>
+        <div class="emote-bubble hidden" data-ref="emoteBubble" role="status" aria-live="polite" aria-atomic="true"></div>
         <div class="emote-wheel hidden" data-ref="emoteWheel">
-          <button data-ui data-action="emote" data-id="👋">👋</button>
-          <button data-ui data-action="emote" data-id="🔥">🔥</button>
-          <button data-ui data-action="emote" data-id="😂">😂</button>
-          <button data-ui data-action="emote" data-id="🙌">🙌</button>
-          <button data-ui data-action="emote" data-id="😱">😱</button>
-          <button data-ui data-action="emote" data-id="👑">👑</button>
-          <button data-ui data-action="emote" data-id="💨">💨</button>
-          <button data-ui data-action="emote" data-id="🤝">🤝</button>
+          <button class="emotes-toggle" data-ui data-action="toggle-emotes" aria-expanded="false" aria-controls="flight-emotes">💬 Emotes</button>
+          <div class="emote-options hidden" id="flight-emotes">${[["👋", "Wave"], ["🔥", "Fire"], ["😂", "Laugh"], ["🙌", "Bravo"], ["👑", "Crown"], ["🤝", "GG"]].map(([icon, label]) => `<button data-ui data-action="emote" data-id="${icon}" aria-label="Send ${label}" title="Send ${label}">${icon} ${label}</button>`).join("")}</div>
         </div>
         <div class="mid-meta">
           <div class="island-chip" data-ref="island">Island 1</div>
@@ -475,20 +576,65 @@ export class HUD {
           <div class="fever-label">FEVER</div>
           <div class="fever-bar"><div class="fever-fill" data-ref="feverFill"></div></div>
         </div>
+        <button class="icon-btn mute-btn" data-ui data-action="set-mute" data-ref="muteBtn" aria-label="Mute sound" title="Mute sound">🔊</button>
         <button class="icon-btn pause-btn" data-ui data-action="pause" data-ref="pauseBtn" aria-label="Pause">❙❙</button>
         <div class="combo" data-ref="combo"></div>
-        <div class="hint" data-ref="hint"></div>
-        <div class="hand" data-ref="hand">☝</div>
+        <div class="hint" data-ref="hint" role="status" aria-live="polite" aria-atomic="true"></div>
+        <div class="hand" data-ref="hand">☝<span class="hand-hint">Tap · Space · ↑</span></div>
       </div>
 
       <div class="overlay menu hidden" data-ref="menu"><div class="paper-card" data-ref="menuCard"></div></div>
 
-      <div class="overlay pause hidden" data-ref="pause">
-        <div class="paper-card slim">
-          <h2>Paused</h2>
-          <p class="tagline">The sun waits for no bird.</p>
-          <button class="primary-btn" data-ui data-action="resume">Resume</button>
-          <button class="ghost-btn" data-ui data-action="menu">Give up</button>
+      <div class="overlay pause hidden" data-ref="pause" role="dialog" aria-modal="true" aria-label="Paused">
+        <div class="paper-card slim pause-card">
+          <div class="pause-kicker">FLIGHT ON HOLD</div>
+          <h2>Take a breath</h2>
+          <p class="tagline">Your run is safe. Adjust settings, grab boosts, or rally your flock — ready when you are.</p>
+          <div class="pause-run-stats" data-ref="pauseStats">
+            <span class="prs"><em>Distance</em><b data-ref="pauseDistance">0 m</b></span>
+            <span class="prs"><em>Altitude</em><b data-ref="pauseAltitude">0 m</b></span>
+            <span class="prs"><em>Combo</em><b data-ref="pauseCombo">×1</b></span>
+          </div>
+          <div class="pause-actions">
+            <button class="primary-btn pause-resume" data-ui data-action="resume">▶ Keep flying</button>
+          </div>
+          <div class="pause-quick-grid" role="group" aria-label="Quick access">
+            <button class="pause-q pause-mute" data-ui data-action="set-mute" data-ref="pauseMute" aria-pressed="false">
+              <i data-ref="pauseMuteIco">🔊</i><span data-ref="pauseMuteLbl">Sound on</span>
+            </button>
+            <button class="pause-q" data-ui data-action="pause-to" data-id="settings">
+              <i>⚙</i><span>Settings</span>
+            </button>
+            <button class="pause-q" data-ui data-action="pause-to" data-id="shop">
+              <i>🛍</i><span>Shop</span>
+            </button>
+            <button class="pause-q" data-ui data-action="pause-to" data-id="board">
+              <i>🌐</i><span>Global Board</span>
+            </button>
+            <button class="pause-q" data-ui data-action="pause-to" data-id="scores">
+              <i>🏆</i><span>My Scores</span>
+            </button>
+            <button class="pause-q" data-ui data-action="pause-to" data-id="pass">
+              <i>🎟</i><span>Nest Pass</span>
+            </button>
+            <button class="pause-q" data-ui data-action="pause-to" data-id="squad">
+              <i>🐦</i><span>Squad</span>
+            </button>
+            <button class="pause-q" data-ui data-action="pause-to" data-id="trophies">
+              <i>🏅</i><span>Trophies</span>
+            </button>
+            <button class="pause-q" data-ui data-action="pause-to" data-id="progress">
+              <i>📈</i><span>Progress</span>
+            </button>
+            <button class="pause-q" data-ui data-action="toggle-fullscreen">
+              <i>⛶</i><span>Fullscreen</span>
+            </button>
+          </div>
+          <div class="pause-exit-row">
+            <button class="soft-btn" data-ui data-action="restart-flight">↻ Restart flight</button>
+            <button class="ghost-btn danger-btn" data-ui data-action="menu">✕ Exit to menu</button>
+          </div>
+          <p class="pause-exit-note">Resume keeps your momentum. Restart begins a fresh flight. Exit returns you to the launch pad.</p>
         </div>
       </div>
 
@@ -498,31 +644,238 @@ export class HUD {
 
       <div class="toasts" data-ref="toasts"></div>
       <div class="flash" data-ref="flash"></div>
-      <div class="matchmaking hidden" data-ref="matchmaking"><div class="matchmaking-spinner"></div><div class="matchmaking-count" data-ref="matchmakingCount">0 pilots</div><div class="matchmaking-label" data-ref="matchmakingLabel">Searching for live pilots…</div><button class="soft-btn mm-cancel" data-ui data-action="mm-cancel">Cancel</button></div>
+      <div class="impact-popups" data-ref="impactPopups"></div>
+      <div class="matchmaking hidden" data-ref="matchmaking" role="status" aria-live="polite">
+        ${flockLoadingMark()}
+        <div class="matchmaking-title" data-ref="matchmakingTitle">Searching for live pilots…</div>
+        <div class="matchmaking-count" data-ref="matchmakingCount">0 live pilots</div>
+        <div class="matchmaking-label" data-ref="matchmakingLabel">Reading the sky…</div>
+        <div class="matchmaking-rooms hidden" data-ref="matchmakingRooms"></div>
+        <div class="btn-row mm-actions">
+          <button class="primary-btn gold mm-ai hidden" data-ui data-ref="matchmakingAi" data-action="mm-ai">🤖 Race the AI flock instead</button>
+          <button class="soft-btn mm-keep hidden" data-ui data-ref="matchmakingKeep" data-action="mm-keep-search">Keep searching</button>
+          <button class="soft-btn mm-cancel" data-ui data-action="mm-cancel">Cancel</button>
+        </div>
+      </div>
     `;
+    // Flow-based lanes reserve actual space; independently positioned counters,
+    // chips and buttons used to overlap as soon as labels wrapped on phones.
+    const play = this.root.querySelector<HTMLElement>('[data-ref="playHud"]')!;
+    const lane = (className: string, selectors: string[], parent = play): HTMLElement => {
+      const el = document.createElement("div");
+      el.className = className;
+      for (const selector of selectors) el.appendChild(this.root.querySelector(selector)!);
+      parent.appendChild(el);
+      return el;
+    };
+    const top = this.root.querySelector<HTMLElement>(".top-bar")!;
+    lane("hud-controls", ['[data-ref="muteBtn"]', '[data-ref="pauseBtn"]'], top);
+    this.root.querySelector(".mid-meta")!.appendChild(this.root.querySelector(".combo")!);
+    const header = lane("hud-header", [".top-bar", ".mid-meta", ".power-chips", ".power-strip", ".roster-bar", ".versus-bar"]);
+    lane("flight-messages", [".launch-banner", ".hint", ".goal-pop", ".finish-countdown", ".countdown"]);
+    const footer = lane("flight-footer", [".goal-strip", ".draft-meter", ".fever-wrap", ".emote-wheel"]);
+    // The menu backdrop is the LIVE 3D gameplay world (Game.menuTick attract
+    // flight): the painted 2D sky canvas stays OUT of the DOM so it never
+    // covers the world, and its loop never starts. The hero-bird overlay
+    // stays mounted (hidden) so MenuSky.dispose() keeps working unchanged.
+    this.root.querySelector<HTMLElement>('[data-ref="menu"]')!.appendChild(this.menuSky.heroHost);
+    this.menuSky.heroHost.classList.add("hidden");
     parent.appendChild(this.root);
     this.bind();
+    this.overlayNavigation = new OverlayNavigation(this.root);
+    // Observe only these small flow containers, not the full scene or per-frame
+    // positions. Header/footer wrapping automatically reserves feedback space.
+    this.resizeObs = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const name = entry.target === header ? "header" : "footer";
+        this.root.style.setProperty(`--hud-${name}-height`, `${entry.contentRect.height}px`);
+      }
+    });
+    this.resizeObs.observe(header);
+    this.resizeObs.observe(footer);
   }
 
   /** Matchmaking overlay: live pilot count + honest countdown to backfill. */
-  setMatchmaking(on: boolean, live: number, _field: number, secsLeft: number): void {
+  /**
+   * The search overlay. Two honest phases:
+   *   searching — a live countdown to the room start, never to a bot race;
+   *   waiting   — the window elapsed with nobody here, the search stays open
+   *               and the pilot chooses between waiting and the AI flock.
+   */
+  setMatchmaking(
+    on: boolean,
+    live: number,
+    _field: number,
+    secsLeft: number,
+    phase: "searching" | "waiting" = "searching",
+    rooms = "",
+  ): void {
     this.matchmakingEl.classList.toggle("hidden", !on);
     if (!on) return;
-    this.matchmakingCount.textContent = `${live} live pilot${live === 1 ? "" : "s"}`;
-    this.matchmakingLabel.textContent =
-      secsLeft > 0.5
-        ? `Searching… player ghosts fill the field in ${Math.ceil(secsLeft)}s`
-        : "Launching…";
+    const searching = phase === "searching";
+    this.matchmakingEl.classList.toggle("is-waiting", !searching);
+    this.matchmakingTitle.textContent = searching ? "Searching for live pilots…" : "No live pilots found yet";
+    this.matchmakingCount.textContent = live > 0
+      ? `${live} live pilot${live === 1 ? "" : "s"} in this room`
+      : "Waiting for the first live pilot";
+    this.matchmakingLabel.textContent = searching
+      ? secsLeft > 0.5
+        ? live > 0
+          ? `Race starts when the room is ready · ${Math.ceil(secsLeft)}s left on the clock`
+          : `Looking for pilots on this circuit · ${Math.ceil(secsLeft)}s`
+        : "Starting the room…"
+      : "The search stays open — anyone who arrives can still join this room";
+    this.matchmakingRooms.textContent = rooms;
+    this.matchmakingRooms.classList.toggle("hidden", !rooms);
+    this.matchmakingAi.classList.toggle("hidden", searching);
+    this.matchmakingKeep.classList.toggle("hidden", searching);
   }
 
   onAction(handler: ActionHandler): void {
+    this.root.addEventListener("keydown", e => {
+      if (e.key === "Enter" && !e.isComposing && e.target instanceof HTMLInputElement && e.target.dataset.enterAction) {
+        e.preventDefault(); e.stopPropagation();
+        this.menuCard.querySelector<HTMLButtonElement>(`button[data-action="${e.target.dataset.enterAction}"]`)?.click();
+        return;
+      }
+      if (e.key === "Escape" && this.emoteWheel.contains(e.target as Node) && this.emoteWheel.querySelector('[aria-expanded="true"]')) {
+        e.preventDefault(); e.stopPropagation();
+        this.emoteWheel.querySelector<HTMLButtonElement>(".emotes-toggle")?.click();
+        this.emoteWheel.querySelector<HTMLButtonElement>(".emotes-toggle")?.focus({ preventScroll: true });
+        return;
+      }
+      if (e.key === "Escape" && this.copyDialog && !e.isComposing) {
+        e.preventDefault(); e.stopPropagation(); this.dismissCopy();
+      }
+    });
+    this.root.addEventListener("compositionstart", e => {
+      if (e.target instanceof Node && this.menuCard.contains(e.target)) this.menuContinuity.beginComposition();
+    });
+    this.root.addEventListener("compositionend", () => this.menuContinuity.endComposition());
     this.root.addEventListener("click", (e) => {
+      if (e.target === this.pauseEl) {
+        handler("resume", "");
+        return;
+      }
+      if (e.target === this.overEl) {
+        handler("restart-flight", "");
+        return;
+      }
+      if (e.target === this.menuEl && this.currentSnapshot && this.currentSnapshot.screen !== "main") {
+        handler("back", "");
+        return;
+      }
       const t = (e.target as HTMLElement).closest("[data-action]") as HTMLElement | null;
-      if (!t || (t as HTMLButtonElement).disabled) return;
+      if (!t || t.matches("input, select, textarea") || (t as HTMLButtonElement).disabled) return;
       e.preventDefault();
       e.stopPropagation();
+      if (t.dataset.action === "toggle-emotes") {
+        const expanded = t.getAttribute("aria-expanded") !== "true";
+        t.setAttribute("aria-expanded", String(expanded));
+        this.emoteWheel.querySelector(".emote-options")?.classList.toggle("hidden", !expanded);
+        return;
+      }
+      if (t.dataset.action === "emote") {
+        const toggle = this.emoteWheel.querySelector<HTMLButtonElement>(".emotes-toggle");
+        this.emoteWheel.querySelector(".emote-options")?.classList.add("hidden");
+        toggle?.setAttribute("aria-expanded", "false");
+        toggle?.focus({ preventScroll: true });
+      }
+      if (t.dataset.action === "shop-filter") {
+        const filter = (t.dataset.id ?? "all") as import("./ShopBrowse").ShopFilter;
+        if (filter) this.shopBrowse.filter = filter;
+        if (this.shopSnapshot) this.renderStatic(this.shopSnapshot);
+        return;
+      }
+      if (t.dataset.action === "preview-skin") {
+        this.shopBrowse.preview = t.dataset.id ?? "";
+        if (this.shopSnapshot) this.renderStatic(this.shopSnapshot);
+        const preview = this.menuCard.querySelector<HTMLElement>(".shop-hero-name");
+        preview?.focus({ preventScroll: true });
+        this.menuCard.querySelector(".shop-hero")?.scrollIntoView({ block: "start" });
+        return;
+      }
+      if (t.dataset.action === "shop-section") {
+        const target = this.menuCard.querySelector<HTMLElement>(`[data-ref="${CSS.escape(t.dataset.id ?? "")}"]`);
+        if (target instanceof HTMLDetailsElement) target.open = true;
+        (target?.querySelector<HTMLElement>("summary, input") ?? target)?.focus({ preventScroll: true });
+        target?.scrollIntoView({ block: "start" });
+        return;
+      }
+      if (t.dataset.action === "shop-clear") {
+        this.shopBrowse.query = ""; this.shopBrowse.filter = "all";
+        this.clearValue("shopSearch");
+        if (this.shopSnapshot) this.renderStatic(this.shopSnapshot);
+        this.menuCard.querySelector<HTMLInputElement>('[data-ref="shopSearch"]')?.focus();
+        return;
+      }
+      if (t.dataset.action === "dismiss-copy") { this.dismissCopy(); return; }
       handler(t.dataset.action ?? "", t.dataset.id ?? "");
     });
+    this.root.addEventListener("change", e => {
+      const field = e.target;
+      if ((field instanceof HTMLInputElement || field instanceof HTMLSelectElement) && field.dataset.action) {
+        handler(field.dataset.action, field.value);
+      }
+    });
+    this.root.addEventListener("input", e => {
+      const field = e.target;
+      if (field instanceof HTMLInputElement && field.dataset.ref === "shopSearch") {
+        this.shopBrowse.query = field.value.slice(0, 80);
+        if (this.shopSnapshot) this.renderStatic(this.shopSnapshot);
+      }
+      if (field instanceof HTMLInputElement && field.type === "range") {
+        const output = field.parentElement?.querySelector("output");
+        if (output) output.textContent = `${field.value}%`;
+      }
+    });
+  }
+
+  /** Immediate sender feedback for an emote: your own bubble pops above the
+   *  wheel. Without this the tap looked dead in states where the sim clock
+   *  (which drives the in-world bubble's lifetime) is not advancing, and the
+   *  reply took a whole step to appear while racing. */
+  pulseEmote(text: string): void {
+    if (!this.emoteBubble) return;
+    this.emoteBubble.textContent = text;
+    this.emoteBubble.classList.remove("hidden", "pop");
+    // Force a reflow so the pop animation restarts on a rapid second emote.
+    void this.emoteBubble.offsetWidth;
+    this.emoteBubble.classList.add("pop");
+    window.clearTimeout(this.emoteBubbleTimer);
+    this.emoteBubbleTimer = window.setTimeout(() => this.emoteBubble.classList.add("hidden"), 2200);
+  }
+
+  clearValue(ref: string): void {
+    const field = this.root.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[data-ref="${CSS.escape(ref)}"]`);
+    if (field instanceof HTMLInputElement && field.type === "checkbox") field.checked = false;
+    else if (field) field.value = "";
+  }
+
+  offerCopy(text: string): void {
+    this.dismissCopy();
+    const dialog = document.createElement("div");
+    dialog.className = "overlay copy-dialog";
+    dialog.innerHTML = '<div class="paper-card slim"><h2>Copy manually</h2><p class="tagline">Your browser blocked automatic copying. Select the text below and use Copy.</p><textarea class="cloud-box" aria-label="Text to copy" readonly rows="4"></textarea><button class="soft-btn wide" data-ui data-action="dismiss-copy">Done</button></div>';
+    const field = dialog.querySelector("textarea")!;
+    field.value = text; // never inject codes/URLs as markup
+    this.root.appendChild(dialog);
+    this.copyDialog = dialog;
+    this.overlayNavigation.sync(dialog);
+    field.focus();
+    field.select();
+  }
+
+  dismissCopy(): boolean {
+    if (!this.copyDialog) return false;
+    this.copyDialog.remove();
+    this.copyDialog = null;
+    this.overlayNavigation.sync(this.root.querySelector<HTMLElement>(".overlay:not(.hidden)"));
+    return true;
+  }
+
+  readChecked(ref: string): boolean {
+    return this.root.querySelector<HTMLInputElement>(`[data-ref="${CSS.escape(ref)}"]`)?.checked === true;
   }
 
   readValue(ref: string): string {
@@ -530,8 +883,77 @@ export class HUD {
     return el?.value ?? "";
   }
 
+  setValue(ref: string, val: string): void {
+    const el = this.root.querySelector(`[data-ref="${CSS.escape(ref)}"]`) as HTMLInputElement | HTMLTextAreaElement | null;
+    if (el) el.value = val;
+  }
+
+  updateNameTags(tags: RivalNameTag[], camera: THREE.Camera, width: number, height: number): void {
+    const container = this.root.querySelector<HTMLElement>('[data-ref="nametags"]');
+    if (!container) return;
+    // A root re-render (flushCaches) replaces the container's children — the
+    // cached elements are detached; drop the caches and start fresh.
+    if (!container.childElementCount && this.nameTagEls.size > 0) {
+      this.nameTagEls.clear();
+      this.nameTagKeys.clear();
+    }
+    // DOM reuse: positions are cheap style writes (composited), while the
+    // tag CONTENT is only re-parsed when rank/name/emote/draft actually
+    // changes. The old version rebuilt container.innerHTML 60x/second in a
+    // packed field — a full HTML parse + node churn on every frame, which is
+    // where mobile PVP frame times went to die.
+    const seen = new Set<string>();
+    for (const tag of tags ?? []) {
+      this.tmpNameTagVec.set(tag.worldX, tag.worldY, -3.5);
+      this.tmpNameTagVec.project(camera);
+      if (this.tmpNameTagVec.z > 1) continue;
+      const px = ((this.tmpNameTagVec.x + 1) * width) / 2;
+      const py = ((-this.tmpNameTagVec.y + 1) * height) / 2;
+      if (px < -60 || px > width + 60 || py < -60 || py > height + 60) continue;
+      seen.add(tag.id);
+
+      let el = this.nameTagEls.get(tag.id);
+      if (!el) {
+        el = document.createElement("div");
+        el.className = "rival-nametag";
+        container.appendChild(el);
+        this.nameTagEls.set(tag.id, el);
+        this.nameTagKeys.set(tag.id, "");
+      }
+      el.style.left = `${px.toFixed(1)}px`;
+      el.style.top = `${py.toFixed(1)}px`;
+
+      const key = `${tag.place}|${tag.name}|${tag.emote}|${tag.drafting ? 1 : 0}`;
+      if (this.nameTagKeys.get(tag.id) !== key) {
+        this.nameTagKeys.set(tag.id, key);
+        el.classList.toggle("drafting", tag.drafting);
+        el.innerHTML =
+          `${tag.emote ? `<b class="rt-emote" aria-hidden="true">${escapeHtml(tag.emote)}</b>` : ""}` +
+          `<span class="rank-badge">#${tag.place}</span><span>${escapeHtml(tag.name)}</span>`;
+      }
+    }
+    for (const [id, el] of this.nameTagEls) {
+      if (!seen.has(id)) {
+        el.remove();
+        this.nameTagEls.delete(id);
+        this.nameTagKeys.delete(id);
+      }
+    }
+  }
+
   update(s: HudSnapshot): void {
-    const key = `${s.state}|${s.screen}|${s.version}`;
+    this.currentSnapshot = s;
+    if (s.state === "playing" && !this.wasInFlight) this.resultsContinuity.reset();
+    this.wasInFlight = s.state === "playing";
+    // Keep the menu bird animated by default. The in-game Reduce motion
+    // switch remains the explicit opt-out; relying solely on the browser's
+    // media query made the hero appear frozen on some desktop profiles.
+    document.documentElement.classList.toggle("sb-reduce-motion", s.settings.reduceMotion);
+    // Network presence is asynchronous and doesn't increment the save/UI
+    // version. Include it or a connected room stays stuck on disabled Ready.
+    const roomKey = s.state === "menu" && s.screen === "live"
+      ? `${s.netState}|${s.netError}|${s.roomCode}|${s.roomCount}|${s.roomReady}|${s.roomReadyCount}|${JSON.stringify(s.lobbyRivals)}` : "";
+    const key = `${s.state}|${s.screen}|${s.version}|${roomKey}`;
     if (key !== this.lastKey) {
       this.lastKey = key;
       this.flushCaches();
@@ -541,18 +963,57 @@ export class HUD {
     const inPlay = s.state === "playing" || s.state === "paused" || s.state === "continue";
     this.playHud.classList.toggle("hidden", !inPlay);
     this.playHud.classList.toggle("versus", s.versus);
-    const menuVisible = s.state === "menu" || (s.state === "gameover" && s.screen !== "main");
+    if (this.root.dataset.uiState !== s.state) this.root.dataset.uiState = s.state;
+    const flying = String(inPlay);
+    if (this.root.dataset.flying !== flying) this.root.dataset.flying = flying;
+    const feedback = feedbackSlot(s);
+    if (this.root.dataset.feedback !== feedback) this.root.dataset.feedback = feedback;
+    // Menu overlay: (a) main menu/attract, (b) post-crash postcards, or
+    // (c) paused-run sub-screens (shop/settings/... overlaid on a frozen flight).
+    const menuVisible = s.state === "menu" || (s.state === "gameover" && s.screen !== "main")
+      || (s.state === "paused" && s.screen !== null && s.screen !== "main");
     this.menuEl.classList.toggle("hidden", !menuVisible);
-    if (menuVisible) this.menuSky.resize(this.menuEl.clientWidth, this.menuEl.clientHeight);
-    this.menuSky.setActive(menuVisible);
-    // The static perched hero-bird SVG on the sun is the menu's bird. The
-    // canvas "hero bird" overlay used to draw a second swooping bird on top of
-    // it — two birds on one title screen. Keep it hidden so the mark reads once.
+    this.menuEl.classList.toggle("pause-submenu", s.state === "paused" && s.screen !== null && s.screen !== "main");
+    // When a pause sub-screen is open, hide the plain pause card (the menu card
+    // shows on top with its own "Back to flight" affordance).
+    this.pauseEl.classList.toggle("hidden", s.state !== "paused" || (s.screen !== null && s.screen !== "main"));
+    // The painted 2D sky and the hero bird stay OFF everywhere: the menu
+    // backdrop is the live 3D gameplay world (attract flight) behind the
+    // translucent card — the 2D canvas would cover it with a flat painting.
+    this.menuSky.setActive(false);
     this.menuSky.heroHost.classList.add("hidden");
-    this.pauseEl.classList.toggle("hidden", s.state !== "paused");
     // The pause control only makes sense in live flight — hide it while the
     // crash "second wind" card is up so it can't read as a dead button.
     this.pauseBtnEl.classList.toggle("hidden", s.state !== "playing");
+    this.muteBtnEl.classList.toggle("hidden", !inPlay);
+    const muted = s.settings.mute;
+    if (this.playMuteShown !== muted) {
+      this.playMuteShown = muted;
+      this.paintMute(this.muteBtnEl, muted);
+    }
+    // Keep the pause-card stats & mute in sync while paused.
+    if (s.state === "paused") {
+      this.pauseDistanceEl.textContent = `${Math.max(0, Math.round(s.distance))} m`;
+      this.pauseAltitudeEl.textContent = `${Math.max(0, Math.round(s.altitude))} m`;
+      this.pauseComboEl.textContent = `×${Math.max(1, s.combo)}`;
+      if (this.pauseMuteShown !== muted) {
+        this.pauseMuteShown = muted;
+        this.pauseMuteBtn.setAttribute("aria-pressed", String(muted));
+        this.pauseMuteIco.textContent = muted ? "🔇" : "🔊";
+        this.pauseMuteLbl.textContent = muted ? "Sound off" : "Sound on";
+      }
+    }
+    // Menu mute stays in sync without re-querying every frame. Re-query only
+    // when the sheet was re-rendered (the old node is detached).
+    if (this.menuMuteEl && !this.menuMuteEl.isConnected) this.menuMuteEl = null;
+    if (!this.menuMuteEl) {
+      this.menuMuteEl = this.menuCard.querySelector<HTMLButtonElement>("[data-menu-mute]");
+      if (this.menuMuteEl) this.menuMuteShown = null;
+    }
+    if (this.menuMuteEl && this.menuMuteShown !== muted) {
+      this.menuMuteShown = muted;
+      this.paintMute(this.menuMuteEl, muted);
+    }
     this.contEl.classList.toggle("hidden", s.state !== "continue");
     this.adEl.classList.toggle("hidden", s.state !== "ad");
     this.overEl.classList.toggle("hidden", !(s.state === "gameover" && s.screen === "main"));
@@ -641,7 +1102,7 @@ export class HUD {
           .join("");
       }
 
-      const cd = s.countdown > 0 ? (s.countdown > 1 ? String(Math.ceil(s.countdown - 1)) : "FLY!") : "";
+      const cd = s.countdown > 0 ? String(Math.ceil(s.countdown)) : "";
       if (cd !== this.lastCountdown) {
         this.lastCountdown = cd;
         this.countdownEl.textContent = cd;
@@ -731,7 +1192,11 @@ export class HUD {
         const bar = this.draftMeter.firstElementChild as HTMLElement | null;
         if (bar) bar.style.width = `${Math.round(s.draft * 100)}%`;
       }
-      this.emoteWheel.classList.toggle("hidden", !s.massRace);
+      // Emotes show whenever a race field exists — lobby included (see
+      // emoteWheelVisible). Sending on the results card is harmless: the
+      // toast-free local echo still pops and the net send is a no-op after
+      // disconnect.
+      this.emoteWheel.classList.toggle("hidden", !emoteWheelVisible(s));
 
       // Live standings ticker: leaders plus your row, with gaps to the car
       // ahead so every position fight reads at a glance. Throttled like the
@@ -767,19 +1232,20 @@ export class HUD {
       this.versusBar.classList.toggle("hidden", !s.versus);
       if (s.versus && s.p1Stats && s.p2Stats) {
         const pct = (d: number): number => Math.min(100, (d / s.raceFinish) * 100);
-        const vkey = `${Math.round(pct(s.p1Stats.distance))}|${Math.round(pct(s.p2Stats.distance))}`;
+        const vkey = `${s.splitLayout}|${Math.round(pct(s.p1Stats.distance))}|${Math.round(pct(s.p2Stats.distance))}`;
         if (vkey !== this.lastVersusKey) {
           this.lastVersusKey = vkey;
           const lead1 = s.p1Stats.distance >= s.p2Stats.distance;
           this.versusBar.innerHTML =
             `<div class="vs-row p1 ${lead1 ? "lead" : ""}"><span>P1${lead1 ? " 👑" : ""}</span><i><b style="width:${pct(s.p1Stats.distance)}%"></b></i><em>${Math.round(s.p1Stats.distance)}m</em></div>` +
-            `<div class="vs-row p2 ${lead1 ? "" : "lead"}"><span>P2${lead1 ? "" : " 👑"}</span><i><b style="width:${pct(s.p2Stats.distance)}%"></b></i><em>${Math.round(s.p2Stats.distance)}m</em></div>`;
+            `<div class="vs-row p2 ${lead1 ? "" : "lead"}"><span>P2${lead1 ? "" : " 👑"}</span><i><b style="width:${pct(s.p2Stats.distance)}%"></b></i><em>${Math.round(s.p2Stats.distance)}m</em></div>` +
+            `<div class="versus-guide"><span>P1: A / Space · ${s.splitLayout === "horizontal" ? "top" : "left"}</span><span>P2: L / Enter · ${s.splitLayout === "horizontal" ? "bottom" : "right"}</span></div>`;
         }
       }
       this.handEl.classList.toggle("show", s.showTutorialHand);
       if (html !== this.lastChips) {
         this.lastChips = html;
-        this.powersEl.innerHTML = html;
+        this.powersEl.innerHTML = renderCoins(html);
       }
 
       if (s.hint !== this.lastHint) {
@@ -803,6 +1269,7 @@ export class HUD {
         if (this.adSkipEl.textContent !== txt) this.adSkipEl.textContent = txt;
       }
     }
+    this.overlayNavigation.sync(this.copyDialog ?? (this.matchmakingEl.classList.contains("hidden") ? this.root.querySelector<HTMLElement>(".overlay:not(.hidden)") : this.matchmakingEl));
   }
 
   toast(text: string, kind = "info"): void {
@@ -813,18 +1280,20 @@ export class HUD {
     if (live && live.el.isConnected) {
       live.count += 1;
       live.el.textContent = `${text} ×${live.count}`;
-      live.el.classList.remove("bump");
-      void live.el.offsetWidth;
-      live.el.classList.add("bump");
-      window.clearTimeout(live.timer);
+      // Updating a duplicate must not force a synchronous browser layout.
+      this.cancelTimer(live.timer);
       live.timer = this.scheduleToastOut(live.el, text);
       return;
     }
-    // Cap the stack — beyond 4 pills the oldest leaves immediately.
-    while (this.toastLayer.children.length >= 4) {
+    // One readable pill in flight, at most two on menu screens.
+    const cap = this.root.dataset.flying === "true" ? 1 : 2;
+    while (this.toastLayer.children.length >= cap) {
       const oldest = this.toastLayer.firstElementChild;
       if (!oldest) break;
-      for (const [k, v] of this.liveToasts) if (v.el === oldest) this.liveToasts.delete(k);
+      for (const [k, v] of this.liveToasts) if (v.el === oldest) {
+        this.cancelTimer(v.timer);
+        this.liveToasts.delete(k);
+      }
       oldest.remove();
     }
     const el = document.createElement("div");
@@ -839,10 +1308,13 @@ export class HUD {
   /** Long lines earn longer reads: 1.2 s base + 28 ms/char, capped at 4 s. */
   private scheduleToastOut(el: HTMLElement, key: string): number {
     const hold = Math.min(4000, 1200 + Math.max(0, el.textContent!.length - 16) * 28);
-    return window.setTimeout(() => {
+    return this.after(() => {
+      // Once exit starts, a repeat is a new toast rather than refreshing a
+      // node that already has a pending removal callback.
+      if (this.liveToasts.get(key)?.el === el) this.liveToasts.delete(key);
       el.classList.remove("in");
       el.classList.add("out");
-      window.setTimeout(() => {
+      this.after(() => {
         el.remove();
         const live = this.liveToasts.get(key);
         if (live && live.el === el) this.liveToasts.delete(key);
@@ -852,29 +1324,54 @@ export class HUD {
 
   flash(kind: "perfect" | "fever" | "island" | "sleep"): void {
     this.flashEl.className = `flash show ${kind}`;
-    window.setTimeout(() => this.flashEl.classList.remove("show"), 280);
+    this.after(() => this.flashEl.classList.remove("show"), 280);
   }
 
+  private readonly timers = new Set<number>();
+  private after(callback: () => void, ms: number): number {
+    const timer = window.setTimeout(() => { this.timers.delete(timer); callback(); }, ms);
+    this.timers.add(timer);
+    return timer;
+  }
+  private cancelTimer(timer: number): void {
+    window.clearTimeout(timer);
+    this.timers.delete(timer);
+  }
   private resizeObs: ResizeObserver | null = null;
+  private readonly menuContinuity = new MenuContinuity();
+  private readonly resultsContinuity = new MenuContinuity();
+  private copyDialog: HTMLElement | null = null;
+  private wasInFlight = false;
+  private readonly overlayNavigation: OverlayNavigation;
 
   dispose(): void {
     this.resizeObs?.disconnect();
     this.menuSky.dispose();
+    this.overlayNavigation.dispose();
+    for (const timer of this.timers) window.clearTimeout(timer);
+    this.timers.clear();
+    this.liveToasts.clear();
     this.root.remove();
   }
 
   private renderStatic(s: HudSnapshot): void {
-    if (s.state === "menu" || (s.state === "gameover" && s.screen !== "main")) {
-      this.menuCard.className = `paper-card ${s.screen === "main" ? "menu-hero" : s.screen === "shop" || s.screen === "pass" ? "wide" : ""}`;
-      this.menuCard.innerHTML = this.renderScreen(s);
+    const menuRendered = s.state === "menu"
+      || (s.state === "gameover" && s.screen !== "main")
+      || (s.state === "paused" && s.screen !== null && s.screen !== "main");
+    if (menuRendered) {
+      // In pause sub-screens never show the menu-hero (the launch grid) and
+      // never add "wide" — pause overlays should stay compact over the flight.
+      const wide = s.state === "paused" ? "" : (s.screen === "shop" || s.screen === "pass" ? "wide" : "");
+      const cls = `paper-card ${s.state === "menu" && s.screen === "main" ? "menu-hero" : wide}`;
+      this.menuContinuity.render(this.menuCard, s.screen, renderCoins(this.renderScreen(s)), cls);
     }
-    if (s.state === "gameover") this.overCard.innerHTML = renderGameOver(s);
+    if (s.state === "gameover") this.resultsContinuity.render(this.overCard, "results", renderCoins(renderGameOver(s)), "paper-card results-card");
     if (s.state === "continue") {
-      this.contCard.innerHTML = renderContinue(s);
+      this.contCard.innerHTML = renderCoins(renderContinue(s));
       this.contTimerEl = this.contCard.querySelector('[data-live="contTimer"]');
     }
     if (s.state === "ad") {
-      this.adCard.innerHTML = renderAd(s);
+      this.adCard.innerHTML = renderCoins(renderAd(s));
       this.adBarEl = this.adCard.querySelector('[data-live="adBar"]');
       this.adSkipEl = this.adCard.querySelector('[data-live="adSkip"]');
     }
@@ -884,7 +1381,8 @@ export class HUD {
   private renderScreen(s: HudSnapshot): string {
     switch (s.screen) {
       case "shop":
-        return renderShop(s);
+        this.shopSnapshot = s;
+        return renderShop(s, this.shopBrowse);
       case "paywall":
         return renderPaywall(s);
       case "checkout":
@@ -911,12 +1409,18 @@ export class HUD {
         return renderLive(s);
       case "rank":
         return renderRank(s);
+      case "practice":
+        return renderPractice(s);
+      case "progress":
+        return renderProgress(s);
       case "challenges":
         return renderChallenges(s);
       case "campaign":
         return renderCampaign(s);
       case "squad":
         return renderSquad(s);
+      case "nameEntry":
+        return renderNameEntry(s);
       default:
         return renderMain(s);
     }
@@ -940,17 +1444,16 @@ export class HUD {
     this.feverFill = grab("feverFill");
     this.hintEl = grab("hint");
     this.menuEl = grab("menu");
-    // Living painted sky with the depth flock — sits behind the paper card.
-    this.menuEl.insertBefore(this.menuSky.host, this.menuEl.firstChild);
-    // Hero-bird overlay: appended last so the sunbird swoops over the card.
-    this.menuEl.appendChild(this.menuSky.heroHost);
-    if (typeof ResizeObserver !== "undefined") {
-      this.resizeObs = new ResizeObserver(() => this.menuSky.resize(this.menuEl.clientWidth, this.menuEl.clientHeight));
-      this.resizeObs.observe(this.menuEl);
-    }
     this.menuCard = grab("menuCard");
     this.pauseEl = grab("pause");
     this.pauseBtnEl = grab("pauseBtn");
+    this.muteBtnEl = grab("muteBtn") as HTMLButtonElement;
+    this.pauseDistanceEl = grab("pauseDistance");
+    this.pauseAltitudeEl = grab("pauseAltitude");
+    this.pauseComboEl = grab("pauseCombo");
+    this.pauseMuteBtn = grab("pauseMute") as HTMLButtonElement;
+    this.pauseMuteIco = grab("pauseMuteIco");
+    this.pauseMuteLbl = grab("pauseMuteLbl");
     this.contEl = grab("continue");
     this.contCard = grab("contCard");
     this.adEl = grab("ad");
@@ -972,8 +1475,12 @@ export class HUD {
     this.countdownEl = grab("countdown");
     this.versusBar = grab("versusBar");
     this.matchmakingEl = grab("matchmaking");
+    this.matchmakingTitle = grab("matchmakingTitle");
     this.matchmakingCount = grab("matchmakingCount");
     this.matchmakingLabel = grab("matchmakingLabel");
+    this.matchmakingRooms = grab("matchmakingRooms");
+    this.matchmakingAi = grab("matchmakingAi");
+    this.matchmakingKeep = grab("matchmakingKeep");
     this.goalStrip = grab("goalStrip");
     this.goalPop = grab("goalPop");
     this.standingsEl = grab("standings");
@@ -981,21 +1488,52 @@ export class HUD {
     this.draftMeter = grab("draftMeter");
     this.finishCd = grab("finishCd");
     this.emoteWheel = grab("emoteWheel");
+    this.emoteBubble = grab("emoteBubble");
+    this.impactPopupsEl = grab("impactPopups");
+  }
+
+  /** Floating impact text that rises from a screen position and fades out.
+   *  x/y are screen fractions 0–1 (0,0 = top-left). kind controls the color.
+   *  Use projectBirdToScreen() in Game.ts to get the position. */
+  popup(text: string, kind: "perfect" | "great" | "thud" | "bop" | "fever" | "zenith" | "splash" | "power", sx: number, sy: number): void {
+    const el = document.createElement("div");
+    el.className = `impact-popup impact-popup--${kind}`;
+    el.textContent = text;
+    // Project into the protected flight corridor, not over menus/controls.
+    const lane = this.impactPopupsEl.getBoundingClientRect();
+    if (lane.width < 80 || lane.height < 70) return;
+    const viewport = this.root.getBoundingClientRect();
+    el.style.left = `${Math.max(40, Math.min(lane.width - 40, sx * viewport.width + viewport.left - lane.left))}px`;
+    el.style.top = `${Math.max(50, Math.min(lane.height - 20, sy * viewport.height + viewport.top - lane.top))}px`;
+    this.impactPopupsEl.replaceChildren(el);
+    // Trigger animation on next frame then remove after it finishes.
+    requestAnimationFrame(() => el.classList.add("rise"));
+    this.after(() => el.remove(), 1100);
+  }
+
+  setFullscreenActive(active: boolean): void {
+    const btns = this.root.querySelectorAll<HTMLButtonElement>('[data-action="toggle-fullscreen"]');
+    for (const b of btns) {
+      if (b.classList.contains("menu-fullscreen")) {
+        b.textContent = active ? "🗗" : "⛶";
+        b.title = active ? "Exit Fullscreen" : "Full Screen";
+      } else if (b.textContent?.includes("Fullscreen")) {
+        b.textContent = active ? "🗗 Exit Fullscreen" : "⛶ Fullscreen mode";
+      }
+    }
   }
 }
 
 /* ---------- templates ---------- */
 
-function hex(n: number): string {
-  return `#${n.toString(16).padStart(6, "0")}`;
-}
-
 function head(title: string, backAction = "back", right = ""): string {
-  return `<div class="screen-head"><button class="back-btn" data-ui data-action="${backAction}" aria-label="Back">‹</button><h2>${title}</h2><span>${right}</span></div>`;
+  const destination = [...PLAY_DESTINATIONS, ...COLLECTION_DESTINATIONS, ...PROGRESS_DESTINATIONS].find(d => d.title === title);
+  const icon = destination?.icon ?? (title === "Race Lobby" ? "online" : title === "Solo modes" ? "compass" : undefined);
+  return `<div class="screen-head"><button class="back-btn" data-ui data-action="${backAction}" aria-label="Back">‹</button><h2>${icon ? `<span class="heading-art">${menuIcon(icon)}</span>` : ""}${title}</h2><span>${right}</span></div>`;
 }
 
 function upsellStrip(): string {
-  return `<button class="upsell" data-ui data-action="open-paywall"><div><b>✦ Sunbird Gold &amp; VIP</b><span>2× coins · no breaks · Phoenix &amp; Aurora skins · Nest Pass</span></div><span class="mini-btn gold">See</span></button>`;
+  return `<button class="upsell" data-ui data-action="open-paywall"><div><b>✦ Sunbird Gold &amp; VIP</b><span>2× coins · ad-free flights · Phoenix &amp; Aurora skins · Nest Pass</span></div><span class="mini-btn gold">See</span></button>`;
 }
 
 function renderMissions(list: MissionView[], newly: string[] = []): string {
@@ -1038,6 +1576,31 @@ function escapeHtml(v: string): string {
   return v.replace(/[&<>"']/g, (c) =>
     c === "&" ? "&amp;" : c === "<" ? "&lt;" : c === ">" ? "&gt;" : c === '"' ? "&quot;" : "&#39;",
   );
+}
+
+/** Inline-SVG sun-coin glyph. The UI used to mark coin amounts with the raw
+ *  unicode bullet "●" (U+25CF), but neither Fredoka nor Atkinson Hyperlegible
+ *  ship that codepoint in their latin subsets — the browser fell back to a
+ *  random system font where the glyph was oversized and overlapped adjacent
+ *  digits, producing the "● 250" blob that sat on top of the First Flight
+ *  Pack header. An inline SVG matches the current text size and color, sits
+ *  cleanly on the baseline, and never needs a fallback font. */
+const COIN_SVG =
+  '<svg class="coin-glyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+  '<circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.25"/>' +
+  '<circle cx="12" cy="12" r="8.2" fill="currentColor"/>' +
+  '<circle cx="12" cy="12" r="8.2" fill="none" stroke="rgba(0,0,0,0.22)" stroke-width="1.2"/>' +
+  '<path d="M7.2 12 Q12 7 16.8 12 Q12 17 7.2 12 Z" fill="rgba(255,255,255,0.55)"/>' +
+  '<circle cx="12" cy="12" r="2.2" fill="rgba(255,255,255,0.8)"/>' +
+  "</svg>";
+
+/** Replace every leading bullet with the SVG coin glyph. Runs on the final
+ *  rendered HTML so price strings defined in Economy.ts and toast strings in
+ *  Game.ts all pick up the fix without edits at every call site. */
+function renderCoins(html: string): string {
+  // Match "●" optionally followed by a space and then digits/punctuation
+  // (the coin amount). We keep the whitespace as a non-breaking thin gap.
+  return html.replace(/●\s?/g, COIN_SVG);
 }
 
 function renderBoard(s: HudSnapshot): string {
@@ -1098,146 +1661,180 @@ function renderBoard(s: HudSnapshot): string {
       .join("")}</div>
     <div class="board-list">${rows}</div>
     ${page && page.yourRank > 0 ? `<div class="board-rank">Your rank · <b>#${page.yourRank}</b> of ${page.total}</div>` : ""}
-    <div class="redeem">
-      <input data-ui data-ref="pilotName" maxlength="14" placeholder="Pilot name" value="${escapeHtml(s.pilotName)}" />
-      <button class="mini-btn" data-ui data-action="rename-pilot">Save</button>
+    ${s.portalLeaderboard
+      ? `<button class="soft-btn wide" data-ui data-action="open-portal-leaderboard">🏆 ${PORTAL_DISPLAY_NAME} leaderboard</button>`
+      : ""}
+    ${
+      CUSTOM_PILOT_NAMES
+        ? `<div class="redeem pilot-name-row">
+      <input data-ui data-ref="pilotName" aria-label="Pilot name" maxlength="14" placeholder="Pilot name" value="${escapeHtml(s.pilotName)}" />
+      <button class="mini-btn autogen-btn" data-ui data-action="autogen-pilot" title="Autogenerate random pilot name">🎲 Random</button>
+      <button class="mini-btn primary" data-ui data-action="rename-pilot">Save</button>
+    </div>`
+        : /* Portal editions broadcast this name to real players, so it is a
+           curated generated name rather than free text — read-only display
+           plus the dice, no typing surface at all. */
+          `<div class="redeem pilot-name-row">
+      <span class="pilot-name-readonly" aria-label="Pilot name">${escapeHtml(s.pilotName)}</span>
+      <button class="mini-btn autogen-btn" data-ui data-action="autogen-pilot" title="Roll a new pilot name">🎲 Random</button>
+    </div>`
+    }
+    <div class="prize-card">
+      <div class="section-title">🏆 Tournament Rank Prizes</div>
+      <div class="prize-grid">
+        <div class="prize-tier gold"><span>🥇 1st Place</span><b>500 Coins + Crown</b></div>
+        <div class="prize-tier silver"><span>🥈 2nd Place</span><b>250 Coins + 10 Gems</b></div>
+        <div class="prize-tier bronze"><span>🥉 3rd Place</span><b>100 Coins</b></div>
+      </div>
+      ${s.rankPrizeClaimed
+        ? `<div class="pc-claimed" style="width:100%; justify-content:center; padding:8px;">✓ Claimed · next prize at the season rollover</div>`
+        : `<button class="primary-btn gold wide" data-ui data-action="claim-rank-prize">Claim Rank Prize 🏆</button>`}
     </div>
     <button class="soft-btn wide" data-ui data-action="board-refresh">${s.boardLoading ? "Refreshing…" : "↻ Refresh"}</button>
     <p class="fineprint">${
       s.boardOnline
-        ? "Scores sync to the configured global leaderboard service."
+        ? `Scores sync to the ${
+            leaderboardBackend() === "auds" ? LEADERBOARD_CLOUD_LABEL : leaderboardBackend() === "http" ? "🌐 global" : "💾 local"
+          } leaderboard.`
         : "Rankings are stored locally. Fly well to climb the leaderboard!"
     }</p>
   `;
 }
 
 /** Compact top-wings leaderboard embedded on the main menu. */
-function renderMiniBoard(s: HudSnapshot): string {
-  const page = s.board;
-  const fmt = (v: number): string =>
-    s.boardMetric === "distance" || s.boardMetric === "altitude" ? `${Math.round(v)} m` : String(Math.round(v));
-  const medals = ["🥇", "🥈", "🥉"];
-  const rows =
-    page && page.entries.length
-      ? page.entries
-          .slice(0, 5)
-          .map(
-            (e, i) => `<div class="board-row ${e.you ? "you" : ""}">
-              <span class="bp">${i < 3 ? medals[i] : i + 1}</span>
-              <span class="bn">${escapeHtml(e.name)}</span>
-              <span class="bv">${fmt(e.value)}</span>
-            </div>`,
-          )
-          .join("")
-      : `<div class="board-row empty">${s.boardLoading ? "Loading leaderboard…" : "No flights yet — be first!"}</div>`;
-  // The competitiveness hook Tiny Wings reviewers kept praising: surface the
-  // player's own standing + personal best right on the home screen, not only
-  // on the full board, so "beat your high score" is always one glance away.
-  const ranked = Boolean(page && page.yourRank > 0);
-  const bestLabel =
-    s.boardMetric === "distance" && s.bestDistance > 0
-      ? `best ${formatDistance(s.bestDistance)}`
-      : s.boardMetric === "altitude" && s.bestAltitude > 0
-        ? `best ${Math.round(s.bestAltitude)} m`
-        : "";
-  const foot = ranked
-    ? `<div class="mini-board-foot">You're <b>#${page?.yourRank}</b> of ${page?.total}${bestLabel ? ` · ${bestLabel}` : ""}</div>`
-    : bestLabel
-      ? `<div class="mini-board-foot">Your ${bestLabel}</div>`
-      : "";
-  return `
-    <section class="mini-board" aria-label="Leaderboard">
-      <div class="mini-board-head">
-        <h2>🏆 Leaderboard</h2>
-        <button class="mini-btn" data-ui data-action="open-board">Full board ›</button>
-      </div>
-      <div class="board-list mini">${rows}</div>
-      ${foot}
-    </section>`;
-}
-
 function renderLive(s: HudSnapshot): string {
-  const status = s.multiplayerLive
-    ? s.netState === "racing" || s.netState === "lobby"
-      ? `<span class="board-badge live">● Connected</span>`
-      : s.netState === "connecting"
-        ? `<span class="board-badge warn">Connecting…</span>`
-        : `<span class="board-badge warn">${escapeHtml(s.netError || "Offline")}</span>`
-    : `<span class="board-badge local">Solo field · practice</span>`;
+  const connected = s.netState === "lobby" || s.netState === "racing";
+  const status = connected ? "Connected" : s.netState === "connecting" ? "Flock Ready" : "Local Flock";
+  const live = s.lobbyRivals.filter((r) => r.tag.includes("live"));
 
-  const featured = s.lobbyRivals.slice(0, 3);
-  return `
-    ${head("Race Lobby", "back", status)}
-    <div class="vs-stage" aria-label="You versus the featured rivals">
-      <div class="vs-you"><span class="vs-swatch" style="--body:#ff7a45;--wing:#ff9a62;--belly:#ffe6c4"><i class="w"></i><i class="b"></i><i class="e"></i></span><b>YOU</b><span class="vs-sub">${s.rival.divisionIcon} ${s.rival.division} · ${s.rival.rating}</span></div>
-      <div class="vs-mark">VS</div>
-      <div class="vs-foes">${featured.map((r) => `<div class="vs-foe ${r.tag.includes("live") ? "live" : ""}"><span class="vs-swatch" style="${r.tag.includes("live") ? "--body:#5eb7ea;--wing:#83cbf2;--belly:#eaf6ff" : "--body:#8a9bb0;--wing:#a8b8c8;--belly:#e8eef4"}"><i class="w"></i><i class="b"></i><i class="e"></i></span><b>${escapeHtml(r.name)}</b><span class="vs-sub">${escapeHtml(r.tag)}</span></div>`).join("")}</div>
-    </div>
+  const modePills = (s.pvpModes || []).map((m) => `
+    <button class="pvp-pill ${s.selectedPvpMode === m.id ? "on" : ""}" data-ui data-action="select-pvp-mode" data-id="${m.id}" title="${m.blurb}">
+      <span>${m.icon}</span> <b>${m.name}</b> <small>${m.finish}m</small>
+    </button>
+  `).join("");
 
-    <div class="lobby-rules">
-      <span><b>4,000 m</b> gate</span><span class="dot"></span>
-      <span><b>${s.roomSize + 1}</b> birds</span><span class="dot"></span>
-      <span>Same hills · same wind</span>
-    </div>
+  const worldPills = (s.pvpWorlds || []).map((w) => `
+    <button class="world-pill ${s.selectedPvpWorld === w.id ? "on" : ""}" data-ui data-action="select-pvp-world" data-id="${w.id}" title="${w.tagline}">
+      <span>${w.emoji}</span> <b>${w.name}</b> <small>${w.difficulty}</small>
+    </button>
+  `).join("");
 
-    <div class="room-controls">
-      <div class="room-ctl">
-        <span class="room-ctl-label">Field size</span>
-        <div class="seg">${[5, 10, 20, 40]
-          .map((n) => `<button data-ui data-action="room-size" data-id="${n}" class="${s.roomSize === n ? "on" : ""}">${n}</button>`)
-          .join("")}</div>
-      </div>
-      <div class="room-ctl">
-        <span class="room-ctl-label">Rival skill</span>
-        <div class="seg">${(["chill", "sharp", "ace"] as const)
-          .map((k) => `<button data-ui data-action="room-skill" data-id="${k}" class="${s.roomSkill === k ? "on" : ""}">${k === "chill" ? "😌 Chill" : k === "sharp" ? "🎯 Sharp" : "🔥 Ace"}</button>`)
-          .join("")}</div>
-      </div>
-    </div>
+  const activeMode = (s.pvpModes || []).find((m) => m.id === s.selectedPvpMode) ?? (s.pvpModes || [])[0] ?? { name: "Sprint GP", icon: "⚡", finish: 1500 };
+  const activeWorld = (s.pvpWorlds || []).find((w) => w.id === s.selectedPvpWorld) ?? (s.pvpWorlds || [])[0] ?? { name: "Emerald Circuit", emoji: "🌿" };
 
-    <div class="loadout-card">
-      <div class="loadout-row"><span>🐦 ${s.loadout.bird}</span><span>${s.loadout.trail}</span><span>🎒 ${s.loadout.boosts} armed</span></div>
-      <button class="mini-btn" data-ui data-action="open-shop">Change loadout</button>
-    </div>
+  return `${head("Race Lobby")}
+    <p class="tagline">40-pilot live &amp; neural AI racing across 9 scenic worlds.</p>
+    ${s.netState === "error" && s.netError ? `<p class="network-notice" role="alert">${escapeHtml(s.netError)}</p>` : ""}
+    <p class="race-fairness">${menuIcon("medal")} Equal flight equipment · your bird, your timing. Store boosts are saved for solo play.</p>
 
-    <button class="primary-btn race40 hero" data-ui data-action="quick-match"><span class="hero-label">⚡ START RACE</span><span class="hero-hint">ranked · rating on the line</span></button>
-    <button class="soft-btn wide" data-ui data-action="pvp-casual">Casual start · no rating change</button>
-    <button class="soft-btn wide storm-cta" data-ui data-action="pvp-storm">⛈ Stormfront Royale · PvE storm × PvP race</button>
-
-    <div class="race-grid">
-      <div class="race-card">
-        <div class="race-card-h"><b>Private room</b><span>invite friends</span></div>
-        <div class="code-row big">
-          <span class="code">${s.roomCode ? escapeHtml(s.roomCode) : "— — — — —"}</span>
-          <button class="mini-btn gold" data-ui data-action="host-room">${s.roomCode ? "New" : "Host"}</button>
+    ${s.roomCode ? `      <section class="race-section private-session" aria-label="Your private room">
+        <div class="race-section-head">
+          <h3>Flock Room: <strong>${escapeHtml(s.roomCode)}</strong></h3>
+          <span class="board-badge ${connected ? "live" : "island"}" role="status">${status}</span>
         </div>
-        ${
-          s.roomCode
-            ? `<button class="soft-btn wide invite-btn" data-ui data-action="copy-invite">🔗 Copy invite link</button>
-               <button class="primary-btn race40 hero room-fly" data-ui data-action="start-room"><span class="hero-label">⚡ FLY · room ${escapeHtml(s.roomCode)}</span><span class="hero-hint">friends join your room by link</span></button>`
-            : ""
-        }
+        <div class="room-now">
+          <span class="room-now-label">Invite code</span>
+          <strong class="room-now-code">${escapeHtml(s.roomCode)}</strong>
+          <button class="mini-btn" data-ui data-action="copy-invite">Copy link</button>
+        </div>
+
+        <div class="lobby-selector-box">
+          <div class="lobby-selector-label"><span>Race Format</span> <b>${activeMode.icon} ${activeMode.name} (${activeMode.finish} m)</b></div>
+          <div class="pills-scroll">${modePills}</div>
+          <div class="lobby-selector-label"><span>World Circuit</span> <b>${activeWorld.emoji} ${activeWorld.name}</b></div>
+          <div class="pills-scroll">${worldPills}</div>
+        </div>
+
+        <p class="room-presence" role="status">${Math.max(1, s.roomCount)} connected · ${s.roomReadyCount} ready</p>
+
+        <div class="room-actions-bar">
+          <button class="primary-btn gold large-btn" data-ui data-action="start-room-now">⚡ Start Race Now (${s.roomCount > 1 ? "Launch Room" : "Fill with AI flock"})</button>
+          <button class="soft-btn ${s.roomReady ? "on" : ""}" data-ui data-action="ready-room" aria-pressed="${s.roomReady}">${s.roomReady ? "Cancel ready" : "Ready up ✓"}</button>
+        </div>
+
+        <div class="room-flock" aria-label="Pilots in this room">
+          <div class="room-bird ${s.roomReady ? "is-ready" : ""}">
+            ${sunbirdSVG({ width: 48, palette: s.skins.some((v) => v.equipped) ? skinPalette(s.skins.find((v) => v.equipped)!.def) : undefined })}
+            <b>You</b>
+            <small>${s.roomReady ? "Ready ✓" : "In room"}</small>
+          </div>
+          ${live.slice(0, 7).map((p, i) => `
+            <div class="room-bird ${p.ready ? "is-ready" : ""}">
+              ${sunbirdSVG({ width: 48, palette: s.skins.some((v) => v.def.id === p.skin) ? skinPalette(s.skins.find((v) => v.def.id === p.skin)!.def) : rivalPalette(i + 1) })}
+              <b>${escapeHtml(p.name)}</b>
+              <small>${p.ready ? "Ready ✓" : "In room"}</small>
+            </div>
+          `).join("")}
+        </div>
+        ${live.length === 0 ? `<p class="fineprint">Just you so far — share the code above and the room fills with real pilots.</p>` : ""}
+        ${s.roomCount > 8 ? `<p class="fineprint">And ${s.roomCount - 8} more connected pilots</p>` : ""}
+
+        <button class="ghost-btn" data-ui data-action="room-close">Leave room</button>
+      </section>` : `
+      <section class="race-section quick-match-hero" aria-label="Quick Match">
+        <div class="race-section-head">
+          <h3>⚡ Quick Match</h3>
+          <span class="board-badge live">Live search</span>
+        </div>
+        <p class="qm-desc">Search this circuit for live pilots. If nobody answers, you choose — keep waiting or race the AI flock.</p>
+
+        <div class="quick-match-btns">
+          <button class="primary-btn gold large-btn" data-ui data-action="quick-match-instant">⚡ ${activeMode.name} on ${activeWorld.name}</button>
+          <button class="soft-btn" data-ui data-action="quick-match-shuffle">🎲 Surprise me — random race</button>
+          <button class="soft-btn" data-ui data-action="pvp-casual">Search Online Pilots</button>
+        </div>
+
+        <details class="customize-race">
+          <summary>Customize · format &amp; world (${activeMode.name} · ${activeWorld.name})</summary>
+          <div class="lobby-selector-box">
+            <div class="lobby-selector-label"><span>PvP Format</span> <b>${activeMode.icon} ${activeMode.name} (${activeMode.finish} m)</b></div>
+            <div class="pills-scroll">${modePills}</div>
+            <div class="lobby-selector-label"><span>World Circuit</span> <b>${activeWorld.emoji} ${activeWorld.name}</b></div>
+            <div class="pills-scroll">${worldPills}</div>
+          </div>
+        </details>
+      </section>
+
+      <section class="race-section room-entry" aria-label="Invite friends">
+        <div class="room-entry-crest">${menuIcon("online")}</div>
+        <h3>Fly with your flock</h3>
+        <p>Create a private room with a custom code and link. Race your squad on any course!</p>
+        <button class="primary-btn" data-ui data-action="host-room">Create Private Room</button>
+        <label class="field-label" for="race-room-code">Or enter a friend's room code</label>
         <div class="redeem">
-          <input data-ui data-ref="roomCode" maxlength="5" placeholder="CODE" autocomplete="off" style="text-transform:uppercase" />
+          <input id="race-room-code" data-ui data-ref="roomCode" data-enter-action="join-room" aria-label="Room code" maxlength="2048" placeholder="Code or invite link" autocomplete="off" autocapitalize="characters" spellcheck="false" />
           <button class="mini-btn" data-ui data-action="join-room">Join</button>
         </div>
-      </div>
-      <div class="race-card craft">
-        <div class="race-card-h"><b>Race craft</b><span>win the pack</span></div>
-        <div class="race-tip"><b>🌀 Draft</b><span>Tuck behind a rival to cut drag, then slingshot past.</span></div>
-        <div class="race-tip"><b>👑 Roster</b><span>Every bird rides the top rail — you are gold.</span></div>
-        <div class="race-tip"><b>📸 Finish</b><span>Cross within a wing-length for a photo finish.</span></div>
-      </div>
-    </div>
+      </section>
+      <nav class="destination-grid" aria-label="More ways to race">
+        <button class="destination" data-ui data-action="open-practice"><span class="destination-art">${menuIcon("compass")}</span><span class="destination-copy"><b>AI Practice</b><span>Custom opponent count &amp; skill</span></span></button>
+        <button class="destination" data-ui data-action="versus"><span class="destination-art">${menuIcon("versus")}</span><span class="destination-copy"><b>Same-screen 1v1</b><span>Local split-screen flight</span></span></button>
+        <button class="destination" data-ui data-action="open-squad"><span class="destination-art">${menuIcon("squad")}</span><span class="destination-copy"><b>Squad</b><span>${SQUAD_CHAT ? "Friends &amp; club chat" : "Friends &amp; clubs"}</span></span></button>
+      </nav>`}
+    <button class="soft-btn wide" data-ui data-action="open-shop">Change loadout</button>
+    <p class="fineprint">Hold downhill to build speed. Release uphill to launch. Slipstream behind rivals for slingshot surges!</p>`;
+}
 
-    ${s.nemesis ? `<div class="reward-strip nest nemesis">Rival: <b>${escapeHtml(s.nemesis)}</b> beat you last race. <button class="mini-btn gold" data-ui data-action="quick-match">Settle it</button></div>` : ""}
-    <button class="ghost-btn" data-ui data-action="menu">Back out</button>
-    <p class="fineprint">${
-      s.multiplayerLive
-        ? "Connected to the configured race server. Finish order is decided server-side."
-        : "Race against AI pilots on today's hills. Each pilot flies the same terrain with unique skill levels."
-    }</p>
-  `;
+function renderPractice(s: HudSnapshot): string {
+  return `${head("AI PvP")}
+    <section class="race-section" aria-label="AI race practice">
+      <div class="race-section-head"><h3>Race the AI flock offline</h3><span class="section-step">AI pilots · no waiting</span></div>
+      <p>Every format below starts immediately against computer-controlled birds — no server, no room, no rating. Learning the circuits here is the fastest way to win them online.</p>
+      <div class="room-controls">
+        <div class="room-ctl"><span class="room-ctl-label">AI opponents <small>plus you</small></span><div class="seg" role="group" aria-label="AI opponents">${[5, 10, 20, 40].map((n) => `<button data-ui data-action="room-size" data-id="${n}" aria-pressed="${s.roomSize === n}" class="${s.roomSize === n ? "on" : ""}">${n}</button>`).join("")}</div></div>
+        <div class="room-ctl"><span class="room-ctl-label">AI skill</span><div class="seg" role="group" aria-label="AI skill">${(["chill", "sharp", "ace"] as const).map((k) => `<button data-ui data-action="room-skill" data-id="${k}" aria-pressed="${s.roomSkill === k}" class="${s.roomSkill === k ? "on" : ""}">${k === "chill" ? "Chill" : k === "sharp" ? "Sharp" : "Ace"}</button>`).join("")}</div></div>
+      </div>
+      <button class="primary-btn gold wide" data-ui data-action="ai-pvp" data-id="${s.selectedPvpMode}">🤖 Race the AI flock · ${(s.pvpModes || []).find((m) => m.id === s.selectedPvpMode)?.name ?? "Sprint GP"}</button>
+      <div class="practice-formats"><h3>Race formats</h3>
+        <p class="fineprint">Dynamic AI pilots adapt locally with neural downslope timing, slipstream drafting, and slingshot attacks. No server connection required!</p>
+        ${PVP_MODES.map((m) => `<button class="soft-btn wide ${s.selectedPvpMode === m.id ? "on" : ""}" data-ui data-action="ai-pvp" data-id="${m.id}">${m.icon} ${m.name} · ${m.blurb}</button>`).join("")}
+        <button class="soft-btn wide" data-ui data-action="pvp-duel">⚔ 1v1 Seeded Rival Duel</button>
+        <button class="soft-btn wide" data-ui data-action="practice-storm">⛈ Stormfront Race · wild weather</button>
+        <button class="soft-btn wide" data-ui data-action="practice-ranked">🏆 40-Pilot Flock Grand Prix</button>
+      </div>
+    </section>
+    <button class="soft-btn wide" data-ui data-action="open-live">🌐 Want human rivals? Open PvP</button>
+    <button class="soft-btn wide" data-ui data-action="open-shop">Change loadout</button>`;
 }
 
 function renderChallenges(s: HudSnapshot): string {
@@ -1264,7 +1861,7 @@ function renderChallenges(s: HudSnapshot): string {
           (st) => `<div class="g-stage ${st.done ? "done" : ""}">
             <span class="g-num">${st.done ? "✓" : st.index + 1}</span>
             <div class="g-body"><b>${st.modeIcon} ${escapeHtml(st.label)}</b><em>${st.modeName} · ${escapeHtml(st.metric)} ≥ ${st.target}</em></div>
-            ${st.done ? `<span class="tag on">Clear</span>` : `<button class="mini-btn" data-ui data-action="play-gauntlet" data-id="${st.index}">● ${st.reward}</button>`}
+            ${st.done ? `<span class="tag on">Clear</span>` : `<button class="mini-btn" data-ui data-action="play-gauntlet" data-id="${st.index}">Fly · ● ${st.reward}</button>`}
           </div>`,
         )
         .join("")}
@@ -1367,62 +1964,159 @@ function renderCampaign(s: HudSnapshot): string {
   `;
 }
 
-function renderSquad(s: HudSnapshot): string {
+/** Exported so the Pilot Lookup panel can be tested without a live game. */
+export function renderSquad(s: HudSnapshot): string {
   const sq = s.squad;
-  if (!sq.live) {
-    return `
-      ${head("Squad", "back")}
-      <p class="tagline">Friends, clubs and club chat live on the social server.</p>
-      <div class="empty-note">🔌 Social server not configured.<br/><small>Set <b>VITE_SOCIAL_URL</b> and restart — see SOCIAL_API.md. No fake friends here, ever.</small></div>
-    `;
-  }
+  const friendPage = paginate(sq.friends, sq.friendPage);
+  const clubPage = paginate(sq.clubs, sq.clubPage);
+  const pages = (kind: string, view: { page: number; pages: number }): string => view.pages < 2 ? "" : `<nav class="collection-pager" aria-label="${kind} pages"><button class="mini-btn" data-ui data-action="squad-page" data-id="${kind}:${view.page - 1}" aria-label="Previous ${kind}" ${view.page === 0 ? "disabled" : ""}>‹</button><span>${view.page + 1} / ${view.pages}</span><button class="mini-btn" data-ui data-action="squad-page" data-id="${kind}:${view.page + 1}" aria-label="Next ${kind}" ${view.page === view.pages - 1 ? "disabled" : ""}>›</button></nav>`;
   const notice = s.squadNotice ? `<div class="reward-strip">${escapeHtml(s.squadNotice)}</div>` : "";
-  const friends = `
-    <div class="section-title">Friends <small>${sq.friends.length} winged</small></div>
-    <div class="redeem"><input data-ui data-ref="squadCode" placeholder="Friend's code (SUN-XXXXXX)" maxlength="10" autocomplete="off" /><button class="mini-btn" data-ui data-action="squad-add">Add</button></div>
-    ${
-      sq.friends.length
-        ? `<div class="friend-list">${sq.friends
-            .map(
-              (f) => `<div class="friend-row"><span class="fr-name">🐦 ${escapeHtml(f.name)}</span><span class="fr-code">${escapeHtml(f.code)}</span><button class="mini-btn ghost" data-ui data-action="squad-remove" data-id="${escapeHtml(f.code)}">✕</button></div>`,
-            )
-            .join("")}</div>`
-        : `<div class="empty-note">No friends yet — swap codes! Yours is <b>${escapeHtml(sq.myCode || "…")}</b></div>`
-    }`;
+
+  const quests = `
+    <div class="section-title">Squadron Team Quests <small>Co-Op Milestones</small></div>
+    <div class="squad-quests">
+      ${SQUAD_QUESTS.map((q) => {
+        const prog = q.id === "migration" ? Math.min(q.target, Math.round(s.bestDistance * 1.5)) : q.id === "drafting" ? Math.min(q.target, Math.round(s.runsPlayed * 5)) : Math.min(q.target, Math.round(s.todayBest / 100));
+        return `<div class="squad-quest-card">
+          <div class="sq-info"><b>${escapeHtml(q.title)}</b><span>${escapeHtml(q.desc)}</span></div>
+          <div class="sq-action">
+            ${prog >= q.target
+              ? `<button class="mini-btn gold" data-ui data-action="claim-squad-quest" data-id="${q.id}">Claim ● ${q.rewardCoins}</button>`
+              : `<span class="sq-prog-label">${prog}/${q.target}</span>`}
+          </div>
+        </div>`;
+      }).join("")}
+    </div>
+  `;
+
+  // ---------------------------------------------------------- pilot lookup
+  // The panel never invents a pilot. Every row below is either a code the
+  // service resolved, a wingman row the service returned, or a pilot this
+  // device actually shared a room with.
+  const lookup = sq.lookup;
+  const lookupCard = (() => {
+    if (!lookup) return "";
+    if (lookup.status !== "ok") {
+      const tone = lookup.status === "unavailable" ? "island" : "warn";
+      return `<div class="pilot-note ${tone}" role="status">${escapeHtml(lookup.message)}${lookup.query ? ` <b>${escapeHtml(lookup.query)}</b>` : ""}</div>`;
+    }
+    const stats = [
+      lookup.club ? `🏰 ${escapeHtml(lookup.club)}` : "",
+      lookup.bestDistance > 0 ? `🛫 best ${lookup.bestDistance.toLocaleString()} m` : "",
+      lookup.rank > 0 ? `#${lookup.rank} global` : "",
+    ].filter(Boolean).join(" · ");
+    const action = lookup.friend
+      ? `<span class="fineprint">Already in your wingmen</span>`
+      : lookup.incoming
+        ? `<button class="primary-btn" data-ui data-action="pilot-add" data-id="${escapeHtml(lookup.code)}">Accept their request</button>`
+        : lookup.outgoing
+          ? `<span class="fineprint">Request sent — waiting for them</span>`
+          : `<button class="primary-btn" data-ui data-action="pilot-add" data-id="${escapeHtml(lookup.code)}">🪽 Add wingman</button>`;
+    return `
+      <div class="pilot-card">
+        <div class="pilot-card-head">
+          <b>${escapeHtml(lookup.name)}</b>
+          <span class="pilot-dot ${lookup.online ? "on" : ""}">${lookup.online ? "● Online now" : "○ Offline"}</span>
+        </div>
+        <div class="pilot-card-meta"><span class="pilot-code">${escapeHtml(lookup.code)}</span>${stats ? `<span>${stats}</span>` : ""}</div>
+        <div class="pilot-card-actions">
+          ${action}
+          <button class="mini-btn" data-ui data-action="pilot-invite" data-id="${escapeHtml(lookup.name)}">Invite to my room</button>
+          <button class="mini-btn" data-ui data-action="pilot-copy" data-id="${escapeHtml(lookup.code)}">Copy code</button>
+        </div>
+      </div>`;
+  })();
+
+  const requests = (() => {
+    const rows = [
+      ...sq.requestsIn.map((r) => `<div class="friend-row"><span class="fr-name">📨 ${escapeHtml(r.name)}</span><span class="fr-code">wants to fly with you</span><button class="mini-btn" data-ui data-action="req-accept" data-id="${escapeHtml(r.requestId)}">Accept</button><button class="mini-btn ghost" data-ui data-action="req-decline" data-id="${escapeHtml(r.requestId)}">Decline</button></div>`),
+      ...sq.requestsOut.map((r) => `<div class="friend-row"><span class="fr-name">📤 ${escapeHtml(r.name)}</span><span class="fr-code">request pending</span><button class="mini-btn ghost" data-ui data-action="req-cancel" data-id="${escapeHtml(r.requestId)}">Cancel</button></div>`),
+    ];
+    if (!rows.length) return "";
+    return `<div class="section-title">Requests <small>${rows.length} waiting</small></div><div class="friend-list">${rows.join("")}</div>`;
+  })();
+
+  const lookupPanel = `
+    <div class="section-title">🔍 Pilot Lookup <small>${sq.live && !sq.isAutonomous ? "online directory" : "offline build"}</small></div>
+    <p class="fineprint">Look a pilot up by their exact code. Results come from the pilot directory — nothing here is invented, and an unknown or unreachable code says so.</p>
+    <div class="redeem">
+      <input data-ui data-ref="pilotCode" data-enter-action="pilot-lookup" aria-label="Pilot code" placeholder="Pilot code (SUN-9F3K2A)" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${escapeHtml(sq.pilotQuery)}" />
+      <button class="mini-btn" data-ui data-action="pilot-lookup">${sq.lookupBusy ? "Looking…" : "Look up"}</button>
+    </div>
+    ${lookupCard}
+    ${requests}`;
+
+  const wingmen = (() => {
+    const page = sq.friends.length > 0 ? friendPage : { items: [], page: 0, pages: 0 };
+    if (!sq.friends.length) {
+      return `<div class="section-title">🪽 Wingmen <small>0</small></div>
+        <div class="empty-note">No wingmen yet. Look one up by code above, or save a pilot you have actually raced with below. Your code is <b>${escapeHtml(sq.myCode || "…")}</b>.</div>`;
+    }
+    return `
+    <div class="section-title">🪽 Wingmen <small>${sq.friends.length}</small></div>
+    <div class="friend-list">${(page.items as typeof sq.friends)
+      .map((f) => {
+        const presence = f.local ? "met in a race" : f.online ? "● online" : "○ offline";
+        const best = f.bestDistance && f.bestDistance > 0 ? ` · best ${Math.round(f.bestDistance).toLocaleString()} m` : "";
+        return `<div class="friend-row"><span class="fr-name">🐦 ${escapeHtml(f.name)}</span><span class="fr-code">${escapeHtml(presence)}${f.code ? ` · ${escapeHtml(f.code)}` : ""}${best}</span><button class="mini-btn ghost" data-ui data-action="squad-remove" aria-label="Remove ${escapeHtml(f.name)}" data-id="${escapeHtml(f.code || f.name)}">✕</button></div>`;
+      })
+      .join("")}</div>${pages("friends", page)}`;
+  })();
+
+  // Real history: rooms this device actually shared with other pilots.
+  const flewWith = (() => {
+    const mates = s.recentPilots.filter((m) => !sq.friends.some((f) => f.name.toLowerCase() === m.name.toLowerCase()));
+    if (!s.recentPilots.length) {
+      return `<div class="section-title">🛫 Flew with <small>0</small></div><div class="empty-note">Pilots who share a room with you appear here — real rooms, real names, remembered on this device.</div>`;
+    }
+    const rows = mates.slice(0, 8).map((m) => `<div class="friend-row">
+      <span class="fr-name">🐦 ${escapeHtml(m.name)}</span>
+      <span class="fr-code">room ${escapeHtml(m.roomCode)} · ${escapeHtml(seenAgo(m.lastSeenAt, Date.now()))}${m.bestDistance > 0 ? ` · ${m.bestDistance.toLocaleString()} m` : ""}</span>
+      <button class="mini-btn" data-ui data-action="mate-wingman" data-id="${escapeHtml(m.name)}">Save</button>
+      <button class="mini-btn ghost" data-ui data-action="mate-invite" data-id="${escapeHtml(m.name)}">Invite</button>
+      <button class="mini-btn ghost" data-ui data-action="mate-forget" data-id="${escapeHtml(m.name)}" aria-label="Forget ${escapeHtml(m.name)}">✕</button>
+    </div>`).join("");
+    return `<div class="section-title">🛫 Flew with <small>${s.recentPilots.length} remembered</small></div>
+      <p class="fineprint">Kept on this device from races you actually flew together.</p>
+      <div class="friend-list">${rows || `<div class="empty-note">Everyone you flew with is already in your wingmen.</div>`}</div>`;
+  })();
+
+  const friends = `${lookupPanel}${wingmen}${flewWith}`;
   const myClub = sq.clubs.find((c) => c.id === sq.myClubId);
   const clubs = myClub
     ? `
     <div class="section-title">Your club <small>${myClub.members}/30 members</small></div>
     <div class="club-card mine">
       <div class="daily-head"><span class="daily-icon">🏰</span><div><b>${escapeHtml(myClub.name)}</b><em>${escapeHtml(myClub.motto)}</em></div><button class="mini-btn ghost" data-ui data-action="squad-leave-club">Leave</button></div>
-      <div class="chat-box" data-ref="chatBox">${
-        sq.chat.length
-          ? sq.chat.map((m) => `<div class="chat-msg"><b>${escapeHtml(m.name)}</b><span>${escapeHtml(m.text)}</span></div>`).join("")
-          : `<div class="chat-msg dim"><span>Quiet in here. Say hi 👋</span></div>`
-      }</div>
-      <div class="redeem"><input data-ui data-ref="chatText" placeholder="Message your club…" maxlength="200" autocomplete="off" /><button class="mini-btn" data-ui data-action="squad-chat">Send</button></div>
     </div>`
     : `
-    <div class="section-title">Clubs <small>join or found one</small></div>
+    <div class="section-title">Flight Clubs <small>join or found one</small></div>
     ${
       sq.clubs.length
-        ? `<div class="club-list">${sq.clubs
+        ? `<div class="club-list">${clubPage.items
             .map(
               (c) => `<div class="club-row"><div><b>🏰 ${escapeHtml(c.name)}</b><em>${escapeHtml(c.motto)} · ${c.members}/30</em></div><button class="mini-btn" data-ui data-action="squad-join-club" data-id="${c.id}" ${c.members >= 30 ? "disabled" : ""}>Join</button></div>`,
             )
             .join("")}</div>`
         : `<div class="empty-note">No clubs yet — found the first one.</div>`
     }
-    <div class="redeem"><input data-ui data-ref="clubName" placeholder="Club name" maxlength="24" autocomplete="off" /><button class="mini-btn gold" data-ui data-action="squad-create-club">Found club</button></div>`;
+    ${pages("clubs", clubPage)}
+    <div class="redeem"><input data-ui data-ref="clubName" data-enter-action="squad-create-club" aria-label="Club name" placeholder="Club name" maxlength="24" autocomplete="off" /><button class="mini-btn gold" data-ui data-action="squad-create-club">Found club</button></div>`;
+
+  const hubBanner = sq.isAutonomous
+    ? `<div class="reward-strip" style="background:linear-gradient(135deg,#fff8e1,#ffe082); color:#5d4037; border:1px solid #ffcc80; margin-bottom:12px;">📴 Offline build · wingman requests and pilot lookup need the online service. Pilots you actually raced with still work.</div>`
+    : "";
+
   return `
     ${head("Squad", "back", sq.myCode ? `<span class="pill">${escapeHtml(sq.myCode)}</span>` : "")}
-    <p class="tagline">Real pilots only — friends, clubs and club chat.</p>
-    ${sq.loading ? `<div class="reward-strip">↻ Syncing with the roost…</div>` : ""}
-    ${sq.error ? `<div class="empty-note">⚠ ${escapeHtml(sq.error)}</div>` : ""}
+    <p class="tagline">A little flock. A bigger adventure.</p>
+    ${hubBanner}
+    ${sq.myCode ? `<div class="squad-invite"><span class="squad-invite-art">${menuIcon("squad")}</span><div><b>Your friend code</b><p>Share it with someone you want to fly with.</p></div><button class="mini-btn" data-ui data-action="squad-copy-code">Copy code</button></div>` : ""}
     ${notice}
-    ${friends}
-    ${clubs}
-    <button class="soft-btn wide" data-ui data-action="squad-refresh">↻ Refresh</button>
+    ${quests}
+    <fieldset class="squad-fields"><legend class="sr-only">Squad actions</legend>${friends + clubs}</fieldset>
+    <button class="soft-btn wide" data-ui data-action="squad-refresh" ${sq.loading || sq.busy ? "disabled" : ""}>${sq.loading ? "Connecting…" : "Refresh Squad"}</button>
+    <button class="soft-btn wide" data-ui data-action="open-live">Race with friends</button>
   `;
 }
 
@@ -1463,9 +2157,9 @@ function renderRank(s: HudSnapshot): string {
     <div class="section-title">Duels <small>ranked 1v1 · ±16 rating</small></div>
     <div class="duel-card">
       <div class="vs-stage slim">
-        <div class="vs-you"><span class="vs-swatch" style="--body:#ff7a45;--wing:#ff9a62;--belly:#ffe6c4"><i class="w"></i><i class="b"></i><i class="e"></i></span><b>YOU</b><span class="vs-sub">${r.rating}</span></div>
+        <div class="vs-you"><span class="bird-badge you">${sunbirdSVG({ width: 62, flap: 0.55, title: "Your sunbird" })}</span><b>YOU</b><span class="vs-sub">${r.rating}</span></div>
         <div class="vs-mark">VS</div>
-        <div class="vs-foes"><div class="vs-foe"><span class="vs-swatch" style="--body:#8a9bb0;--wing:#a8b8c8;--belly:#e8eef4"><i class="w"></i><i class="b"></i><i class="e"></i></span><b>${escapeHtml(s.duelFoe.name)}</b><span class="vs-sub">${escapeHtml(s.duelFoe.tag)} · ~${s.duelFoe.rating}</span></div></div>
+        <div class="vs-foes"><div class="vs-foe"><span class="bird-badge">${sunbirdSVG({ palette: rivalPalette(0), width: 54, flap: 0.35, title: s.duelFoe.name })}</span><b>${escapeHtml(s.duelFoe.name)}</b><span class="vs-sub">${escapeHtml(s.duelFoe.tag)} · ~${s.duelFoe.rating}</span></div></div>
       </div>
       <div class="rank-stats">
         <div><span>Duel W–L</span><b>${s.duel.wins}–${s.duel.losses}</b></div>
@@ -1525,7 +2219,7 @@ function renderCups(s: HudSnapshot): string {
 function renderModes(s: HudSnapshot): string {
   return `
     ${head("Game modes")}
-    <p class="tagline">Same hills, different pressure. Every mode shares your unlocks.</p>
+    <p class="tagline">Solo flights below are you against the course. A <b>PvP circuit</b> opens the PvP options — ranked and casual online racing, private rooms, or the AI flock. All modes share your unlocks.</p>
     <div class="mode-list">
       ${s.modes
         .map(
@@ -1537,7 +2231,21 @@ function renderModes(s: HudSnapshot): string {
         )
         .join("")}
     </div>
-    <button class="soft-btn wide" data-ui data-action="versus">👥 Local 2-player race</button>
+    <div class="section-title">PvAI Circuits</div>
+    <div class="mode-list">
+      ${PVP_MODES
+        .map(
+          (m) => `<button class="mode-card ${m.id === s.modeId ? "on" : ""}" data-ui data-action="pick-mode" data-id="${m.id}">
+            <span class="mode-icon">${m.icon}</span>
+            <span class="mode-body"><b>${m.name}</b><em>${m.blurb}</em></span>
+            <span class="mode-meta">${m.finish ? `${m.finish / 1000} km` : m.clock ? `${m.clock}s` : "∞"}</span>
+          </button>`,
+        )
+        .join("")}
+    </div>
+    <div class="section-title">Race the flock offline</div>
+    <button class="primary-btn gold wide" data-ui data-action="open-practice">🤖 AI PvP · pick a circuit &amp; race the neural flock</button>
+    <button class="soft-btn wide" data-ui data-action="versus">👥 Split-screen · 2 players on this device</button>
   `;
 }
 
@@ -1604,7 +2312,87 @@ function renderAtlas(s: HudSnapshot): string {
   `;
 }
 
+function menuLinks(items: MenuDestination[]): string {
+  return items.map(item => `<button class="destination" data-ui data-action="${item.action}" data-icon="${item.icon}"><span class="destination-art">${menuIcon(item.icon)}</span><span class="destination-copy"><b>${item.title}</b><span>${item.detail}</span></span><span class="destination-arrow" aria-hidden="true">↗</span></button>`).join("");
+}
+
+function renderNameEntry(_s: HudSnapshot): string {
+  return `
+    <div class="name-entry-hero">
+      ${sunSVG({ size: 48, className: "name-entry-sun" })}
+      ${sunbirdSVG({ width: 72, className: "name-entry-bird", animateWings: true, title: "Sunbird" })}
+    </div>
+
+    <div class="name-entry-headline">
+      <h2 class="name-entry-title">Welcome, Pilot</h2>
+      <p class="name-entry-sub">We picked a name for you — change it or fly right now.</p>
+    </div>
+
+    <div class="name-entry-form">
+      <label class="name-entry-label" for="pilot-name-input">Your call sign</label>
+      <div class="name-input-row">
+        <div class="name-input-wrapper">
+          <input
+            type="text"
+            id="pilot-name-input"
+            data-ui
+            data-ref="pilotNameInput"
+            placeholder="e.g. Rook, Ivy, Vale…"
+            maxlength="14"
+            aria-label="Pilot name"
+            autocomplete="off"
+          />
+          <div class="name-char-count"><span>0</span>/14</div>
+        </div>
+        <button class="name-random-btn" data-ui data-action="randomize-pilot-name" title="Suggest a name" aria-label="Random name">🎲</button>
+      </div>
+
+      <button class="primary-btn name-entry-cta" data-ui data-action="confirm-pilot-name">
+        Let's Fly ›
+      </button>
+    </div>
+
+    <p class="name-entry-footer">You can rename yourself anytime in Settings.</p>
+  `;
+}
+
 function renderMain(s: HudSnapshot): string {
+  return `
+    <button
+      class="icon-btn menu-mute"
+      data-ui
+      data-action="set-mute"
+      data-menu-mute
+      aria-pressed="${s.settings.mute ? "true" : "false"}"
+      aria-label="${s.settings.mute ? "Unmute sound" : "Mute sound"}"
+      title="${s.settings.mute ? "Unmute sound" : "Mute sound"}"
+    >${s.settings.mute ? "\u{1F507}" : "\u{1F50A}"}</button>
+    <header class="hero">
+      ${menuHorizon()}
+      <!-- Sun and bird both come from Sunbird.ts, so the title screen, the
+           lobby and the flock in the menu sky are literally one sun and one
+           bird. This SVG *is* the reference the whole game is drawn from. -->
+      <div class="hero-sun-wrap">${sunSVG({ size: 64, className: "hero-sun" })}</div>
+      ${sunbirdSVG({ className: "hero-bird", width: 92, title: "Sunbird", animateWings: true })}
+      <div class="hero-title">
+        <span class="hero-kicker">chase the daylight</span>
+        <h1>SUNBIRD</h1>
+        <p class="hero-sub">Hold to dive. Release to soar.<br>Master the glide across endless islands.</p>
+      </div>
+    </header>
+
+    <button class="primary-btn home-launch" data-ui data-action="pvp-practice" aria-label="Play free flight now"><span class="launch-art">${menuIcon("flight")}</span><span class="launch-copy"><small>${t("onboarding.skyIsYours", undefined, "THE SKY IS YOURS")}</small><b>Fly now</b><span>${t("onboarding.launchSub", undefined, "Hold to dive · release to glide")}</span></span><span class="launch-arrow" aria-hidden="true">→</span></button>
+    <div class="home-section-title"><span>${t("hud.menu.chooseAdventure", undefined, "Choose your adventure")}</span><small>01 — PLAY</small></div>
+    <nav class="destination-grid play-destinations" aria-label="Choose how to play">${menuLinks(PLAY_DESTINATIONS)}</nav>
+    <div class="home-section-title"><span>${t("hud.menu.makeItYours", undefined, "Make it yours")}</span><small>02 — HANGAR</small></div>
+    <nav class="destination-grid utility-destinations" aria-label="Your hangar">${menuLinks(COLLECTION_DESTINATIONS)}</nav>
+    <div class="home-section-title"><span>${t("hud.menu.everyFlightCounts", undefined, "Every flight counts")}</span><small>03 — DISCOVER</small></div>
+    <nav class="destination-grid progress-destinations" aria-label="Challenges and progress">${menuLinks(PROGRESS_DESTINATIONS)}</nav>
+    <div class="home-record"><span class="record-art">${menuIcon("medal")}</span><span>${t("hud.menu.personalBest", undefined, "Personal best")} <b>${formatDistance(s.bestDistance)}</b></span><span class="record-wallet">${s.wallet.toLocaleString()} <small>${t("hud.menu.coinBalance", undefined, "coin balance")}</small></span></div>
+  `;
+}
+
+function renderProgress(s: HudSnapshot): string {
   const portal = s.portalName !== "none";
   const modes: { id: SeedMode; label: string }[] = [
     { id: "today", label: "Today" },
@@ -1616,34 +2404,10 @@ function renderMain(s: HudSnapshot): string {
         .map((m) => `<button data-ui data-action="seed-${m.id}" class="${s.seedMode === m.id ? "on" : ""}">${m.label}</button>`)
         .join("")}</div>`
     : portal
-      ? `<p class="portal-note">${s.portalName === "poki" ? "Poki edition · portal rewards enabled" : s.portalName === "crazy" ? "CrazyGames edition · portal rewards enabled" : "Portal edition"}</p>`
+      ? `<p class="portal-note">${PORTAL_EDITION_NOTE}</p>`
       : `<button class="lock-chip" data-ui data-action="open-paywall">✦ Pick your hills with Gold</button>`;
-  return `
-    <header class="hero">
-      <div class="hero-sun" aria-hidden="true"></div>
-      <svg class="hero-bird" viewBox="0 0 64 64" role="img" aria-hidden="true">
-        <!-- A clean sunbird mark (no baked-in wordmark, no full app-icon scene)
-             so the title "SUNBIRD" below reads exactly once and the bird never
-             doubles the menu's painted sky. -->
-        <path d="M8 42 L2 34 L5 44 L3 50 L12 45 Z" fill="#e06a35"/>
-        <path d="M8 44 L3 50 L6 54 L13 48 Z" fill="#be4824"/>
-        <ellipse cx="30" cy="36" rx="17" ry="11" fill="#ff7a45"/>
-        <ellipse cx="33" cy="40" rx="11" ry="6" fill="#ffe6c4"/>
-        <path d="M24 26 Q14 12 6 16 Q14 22 24 30 Z" fill="#c85228"/>
-        <path d="M26 30 Q14 14 4 20 Q15 24 27 34 Z" fill="#ff9a62"/>
-        <path d="M46 34 L58 37 L46 40 Z" fill="#ffb020"/>
-        <circle cx="41" cy="32" r="3.4" fill="#fff"/>
-        <circle cx="42.4" cy="31.4" r="1.7" fill="#2a1c28"/>
-        <circle cx="43" cy="30.8" r="0.7" fill="#fff"/>
-        <path d="M36 27 Q42 27.5 44 30 Q40 29.6 37 29.4 Z" fill="#d84a2e"/>
-      </svg>
-      <div class="hero-title">
-        <span class="hero-kicker">chase the daylight</span>
-        <h1>SUNBIRD</h1>
-        <p class="hero-sub">Dive the valleys · ride the ridgeline · outrun the sunset</p>
-      </div>
-    </header>
-
+  return `${head(t("hud.progress.title", undefined, "Your progress"))}
+    <p class="tagline">${t("hud.progress.tagline", undefined, "Missions and rewards from all your flights, in one place.")}</p>
     <div class="hero-meta">
       <span class="pill seed-pill">${s.seedLabel}</span>
       <span class="pill wings-pill" title="${formatDistance(s.wings.lifetime)} lifetime">${s.wings.icon} ${s.wings.name}</span>
@@ -1656,35 +2420,38 @@ function renderMain(s: HudSnapshot): string {
     ${s.rivalBanner ? renderRivalBanner(s.rivalBanner) : ""}
     ${seedPicker}
 
-    <!-- PLAY: one primary action, then grouped secondary paths. All data-action
-         ids are unchanged — Game.handleAction is the contract. -->
-    <div class="section-title">Play <small>hold to dive · release to soar</small></div>
-    <div class="mode-cards hero-play" role="group" aria-label="Primary play">
-      <button class="mode-card-main primary" data-ui data-action="pvp-practice" aria-label="Play free flight now">
-        <span class="mode-icon-lg"><svg class="mi" viewBox="0 0 48 48"><defs><linearGradient id="gSun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd76a"/><stop offset="1" stop-color="#ff9a3a"/></linearGradient></defs><circle cx="24" cy="22" r="9" fill="url(#gSun)"/><g stroke="url(#gSun)" stroke-width="3" stroke-linecap="round"><line x1="24" y1="5" x2="24" y2="10"/><line x1="24" y1="34" x2="24" y2="39"/><line x1="7" y1="22" x2="12" y2="22"/><line x1="36" y1="22" x2="41" y2="22"/><line x1="11.5" y1="9.5" x2="15" y2="13"/><line x1="33" y1="31" x2="36.5" y2="34.5"/><line x1="36.5" y1="9.5" x2="33" y2="13"/><line x1="15" y1="31" x2="11.5" y2="34.5"/></g><path d="M14 42 Q20 36 24 40 Q28 36 34 42" fill="none" stroke="#e8862a" stroke-width="2.6" stroke-linecap="round"/></svg></span>
-        <span class="mode-name">▶ FLY NOW — 1 PLAYER</span>
-        <span class="mode-desc">Free flight — hold to dive, release to soar</span>
-      </button>
+    <div class="pc pc--blue pc-row">
+      <span class="pc-icon">🎡</span>
+      <div class="pc-body">
+        <b>Daily Lucky Wheel</b>
+        <span>Spin to win up to ● 1,000 Coins &amp; Mystery Vault Keys!</span>
+      </div>
+      ${s.canFreeSpin
+        ? `<button class="primary-btn gold" data-ui data-action="spin-wheel">Free Spin! 🎡</button>`
+        : `<button class="soft-btn" disabled>🎡 Tomorrow</button>`}
     </div>
 
-    <div class="section-title">More ways to fly <small>PvE · cups · live rooms</small></div>
-    <div class="mode-cards" role="group" aria-label="Play modes">
-      <button class="mode-card-main pvp" data-ui data-action="open-live">
-        <span class="mode-icon-lg"><svg class="mi" viewBox="0 0 48 48"><defs><linearGradient id="gPvp" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7a6a"/><stop offset="1" stop-color="#d84a5a"/></linearGradient></defs><g stroke="url(#gPvp)" stroke-width="3.4" stroke-linecap="round"><line x1="10" y1="10" x2="34" y2="34"/><line x1="38" y1="10" x2="14" y2="34"/></g><g stroke="#a83a4a" stroke-width="3.4" stroke-linecap="round"><line x1="31" y1="37" x2="37" y2="31"/><line x1="11" y1="31" x2="17" y2="37"/></g><circle cx="24" cy="22" r="4.5" fill="#fff" opacity="0.9"/></svg></span>
-        <span class="mode-name">PVP</span>
-        <span class="mode-desc">Race 40 pilots · duels · rooms</span>
-      </button>
-      <button class="mode-card-main pve" data-ui data-action="open-challenges">
-        <span class="mode-icon-lg"><svg class="mi" viewBox="0 0 48 48"><defs><linearGradient id="gPve" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6ab8ff"/><stop offset="1" stop-color="#3a7ad8"/></linearGradient></defs><circle cx="24" cy="24" r="16" fill="none" stroke="url(#gPve)" stroke-width="3.4"/><circle cx="24" cy="24" r="9" fill="none" stroke="url(#gPve)" stroke-width="3"/><circle cx="24" cy="24" r="3.2" fill="url(#gPve)"/></svg></span>
-        <span class="mode-name">PVE</span>
-        <span class="mode-desc">Daily challenge & storm gauntlet</span>
-      </button>
-      <button class="mode-card-main cup" data-ui data-action="open-cups">
-        <span class="mode-icon-lg"><svg class="mi" viewBox="0 0 48 48"><defs><linearGradient id="gCup" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe08a"/><stop offset="1" stop-color="#e8a020"/></linearGradient></defs><path d="M15 8h18v10a9 9 0 0 1-18 0z" fill="url(#gCup)"/><path d="M15 10H8a7 7 0 0 0 7 9M33 10h7a7 7 0 0 1-7 9" fill="none" stroke="url(#gCup)" stroke-width="3"/><rect x="21" y="26" width="6" height="7" fill="url(#gCup)"/><path d="M16 36h16v4H16z" fill="#c8871a"/></svg></span>
-        <span class="mode-name">TOURNAMENT</span>
-        <span class="mode-desc">Weekly cups — win exclusive gear</span>
-      </button>
+    <div class="pc pc--pink pc-row">
+      <span class="pc-icon">🐷</span>
+      <div class="pc-body">
+        <b>Coin Piggy Bank</b>
+        <span>+20% flight bonus accumulated: ● ${s.piggyCoins} / 1,000</span>
+      </div>
+      ${s.piggyCoins >= 50
+        ? `<button class="primary-btn gold" data-ui data-action="smash-piggy">Smash 🔨</button>`
+        : `<span class="tag need">Fly to fill</span>`}
     </div>
+
+    ${s.nestLevel >= 5 || s.prestigeLevel > 0
+      ? `<div class="pc pc--purple pc-row">
+          <span class="pc-icon">👑</span>
+          <div class="pc-body">
+            <b>Solar Crown Prestige ${s.prestigeLevel > 0 ? `Rank ${s.prestigeLevel}` : ""}</b>
+            <span>Permanent coin boost: +${Math.round((s.prestigeMult - 1) * 100)}%</span>
+          </div>
+          <button class="primary-btn gold" data-ui data-action="perform-prestige">Rebirth 👑</button>
+        </div>`
+      : ""}
 
     <div class="section-title">Local rank <small>practice field · not global</small></div>
     <button class="rank-card" data-ui data-action="open-rank" aria-label="View local Rival rank (practice field)">
@@ -1698,63 +2465,12 @@ function renderMain(s: HudSnapshot): string {
       } · 🔥${s.rival.streak} streak</span>
     </button>
 
-    <div class="section-title">Race formats <small>all on-device unless in a room</small></div>
-    <div class="pvp-modes" role="group" aria-label="Race formats">
-      <button class="pvp-mode rated" data-ui data-action="pvp-ranked"><i>🏆</i><b>Ranked 40</b><span>Local rating</span></button>
-      <button class="pvp-mode rated" data-ui data-action="pvp-duel"><i>⚔</i><b>Duel 1v1</b><span>Local ±16</span></button>
-      <button class="pvp-mode" data-ui data-action="pvp-casual"><i>🐦</i><b>Casual 40</b><span>Practice · no rating</span></button>
-      <button class="pvp-mode storm" data-ui data-action="pvp-storm"><i>⛈</i><b>Stormfront</b><span>Practice · PvE × PvP</span></button>
-      <button class="pvp-mode" data-ui data-action="versus"><i>👥</i><b>Local 2P</b><span>Same screen</span></button>
-    </div>
-
-    <button class="daily-strip ${s.daily.done ? "done" : ""}" data-ui data-action="${s.daily.done ? "open-challenges" : "play-daily"}">
-      <span class="ds-icon">${s.daily.done ? "✓" : s.daily.modifierIcon}</span>
-      <span class="ds-body"><b>Daily · ${s.daily.title}</b><em>${s.daily.done ? "Complete — gauntlet & calendar inside" : `${s.daily.modifierLabel} · ${escapeHtml(s.daily.metric)} ≥ ${s.daily.target} · ● ${s.daily.reward}`}</em></span>
-      <span class="ds-go">${s.daily.done ? "›" : "FLY"}</span>
-    </button>
     <button class="event-strip" data-ui data-action="play-event">
       <span class="ds-icon">${s.weeklyEvent.icon}</span>
       <span class="ds-body"><b>Event · ${s.weeklyEvent.name}</b><em>${s.monthlyTheme.icon} ${s.monthlyTheme.name} · fly ${s.weeklyEvent.target.toLocaleString()} m · ● ${s.weeklyEvent.reward}</em></span>
       <span class="ds-go">${s.eventClearsWeek > 0 ? `✓${s.eventClearsWeek}` : "FLY"}</span>
     </button>
     ${!s.calendar.claimedToday ? `<button class="cal-strip" data-ui data-action="claim-calendar">📅 Daily gift ready — day ${(s.calendar.cycleDay % 28) + 1} of 28 <b>CLAIM</b></button>` : ""}
-
-    <div class="loadout-strip">
-      <span class="loadout-bird">🐦 ${s.loadout.bird}</span>
-      <span class="loadout-trail">${s.loadout.trail}</span>
-      <span class="loadout-boost">🎒 ${s.loadout.boosts} armed</span>
-      <button class="mini-btn" data-ui data-action="open-shop">Loadout</button>
-    </div>
-
-    <div class="how"><div><b>HOLD</b> to dive</div><div class="dot"></div><div><b>RELEASE</b> to glide</div></div>
-
-    ${renderMiniBoard(s)}
-
-    <nav class="nav-grid compact">
-      <button class="nav-btn" data-ui data-action="mode-select"><i>🎯</i><span>Modes</span></button>
-      <button class="nav-btn" data-ui data-action="open-challenges"><i>☀</i><span>Daily</span></button>
-      <button class="nav-btn" data-ui data-action="open-live"><i>🐦</i><span>Race</span></button>
-      <button class="nav-btn" data-ui data-action="open-board"><i>🌍</i><span>Board</span></button>
-      <button class="nav-btn" data-ui data-action="open-cups"><i>🏆</i><span>Cups</span></button>
-      <button class="nav-btn" data-ui data-action="open-shop"><i><svg viewBox="0 0 24 24" class="ti"><path d="M6 8h12l-1.2 12H7.2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 8V6a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="2"/></svg></i><span>Shop</span></button>
-      <button class="nav-btn" data-ui data-action="open-pass"><i><svg viewBox="0 0 24 24" class="ti"><path d="M4 9a2 2 0 0 0 0 6v3h16v-3a2 2 0 0 1 0-6V6H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><line x1="14" y1="6" x2="14" y2="18" stroke="currentColor" stroke-width="2" stroke-dasharray="2 2.4"/></svg></i><span>Pass ${s.season.tier}</span></button>
-      <button class="nav-btn" data-ui data-action="open-trophies"><i>🏅</i><span>${s.trophyCounts.unlocked}/${s.trophyCounts.total}</span></button>
-      <button class="nav-btn" data-ui data-action="open-rank"><i>⚔</i><span>Rank</span></button>
-      <button class="nav-btn" data-ui data-action="open-campaign"><i>🧭</i><span>Story ${s.campaignDone}/${s.campaignTotal}</span></button>
-      <button class="nav-btn" data-ui data-action="open-squad"><i>🤝</i><span>Squad</span></button>
-      <button class="nav-btn" data-ui data-action="open-atlas"><i>🗺</i><span>Atlas</span></button>
-      <button class="nav-btn" data-ui data-action="open-scores"><i>📈</i><span>Scores</span></button>
-      <button class="nav-btn" data-ui data-action="open-account"><i>👤</i><span>Account</span></button>
-      <button class="nav-btn" data-ui data-action="open-settings" aria-label="Settings"><i>⚙</i><span>Settings</span></button>
-    </nav>
-
-    ${
-      !portal && s.vipExpiredNotice
-        ? `<div class="expire-strip">♛ VIP has lapsed — the Aurora bird stays yours, perks are paused.
-             <button class="mini-btn vip" data-ui data-action="vip-buy">Renew ${s.vipPrice}</button>
-             <button class="mini-btn ghost" data-ui data-action="vip-dismiss">Later</button></div>`
-        : ""
-    }
 
     <div class="wallet-row">
       <span class="pill coin">● ${s.wallet}</span>
@@ -1769,7 +2485,7 @@ function renderMain(s: HudSnapshot): string {
     ${renderQuests(s.quests)}
     ${renderMissions(s.missions)}
     <div class="menu-stats"><div>Best <b>${formatDistance(s.bestDistance)}</b></div><div>Today <b>${formatDistance(s.todayBest)}</b></div></div>
-  `;
+`;
 }
 
 function skinRarity(d: { goldOnly?: boolean; vipOnly?: boolean; prizeOnly?: string; price: number; rarity?: string }): { key: string; label: string } {
@@ -1786,9 +2502,9 @@ function skinRarity(d: { goldOnly?: boolean; vipOnly?: boolean; prizeOnly?: stri
 
 function skinStatBars(d: { speedMult: number; feverBonus: number; daylightBonus: number; magnetAlways: boolean }): string {
   const bars: [string, number, string][] = [
-    ["SPD", Math.min(100, Math.round(((d.speedMult - 1) / 0.08) * 100)), `${d.speedMult > 1 ? "+" : ""}${Math.round((d.speedMult - 1) * 100)}%`],
-    ["FVR", Math.min(100, Math.round((d.feverBonus / 5) * 100)), d.feverBonus > 0 ? `+${d.feverBonus}s` : "—"],
-    ["SUN", Math.min(100, Math.round((d.daylightBonus / 12) * 100)), d.daylightBonus > 0 ? `+${d.daylightBonus}s` : "—"],
+    ["Speed", Math.min(100, Math.round(((d.speedMult - 1) / 0.08) * 100)), `${d.speedMult > 1 ? "+" : ""}${Math.round((d.speedMult - 1) * 100)}%`],
+    ["Fever", Math.min(100, Math.round((d.feverBonus / 5) * 100)), d.feverBonus > 0 ? `+${d.feverBonus}s` : "—"],
+    ["Daylight", Math.min(100, Math.round((d.daylightBonus / 12) * 100)), d.daylightBonus > 0 ? `+${d.daylightBonus}s` : "—"],
   ];
   return `<div class="sk-stats">${bars
     .map(([k, pct, val]) => `<span class="sk-stat"><em>${k}</em><i><b style="width:${pct}%"></b></i><u>${val}</u></span>`)
@@ -1796,10 +2512,13 @@ function skinStatBars(d: { speedMult: number; feverBonus: number; daylightBonus:
 }
 
 /** Group the 60+ bird wall into browsable collections with owned counters. */
-function renderSkinCollections(s: HudSnapshot): string {
+function renderSkinCollections(s: HudSnapshot, browse: ShopBrowse): string {
+  const matches = browseSkins(s.skins, browse);
+  const filtered = browse.query.trim() !== "" || browse.filter !== "all";
+  if (!matches.length) return `<div class="shop-empty">${menuIcon("compass")}<b>No birds in this view</b><p>Try a bird name, a perk, or a different filter.</p><button class="soft-btn" data-ui data-action="shop-clear">Show all birds</button></div>`;
   const portal = s.portalName !== "none";
   const byId = new Map<string, SkinView[]>();
-  for (const v of s.skins) {
+  for (const v of matches) {
     const cid = v.def.collection ?? "starter";
     if (!byId.has(cid)) byId.set(cid, []);
     byId.get(cid)!.push(v);
@@ -1807,22 +2526,23 @@ function renderSkinCollections(s: HudSnapshot): string {
   return COLLECTIONS.filter((c) => byId.has(c.id))
     .map((c) => {
       const skins = byId.get(c.id)!;
-      const got = skins.filter((v) => v.owned).length;
-      const complete = got === skins.length;
-      const bonus = 100 + skins.length * 25;
-      return `<div class="collection ${complete ? "complete" : ""}">
-        <div class="coll-head"><span class="coll-icon">${c.icon}</span><b>${c.name}</b>
-        <span class="coll-count">${complete ? "✓ complete" : `${got}/${skins.length} · set bonus ● ${bonus}`}</span></div>
-        <div class="skin-grid">${skins.map((v) => renderSkinCard(v, portal)).join("")}</div>
-      </div>`;
+      const collection = s.skins.filter(v => (v.def.collection ?? "starter") === c.id);
+      const got = collection.filter(v => v.owned).length;
+      const complete = got === collection.length;
+      const bonus = 100 + collection.length * 25;
+      return `<details class="collection ${complete ? "complete" : ""}" data-ref="collection-${c.id}${filtered ? "-filtered" : ""}" ${filtered ? "open" : ""}>
+        <summary class="coll-head"><span class="collection-art">${menuIcon(c.id === "tournament" ? "trophy" : c.id === "achievement" ? "medal" : c.id === "cosmic" ? "endless" : c.id === "premium" ? "rank" : c.id === "elements" ? "boost" : c.id === "nature" ? "atlas" : "bird")}</span><b>${c.name}</b>
+        <span class="coll-count">${complete ? "✓ complete" : `${got}/${collection.length} · bonus ● ${bonus}`}</span></summary>
+        <div class="skin-grid">${skins.map((v) => renderSkinCard(v, portal, browse.preview, s.wallet)).join("")}</div>
+      </details>`;
     })
     .join("");
 }
 
-function renderSkinCard(v: SkinView, portal = false): string {
+function skinAction(v: SkinView, portal: boolean, wallet: number): string {
   const d = v.def;
-  const rarity = skinRarity(d);
-  const swatch = `<div class="bird-swatch" style="--body:${hex(d.body)};--wing:${hex(d.wing)};--belly:${hex(d.belly)}"><i class="w"></i><i class="b"></i><i class="e"></i></div>`;
+  const price = v.dealPrice ?? d.price;
+  const priceLabel = v.dealPrice !== undefined ? `<s>● ${d.price}</s> ● ${price}` : `● ${price}`;
   let action: string;
   if (v.equipped) action = `<span class="tag on">✓ In use</span>`;
   else if (v.owned) action = `<button class="mini-btn" data-ui data-action="equip-skin" data-id="${d.id}">Equip</button>`;
@@ -1832,10 +2552,19 @@ function renderSkinCard(v: SkinView, portal = false): string {
   else if (v.locked)
     action = `<button class="mini-btn ${v.lockReason === "vip" ? "vip" : "gold"}" data-ui data-action="open-paywall">${v.lockReason === "vip" ? "♛ VIP" : "✦ Gold"}</button>`;
   else
-    action = `<button class="mini-btn ${v.affordable ? "" : "off"}" data-ui data-action="buy-skin" data-id="${d.id}">● ${d.price}</button>`;
-  return `<div class="skin-card r-${rarity.key} ${v.equipped ? "equipped" : ""} ${v.owned ? "owned" : ""}">
-    <span class="rarity">${rarity.label}</span>${swatch}
-    <div class="sk-name">${d.name}</div><div class="sk-perk">${d.perk}</div>${skinStatBars(d)}${action}</div>`;
+    action = `<button class="mini-btn ${v.affordable ? (v.dealPrice !== undefined ? "gold" : "") : "off"}" data-ui data-action="buy-skin" data-id="${d.id}" ${v.affordable ? "" : "disabled"} aria-label="${v.affordable ? `Buy ${d.name} for ${price} coins` : `${d.name} costs ${price} coins; earn more coins to unlock`}">${priceLabel}</button>`;
+  return action + (!v.owned && !v.locked && !d.prizeOnly && !v.affordable ? `<small class="purchase-shortfall">${Math.max(0, price - wallet)} more coins</small>` : "");
+}
+
+function renderSkinCard(v: SkinView, portal: boolean, preview: string, wallet: number): string {
+  const d = v.def, rarity = skinRarity(d);
+  const birdSvg = sunbirdSVG({ palette: skinPalette(d), width: 88, flap: 0.38 });
+  const dealTag = v.dealPrice !== undefined && !v.owned ? `<span class="deal-tag">TODAY −40%</span>` : "";
+  return `<div class="skin-card r-${rarity.key} ${v.equipped ? "equipped" : ""} ${v.owned ? "owned" : ""} ${v.dealPrice !== undefined ? "deal" : ""}" data-skin="${d.id}">
+    <span class="rarity">${rarity.label}</span>
+    ${dealTag}
+    <button class="skin-bird skin-preview" data-ui data-action="preview-skin" data-id="${d.id}" aria-label="Preview ${d.name}" aria-pressed="${preview === d.id}">${birdSvg}<span>Preview</span></button>
+    <div class="sk-name">${d.name}</div><div class="sk-perk">${d.perk}</div>${skinStatBars(d)}${skinAction(v, portal, wallet)}</div>`;
 }
 
 function renderRivalBanner(banner: string): string {
@@ -1849,12 +2578,12 @@ function renderBoostRow(v: BoostView, wallet: number): string {
   const missing = Math.max(0, price - wallet);
   const priceLabel = v.dealPrice !== undefined ? `<s>● ${d.price}</s> ● ${price}` : `● ${price}`;
   const action = v.armed
-    ? `<span class="tag on">Armed ✓</span>`
+    ? `<span class="tag on">${d.permanent ? "Unlocked ✓" : "Armed ✓"}</span>`
     : v.affordable
       ? `<button class="mini-btn ${v.dealPrice !== undefined ? "gold" : ""}" data-ui data-action="buy-boost" data-id="${d.id}">${priceLabel}</button>`
       : `<span class="tag need">Need ${missing}●</span>`;
   const dealTag = v.dealPrice !== undefined && !v.armed ? `<span class="deal-tag">TODAY −50%</span>` : "";
-  return `<div class="boost-row ${v.armed ? "armed" : ""} ${v.dealPrice !== undefined ? "deal" : ""}"><span class="bi">${d.icon}</span><div><div class="mt">${d.name}<span class="boost-once">one flight</span>${dealTag}</div><div class="md">${d.desc}</div></div>${action}</div>`;
+  return `<div class="boost-row ${v.armed ? "armed" : ""} ${v.dealPrice !== undefined ? "deal" : ""}"><span class="bi">${menuIcon("boost")}</span><div><div class="mt">${d.name}${d.permanent ? `<span class="boost-once">permanent</span>` : `<span class="boost-once">one flight</span>`}${dealTag}</div><div class="md">${d.desc}</div></div>${action}</div>`;
 }
 
 function renderTrailCard(v: ShopTrailView, wallet: number): string {
@@ -1873,81 +2602,199 @@ function renderTrailCard(v: ShopTrailView, wallet: number): string {
     <div class="trail-body"><b>${d.label}</b><em>${d.desc}</em></div>${action}</div>`;
 }
 
-function renderShop(s: HudSnapshot): string {
+function renderShop(s: HudSnapshot, browse: ShopBrowse): string {
   const owned = s.skins.filter((v) => v.owned).length;
-  const armed = s.boosts.filter((v) => v.armed).length;
+  const armedBoosts = s.boosts.filter((b) => b.armed);
+  const equippedSkin = s.skins.find(v => v.def.id === browse.preview) ?? s.skins.find(v => v.equipped);
+  const matches = browseSkins(s.skins, browse).length;
+  const heroSvg = equippedSkin
+    ? sunbirdSVG({ palette: skinPalette(equippedSkin.def), width: 128, flap: 0.45, title: equippedSkin.def.name })
+    : sunbirdSVG({ width: 88, flap: 0.45, title: "Sunbird" });
+
+  const flash = s.dailyFlash ?? dailyFlashBird("today");
+  const flashDef = skinById(flash.id);
+  const flashView = s.skins.find(v => v.def.id === flash.id);
+  const flashOwned = flashView?.owned ?? false;
+  const flashSvg = sunbirdSVG({ palette: skinPalette(flashDef), width: 90, flap: 0.45, title: flashDef.name });
+
+  const filters = [
+    ["all", "All birds"],
+    ["affordable", "Can unlock"],
+    ["owned", "Owned"],
+    ["nature", "Nature 🌿"],
+    ["cosmic", "Cosmic 🌌"],
+    ["elements", "Elements 🌪"],
+    ["legendary", "Legendary ★"],
+  ] as const;
+
   return `
-    ${head("Shop", "back", `<span class="pill coin">● ${s.wallet}</span>`)}
-    <p class="tagline">Birds change how you fly. Boosts arm for exactly one flight — spend them where they count.</p>
-    <div class="section-title">Birds <small>${owned}/${s.skins.length} owned</small></div>
-    ${renderSkinCollections(s)}
-    <div class="section-title">Boosts <small>${armed} armed for your next flight</small></div>
-    <div class="boost-list">${s.boosts.map((b) => renderBoostRow(b, s.wallet)).join("")}</div>
-    <div class="section-title">Nest <small>permanent score multiplier</small></div>
-    <div class="boost-list"><div class="boost-row nest-row">
-      <span class="bi">☀️</span>
-      <div><div class="mt">Nest upgrade <span class="boost-once">forever</span></div>
-      <div class="md">Lv.${s.nestLevel} · ×${s.nestMult.toFixed(2)} score${s.nestMaxed ? " · fully upgraded" : ` · next ×${(s.nestMult + 0.12).toFixed(2)}`}</div></div>
-      ${
-        s.nestMaxed
-          ? `<span class="tag on">MAX ✓</span>`
-          : s.wallet >= s.nestPrice
-            ? `<button class="mini-btn gold" data-ui data-action="buy-nest">● ${s.nestPrice}</button>`
-            : `<span class="tag need">Need ${s.nestPrice - s.wallet}●</span>`
+    ${head("Shop", "back", `<span class="pill coin">● ${s.wallet.toLocaleString()}</span>`)}
+    <p class="shop-intro">YOUR HANGAR <span>Find your wings. Make them yours.</span></p>
+
+    <div class="pc pc--gold pc-row">
+      <span class="pc-icon">🪙</span>
+      <div class="pc-body">
+        <b>Daily Flight Stipend</b>
+        <span>Daily test &amp; hangar allowance</span>
+      </div>
+      ${s.stipendClaimed
+        ? `<span class="tag on">Claimed Today ✓</span>`
+        : `<button class="primary-btn gold" data-ui data-action="claim-daily-stipend">Claim +● 250</button>`
       }
-    </div></div>
-    <div class="section-title">Trails <small>cosmetic — yours forever</small></div>
-    <div class="trail-list">${s.shopTrails.map((t) => renderTrailCard(t, s.wallet)).join("")}</div>
+    </div>
+
+    <div class="pc pc--red">
+      <div class="pc-header">
+        <span class="pc-badge">🔥 DAILY FLASH SALE · 40% OFF</span>
+        <span class="pc-label" style="color:#c62828;">Resets at Midnight</span>
+      </div>
+      <div class="pc-row">
+        <div class="pc-preview">${flashSvg}</div>
+        <div class="pc-body">
+          <b>${flashDef.name}</b>
+          <span>${flashDef.perk}</span>
+          <div class="pc-price">
+            <s>● ${flashDef.price}</s>
+            <b>● ${flash.price}</b>
+          </div>
+        </div>
+        <div class="pc-action">
+          ${flashOwned
+            ? `<span class="tag on">Owned ✓</span>`
+            : s.wallet >= flash.price
+              ? `<button class="primary-btn gold" data-ui data-action="buy-skin" data-id="${flashDef.id}">Unlock · ● ${flash.price}</button>`
+              : `<span class="tag need">Need ● ${flash.price - s.wallet}</span>`
+          }
+          <button class="mini-btn" data-ui data-action="preview-skin" data-id="${flashDef.id}">Preview</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="shop-hero">
+      ${menuHorizon()}
+      <div class="shop-hero-bird">${heroSvg}</div>
+      <div class="shop-hero-info">
+        <small class="shop-preview-label">${equippedSkin?.equipped ? "YOUR EQUIPPED BIRD" : "BIRD PREVIEW · NOT EQUIPPED"}</small>
+        <div class="shop-hero-name" tabindex="-1">${equippedSkin ? equippedSkin.def.name : "Sunbird"}</div>
+        <div class="shop-hero-perk">${equippedSkin ? equippedSkin.def.perk : "The original. Fast, honest, unstoppable."}</div>
+        ${equippedSkin ? `<div class="shop-preview-action">${skinAction(equippedSkin, s.portalName !== "none", s.wallet)}</div>` : ""}
+      </div>
+    </div>
+    <p class="shop-rules">Bird perks are for solo play. Live races use equal flight equipment; your appearance stays yours.</p>
+
+    <div class="pc pc--blue">
+      <div class="pc-header">
+        <span class="pc-badge">📦 ACE PILOT CRATE · SAVE 54%</span>
+        <span class="pc-label">Value Pack</span>
+      </div>
+      <div class="pc-row" style="margin-bottom:10px;">
+        <span class="pc-icon">✈️</span>
+        <div class="pc-body">
+          <b>Ace Wingman Bundle</b>
+          <span>3 Boosts · Tideglass Trail · +250 Coins</span>
+        </div>
+      </div>
+      ${s.wingmanBundle
+        ? `<span class="pc-claimed" style="justify-content:center;">✓ Unlocked</span>`
+        : s.wallet >= 240
+          ? `<button class="primary-btn gold wide" data-ui data-action="buy-bundle" data-id="wingman">Claim · ● 240</button>`
+          : `<button class="primary-btn gold wide" data-ui data-action="buy-bundle" data-id="wingman" disabled>Need ● ${240 - s.wallet} more</button>`
+      }
+    </div>
+
+    <div class="pc pc--vault pc-row">
+      <span class="pc-icon">🥚</span>
+      <div class="pc-body">
+        <b>Golden Mystery Vault</b>
+        <span>35% Rare Bird · 35% Radiant Trail · 30% Coin Jackpot</span>
+      </div>
+      ${s.wallet >= 150
+        ? `<button class="primary-btn gold" data-ui data-action="buy-vault">Open · ● 150</button>`
+        : `<span class="tag need">Need ● ${150 - s.wallet}</span>`
+      }
+    </div>
+
+    <nav class="shop-jumps" aria-label="Shop sections">${[["shopBirds", "bird", "Birds"], ["shopBoosts", "boost", "Boosts"], ["shopTrails", "trail", "Trails"]].map(([id, icon, label]) => `<button class="soft-btn" data-ui data-action="shop-section" data-id="${id}">${menuIcon(icon as "bird" | "boost" | "trail")}<span>${label}</span></button>`).join("")}</nav>
+
+    <section class="shop-browser" data-ref="shopBirds" aria-label="Browse birds">
+      <div class="section-title shop-section-birds">Bird collection <small>${owned}/${s.skins.length} owned</small></div>
+      <label class="field-label" for="shop-search">Find a bird</label>
+      <input id="shop-search" type="search" data-ui data-ref="shopSearch" value="${escapeHtml(browse.query)}" placeholder="Name, collection or perk" maxlength="80" autocomplete="off" />
+      <div class="shop-filters" role="group" aria-label="Filter birds">${filters.map(([id, label]) => `<button class="mini-btn ${browse.filter === id ? "gold" : ""}" data-ui data-action="shop-filter" data-id="${id}" aria-pressed="${browse.filter === id}">${label}</button>`).join("")}</div>
+      <p class="shop-match-count" role="status">${matches} ${matches === 1 ? "bird" : "birds"} shown${browse.filter === "affordable" ? " · unowned, purchasable with your coins" : ""}</p>
+      ${renderSkinCollections(s, browse)}
+    </section>
+
+    <details class="shop-section" data-ref="shopBoosts"><summary><span class="section-art">${menuIcon("boost")}</span>Boosts &amp; upgrades <span>${armedBoosts.length} armed</span></summary>
+      <p class="fineprint">One-flight boosts are used in solo or casual AI flights. Live races and ranked practice use equal flight equipment and keep these boosts for later. Permanent upgrades stay with you.</p>
+      <div class="boost-list">${s.boosts.map((b) => renderBoostRow(b, s.wallet)).join("")}</div>
+      <div class="section-title">Nest <small>permanent score multiplier</small></div>
+      <div class="boost-list"><div class="boost-row nest-row">
+        <span class="bi">${menuIcon("story")}</span>
+        <div><div class="mt">Nest upgrade <span class="boost-once">forever</span></div>
+        <div class="md">Lv.${s.nestLevel} · ×${s.nestMult.toFixed(2)} score${s.nestMaxed ? " · fully upgraded" : ` · next ×${(s.nestMult + 0.12).toFixed(2)}`}</div></div>
+        ${
+          s.nestMaxed
+            ? `<span class="tag on">MAX ✓</span>`
+            : s.wallet >= s.nestPrice
+              ? `<button class="mini-btn gold" data-ui data-action="buy-nest">● ${s.nestPrice}</button>`
+              : `<span class="tag need">Need ${s.nestPrice - s.wallet}●</span>`
+        }
+      </div></div>
+    </details>
+
+    <details class="shop-section" data-ref="shopTrails"><summary><span class="section-art">${menuIcon("trail")}</span>Trails <span>Cosmetic · yours forever</span></summary>
+      <div class="trail-list">${s.shopTrails.map((t) => renderTrailCard(t, s.wallet)).join("")}</div>
+    </details>
+
     ${s.portalName === "none" && !(s.gold && s.vip) ? upsellStrip() : ""}
     <p class="fineprint">Earn coins by flying, daily quests, streaks and the Nest Pass.</p>
   `;
 }
 
 function renderPaywall(s: HudSnapshot): string {
-  if (s.portalName !== "none") {
-    return `
-      ${head("Portal Edition")}
-      <div class="portal-card">
-        <div class="logo-mark">✦</div>
-        <h2>Play Fair. Fly Far.</h2>
-        <p class="tagline">This portal edition has no direct checkout, no external ads, no paywall.${s.portalName === "poki" || s.portalName === "crazy" ? " Rewards come from the portal." : ""}</p>
-        <p class="fineprint">Keep your momentum, complete missions, and earn every cosmetic through play.</p>
-      </div>
-    `;
-  }
-  const stripeGold = s.checkoutMode === "stripe";
   const starter = !s.starterOwned
     ? `
     <div class="starter-card">
       <div class="starter-flag">ONE-TIME OFFER</div>
-      <h3>🎁 First Flight Pack · ${s.starterPrice}</h3>
+      <h3>🎁 First Flight Pack · ${STARTER_PACK.price}</h3>
       <ul class="feature-list tight">${s.starterFeatures.map((f) => `<li>${f}</li>`).join("")}</ul>
-      <button class="primary-btn starter" data-ui data-action="starter-buy">Claim the pack · ${s.starterPrice}</button>
+      ${
+        s.wallet >= STARTER_PACK.coinPrice
+          ? `<button class="primary-btn starter" data-ui data-action="starter-buy">Claim Pack · ${STARTER_PACK.price}</button>`
+          : `<button class="primary-btn starter off" data-ui data-action="starter-buy">Need ● ${STARTER_PACK.coinPrice - s.wallet} more coins</button>`
+      }
     </div>`
     : "";
   return `
-    ${head("Gold &amp; VIP")}
+    ${head("Coin Store")}
+    <div class="wallet-row" style="margin-bottom:12px"><span class="pill coin">Your Balance: ● ${s.wallet.toLocaleString()}</span></div>
     ${starter}
-    <div class="gold-hero"><div class="gold-badge">✦</div><div class="gold-price">${s.goldPrice}<small> one-time</small></div></div>
+    <div class="gold-hero"><div class="gold-badge">✦</div><div class="gold-price">${GOLD.price}<small> lifetime</small></div></div>
     <ul class="feature-list">${s.goldFeatures.map((f) => `<li>${f}</li>`).join("")}</ul>
     ${
       s.gold
-        ? `<div class="owned-banner">You own Gold. Thank you, sunbird ✦</div>`
-        : `<button class="primary-btn gold" data-ui data-action="gold-buy">Unlock Gold · ${s.goldPrice}</button>`
+        ? `<div class="owned-banner">You own Sunbird Gold ✦</div>`
+        : s.wallet >= GOLD.coinPrice
+          ? `<button class="primary-btn gold" data-ui data-action="gold-buy">Unlock Gold · ${GOLD.price}</button>`
+          : `<button class="primary-btn gold off" data-ui data-action="gold-buy">Need ● ${GOLD.coinPrice - s.wallet} more coins</button>`
     }
-      <div class="gold-hero vip"><div class="gold-badge vip">♛</div><div class="gold-price">${s.vipPrice}<small> per month</small></div></div>
+    <div class="gold-hero vip"><div class="gold-badge vip">♛</div><div class="gold-price">${VIP.price}<small> 30 days</small></div></div>
     <ul class="feature-list">${s.vipFeatures.map((f) => `<li>${f}</li>`).join("")}</ul>
     ${
       s.vip
-        ? `<div class="owned-banner vip">VIP active — ${s.vipDaysLeft} day${s.vipDaysLeft === 1 ? "" : "s"} left${
-            s.vipDaysLeft <= 5 ? " · renew soon to keep the perks" : ""
-          }</div><button class="soft-btn wide vip" data-ui data-action="vip-buy">Extend by 30 days · ${s.vipPrice}</button>`
-        : `<button class="primary-btn vip" data-ui data-action="vip-buy">Subscribe · ${s.vipPrice}</button>`
+        ? `<div class="owned-banner vip">VIP active — ${s.vipDaysLeft} day${s.vipDaysLeft === 1 ? "" : "s"} left</div>
+           ${s.wallet >= VIP.coinPrice
+             ? `<button class="soft-btn wide vip" data-ui data-action="vip-buy">Extend 30 Days · ${VIP.price}</button>`
+             : `<p class="fineprint">Need ● ${VIP.coinPrice - s.wallet} more coins to extend.</p>`}`
+        : s.wallet >= VIP.coinPrice
+          ? `<button class="primary-btn vip" data-ui data-action="vip-buy">Unlock VIP · ${VIP.price}</button>`
+          : `<button class="primary-btn vip off" data-ui data-action="vip-buy">Need ● ${VIP.coinPrice - s.wallet} more coins</button>`
     }
-    <div class="redeem"><input data-ui data-ref="redeem" placeholder="Promo code" maxlength="16" autocomplete="off" /><button class="mini-btn" data-ui data-action="redeem">Redeem</button></div>
-    <button class="ghost-btn" data-ui data-action="restore">Restore purchase</button>
+    <div class="redeem"><input data-ui data-ref="redeem" aria-label="Promo code" placeholder="Promo code" maxlength="16" autocomplete="off" /><button class="mini-btn" data-ui data-action="redeem">Redeem</button></div>
+    <button class="ghost-btn" data-ui data-action="restore">Restore passes</button>
     ${s.restoreMessage ? `<p class="note">${s.restoreMessage}</p>` : ""}
-    <p class="fineprint">${stripeGold ? "Payments are processed securely by Stripe." : "Unlock premium features to enhance your flights!"}</p>
+    <p class="fineprint">All passes &amp; packs are earnable 100% through in-game flight coins!</p>
   `;
 }
 
@@ -1958,38 +2805,29 @@ function renderCheckout(s: HudSnapshot): string {
   }
   const item =
     s.checkoutSku === "sunbird_vip"
-      ? { name: "Sunbird VIP · monthly", price: s.vipPrice }
+      ? { name: "Sunbird VIP", price: VIP.price, coinPrice: VIP.coinPrice, action: "vip-buy" }
       : s.checkoutSku === "sunbird_starter"
-        ? { name: "First Flight Pack · one-time", price: s.starterPrice }
-        : { name: "Sunbird Gold · lifetime", price: s.goldPrice };
-  if (s.checkoutMode === "stripe") {
-    return `
-      ${head("Stripe Checkout", "checkout-cancel")}
-      <div class="sheet stripe">
-        <div class="sheet-row"><span>${item.name}</span><b>${item.price}</b></div>
-        <p class="tagline">You'll continue to Stripe's secure checkout in a new tab.</p>
-        <button class="primary-btn gold" data-ui data-action="stripe-open">Continue to Stripe ↗</button>
-        ${
-          s.checkoutWaiting
-            ? `<div class="stripe-wait"><div class="spinner"></div><p>Finished paying?</p><button class="mini-btn" data-ui data-action="stripe-confirm">I've completed payment</button></div>`
-            : ""
-        }
-        <p class="fineprint">Stripe-hosted Payment Link · card, wallet &amp; local payment methods supported.</p>
-      </div>
-    `;
-  }
+        ? { name: "First Flight Pack", price: STARTER_PACK.price, coinPrice: STARTER_PACK.coinPrice, action: "starter-buy" }
+        : { name: "Sunbird Gold Pass", price: GOLD.price, coinPrice: GOLD.coinPrice, action: "gold-buy" };
+
+  const canAfford = s.wallet >= item.coinPrice;
   return `
-    ${head("Demo Checkout", "checkout-cancel")}
+    ${head("Confirm Unlock", "checkout-cancel")}
     <div class="sheet">
       <div class="sheet-row"><span>${item.name}</span><b>${item.price}</b></div>
-      <label>Card number<input data-ui value="4242 4242 4242 4242" readonly /></label>
-      <div class="two"><label>Expiry<input data-ui value="12 / 29" readonly /></label><label>CVC<input data-ui value="123" readonly /></label></div>
-      <label>Name on card<input data-ui value="Sunbird Tester" readonly /></label>
-      ${s.checkoutError ? `<p class="error">${escapeHtml(s.checkoutError)}</p>` : ""}
-      <button class="primary-btn gold ${s.checkoutBusy ? "busy" : ""}" data-ui data-action="checkout-pay" ${s.checkoutBusy ? "disabled" : ""}>${s.checkoutBusy ? "Processing…" : `Pay ${item.price}`}</button>
-      <p class="fineprint">Sandbox card · no real charge. Connect Stripe in .env to go live.</p>
+      <p class="tagline">Wallet: ● ${s.wallet.toLocaleString()}</p>
+      ${
+        canAfford
+          ? `<button class="primary-btn gold" data-ui data-action="${item.action}">Confirm Unlock · ${item.price}</button>`
+          : `<p class="error">Need ● ${item.coinPrice - s.wallet} more coins to unlock.</p>
+             <button class="primary-btn" data-ui data-action="pvp-practice">Fly &amp; Earn Coins</button>`
+      }
     </div>
   `;
+}
+
+function volumeControl(label: string, key: string, value: number): string {
+  return `<div class="setting-row setting-volume"><label for="${key}">${label}</label><div class="volume-control"><input id="${key}" data-ui data-action="set-${key}" type="range" min="0" max="100" step="5" value="${Math.min(100, Math.max(0, value))}"/><output for="${key}">${Math.min(100, Math.max(0, value))}%</output></div></div>`;
 }
 
 function renderSettings(s: HudSnapshot): string {
@@ -1998,20 +2836,28 @@ function renderSettings(s: HudSnapshot): string {
   const mPct = Math.round((s.settings.musicVolume ?? 0.8) * 100);
   const sPct = Math.round((s.settings.sfxVolume ?? 0.9) * 100);
   return `
-    ${head("Settings")}
-    ${toggle("Sound Effects", "mute", !s.settings.mute)}
-    <div class="setting-row"><span>SFX Volume</span><button class="mini-btn" data-ui data-action="set-sfx-vol">${s.settings.mute ? "Muted" : `${sPct}%`}</button></div>
+    ${head(t("hud.settings.title", undefined, "Settings"))}
+    <p class="settings-intro">Make the flight feel right for you. Changes save automatically.</p>
+    <div class="section-title">Sound</div>
+    ${toggle("Mute all sound", "mute", s.settings.mute)}
+    ${volumeControl("Effects volume", "sfx-vol", sPct)}
     ${toggle("Music", "music", s.settings.music)}
-    <div class="setting-row"><span>Music Volume</span><button class="mini-btn" data-ui data-action="set-music-vol">${!s.settings.music ? "Off" : `${mPct}%`}</button></div>
-    <div class="setting-row"><span>Music Track</span><button class="mini-btn" data-ui data-action="set-track">${s.settings.musicTrack === "shuffle" ? "Shuffle (all 10)" : `${s.settings.musicTrack + 1}. ${TRACK_NAMES[s.settings.musicTrack] ?? ""}`}</button></div>
+    ${volumeControl("Music volume", "music-vol", mPct)}
+    <div class="setting-row setting-select"><label for="music-track">Music track</label><select id="music-track" data-ui data-action="set-track"><option value="shuffle" ${s.settings.musicTrack === "shuffle" ? "selected" : ""}>Shuffle all tracks</option>${TRACK_NAMES.map((name, i) => `<option value="${i}" ${s.settings.musicTrack === i ? "selected" : ""}>${i + 1}. ${name}</option>`).join("")}</select></div>
+    <div class="setting-row setting-select"><label for="language-select">Language / Idioma</label><select id="language-select" data-ui data-action="set-language">${SUPPORTED_LOCALES.map(loc => `<option value="${loc.code}" ${getLocale() === loc.code ? "selected" : ""}>${loc.flag} ${loc.name}</option>`).join("")}</select></div>
+    <div class="setting-row"><span>Show distances in</span><div class="toggle-group"><button class="mini-btn ${s.settings.distUnit !== "mi" ? "gold" : ""}" data-ui data-action="set-dist-unit" data-id="km">km</button><button class="mini-btn ${s.settings.distUnit === "mi" ? "gold" : ""}" data-ui data-action="set-dist-unit" data-id="mi">mi</button></div></div>
+    <div class="section-title">Comfort &amp; controls</div>
     ${toggle("Haptics", "haptics", s.settings.haptics)}
+    ${s.boosts.some((b) => b.def.id === "doubletap" && b.armed) ? toggle("Double-tap boost", "doubletap", s.settings.doubleTapBoost) : ""}
     ${toggle("Reduce motion", "motion", s.settings.reduceMotion)}
     ${toggle("Colorblind assist", "colorassist", s.settings.colorAssist)}
     ${toggle("Large text", "bigtext", s.settings.bigText)}
-    <div class="setting-row"><span>Render quality</span><button class="mini-btn" data-ui data-action="set-quality">${s.settings.quality.toUpperCase()}</button></div>
+    <div class="setting-row setting-select"><label for="render-quality">Render quality</label><select id="render-quality" data-ui data-action="set-quality">${["auto", "high", "low"].map(q => `<option value="${q}" ${s.settings.quality === q ? "selected" : ""}>${q === "auto" ? "Auto · recommended" : q === "high" ? "High · more detail" : "Low · less GPU work"}</option>`).join("")}</select></div>
     <div class="setting-row"><span>Flights flown</span><b>${s.runsPlayed}</b></div>
+    <button class="soft-btn wide" data-ui data-action="toggle-fullscreen">⛶ Fullscreen mode</button>
     ${s.canInstall ? `<button class="soft-btn wide" data-ui data-action="install-app">⬇ Install Sunbird</button>` : ""}
-    <button class="ghost-btn danger" data-ui data-action="reset-progress">${s.resetArmed ? "Tap again to erase everything" : "Reset progress"}</button>
+    <details class="danger-zone" data-ref="resetOptions"><summary>Manage saved progress</summary><p class="fineprint">Reset deletes progress saved on this device. Export a save code from Account first.</p>
+    <button class="ghost-btn danger" data-ui data-action="reset-progress">${s.resetArmed ? "Confirm: erase saved progress" : "Reset progress"}</button></details>
     <p class="fineprint">Sunbird 1.0 · ${s.seedLabel}</p>
   `;
 }
@@ -2020,6 +2866,7 @@ function renderScores(s: HudSnapshot): string {
   return `
     ${head("High glides")}
     ${renderScoreTable(s.highScores)}
+    ${!s.highScores.length ? `<p class="tagline">Your first flight starts your story. Fly a little farther each time.</p><button class="primary-btn" data-ui data-action="pvp-practice">Take your first flight</button>` : ""}
     <div class="menu-stats"><div>Today's best <b>${formatDistance(s.todayBest)}</b></div><div>Flights <b>${s.runsPlayed}</b></div></div>
   `;
 }
@@ -2064,7 +2911,7 @@ function renderTrophies(s: HudSnapshot): string {
     ${order
       .map(
         (rarity) => `
-      <div class="section-title">${rarity}</div>
+      <details class="shop-section trophy-collection" data-ref="trophies-${rarity}"><summary>${rarity}<span>${groups[rarity]!.filter(v => v.unlocked).length}/${groups[rarity]!.length} unlocked</span></summary>
       <div class="trophy-grid">
         ${groups[rarity]!
           .map((v) => {
@@ -2077,7 +2924,7 @@ function renderTrophies(s: HudSnapshot): string {
             </div>`;
           })
           .join("")}
-      </div>`,
+      </div></details>`,
       )
       .join("")}
   `;
@@ -2098,7 +2945,12 @@ function renderAccount(s: HudSnapshot): string {
       }</div>
       <p class="fineprint">VIP gifts ${VIP_DAILY_GIFT} coins every day you play and adds a fourth daily quest. ${
         s.vip ? "" : "Cancel anytime — no auto-renewal in this build; your 30 days simply run out."
-      } Sponsored breaks respect a hard cap: <b>${s.adsLeftToday}</b> left today.</p>
+      }${
+        /* Only the direct build schedules its own interstitials; on a portal the
+           platform owns ad frequency, so the game must not describe (or count)
+           breaks it does not control. */
+        s.portalName === "none" ? ` Sponsored breaks respect a hard cap: <b>${s.adsLeftToday}</b> left today.` : ""
+      }</p>
     </div>
     <div class="section-title">Invite friends</div>
     <div class="sheet">
@@ -2107,19 +2959,20 @@ function renderAccount(s: HudSnapshot): string {
       ${
         s.referralRedeemed
           ? `<p class="note">You've already redeemed a friend code. Thanks for joining!</p>`
-          : `<div class="redeem"><input data-ui data-ref="friendcode" placeholder="Friend's code (SUN-XXXXXX)" maxlength="10" autocomplete="off" /><button class="mini-btn" data-ui data-action="redeem-referral">Apply</button></div>`
+          : `<div class="redeem"><input data-ui data-ref="friendcode" aria-label="Friend referral code" placeholder="Friend's code (SUN-XXXXXX)" maxlength="10" autocomplete="off" /><button class="mini-btn" data-ui data-action="redeem-referral">Apply</button></div>`
       }
       ${s.referralMessage ? `<p class="note">${s.referralMessage}</p>` : ""}
     </div>
-    <div class="section-title">Cloud save</div>
+    <div class="section-title">Transfer saved progress</div>
     <div class="sheet">
       <p class="tagline">Copy this code to move your progress to another device.</p>
-      <textarea class="cloud-box" data-ui data-ref="cloudExport" readonly rows="3">${s.cloudCode}</textarea>
+      <textarea class="cloud-box" data-ui data-ref="cloudExport" aria-label="Your exportable save code" readonly rows="3">${s.cloudCode}</textarea>
       <button class="mini-btn" data-ui data-action="copy-cloud">Copy code</button>
       <p class="tagline" style="margin-top:10px">Paste a code from another device to restore it here:</p>
-      <textarea class="cloud-box" data-ui data-ref="cloudImport" rows="3" placeholder="Paste save code…"></textarea>
-      <button class="mini-btn" data-ui data-action="import-cloud">Import</button>
-      ${s.cloudMessage ? `<p class="note">${s.cloudMessage}</p>` : ""}
+      <textarea class="cloud-box" data-ui data-ref="cloudImport" aria-label="Save code to import" rows="3" placeholder="Paste save code…"></textarea>
+      <label class="import-confirm"><input type="checkbox" data-ui data-ref="confirmImport"/>Replace progress on this device with this save.</label>
+      <button class="mini-btn" data-ui data-action="import-cloud">Import save</button>
+      ${s.cloudMessage ? `<p class="note" role="status">${s.cloudMessage}</p>` : ""}
     </div>
     <p class="fineprint">Copy your save code to transfer progress between devices.</p>
   `;
@@ -2171,6 +3024,26 @@ export function renderFlightRecap(path: [number, number][]): string {
     </div>`;
 }
 
+/**
+ * End-of-run 3× coin bonus card. Pure and exported so the claim contract is
+ * unit-testable: the bonus claims ONCE per run (Game.multiplierClaimed), the
+ * card carries no ad icon — it is a bonus, not an ad placement — and the
+ * title never wraps (nowrap) so narrow phones don't get a four-line header.
+ */
+export function renderCoinMultiplierCard(coins: number, claimed: boolean): string {
+  if (coins <= 0) return "";
+  if (claimed) {
+    return `<div class="multiplier-cta-card claimed">✓ 3× bonus applied &nbsp;+● ${coins * 2} extra coins</div>`;
+  }
+  return `<div class="multiplier-cta-card">
+      <div class="multiplier-cta-text">
+        <b>3× Flight Coin Bonus</b>
+        <span>Triple ● ${coins} → ● ${coins * 3}</span>
+      </div>
+      <button class="primary-btn gold wide" data-ui data-action="multiply-run-coins">Claim 3× &nbsp;+● ${coins * 2}</button>
+    </div>`;
+}
+
 function renderGameOver(s: HudSnapshot): string {
   if (s.versus && s.p1Stats && s.p2Stats) return renderVersusResult(s);
   const questTotal = s.claimedQuests.reduce((a, q) => a + q.reward, 0);
@@ -2184,12 +3057,12 @@ function renderGameOver(s: HudSnapshot): string {
            <div class="race-medal">${s.duelWas === "won" ? "⚔🥇" : "⚔"}</div>
            <div class="race-place"><b>DUEL ${s.duelWas === "won" ? "WON" : "LOST"}</b><span>${s.duelWas === "won" ? "+" : ""}${s.duelDelta} rating → ${s.rival.rating}</span></div>
            <div class="race-rating">Duel record ${s.duel.wins}–${s.duel.losses} · 🔥${s.duel.streak} streak<span class="race-rated-tag">ranked · local</span></div>
-         </div>
-         <button class="primary-btn race40 hero" data-ui data-action="pvp-duel"><span class="hero-label">⚔ REMATCH</span><span class="hero-hint">same rating band, fresh wings</span></button>`
+         </div>`
       : "";
   const raceStrip =
-    s.duelWas === "" && s.massRace && s.racePlace > 0
-      ? `<div class="race-hero ${s.racePlace === 1 ? "win" : s.racePlace <= 3 ? "podium" : ""}">
+    s.duelWas === "" && s.massRace
+      ? s.racePlace > 0
+        ? `<div class="race-hero ${s.racePlace === 1 ? "win" : s.racePlace <= 3 ? "podium" : ""}">
            <div class="race-medal">${s.racePlace === 1 ? "🥇" : s.racePlace === 2 ? "🥈" : s.racePlace === 3 ? "🥉" : "🏁"}</div>
            <div class="race-place"><b>P${s.racePlace}</b><span>of ${s.raceField} pilots · ${s.raceFinishTime.toFixed(1)}s</span></div>
            ${s.raceVerified ? `<div class="verified-tag">✓ placement refereed by the room server</div>` : ""}
@@ -2206,27 +3079,70 @@ function renderGameOver(s: HudSnapshot): string {
            }
          </div>
          ${s.photoFinish ? `<div class="reward-strip photo">📸 ${escapeHtml(s.photoFinish)}</div>` : ""}
-         <button class="primary-btn race40 hero" data-ui data-action="${s.raceRated ? "pvp-ranked" : "pvp-casual"}"><span class="hero-label">🔁 REMATCH</span><span class="hero-hint">${s.nemesis ? `settle it with ${escapeHtml(s.nemesis)}` : "same field · same hills"}</span></button>
-         <button class="soft-btn wide" data-ui data-action="open-live">Find new match</button>`
+`
+        : `<div class="race-hero dnf">
+           <div class="race-medal">💥</div>
+           <div class="race-place"><b>${s.modeId === "pvp_knockout" ? "KNOCKED OUT" : "RACE INCOMPLETE"}</b><span>${s.modeId === "pvp_knockout" ? "Eliminated by the countdown timer" : `DNF · Reached ${Math.round(s.distance)}m of ${s.raceFinishM}m`}</span></div>
+           ${
+             s.raceRated
+               ? `<div class="race-rating">Rival rating ${s.rival.rating} ${deltaTxt}<span class="race-rated-tag">ranked · local</span></div>`
+               : `<div class="race-rating"><span class="race-rated-tag">casual · rating frozen</span></div>`
+           }
+         </div>`
       : "";
+  // Async multiplayer by code. Only rendered when this build can actually
+  // talk to AUDS (Poki + game id) or when the player has already loaded a run.
+  const shareBlock =
+    s.share.available || s.share.loaded || s.share.code
+      ? `
+    <div class="share-run">
+      <div class="section-title">🔗 Shared run <small>friend's code · async race</small></div>
+      ${
+        s.share.code
+          ? `<div class="friend-row"><span class="fr-name">Run code</span><span class="fr-code">${escapeHtml(s.share.code)}</span><button class="mini-btn" data-ui data-action="copy-share">Copy code</button></div>`
+          : `<button class="soft-btn wide" data-ui data-action="share-run" ${s.share.busy ? "disabled" : ""}>${s.share.busy ? "Publishing…" : "Share this run for a friend"}</button>`
+      }
+      <div class="redeem">
+        <input data-ui data-ref="shareCode" data-enter-action="load-run" aria-label="Shared run code" placeholder="A friend's run code" maxlength="40" autocomplete="off" spellcheck="false" />
+        <button class="mini-btn" data-ui data-action="load-run" ${s.share.busy ? "disabled" : ""}>Load</button>
+      </div>
+      ${
+        s.share.loaded
+          ? `<div class="pilot-note">Loaded <b>${escapeHtml(s.share.loaded.name)}</b>'s run — ${Math.round(s.share.loaded.distance).toLocaleString()} m on the same hills. <button class="mini-btn gold" data-ui data-action="race-share">Race their mark</button></div>`
+          : ""
+      }
+      ${s.share.error ? `<div class="pilot-note warn" role="status">${escapeHtml(s.share.error)}</div>` : ""}
+    </div>`
+      : "";
+
   return `
-    <div class="zzz">z z z</div>
+    <div class="results-kicker">${escapeHtml(s.modeName)} · flight recap</div>
+    <h2>${t("hud.gameover.title", undefined, "Flight completed")}</h2>
+    <p class="tagline">${s.massRace ? "Your place, your progress, your next race." : "A little farther. A little smoother. One more flight?"}</p>
+    <div class="result-actions"><button class="play-again-btn" data-ui data-action="${s.massRace && s.racePlace > 0 && !s.duelWas ? "rematch" : "retry"}">${s.massRace && s.roomCode ? "Back to race lobby" : s.massRace && s.racePlace > 0 ? "Race again · same stakes" : t("hud.gameover.flyAgain", undefined, "Fly Again")}</button><button class="soft-btn" data-ui data-action="menu">${t("hud.gameover.mainMenu", undefined, "Main Menu")}</button></div>
+    ${!s.massRace ? `<p class="fineprint replay-note">Fly again replays this exact course so you can race the ghost of the run you just flew 👻</p>` : ""}
     ${s.newBest ? `<div class="new-best">👑 NEW BEST · ${formatDistance(s.distance)}<small>your farthest flight yet</small></div>` : ""}
     ${s.boardScope === "global" && s.boardMetric === "distance" && s.board && s.board.yourRank > 0 ? `<div class="reward-strip rank-strip">Leaderboard rank · <b>#${s.board.yourRank}</b> of ${s.board.total}</div>` : ""}
-    <h2>Sunbird sleeps</h2>
-    <p class="tagline">The daylight ran out.</p>
+
+    ${shareBlock}
     ${renderFlightRecap(s.flightPath)}
-    <div class="over-stats">
-      <div><span>Distance</span><b>${formatDistance(s.distance)}</b></div>
+    <div class="over-stats result-summary">
+      <div><span>${t("hud.stat.distance", undefined, "Distance")}</span><b>${formatDistance(s.distance)}</b></div>
       <div><span>Score</span><b>${Math.floor(s.score).toLocaleString()}</b></div>
-      <div><span>Coins</span><b>${s.coins}</b></div>
+      <div><span>${t("hud.stat.coins", undefined, "Coins")}</span><b>${s.coins}</b></div>
+    </div>
+
+    ${renderCoinMultiplierCard(s.coins, s.multiplierClaimed)}
+
+    ${renderNextFlight(s)}
+    <details class="result-details" data-ref="flightDetails"><summary>Flight details <span>Landmarks &amp; skill</span></summary><div class="over-stats">
       <div><span>Perfects</span><b>${s.perfects}</b></div>
-      <div><span>Zeniths</span><b>${s.zeniths}</b></div>
+      <div><span>Skyline moments</span><b>${s.zeniths}</b></div>
       <div><span>Rings</span><b>${s.rings}</b></div>
       <div><span>Balloons</span><b>${s.balloons}</b></div>
       <div><span>Sunflowers</span><b>${s.sunflowers}</b></div>
       <div><span>Islands</span><b>${s.island + 1}</b></div>
-    </div>
+    </div></details>
     ${s.ghostDelta !== null ? `<div class="reward-strip ${s.ghostDelta >= 0 ? "" : "nest"}">${s.ghostDelta >= 0 ? `Beat your ghost by ${Math.round(s.ghostDelta)}m! 👻` : `${Math.round(-s.ghostDelta)}m behind your best ghost`}</div>` : ""}
     ${questTotal ? `<div class="reward-strip">Daily quest${s.claimedQuests.length > 1 ? "s" : ""} complete · +${questTotal} coins</div>` : ""}
     ${s.newlyCompleted.length ? `<div class="reward-strip nest">Nest upgraded → Lv.${s.nestLevel} · ×${s.nestMult.toFixed(2)} score</div>` : ""}
@@ -2235,38 +3151,47 @@ function renderGameOver(s: HudSnapshot): string {
     ${duelStrip}
     ${raceStrip}
     <div class="reached-strip">Reached <b>${s.biomeEmoji} ${s.biomeName}</b> · Island ${s.island + 1}</div>
-    <button class="play-again-btn" data-ui data-action="retry">✈ FLY AGAIN</button>
-    ${s.massRace && s.racePlace > 0 ? `<button class="soft-btn wide rematch" data-ui data-action="rematch">🔁 Rematch — same stakes</button>` : ""}
+
     ${s.expShareFirst
-      ? `<button class="soft-btn wide" data-ui data-action="share" ${s.shareBusy ? "disabled" : ""}>${s.shareBusy ? "Preparing…" : "📤 Share this flight"}</button>
-         <button class="soft-btn wide" data-ui data-action="throw-challenge">🥊 Challenge a rival on these hills</button>`
-      : `<button class="soft-btn wide" data-ui data-action="throw-challenge">🥊 Challenge a rival on these hills</button>
-         <button class="soft-btn wide" data-ui data-action="share" ${s.shareBusy ? "disabled" : ""}>${s.shareBusy ? "Preparing…" : "📤 Share this flight"}</button>`}
-    <div class="btn-row">
-      <button class="soft-btn" data-ui data-action="open-shop">🛍 Shop</button>
-      <button class="soft-btn" data-ui data-action="open-pass">🎟 Pass</button>
-      <button class="soft-btn" data-ui data-action="open-atlas">🗺 Atlas</button>
-      <button class="soft-btn" data-ui data-action="menu">Menu</button>
+      ? `<button class="soft-btn wide" data-ui data-action="share" ${s.shareBusy ? "disabled" : ""}>${s.shareBusy ? "Preparing…" : `${menuIcon("share")} Share this flight`}</button>
+         <button class="soft-btn wide" data-ui data-action="throw-challenge">${menuIcon("versus")} Challenge a rival on these hills</button>`
+      : `<button class="soft-btn wide" data-ui data-action="throw-challenge">${menuIcon("versus")} Challenge a rival on these hills</button>
+         <button class="soft-btn wide" data-ui data-action="share" ${s.shareBusy ? "disabled" : ""}>${s.shareBusy ? "Preparing…" : `${menuIcon("share")} Share this flight`}</button>`}
+    <div class="btn-row result-links">
+      <button class="soft-btn" data-ui data-action="open-shop">${menuIcon("shop")} Shop</button>
+      <button class="soft-btn" data-ui data-action="open-pass">${menuIcon("pass")} Pass</button>
+      <button class="soft-btn" data-ui data-action="open-atlas">${menuIcon("atlas")} Atlas</button>
+
     </div>
-    ${s.portalName === "none" && !(s.gold && s.vip) ? upsellStrip() : ""}
+    <details class="result-details" data-ref="progressDetails"><summary>Progress &amp; rewards <span>Goals, quests &amp; records</span></summary>
     ${renderGoalList(s.sessionGoals)}
     ${renderQuests(s.quests)}
     ${renderMissions(s.missions, s.newlyCompleted)}
     <h3 class="table-title">High glides</h3>
-    ${renderScoreTable(s.highScores.slice(0, 5))}
+    ${renderScoreTable(s.highScores.slice(0, 5))}</details>
   `;
+}
+
+function renderNextFlight(s: HudSnapshot): string {
+  const lesson = flightTakeaway(s), bird = nextBird(s.skins);
+  return `<section class="next-flight" aria-label="Next flight plan"><span class="next-flight-art">${menuIcon("compass")}</span><div><small>TAKE THIS INTO YOUR NEXT FLIGHT</small><b>${lesson.title}</b><p>${lesson.tip}</p>${bird ? `<p class="next-unlock">${s.wallet >= bird.def.price ? `${bird.def.name} is within reach · ${bird.def.price} coins in the Shop` : `${bird.def.name} · ${bird.def.price - s.wallet} more coins to unlock`}</p>` : ""}</div></section>`;
 }
 
 function renderContinue(s: HudSnapshot): string {
   const portal = s.portalName !== "none";
+  // MON-19: the reason line is context-driven (record / near-best / streak /
+  // momentum). It explains why this run is worth resuming — it never changes
+  // what the options are, and the standard non-ad options stay in the primary
+  // position above the rewarded one (MON-05…MON-08).
   return `
     <div class="zzz">z z z</div>
     <h2>Second wind?</h2>
     <p class="tagline">Sunbird is dozing off at ${formatDistance(s.distance)}.</p>
+    ${s.continueReason ? `<p class="continue-reason${s.continueHighlight ? " is-highlight" : ""}">${escapeHtml(s.continueReason)}</p>` : ""}
     <div class="count-ring" data-live="contTimer">${Math.ceil(s.continueTimer)}</div>
     ${!portal && s.gold ? `<button class="primary-btn gold" data-ui data-action="continue-gold">✦ Gold · free wake-up</button>` : ""}
     <button class="primary-btn ${s.canAffordContinue ? "" : "off"}" data-ui data-action="continue-coins" ${s.canAffordContinue ? "" : "disabled"}>Spend ● ${s.continueCost} <small>(you have ${s.wallet})</small></button>
-    ${s.adAvailable ? `<button class="soft-btn wide" data-ui data-action="continue-ad">▶ ${portal ? "Watch for Second Wind" : "Watch a short break"}</button>` : ""}
+    ${s.adAvailable ? `<button class="soft-btn wide" data-ui data-action="continue-ad">🎬 ${portal ? "Watch for Second Wind" : "Watch a short clip → Second Wind"}</button>` : ""}
     <button class="ghost-btn" data-ui data-action="continue-sleep">Let it sleep</button>
   `;
 }
@@ -2274,12 +3199,12 @@ function renderContinue(s: HudSnapshot): string {
 function renderAd(s: HudSnapshot): string {
   if (s.portalName !== "none") {
     return `
-      <div class="ad-label">${s.portalName === "poki" ? "Poki" : s.portalName === "crazy" ? "CrazyGames" : "Portal"} break</div>
+      <div class="ad-label">${PORTAL_DISPLAY_NAME} break</div>
       <div class="portal-ad-wait"><div class="spinner"></div><h3>Preparing the next flight</h3><p>Your run is paused while the portal handles this break.</p></div>
     `;
   }
   return `
-    <div class="ad-label">Sponsored break · ${s.adReason === "continue" ? "earning your second wind" : "between flights"}</div>
+    <div class="ad-label">Sponsored break · ${s.adReason === "continue" ? "your second wind is loading…" : "back to flying in a moment"}</div>
     <div class="ad-creative">
       <div class="ad-logo">☀️</div>
       <h3>Nest Deluxe</h3>
@@ -2289,7 +3214,7 @@ function renderAd(s: HudSnapshot): string {
     <div class="ad-bar"><i data-live="adBar"></i></div>
     <div class="ad-actions">
       <button class="mini-btn" data-ui data-action="ad-skip" data-live="adSkip" disabled>Skip in ${Math.ceil(s.adTimer)}</button>
-      ${s.gold ? "" : `<button class="mini-btn gold" data-ui data-action="ad-gold">✦ Remove breaks</button>`}
+      ${s.gold || !SELL_AD_REMOVAL ? "" : `<button class="mini-btn gold" data-ui data-action="ad-gold">✦ Remove breaks</button>`}
     </div>
   `;
 }

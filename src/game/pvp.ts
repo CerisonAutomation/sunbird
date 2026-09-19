@@ -42,6 +42,8 @@ export const DIVISIONS: Division[] = [
 
 export const RIVAL_BASE_RATING = 1000;
 export const RIVAL_K = 26;
+/** Live humans are harder than the local flock: rating swings are larger. */
+export const LIVE_RATING_MULT = 1.5;
 
 export function divisionFor(rating: number): Division {
   const r = Math.max(0, Math.floor(rating));
@@ -59,12 +61,16 @@ export function nextDivision(rating: number): { div: Division; needed: number } 
  * Elo-style delta against the whole field, treated as one composite
  * opponent at rating 1000 + field strength. Beating 40 pilots pays more
  * than beating 8. Returns a signed integer, wins positive.
+ *
+ * Pass live=true when real humans shared the field: the same math, scaled
+ * up, because a live field is genuinely harder than the local flock.
  */
-export function ratingDelta(place: number, field: number): number {
+export function ratingDelta(place: number, field: number, live = false): number {
   const p = Math.max(1, Math.min(field, Math.floor(place)));
   const f = Math.max(2, Math.floor(field));
   const score = (f - p) / (f - 1); // 1.0 win … 0.0 last
-  return Math.round(RIVAL_K * (score - 0.5) * 2);
+  const delta = Math.round(RIVAL_K * (score - 0.5) * 2);
+  return live ? Math.round(delta * LIVE_RATING_MULT) : delta;
 }
 
 /** Streak bonus coins actually granted on a ranked win. Capped, honest. */
@@ -82,8 +88,24 @@ const RIVAL_NAMES = [
 ];
 
 /**
- * Deterministic featured rivals for the pre-race lobby, drawn from the same
- * name pool as the simulated field. Clearly local pilots, never live players.
+ * Presence list for the race lobby — **real pilots only**.
+ *
+ * The lobby once padded itself with deterministic name-pool "rivals" and with
+ * time-shifted leaderboard names so the room never looked empty. Both were
+ * fiction: nobody was in the room. A lobby that invents occupants is worse
+ * than a lobby that says it is empty, so this maps the live roster and stops
+ * there — zero peers in, zero rows out, and the UI can say so honestly.
+ */
+export function lobbyRivals(
+  peers: { name: string; ready: boolean; skin: string }[],
+): { name: string; tag: string; ready: boolean; skin: string }[] {
+  return peers.slice(0, 39).map((p) => ({ name: p.name, tag: "in room · live", ready: p.ready, skin: p.skin }));
+}
+
+/**
+ * Deterministic featured rivals, drawn from the same name pool as the
+ * simulated field. Used for **simulated opponents** (local duels, the AI
+ * flock) — never to stand in for live players in the lobby.
  */
 export function featuredRivals(seed: string, count = 3): { name: string; tag: string }[] {
   let h = 2166136261;

@@ -1,9 +1,9 @@
-import { readFileSync, writeFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
+import { sunbirdSVG, sunSVG } from "./src/game/Sunbird";
 import { viteSingleFile } from "vite-plugin-singlefile";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -21,27 +21,73 @@ if (!VALID_PORTALS.includes(PORTAL)) {
   throw new Error(`VITE_PORTAL_TARGET must be one of ${VALID_PORTALS.join("|")}, got "${PORTAL}"`);
 }
 const singleFile = process.env.VITE_SINGLEFILE === "true" || PORTAL !== "none";
+const paymentAdapter = PORTAL !== "none" ? path.resolve(__dirname, "src/game/Payments.portal.ts") : undefined;
+
+// Stub out non-target portal adapters at module resolution. Vite's
+// resolve.alias matches import source strings, not resolved filesystem
+// paths, so we register a tiny plugin that intercepts "./poki" /
+// "./crazygames" relative imports from platform.ts and redirects them
+// to _shim.ts when building for a different target. Without this the
+// real adapter modules (with their "PokiSDK" / "shareableURL" method
+// names / script URLs) end up in non-target bundles — inert, but flagged
+// by portal scanners.
+function portalShimPlugin(): Plugin {
+  const shim = path.resolve(__dirname, "src/sdk/_shim.ts");
+  return {
+    name: "sunbird-portal-shim",
+    enforce: "pre",
+    resolveId(source, importer) {
+      if (!importer) return null;
+      // Match exactly the relative imports used by src/sdk/platform.ts (and
+      // any other module under src/sdk) to pull in the portal adapters.
+      // Using path-absolute comparison is robust against ./ vs no-ext etc.
+      const base = path.basename(source);
+      const dir = path.basename(path.dirname(importer));
+      // Per-target edition strings (display name, portal-note, labels). Same
+      // reasoning as the adapters: a shared ternary on the runtime portal name
+      // embeds EVERY portal's name in EVERY bundle, and scanners flag a
+      // competitor's name even in dead code. Each build gets exactly one file.
+      if (base === "edition" || base === "edition.ts") {
+        if (dir !== "game") return null;
+        const edition =
+          PORTAL === "poki"
+            ? path.resolve(__dirname, "src/game/edition.poki.ts")
+            : PORTAL === "crazy" || PORTAL === "crazygames"
+              ? path.resolve(__dirname, "src/game/edition.crazy.ts")
+              : PORTAL === "generic"
+                ? path.resolve(__dirname, "src/game/edition.generic.ts")
+                : null;
+        return edition; // null => the neutral src/game/edition.ts
+      }
+      if (dir !== "sdk") return null;
+      if (base === "poki" || base === "poki.ts") {
+        if (PORTAL !== "poki") return shim;
+      }
+      if (base === "crazygames" || base === "crazygames.ts") {
+        if (PORTAL !== "crazy" && PORTAL !== "crazygames") return shim;
+      }
+      return null;
+    },
+  };
+}
 
 // Stamp the service worker cache key per build so each deploy busts stale caches.
 const BUILD_ID = Date.now().toString(36);
 
-/** public/ files are copied verbatim — define() can't reach them. This plugin
- * rewrites the __SW_BUILD_ID__ token inside the emitted dist/sw.js for real. */
-function swBuildId(): Plugin {
-  let outDir = "dist";
+// Stamp a short copyright notice onto every emitted chunk. Rollup's
+// `output.banner` is not honoured through Vite's output pipeline (verified: it
+// produced no notice at all), so do it explicitly. This is an honest legal
+// notice plus a mild deterrent — it is NOT a substitute for real protection,
+// which is not achievable for client-side JS.
+function copyrightBanner(): Plugin {
+  const notice =
+    "/*! Sunbird \u00a9 Cerison. All rights reserved. Unauthorised copying, redistribution or resale is prohibited. */";
   return {
-    name: "sunbird-sw-build-id",
+    name: "sunbird-copyright-banner",
     apply: "build",
-    configResolved(config) {
-      outDir = config.build.outDir;
-    },
-    closeBundle() {
-      try {
-        const p = path.resolve(__dirname, outDir, "sw.js");
-        const src = readFileSync(p, "utf8");
-        writeFileSync(p, src.replace(/__SW_BUILD_ID__/g, BUILD_ID));
-      } catch {
-        /* single-file/portal builds strip the SW — nothing to stamp */
+    generateBundle(_options, bundle) {
+      for (const file of Object.values(bundle)) {
+        if (file.type === "chunk") file.code = `${notice}\n${file.code}`;
       }
     },
   };
@@ -52,35 +98,118 @@ export default defineConfig({
   // Relative base: portals (Poki GDN, CrazyGames CDN) serve builds from deep
   // subpaths — any absolute /asset URL 404s there. "./" works everywhere.
   base: "./",
-  plugins: [react(), tailwindcss(), ...(singleFile ? [viteSingleFile()] : []), swBuildId()],
+  plugins: [
+    {
+      name: "sunbird-boot-mark",
+      transformIndexHtml(html) {
+        // Inline the SAME artwork as the menu before any JS or assets arrive.
+        let out = html
+          .replace("<!-- BOOT_SUN -->", sunSVG({ size: 84, className: "boot-sun" }))
+          .replace("<!-- BOOT_BIRD -->", sunbirdSVG({ width: 58, className: "boot-bird", animateWings: true }));
+        // Portal builds: strip the itch.io og:url meta so the bundle is
+        // self-contained with no third-party host references. Inspector
+        // scans the HTML; a stray meta pointing off-portal can trigger the
+        // External Resources warning even though it's never fetched.
+        if (PORTAL !== "none") {
+          out = out.replace(/<meta\s+property=["']og:url["'][^>]*>/i, "");
+          out = out.replace(/<link[^>]*rel=["'](?:preload|canonical|alternate)["'][^>]*href=["']https?:\/\/[^>]+>/gi, "");
+        }
+        return out;
+      },
+    },
+    react(),
+    tailwindcss(),
+    portalShimPlugin(),
+    ...(singleFile ? [viteSingleFile()] : []),
+    ...(singleFile ? [] : [copyrightBanner()]),
+  ],
   server: {
     host: true,
     allowedHosts: true,
-    // Real multiplayer: the browser talks to the SAME origin (/mp) and vite
-    // tunnels it to the Rust room server (sunbird-server) listening on the
-    // legacy `/ws` socket. No hardcoded hosts anywhere.
+    // Real multiplayer + social: the browser talks to the SAME origin and
+    // vite tunnels to the Sunbird social server (server/, default :8791).
+    // Identity paths: that server mounts legacy + v1 under /mp and the
+    // legacy social REST under /social. No hardcoded hosts anywhere —
+    // MULTIPLAYER_PROXY_TARGET / SOCIAL_PROXY_TARGET override per machine.
     proxy: {
       "/mp": {
-        target: "http://localhost:8080",
+        target: process.env.MULTIPLAYER_PROXY_TARGET || "http://127.0.0.1:8790",
         ws: true,
         changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/mp/, "/ws"),
       },
-      // Social server (friends/clubs/chat) — same pattern as /mp: the browser
-      // talks same-origin, vite tunnels to the PGlite server on :8788.
       "/social": {
-        target: "http://localhost:8788",
+        target: process.env.SOCIAL_PROXY_TARGET || "http://127.0.0.1:8790",
         changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/social/, ""),
+      },
+      // Global leaderboard & score-submission endpoints live at the social
+      // server root. Proxy them so dev can hit the board without CORS fuss.
+      "/board": {
+        target: process.env.SOCIAL_PROXY_TARGET || "http://127.0.0.1:8790",
+        changeOrigin: true,
+      },
+      "/score": {
+        target: process.env.SOCIAL_PROXY_TARGET || "http://127.0.0.1:8790",
+        changeOrigin: true,
       },
     },
   },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
+      ...(paymentAdapter ? { "./Payments": paymentAdapter } : {}),
     },
   },
   define: {
     "import.meta.env.VITE_BUILD_ID": JSON.stringify(BUILD_ID),
+    // Freeze the portal target to a compile-time constant so Rollup can
+    // statically fold `TARGET === "poki"` / `TARGET === "crazy"` branches
+    // and strip non-target SDK URLs / branches (e.g. Poki Netlib dynamic
+    // import) from the output entirely.
+    "import.meta.env.VITE_PORTAL_TARGET": JSON.stringify(PORTAL),
+  },
+  build: {
+    // Keep production bundles lean and avoid publishing source maps that
+    // expose the original project structure to casual scrapers.
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        // Portal/itch builds are inlined into a single HTML file by
+        // vite-plugin-singlefile, so splitting there is pointless at best and
+        // breaks the self-contained artefact at worst. Only the chunked
+        // (Vercel/CDN) build gets a vendor split — three.js alone is the bulk
+        // of the bundle, so isolating it lets app-only deploys reuse the
+        // cached vendor chunk instead of re-downloading everything.
+        ...(singleFile
+          ? {}
+          : {
+              manualChunks: {
+                three: ["three"],
+                react: ["react", "react-dom"],
+                audio: [
+                  "./src/game/Audio.ts",
+                  "./src/game/Music.ts",
+                ],
+                // Net bundle: only the WebSocket multiplayer transport and
+                // MassRace (which consumes it). Deliberately excludes
+                // src/sdk/platform.ts and src/game/PokiNetlib.ts so that
+                // portal-specific code (Poki SDK strings, @poki/netlib)
+                // stays in its own chunks and Rollup's DCE can strip the
+                // unused adapter path for each build target.
+                net: [
+                  "./src/game/Realtime.ts",
+                  "./src/game/PokiMpUtils.ts",
+                  "./src/game/MassRace.ts",
+                  "./src/game/GhostNet.ts",
+                  "./src/game/bufferUpdates.ts",
+                ],
+                social: [
+                  "./src/game/Leaderboard.ts",
+                  "./src/game/Squad.ts",
+                  "./src/game/Tournaments.ts",
+                ],
+              },
+            }),
+      },
+    },
   },
 });

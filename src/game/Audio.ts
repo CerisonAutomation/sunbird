@@ -1,3 +1,5 @@
+const COIN_SCALE = [1046.5, 1174.66, 1318.51, 1567.98, 1760.0, 2093.0, 2349.32, 2637.02, 3135.96, 3520.0];
+
 import { Music, type BiomeMusicStyle, type MusicMode } from "./Music";
 
 /**
@@ -22,15 +24,49 @@ export class GameAudio {
   private sfxVol = 0.9;
   private adMuted = false;
   private hiddenMuted = false;
+  private portalMuted = false;
   private started = false;
   private pendingMode: MusicMode = "off";
   private pendingBiome: BiomeMusicStyle = "bright";
   private pendingTrack: number | "shuffle" = "shuffle";
   private onTrackChange: ((name: string) => void) | null = null;
+  /** Prevent dense pickup/event bursts from spawning unbounded WebAudio voices.
+   *  Shared by every one-shot source (oscillator tones AND noise bursts), so a
+   *  boost + storm + fever + landing on the same frame cannot stack voices. */
+  private activeOneShots = 0;
+  private readonly maxOneShots = 28;
+
+  /** Last value actually written to each continuously-modulated param. */
+  private lastWhooshGain = -1;
+  private lastWhooshFreq = -1;
+  private lastWindGain = -1;
 
   // Ascending musical coin streak tracker
   private coinStreak = 0;
   private lastCoinTime = 0;
+
+  private unlockListener: (() => void) | null = null;
+
+  constructor() {
+    if (typeof window !== "undefined") {
+      const unlock = () => {
+        void this.resume();
+        this.removeUnlockListeners();
+      };
+      this.unlockListener = unlock;
+      window.addEventListener("pointerdown", unlock, { passive: true });
+      window.addEventListener("touchstart", unlock, { passive: true });
+      window.addEventListener("keydown", unlock, { passive: true });
+    }
+  }
+
+  private removeUnlockListeners(): void {
+    if (!this.unlockListener || typeof window === "undefined") return;
+    window.removeEventListener("pointerdown", this.unlockListener);
+    window.removeEventListener("touchstart", this.unlockListener);
+    window.removeEventListener("keydown", this.unlockListener);
+    this.unlockListener = null;
+  }
 
   private ensure(): AudioContext | null {
     if (this.ctx) return this.ctx;
@@ -38,34 +74,55 @@ export class GameAudio {
       window.AudioContext ||
       (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!AC) return null;
-    this.ctx = new AC();
+    // Balanced buffering avoids audio-thread underruns on mobile Safari,
+    // Android WebView and low-power portal devices while keeping UI cues
+    // responsive enough for a flight game.
+    // A slightly larger output buffer trades a few ms of latency for far fewer
+    // audio-thread underruns on mobile Safari, Android WebView and low-power
+    // portal devices — underruns are heard as crackle. "playback" is the
+    // largest hint the API offers; fall back if a browser rejects it.
+    try {
+      this.ctx = new AC({ latencyHint: "playback" });
+    } catch {
+      this.ctx = new AC({ latencyHint: "balanced" });
+    }
 
     const comp = this.ctx.createDynamicsCompressor();
-    comp.threshold.value = -14;
-    comp.knee.value = 18;
-    comp.ratio.value = 4;
-    comp.attack.value = 0.004;
-    comp.release.value = 0.18;
-    comp.connect(this.ctx.destination);
+    // Leave real headroom before the compressor. Mobile speakers expose
+    // inter-sample peaks quickly as crackle when many synth voices land on the
+    // same frame. A quiet post-compressor ceiling keeps the final mix below
+    // 0 dBFS on Safari, Chrome Android and embedded portal webviews.
+    comp.threshold.value = -18;
+    comp.knee.value = 24;
+    comp.ratio.value = 8;
+    comp.attack.value = 0.008;
+    comp.release.value = 0.22;
+    const output = this.ctx.createGain();
+    output.gain.value = 0.68;
+    comp.connect(output);
+    output.connect(this.ctx.destination);
 
     this.master = this.ctx.createGain();
-    this.master.gain.value = 0.85;
+    this.master.gain.value = 0.72;
     this.master.connect(comp);
 
     this.sfxBus = this.ctx.createGain();
-    this.sfxBus.gain.value = this.muted ? 0 : 0.75 * this.sfxVol;
+    this.sfxBus.gain.value = this.muted ? 0 : 0.5 * this.sfxVol;
     this.sfxBus.connect(this.master);
 
     // Pre-allocate noise buffer for reuse (avoids per-call allocation)
-    const noiseLen = Math.floor(this.ctx.sampleRate * 0.5);
+    const noiseLen = Math.floor(this.ctx.sampleRate * 1);
     this.noiseBuffer = this.ctx.createBuffer(1, noiseLen, this.ctx.sampleRate);
     const noiseData = this.noiseBuffer.getChannelData(0);
     for (let i = 0; i < noiseLen; i++) noiseData[i] = (Math.random() * 2 - 1) * (1 - i / noiseLen);
 
     const convolver = this.ctx.createConvolver();
-    convolver.buffer = this.makeImpulse(1.8, 2.3);
+    const mobile = window.innerWidth < 700;
+    // Shorter impulse/less wet signal on phones avoids convolution spikes while
+    // keeping event stingers spacious on desktop.
+    convolver.buffer = this.makeImpulse(mobile ? 0.9 : 1.8, mobile ? 1.8 : 2.3);
     const wet = this.ctx.createGain();
-    wet.gain.value = 0.34;
+    wet.gain.value = mobile ? 0.1 : 0.18;
     this.reverbSend = this.ctx.createGain();
     this.reverbSend.gain.value = 1;
     this.reverbSend.connect(convolver);
@@ -73,7 +130,7 @@ export class GameAudio {
     wet.connect(this.master);
 
     this.music = new Music(this.ctx, this.master, this.reverbSend);
-    this.music.setLevel(this.musicOn && !this.muted ? 0.64 * this.musicVol : 0);
+    this.music.setLevel(this.musicOn && !this.muted ? 0.5 * this.musicVol : 0);
     this.music.setBiome(this.pendingBiome);
     this.music.setMode(this.pendingMode);
     this.music.setTrack(this.pendingTrack);
@@ -85,6 +142,7 @@ export class GameAudio {
   }
 
   async resume(): Promise<void> {
+    this.removeUnlockListeners();
     const ctx = this.ensure();
     if (!ctx) return;
     if (ctx.state === "suspended") {
@@ -97,10 +155,32 @@ export class GameAudio {
     this.started = true;
   }
 
+  /** Suspend an already-created context when the tab is backgrounded. */
+  async suspend(): Promise<void> {
+    if (!this.ctx || this.ctx.state !== "running") return;
+    try {
+      await this.ctx.suspend();
+    } catch {
+      /* Some embedded WebViews do not expose suspend; master mute still applies. */
+    }
+  }
+
+  /** Resume only an existing context; never create audio outside a user gesture. */
+  async resumeExisting(): Promise<void> {
+    if (!this.ctx || this.ctx.state !== "suspended") return;
+    try {
+      await this.ctx.resume();
+    } catch {
+      /* A later user gesture will retry through resume(). */
+    }
+  }
+
   dispose(): void {
+    this.removeUnlockListeners();
     this.music?.dispose();
     if (this.ctx) void this.ctx.close();
     this.ctx = null;
+    this.noiseBuffer = null;
     this.master = null;
     this.sfxBus = null;
     this.reverbSend = null;
@@ -108,6 +188,7 @@ export class GameAudio {
     this.whooshFilter = null;
     this.windGain = null;
     this.music = null;
+    this.activeOneShots = 0;
   }
 
   /* ---------- volume & state ---------- */
@@ -115,23 +196,23 @@ export class GameAudio {
   setVolumes(musicVol: number, sfxVol: number): void {
     this.musicVol = Math.max(0, Math.min(1, musicVol));
     this.sfxVol = Math.max(0, Math.min(1, sfxVol));
-    if (this.music) this.music.setLevel(this.musicOn && !this.muted ? 0.64 * this.musicVol : 0);
+    if (this.music) this.music.setLevel(this.musicOn && !this.muted ? 0.5 * this.musicVol : 0);
     if (this.sfxBus && this.ctx) {
-      this.sfxBus.gain.setTargetAtTime(this.muted ? 0 : 0.75 * this.sfxVol, this.ctx.currentTime, 0.05);
+      this.sfxBus.gain.setTargetAtTime(this.muted ? 0 : 0.5 * this.sfxVol, this.ctx.currentTime, 0.05);
     }
   }
 
   setMuted(m: boolean): void {
     this.muted = m;
-    this.music?.setLevel(this.musicOn && !m ? 0.64 * this.musicVol : 0);
+    this.music?.setLevel(this.musicOn && !m ? 0.5 * this.musicVol : 0);
     if (this.sfxBus && this.ctx) {
-      this.sfxBus.gain.setTargetAtTime(m ? 0 : 0.75 * this.sfxVol, this.ctx.currentTime, 0.05);
+      this.sfxBus.gain.setTargetAtTime(m ? 0 : 0.5 * this.sfxVol, this.ctx.currentTime, 0.05);
     }
   }
 
   setMusicEnabled(on: boolean): void {
     this.musicOn = on;
-    this.music?.setLevel(on && !this.muted ? 0.64 * this.musicVol : 0);
+    this.music?.setLevel(on && !this.muted ? 0.5 * this.musicVol : 0);
   }
 
   /** Portal SDKs require that audio is silent while an ad has focus. */
@@ -146,10 +227,20 @@ export class GameAudio {
     this.applyMasterMute();
   }
 
+  /**
+   * Portal-level mute (CrazyGames `muteAudio` setting). Lives on the master
+   * bus alongside the ad/hidden mutes, so it takes priority over the in-game
+   * audio toggle — as the portal requires — without disturbing saved settings.
+   */
+  setPortalMuted(muted: boolean): void {
+    this.portalMuted = muted;
+    this.applyMasterMute();
+  }
+
   private applyMasterMute(): void {
     if (!this.master || !this.ctx) return;
-    const silent = this.adMuted || this.hiddenMuted;
-    this.master.gain.setTargetAtTime(silent ? 0 : 0.85, this.ctx.currentTime, silent ? 0.01 : 0.08);
+    const silent = this.adMuted || this.hiddenMuted || this.portalMuted;
+    this.master.gain.setTargetAtTime(silent ? 0 : 0.72, this.ctx.currentTime, silent ? 0.01 : 0.08);
   }
 
   setMusicMode(mode: MusicMode): void {
@@ -194,24 +285,67 @@ export class GameAudio {
     windStrength = 0,
   ): void {
     if (!this.ctx || !this.whooshGain || !this.whooshFilter || !this.windGain || this.adMuted) return;
-    const t = this.ctx.currentTime;
-    // Fever swells the wind so the audio feels as hot as the visuals look.
-    const whoosh =
-      playing && grounded && speed > 8
-        ? Math.min(0.28, (speed / 90) * (diving ? 0.24 : 0.12) * (fever ? 1.35 : 1))
-        : 0.0008;
-    this.whooshGain.gain.setTargetAtTime(this.muted ? 0 : whoosh * this.sfxVol, t, 0.05);
-    this.whooshFilter.frequency.setTargetAtTime(280 + speed * 18 + (diving ? 220 : 0), t, 0.08);
+    // Rushing air when carving down slopes OR slicing down through the sky in a dive.
+    const activeRush = playing && ((grounded && speed > 8) || (diving && speed > 10));
+    const whoosh = activeRush
+      ? Math.min(0.32, (speed / 90) * (diving ? 0.26 : 0.12) * (fever ? 1.35 : 1))
+      : 0.0008;
+    // Only write a parameter when it has actually moved, and clear the pending
+    // ramp first. The old code called setTargetAtTime on three params on EVERY
+    // animation frame (~180 automation events/second, forever). That grows the
+    // automation timeline without bound and is a known cause of crackle and
+    // buffer underruns on WebViews.
+    this.lastWhooshGain = this.smoothParam(
+      this.whooshGain.gain,
+      this.muted ? 0 : whoosh * this.sfxVol,
+      0.05,
+      this.lastWhooshGain,
+      0.0015,
+    );
+    this.lastWhooshFreq = this.smoothParam(
+      this.whooshFilter.frequency,
+      280 + speed * 18 + (diving ? 220 : 0),
+      0.08,
+      this.lastWhooshFreq,
+      6,
+    );
 
     const air = playing && !grounded ? Math.min(0.18, speed / 550) : 0;
     const wind = this.muted ? 0 : (air + windStrength * 0.18) * this.sfxVol;
-    this.windGain.gain.setTargetAtTime(wind, t, 0.12);
+    this.lastWindGain = this.smoothParam(this.windGain.gain, wind, 0.12, this.lastWindGain, 0.0015);
 
     this.music?.setNight(1 - daylight);
     void dt;
   }
 
+  /**
+   * Write a smoothed AudioParam only when the value actually changed, clearing
+   * any stale automation first so an old ramp cannot fight the new one. Returns
+   * the value now being targeted, for the caller to remember.
+   */
+  private smoothParam(
+    param: AudioParam,
+    value: number,
+    timeConstant: number,
+    previous: number,
+    epsilon: number,
+  ): number {
+    if (Math.abs(value - previous) < epsilon) return previous;
+    const t = this.ctx!.currentTime;
+    // Each param here has exactly one driver, so cancelling outright is safe
+    // and cheaper than cancelAndHoldAtTime (which older Safari lacks).
+    param.cancelScheduledValues(t);
+    param.setTargetAtTime(value, t, timeConstant);
+    return value;
+  }
+
   /* ---------- one-shots with juicy feedback ---------- */
+
+  /** Tactile aerodynamic tuck cue when initiating a dive. */
+  diveCue(): void {
+    this.noiseBurst(0.12, 600, 0.05);
+    this.tone(280, 0.09, "sine", 0.03, 140);
+  }
 
   chirp(): void {
     this.tone(440, 0.14, "sine", 0.16, 980);
@@ -232,8 +366,7 @@ export class GameAudio {
     this.lastCoinTime = now;
 
     // Pentatonic scale: C6, D6, E6, G6, A6, C7, D7, E7, G7, A7
-    const scale = [1046.5, 1174.66, 1318.51, 1567.98, 1760.0, 2093.0, 2349.32, 2637.02, 3135.96, 3520.0];
-    const pitch = scale[Math.min(this.coinStreak - 1, scale.length - 1)]!;
+    const pitch = COIN_SCALE[Math.min(this.coinStreak - 1, COIN_SCALE.length - 1)]!;
     const freq = gem ? pitch * 1.5 : pitch;
 
     this.tone(freq, 0.12, "sine", 0.14, freq * 1.04);
@@ -249,6 +382,7 @@ export class GameAudio {
     this.tone(659.25, 0.2, "sine", 0.12, 659.25);
     this.tone(783.99, 0.24, "sine", 0.12, 783.99);
     this.tone(1046.5, 0.28, "triangle", 0.08, 1046.5);
+    this.music?.sidechainPump(0.3, 0.15);
   }
 
   feverOn(): void {
@@ -256,6 +390,20 @@ export class GameAudio {
     this.tone(523.25, 0.14, "square", 0.05, 659.25);
     this.tone(783.99, 0.2, "square", 0.06, 1046.5);
     this.tone(1046.5, 0.25, "triangle", 0.08, 1318.5);
+    this.music?.triggerBeatDrop(1.2);
+    this.music?.triggerViralGlissando();
+  }
+
+  triggerBeatDrop(intensityMult?: number): void {
+    this.music?.triggerBeatDrop(intensityMult);
+  }
+
+  triggerViralGlissando(): void {
+    this.music?.triggerViralGlissando();
+  }
+
+  sidechainPump(duckAmount?: number, duration?: number): void {
+    this.music?.sidechainPump(duckAmount, duration);
   }
 
   splash(): void {
@@ -384,6 +532,20 @@ export class GameAudio {
     this.tone(330, 0.22, "triangle", 0.06, 880);
   }
 
+  /** Ring chains climb through a bounded major pentatonic chord, not a
+   * full fanfare on every gate. Two short tones leave timing sounds audible. */
+  ringPass(chain: number): void {
+    const pitch = COIN_SCALE[Math.min(4, Math.max(0, Math.floor(chain) - 1))]! / 2;
+    this.tone(pitch, 0.10, "sine", 0.09, pitch * 1.25);
+    this.tone(pitch * 1.5, 0.09, "triangle", 0.04);
+  }
+
+  /** A soft brush/whistle distinguishes a ridge skim from a butter landing. */
+  ridgeSkim(): void {
+    this.noiseBurst(0.08, 2200, 0.025);
+    this.tone(784, 0.10, "sine", 0.055, 1046.5);
+  }
+
   /** Balloon bounce: a taut rubber pop + a springy upward slide. */
   balloon(): void {
     this.noiseBurst(0.06, 2600, 0.16);
@@ -411,6 +573,25 @@ export class GameAudio {
     const baseFreq = rating === "perfect" ? 784 : rating === "great" ? 587 : 440;
     this.tone(baseFreq, 0.18, "sine", 0.12 * speedRatio, baseFreq * 1.6);
     this.noiseBurst(0.2, 800 + speed * 12, 0.07 * speedRatio);
+  }
+
+  /** Momentum building: a short low-to-high rubbery scoop, once per big drop. */
+  runup(): void {
+    this.tone(130.81, 0.32, "triangle", 0.07, 261.63);
+    this.noiseBurst(0.18, 650, 0.035);
+  }
+
+  /** A wider upward whistle for the island-transfer ramp. */
+  rampLaunch(speed: number): void {
+    this.tone(392, 0.30, "sine", 0.09, 1174.66);
+    this.tone(587.33, 0.24, "triangle", 0.045, 1567.98);
+    this.noiseBurst(0.2, 800 + Math.min(128, speed) * 10, 0.045);
+  }
+
+  /** A quiet apex bell tells the player the climb has become a descent. */
+  apexChime(): void {
+    this.tone(1046.5, 0.32, "sine", 0.045);
+    this.tone(1567.98, 0.4, "sine", 0.025);
   }
 
   countdownBeep(isGo = false): void {
@@ -455,11 +636,13 @@ export class GameAudio {
   /* ---------- synth primitives ---------- */
 
   private tone(freq: number, dur: number, type: OscillatorType, gain: number, slideTo?: number): void {
-    if (!this.ctx || !this.sfxBus || !this.reverbSend || this.muted || !this.started) return;
+    if (!this.ctx || !this.sfxBus || !this.reverbSend || this.muted || this.sfxVol <= 0 || this.adMuted || this.hiddenMuted || this.portalMuted || !this.started) return;
+    if (this.activeOneShots >= this.maxOneShots) return;
+    this.activeOneShots++;
     const t = this.ctx.currentTime;
     const g = this.ctx.createGain();
     // Click-free envelope: a ~5 ms rise, then exponential decay.
-    const effGain = Math.max(0.0001, gain * this.sfxVol);
+    const effGain = Math.max(0.0001, gain * this.sfxVol * 0.78);
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(effGain, t + 0.005);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
@@ -469,6 +652,8 @@ export class GameAudio {
     g.connect(send);
     send.connect(this.reverbSend);
 
+    let ended = 0;
+    const voices = dur < 0.12 ? 1 : 2;
     const voice = (detune: number, vol: number): void => {
       const o = this.ctx!.createOscillator();
       o.type = type;
@@ -481,33 +666,57 @@ export class GameAudio {
       vg.connect(g);
       o.start();
       o.stop(t + dur + 0.03);
+      o.addEventListener("ended", () => {
+        o.disconnect();
+        vg.disconnect();
+        ended++;
+        if (ended === voices) {
+          g.disconnect();
+          send.disconnect();
+          this.activeOneShots = Math.max(0, this.activeOneShots - 1);
+        }
+      });
     };
-    // A gently detuned second voice thickens every sound into a small chorus
-    // without raising the overall level (0.8 + 0.4 ≈ the single voice).
-    voice(0, 0.8);
-    voice(6, 0.4);
+    // Longer accents get a chorus; short ticks use one oscillator/gain pair.
+    // Preserve the envelope while avoiding a doubled node graph for tiny cues.
+    voice(0, voices === 1 ? 1 : 0.8);
+    if (voices === 2) voice(6, 0.4);
   }
 
   private noiseBurst(dur: number, freq: number, gain: number): void {
-    if (!this.ctx || !this.sfxBus || this.muted || !this.started) return;
+    if (!this.ctx || !this.sfxBus || this.muted || this.sfxVol <= 0 || this.adMuted || this.hiddenMuted || this.portalMuted || !this.started) return;
+    if (this.activeOneShots >= this.maxOneShots) return;
+    this.activeOneShots++;
     const len = Math.floor(this.ctx.sampleRate * dur);
     // Reuse pre-allocated noise buffer when duration fits, otherwise create new
-    const buffer = (this.noiseBuffer && len <= this.noiseBuffer.length)
-      ? this.noiseBuffer
-      : this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+    if (!this.noiseBuffer || len > this.noiseBuffer.length) {
+      this.noiseBuffer = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noiseBuffer.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    }
+    const buffer = this.noiseBuffer;
     const src = this.ctx.createBufferSource();
     src.buffer = buffer;
     const filter = this.ctx.createBiquadFilter();
     filter.type = "lowpass";
     filter.frequency.value = freq;
     const g = this.ctx.createGain();
-    const effGain = Math.max(0.0001, gain * this.sfxVol);
-    g.gain.setValueAtTime(effGain, this.ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + dur);
+    const t = this.ctx.currentTime;
+    const effGain = Math.max(0.0001, gain * this.sfxVol * 0.72);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(effGain, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     src.connect(filter);
     filter.connect(g);
     g.connect(this.sfxBus);
-    src.start();
+    src.start(t);
+    src.stop(t + dur + 0.03);
+    src.addEventListener("ended", () => {
+      src.disconnect();
+      filter.disconnect();
+      g.disconnect();
+      this.activeOneShots = Math.max(0, this.activeOneShots - 1);
+    });
   }
 
   private makeImpulse(seconds: number, decay: number): AudioBuffer {

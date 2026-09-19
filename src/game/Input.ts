@@ -1,18 +1,41 @@
+/**
+ * Dive aliases — Poki EN-02 asks for standardised movement keys ("use WASD or
+ * arrow keys for movement"), and this game's single movement control is
+ * dive/hold. Accepting both clusters (plus Space) means muscle memory from
+ * either convention works; there is no horizontal steering to conflict with.
+ */
+const DIVE_CODES = ["Space", "KeyA", "KeyW", "KeyS", "KeyD", "ArrowUp", "ArrowDown"];
+const DIVE_CODE_SET = new Set(DIVE_CODES);
+
+/** Player-2 dive aliases: Return is the standard secondary confirm key (EN-02). */
+const P2_CODES = ["Enter", "NumpadEnter", "ShiftRight", "KeyL"];
+const P2_CODE_SET = new Set(P2_CODES);
+
 export class Input {
   enabled = true;
   held = false;
   pausePressed = false;
   restartPressed = false;
+  mutePressed = false;
+  fullscreenPressed = false;
+  boostPressed = false;
   /** Player 2: Enter / right-half touch / second gamepad. */
   p2Key = false;
   p2Touch = false;
   private space = false;
+  private readonly keys = new Set<string>();
+  private readonly boundBlur = () => this.resetHeld();
   private padP1 = false;
   private padP2 = false;
   /** In versus mode a tap is routed to a player by which half of the screen it lands on. */
   splitMode: "off" | "vertical" | "horizontal" = "off";
   private readonly touches = new Map<number, 1 | 2>();
   private first = false;
+  private lastTapDownAt = 0;
+  private lastTapUpAt = 0;
+  private lastTapDuration = 0;
+  private lastTapX = 0;
+  private lastTapY = 0;
   private readonly onFirstGesture: () => void;
   private readonly el: HTMLElement;
   private readonly boundPointerDown: (e: PointerEvent) => void;
@@ -21,23 +44,48 @@ export class Input {
   private readonly boundKeyDown: (e: KeyboardEvent) => void;
   private readonly boundKeyUp: (e: KeyboardEvent) => void;
   private readonly boundContext: (e: Event) => void;
+  private readonly boundTouchStart: (e: TouchEvent) => void;
+  private readonly boundTouchMove: (e: TouchEvent) => void;
+  private readonly boundWindowTouchMove: (e: TouchEvent) => void;
 
   constructor(el: HTMLElement, onFirstGesture: () => void) {
     this.el = el;
     this.onFirstGesture = onFirstGesture;
     this.boundPointerDown = (e) => this.onPointerDown(e);
     this.boundPointerUp = (e) => this.onPointerUp(e);
-    this.boundPointerCancel = () => this.onPointerEnd();
+    this.boundPointerCancel = (e: PointerEvent) => this.onPointerUp(e);
     this.boundKeyDown = (e) => this.onKeyDown(e);
     this.boundKeyUp = (e) => this.onKeyUp(e);
     this.boundContext = (e) => e.preventDefault();
+    this.boundTouchStart = (e: TouchEvent) => {
+      this.markFirst();
+      if (!this.isTyping(e.target) && !this.isInteractive(e.target)) {
+        if (e.cancelable) e.preventDefault();
+      }
+    };
+    this.boundTouchMove = (e: TouchEvent) => {
+      if (!this.isTyping(e.target) && !this.isInteractive(e.target)) {
+        if (e.cancelable) e.preventDefault();
+      }
+    };
+    this.boundWindowTouchMove = (e: TouchEvent) => {
+      if (!this.isTyping(e.target) && !this.isInteractive(e.target)) {
+        if (e.cancelable) e.preventDefault();
+      }
+    };
 
     el.addEventListener("pointerdown", this.boundPointerDown);
+    window.addEventListener("pointerdown", this.boundPointerDown);
+    el.addEventListener("touchstart", this.boundTouchStart, { passive: false });
+    window.addEventListener("touchstart", this.boundTouchStart, { passive: false });
     window.addEventListener("pointerup", this.boundPointerUp);
     window.addEventListener("pointercancel", this.boundPointerCancel);
+    window.addEventListener("blur", this.boundBlur);
     window.addEventListener("keydown", this.boundKeyDown);
     window.addEventListener("keyup", this.boundKeyUp);
     el.addEventListener("contextmenu", this.boundContext);
+    el.addEventListener("touchmove", this.boundTouchMove, { passive: false });
+    window.addEventListener("touchmove", this.boundWindowTouchMove, { passive: false });
   }
 
   get diving(): boolean {
@@ -51,7 +99,7 @@ export class Input {
 
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
-    if (!enabled) this.onPointerEnd();
+    if (!enabled) this.resetHeld();
   }
 
   /** Poll gamepads once per frame: pad 0 drives P1, pad 1 drives P2. */
@@ -84,13 +132,37 @@ export class Input {
     return v;
   }
 
+  consumeMute(): boolean {
+    const v = this.mutePressed;
+    this.mutePressed = false;
+    return v;
+  }
+
+  consumeFullscreen(): boolean {
+    const v = this.fullscreenPressed;
+    this.fullscreenPressed = false;
+    return v;
+  }
+
+  consumeBoost(): boolean {
+    const v = this.boostPressed;
+    this.boostPressed = false;
+    return v;
+  }
+
   dispose(): void {
     this.el.removeEventListener("pointerdown", this.boundPointerDown);
+    window.removeEventListener("pointerdown", this.boundPointerDown);
+    this.el.removeEventListener("touchstart", this.boundTouchStart);
+    window.removeEventListener("touchstart", this.boundTouchStart);
     window.removeEventListener("pointerup", this.boundPointerUp);
     window.removeEventListener("pointercancel", this.boundPointerCancel);
+    window.removeEventListener("blur", this.boundBlur);
     window.removeEventListener("keydown", this.boundKeyDown);
     window.removeEventListener("keyup", this.boundKeyUp);
     this.el.removeEventListener("contextmenu", this.boundContext);
+    this.el.removeEventListener("touchmove", this.boundTouchMove);
+    window.removeEventListener("touchmove", this.boundWindowTouchMove);
   }
 
   private markFirst(): void {
@@ -105,29 +177,45 @@ export class Input {
     // non-interactive made the input layer pointer-capture the event and
     // swallow the tap.
     if (!(target instanceof Element)) return false;
-    if (target.matches("input, textarea, select, a")) return true;
-    const btn = target.closest<HTMLElement>("button, [data-action]");
-    if (btn) {
-      const act = btn.dataset.action;
-      if (act === "start" || act === "retry") return false;
-      return true;
-    }
-    return false;
+    if (target.closest("input, textarea, select, a, summary, label, [contenteditable=true]")) return true;
+    // Every DOM action, including Start/Retry, owns its pointer sequence.
+    // Capturing Retry's pointer used to retarget its click away from the button.
+    return Boolean(target.closest("button, [data-action]"));
   }
 
   private isTyping(target: EventTarget | null): boolean {
-    return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+    return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || (target instanceof Element && !!target.closest("[contenteditable=true]"));
   }
 
   private onPointerDown(e: PointerEvent): void {
     if (!this.enabled) return;
     if (this.isInteractive(e.target)) return;
+    if (this.touches.has(e.pointerId)) return;
     if (!this.isTyping(e.target)) e.preventDefault();
     this.markFirst();
+
+    const now = performance.now();
+    const timeSinceLastUp = now - this.lastTapUpAt;
+    const dist = Math.hypot(e.clientX - this.lastTapX, e.clientY - this.lastTapY);
+
+    // Intentional double-tap boost:
+    // 1. Previous tap was a short tap (< 220ms duration)
+    // 2. Second tap follows quickly (< 280ms gap from release)
+    // 3. Second tap lands near first tap (< 80px radius)
+    if (timeSinceLastUp > 0 && timeSinceLastUp <= 280 && this.lastTapDuration > 0 && this.lastTapDuration <= 220 && dist <= 80) {
+      this.boostPressed = true;
+    }
+    this.lastTapDownAt = now;
+    this.lastTapX = e.clientX;
+    this.lastTapY = e.clientY;
+
     const who = this.whichPlayer(e);
     this.touches.set(e.pointerId, who);
     if (who === 2) this.p2Touch = true;
     else this.held = true;
+
+    this.spawnTouchRipple(e.clientX, e.clientY, who);
+
     try {
       this.el.setPointerCapture(e.pointerId);
     } catch {
@@ -143,6 +231,20 @@ export class Input {
   }
 
   private onPointerUp(e: PointerEvent): void {
+    const now = performance.now();
+    const duration = now - this.lastTapDownAt;
+    const dy = e.clientY - this.lastTapY;
+    const dx = e.clientX - this.lastTapX;
+
+    // Upward flick / swipe-up gesture for mobile rocket boost:
+    // dy <= -35px, duration < 320ms, vertical bias (|dy| > |dx| * 0.7)
+    if (dy <= -35 && duration < 320 && Math.abs(dy) > Math.abs(dx) * 0.7) {
+      this.boostPressed = true;
+    }
+
+    this.lastTapDuration = duration;
+    this.lastTapUpAt = now;
+
     const who = this.touches.get(e.pointerId);
     this.touches.delete(e.pointerId);
     if (who === 2) {
@@ -153,37 +255,68 @@ export class Input {
     if (this.splitMode === "off") this.held = this.touches.size > 0;
   }
 
+  private spawnTouchRipple(x: number, y: number, player: 1 | 2 = 1): void {
+    if (typeof document === "undefined" || !x || !y) return;
+    try {
+      const ripple = document.createElement("span");
+      ripple.className = `touch-ripple p${player}`;
+      ripple.style.left = `${x}px`;
+      ripple.style.top = `${y}px`;
+      document.body.appendChild(ripple);
+      setTimeout(() => ripple.remove(), 400);
+    } catch {
+      /* ignore */
+    }
+  }
+
   private onPointerEnd(): void {
     this.touches.clear();
     this.held = false;
     this.p2Touch = false;
   }
 
+  private resetHeld(): void {
+    this.onPointerEnd();
+    this.keys.clear();
+    this.space = this.p2Key = this.padP1 = this.padP2 = false;
+  }
+
   private onKeyDown(e: KeyboardEvent): void {
     if (!this.enabled) return;
     if (e.repeat || this.isTyping(e.target)) return;
-    if (e.code === "Space") {
+    // Enter/Space must activate native menu controls, not hold a bird down.
+    if (e.code !== "Escape" && e.target instanceof Element && e.target.closest("button, a, summary, [role=button]")) return;
+    if (DIVE_CODE_SET.has(e.code)) {
+      // Arrows would otherwise scroll the host page in embedded frames.
       e.preventDefault();
       this.markFirst();
+      this.keys.add(e.code);
       this.space = true;
-    } else if (e.code === "Enter" || e.code === "NumpadEnter" || e.code === "ShiftRight") {
+    } else if (P2_CODE_SET.has(e.code)) {
       e.preventDefault();
       this.markFirst();
+      this.keys.add(e.code);
       this.p2Key = true;
     } else if (e.code === "KeyP" || e.code === "Escape") {
       this.pausePressed = true;
     } else if (e.code === "KeyR") {
       this.restartPressed = true;
+    } else if (e.code === "KeyM") {
+      // Prevent browser/OS mute or tab-mute shortcuts from stealing our M.
+      e.preventDefault();
+      this.mutePressed = true;
+    } else if (e.code === "KeyF") {
+      // F is an alt fullscreen; don't let the browser's "Find in page" pop up.
+      if (!e.ctrlKey && !e.metaKey && !e.altKey) e.preventDefault();
+      this.fullscreenPressed = true;
     }
   }
 
   private onKeyUp(e: KeyboardEvent): void {
-    if (this.isTyping(e.target)) return;
-    if (e.code === "Space") {
-      e.preventDefault();
-      this.space = false;
-    } else if (e.code === "Enter" || e.code === "NumpadEnter" || e.code === "ShiftRight") {
-      this.p2Key = false;
-    }
+    // Releasing one alias must not release the player's other held key.
+    if (this.keys.has(e.code)) e.preventDefault();
+    this.keys.delete(e.code);
+    this.space = DIVE_CODES.some(code => this.keys.has(code));
+    this.p2Key = P2_CODES.some(code => this.keys.has(code));
   }
 }

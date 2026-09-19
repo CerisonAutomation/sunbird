@@ -39,8 +39,11 @@ function install(name: "localStorage" | "sessionStorage"): void {
   proto.key = function (i: number) {
     return [...data(this).keys()][i] ?? null;
   };
-  Object.defineProperty(proto, "length", { get(this: object) { return data(this).size; }, configurable: true });
   const inst = Object.create(proto);
+  // `length` is a non-configurable getter on the native Storage prototype;
+  // redefine it on the instance instead of the prototype to avoid
+  // "Cannot redefine property: length" on newer Node.js builds.
+  Object.defineProperty(inst, "length", { get(this: object) { return data(this as object).size; }, configurable: true });
   g[name] = inst;
   try {
     (window as unknown as Record<string, unknown>)[name] = inst;

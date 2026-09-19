@@ -13,7 +13,8 @@
 //! - a single 15 Hz packed state broadcast per room,
 //! - server-assigned finish places (clients never decide who won),
 //! - emotes and readied flags,
-//! - a startup-triggered `start` frame once two pilots are seated,
+//! - a startup-triggered `start` frame once two pilots are seated and every
+//!   seated pilot has explicitly readied up,
 //! - stale-seat reaping and empty-room teardown as safety nets.
 //!
 //! Unlike protocol v1 (`ws.rs` / `rooms.rs`), this path is intentionally
@@ -21,12 +22,14 @@
 //! production client needs no migration step. A future phase can collapse the
 //! two registries once the browser has moved onto v1.
 
+use crate::validate::{record_rejection, MotionBaseline, MotionPolicy, MotionSample};
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         Query, State,
     },
-    response::Response,
+    http::HeaderMap,
+    response::{IntoResponse, Response},
 };
 use futures_util::{sink::SinkExt, stream::SplitSink, stream::StreamExt};
 use parking_lot::RwLock;
@@ -36,6 +39,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+use sunbird_protocol::MAX_JSON_PAYLOAD_BYTES;
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
@@ -49,6 +53,10 @@ const EMPTY_ROOM_TTL: Duration = Duration::from_secs(60);
 const STALE_AFTER: Duration = Duration::from_secs(60);
 /// Per-socket outbound queue depth.
 const OUT_QUEUE: usize = 256;
+/// Maximum inbound state updates per pilot per second. The client sends at 15 Hz;
+/// 30 Hz allows a doubled-rate client without giving spammers headroom to flood
+/// the room with thousands of frames per second.
+const MAX_STATE_HZ: u64 = 30;
 
 const MAX_NAME: usize = 14;
 const MAX_SKIN: usize = 24;
@@ -70,6 +78,8 @@ enum In {
     Ready { ready: bool },
     #[serde(rename = "finish")]
     Finish { time: f64, d: f64 },
+    #[serde(rename = "leave")]
+    Leave,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -131,6 +141,10 @@ struct Pilot {
     finished: bool,
     ready: bool,
     last_seen: Instant,
+    /// Last inbound state timestamp; enforces max 30 Hz per seat so a
+    /// runaway client can't flood the room with thousands of frames/sec.
+    last_state_recv: Instant,
+    motion_baseline: Option<MotionBaseline>,
     tx: mpsc::Sender<Outbox>,
 }
 
@@ -167,6 +181,7 @@ struct Registry {
 /// crosses an await point.
 pub struct LegacyRooms {
     inner: RwLock<Registry>,
+    motion_policy: MotionPolicy,
 }
 
 impl LegacyRooms {
@@ -175,12 +190,14 @@ impl LegacyRooms {
             inner: RwLock::new(Registry {
                 rooms: HashMap::new(),
             }),
+            motion_policy: MotionPolicy::default(),
         }
     }
 
     /// Seat a pilot (creating or joining a room). Sends `welcome` to the
     /// newcomer, `peers` to everyone, and — once two pilots are present —
-    /// broadcasts `start`. Returns the joined room code.
+    /// broadcasts the current roster. A race starts only after every seated
+    /// pilot explicitly readies up. Returns the joined room code.
     fn join(&self, identity: &Identity, tx: mpsc::Sender<Outbox>) -> Result<String, ()> {
         let mut reg = self.inner.write();
         let code = find_room(&mut reg, &identity.code, &identity.seed);
@@ -205,6 +222,8 @@ impl LegacyRooms {
             finished: false,
             ready: false,
             last_seen: Instant::now(),
+            last_state_recv: Instant::now(),
+            motion_baseline: None,
             tx,
         };
         room.pilots.insert(identity.id.clone(), pilot);
@@ -221,17 +240,6 @@ impl LegacyRooms {
             },
         );
         broadcast_peers(room);
-
-        if room.pilots.len() >= 2 && room.started_at == 0 {
-            room.started_at = epoch_ms() + 6000;
-            broadcast(
-                room,
-                &Out::Start {
-                    at: room.started_at,
-                    seed: room.seed.clone(),
-                },
-            );
-        }
 
         Ok(room.code.clone())
     }
@@ -258,20 +266,49 @@ impl LegacyRooms {
 
     /// Dispatch an inbound legacy frame against a seated pilot.
     fn on_message(&self, code: &str, id: &str, msg: In) {
+        // An explicit `leave` is not a drop: free the seat now so peers see the
+        // room shrink, exactly like the TypeScript gateway. Handled before the
+        // registry lock is taken because `leave` acquires it itself.
+        if let In::Leave = &msg {
+            self.leave(code, id);
+            return;
+        }
         let mut reg = self.inner.write();
         let Some(room) = reg.rooms.get_mut(code) else {
             return;
         };
+        let pilot = room.pilots.get_mut(id);
         match msg {
             In::State { x, y, r, d } => {
-                if let Some(p) = room.pilots.get_mut(id) {
-                    p.x = x;
-                    p.y = y;
-                    p.rot = r;
-                    p.distance = d;
-                    p.has_state = true;
-                    p.last_seen = Instant::now();
+                let Some(p) = pilot else { return };
+                // Per-seat rate limit: clamp to MAX_STATE_HZ so a single bad
+                // client can't starve 39 others of broadcast bandwidth. The
+                // first state from a seat is always allowed (has_state is
+                // false on join) so a freshly-seated pilot isn't penalized.
+                let now = Instant::now();
+                if p.has_state {
+                    let min_interval = Duration::from_micros(1_000_000 / MAX_STATE_HZ);
+                    if now.duration_since(p.last_state_recv) < min_interval {
+                        return;
+                    }
                 }
+                let sample = MotionSample::new(x, y, r, d);
+                if let Err(reason) =
+                    self.motion_policy
+                        .admit(p.motion_baseline.as_ref(), &sample, now)
+                {
+                    record_rejection(reason);
+                    return;
+                }
+                let sample = self.motion_policy.canonicalise(sample);
+                p.last_state_recv = now;
+                p.x = sample.x;
+                p.y = sample.y;
+                p.rot = sample.rot;
+                p.distance = sample.distance;
+                p.motion_baseline = Some(MotionBaseline { sample, at: now });
+                p.has_state = true;
+                p.last_seen = now;
             }
             In::Emote { emote } => {
                 if room.pilots.contains_key(id) {
@@ -292,8 +329,11 @@ impl LegacyRooms {
                     p.last_seen = Instant::now();
                 }
                 broadcast_peers(room);
+                maybe_start(room);
             }
             In::Finish { time, d } => finish(room, id, time, d),
+            // Handled at the top of this function, before the registry lock.
+            In::Leave => {}
         }
     }
 
@@ -301,7 +341,6 @@ impl LegacyRooms {
     /// Driven once per interval by [`spawn_tick`].
     fn tick(&self) {
         let now = Instant::now();
-        let now_secs = epoch_seconds();
         let mut reg = self.inner.write();
         let mut dead: Vec<String> = Vec::new();
 
@@ -340,7 +379,7 @@ impl LegacyRooms {
                 broadcast(
                     room,
                     &Out::State {
-                        t: now_secs,
+                        t: epoch_seconds_ms(),
                         pilots,
                     },
                 );
@@ -351,6 +390,24 @@ impl LegacyRooms {
             reg.rooms.remove(&code);
         }
     }
+}
+
+/// Match the party-lobby contract used by the client: two or more seated
+/// pilots are eligible, but nobody is pulled into a race before the whole
+/// current flock confirms readiness. The six-second countdown gives late
+/// roster frames time to arrive on slower portal connections.
+fn maybe_start(room: &mut Room) {
+    if room.pilots.len() < 2 || room.started_at != 0 || !room.pilots.values().all(|p| p.ready) {
+        return;
+    }
+    room.started_at = epoch_ms() + 6000;
+    broadcast(
+        room,
+        &Out::Start {
+            at: room.started_at,
+            seed: room.seed.clone(),
+        },
+    );
 }
 
 /* ----------------------------- room helpers ----------------------------- */
@@ -492,13 +549,33 @@ struct Identity {
     seed: String,
 }
 
+/// WebSocket upgrade state for the legacy socket: room registry + allowed origins.
+#[derive(Clone)]
+pub struct LegacySocketState {
+    pub rooms: Arc<LegacyRooms>,
+    pub allowed_origins: Vec<String>,
+}
+
 pub async fn legacy_ws_handler(
     ws: WebSocketUpgrade,
     Query(params): Query<LegacyQuery>,
-    State(rooms): State<Arc<LegacyRooms>>,
+    State(state): State<LegacySocketState>,
+    headers: HeaderMap,
 ) -> Response {
+    let allowed = state.allowed_origins.iter().any(|o| o == "*");
+    if !allowed {
+        let origin = headers
+            .get("origin")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+        if !state.allowed_origins.iter().any(|o| o == origin) {
+            return (axum::http::StatusCode::FORBIDDEN, "origin not allowed").into_response();
+        }
+    }
     let identity = identity_from(params);
-    ws.on_upgrade(move |socket| serve_legacy(socket, rooms, identity))
+    ws.max_message_size(MAX_JSON_PAYLOAD_BYTES)
+        .max_frame_size(MAX_JSON_PAYLOAD_BYTES)
+        .on_upgrade(move |socket| serve_legacy(socket, state.rooms.clone(), identity))
 }
 
 /// Periodic 15 Hz broadcaster + reaper. Run once from `main()` at startup.
@@ -616,6 +693,185 @@ fn epoch_ms() -> u64 {
     (time::OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000_000) as u64
 }
 
-fn epoch_seconds() -> f64 {
-    time::OffsetDateTime::now_utc().unix_timestamp_nanos() as f64 / 1_000_000_000.0
+/// Monotonic-ish wall clock in f64 seconds with sub-second resolution.
+/// The client interpolates remote pilots 120 ms behind the server's clock; if
+/// the tick timestamp has only 1-second granularity, all 15 frames in that
+/// second share the same t and the interpolation buffer can never bracket
+/// `renderAt = serverClock - 0.12`, so rivals freeze and teleport instead of
+/// sliding smoothly. Returning millisecond precision (as fractional seconds)
+/// restores the 15 Hz lerp every remote client depends on.
+fn epoch_seconds_ms() -> f64 {
+    epoch_ms() as f64 / 1000.0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn epoch_seconds_ms_has_subsecond_resolution() {
+        let a = epoch_seconds_ms();
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        let b = epoch_seconds_ms();
+        assert!(
+            b > a,
+            "epoch_seconds_ms should advance with sub-second precision"
+        );
+    }
+
+    #[test]
+    fn explicit_leave_frees_the_seat_and_tells_the_room() {
+        let rooms = LegacyRooms::new();
+        let (tx_a, _rx_a) = mpsc::channel(16);
+        let (tx_b, mut rx_b) = mpsc::channel(16);
+        let a = Identity {
+            id: "p1".into(),
+            name: "A".into(),
+            skin: "s".into(),
+            hue: 0.0,
+            code: "ROOM".into(),
+            seed: "2026-09-11".into(),
+        };
+        let b = Identity {
+            id: "p2".into(),
+            name: "B".into(),
+            skin: "s".into(),
+            hue: 0.0,
+            code: "ROOM".into(),
+            seed: "2026-09-11".into(),
+        };
+        let code = rooms.join(&a, tx_a).unwrap();
+        rooms.join(&b, tx_b).unwrap();
+
+        rooms.on_message(&code, &a.id, In::Leave);
+
+        // The remaining pilot is told about it without waiting for a socket close.
+        let mut frames: Vec<String> = Vec::new();
+        while let Ok(Outbox::Frame(text)) = rx_b.try_recv() {
+            frames.push(text);
+        }
+        let mut told = false;
+        for text in &frames {
+            if text.contains("left") && text.contains("p1") {
+                told = true;
+            }
+        }
+        assert!(told, "peers are told about the leave, got {frames:?}");
+
+        let reg = rooms.inner.read();
+        let room = reg.rooms.get(&code).expect("room outlives its seats");
+        assert!(!room.pilots.contains_key("p1"), "the leaver's seat is free");
+        assert!(
+            room.pilots.contains_key("p2"),
+            "the other pilot keeps their seat"
+        );
+    }
+
+    #[test]
+    fn state_with_nan_is_dropped() {
+        let rooms = LegacyRooms::new();
+        let (tx, _rx) = mpsc::channel(8);
+        let identity = Identity {
+            id: "p1".into(),
+            name: "A".into(),
+            skin: "s".into(),
+            hue: 0.0,
+            code: "ROOM".into(),
+            seed: "2026-09-11".into(),
+        };
+        let code = rooms.join(&identity, tx).unwrap();
+
+        // Valid state accepted
+        rooms.on_message(
+            &code,
+            &identity.id,
+            In::State {
+                x: 1.0,
+                y: 2.0,
+                r: 0.5,
+                d: 100.0,
+            },
+        );
+        // NaN coordinates dropped silently
+        rooms.on_message(
+            &code,
+            &identity.id,
+            In::State {
+                x: f64::NAN,
+                y: 2.0,
+                r: 0.5,
+                d: 100.0,
+            },
+        );
+        rooms.on_message(
+            &code,
+            &identity.id,
+            In::State {
+                x: 1.0,
+                y: f64::INFINITY,
+                r: 0.5,
+                d: 100.0,
+            },
+        );
+
+        let reg = rooms.inner.read();
+        let room = reg.rooms.get(&code).unwrap();
+        let p = room.pilots.get(&identity.id).unwrap();
+        assert!(p.has_state, "pilot should still have valid state");
+        assert_eq!(p.x, 1.0, "NaN should not corrupt position");
+        assert_eq!(p.y, 2.0, "Infinity should not corrupt position");
+    }
+
+    #[test]
+    fn state_rate_limited_per_seat() {
+        let rooms = LegacyRooms::new();
+        let (tx, _rx) = mpsc::channel(8);
+        let identity = Identity {
+            id: "p1".into(),
+            name: "A".into(),
+            skin: "s".into(),
+            hue: 0.0,
+            code: "ROOM".into(),
+            seed: "2026-09-11".into(),
+        };
+        let code = rooms.join(&identity, tx).unwrap();
+
+        // Back-to-back state messages should only be accepted once (rate limited)
+        rooms.on_message(
+            &code,
+            &identity.id,
+            In::State {
+                x: 1.0,
+                y: 2.0,
+                r: 0.5,
+                d: 100.0,
+            },
+        );
+        let first_dist = {
+            let reg = rooms.inner.read();
+            let room = reg.rooms.get(&code).unwrap();
+            room.pilots.get(&identity.id).unwrap().distance
+        };
+        // Second message within the same interval is dropped
+        rooms.on_message(
+            &code,
+            &identity.id,
+            In::State {
+                x: 100.0,
+                y: 200.0,
+                r: 0.5,
+                d: 9999.0,
+            },
+        );
+        let second_dist = {
+            let reg = rooms.inner.read();
+            let room = reg.rooms.get(&code).unwrap();
+            room.pilots.get(&identity.id).unwrap().distance
+        };
+        assert_eq!(first_dist, 100.0, "first state should be accepted");
+        assert_eq!(
+            second_dist, 100.0,
+            "second state within rate window should be dropped"
+        );
+    }
 }

@@ -31,6 +31,10 @@ const CAPACITY = 40;
 const TICK_HZ = 15;
 const EMPTY_ROOM_TTL_MS = 60_000;
 const MAX_NAME = 14;
+// Keep the reference server's movement guard aligned with the client physics
+// ceiling. A state frame may cover a few network ticks, but never a whole map.
+const MAX_STATE_MAGNITUDE = 1_000_000;
+const MAX_STATE_STEP = 234 * 4;
 
 /* ----------------------------------------------------------------- state */
 
@@ -75,9 +79,13 @@ class Room {
       capacity: CAPACITY,
     });
     this.broadcastPeers();
-    // A room becomes "racing" as soon as two pilots are present; solo players
-    // still fly (against local squadron pilots) with zero waiting.
-    if (this.pilots.size >= 2 && !this.startedAt) {
+    this.maybeStart();
+  }
+
+  // Match the Rust legacy room's all-ready barrier. Checking only on join
+  // can never start a room: every newly joined pilot is unready.
+  maybeStart() {
+    if (this.pilots.size >= 2 && [...this.pilots.values()].every((p) => p.ready) && !this.startedAt) {
       this.startedAt = Date.now() + 6000;
       this.broadcast({ type: "start", at: this.startedAt, seed: this.seed });
     }
@@ -160,6 +168,9 @@ class Pilot {
     this.rot = 0;
     this.distance = 0;
     this.hasState = false;
+    this.lastStateX = 0;
+    this.lastStateY = 0;
+    this.lastStateDistance = 0;
     this.finished = false;
     this.finishTime = 0;
     this.ready = false;
@@ -190,10 +201,23 @@ function findRoom(code, seed) {
     }
     return room;
   }
-  // Public matchmaking: first room with space on the same seed.
+  // Public matchmaking: the fullest open room on the same seed.
+  //
+  // Deliberately NOT filtered on `startedAt`. A pilot whose socket blips
+  // reconnects on the same seed, and matchmaking has to put them back in the
+  // room they were racing in — that is what the Rust `sunbird-server` does
+  // (`find_room` in legacy.rs) and what the botsim resume gate measures.
+  // Filtering started rooms out used to scatter a single flock across two
+  // rooms: the reconnecting pilot landed in a fresh lobby, a second race
+  // started, and that race handed out its own places while the first one was
+  // still running. Finish places then looked duplicated to every peer.
+  const wanted = seed || todayStr();
+  let best = null;
   for (const room of rooms.values()) {
-    if (room.public && !room.full && room.seed === (seed || todayStr())) return room;
+    if (!room.public || room.full || room.seed !== wanted) continue;
+    if (!best || room.pilots.size > best.pilots.size) best = room;
   }
+  if (best) return best;
   const created = new Room(newCode(), seed, true);
   rooms.set(created.code, created);
   return created;
@@ -303,10 +327,31 @@ wss.on("connection", (ws, req) => {
     }
     switch (msg.type) {
       case "state":
-        pilot.x = num(msg.x);
-        pilot.y = num(msg.y);
-        pilot.rot = num(msg.r);
-        pilot.distance = num(msg.d);
+        // Validate before mutating or broadcasting. This prevents absurd
+        // values and single-frame teleports from poisoning every peer's
+        // interpolation buffer (the production Rust server applies the same
+        // policy; this reference server should remain safe for local testing).
+        const nextX = Number(msg.x);
+        const nextY = Number(msg.y);
+        const nextRot = Number(msg.r);
+        const nextDistance = Number(msg.d);
+        const finite = [nextX, nextY, nextRot, nextDistance].every(Number.isFinite);
+        const bounded = [nextX, nextY, nextRot, nextDistance].every(
+          (value) => Math.abs(value) <= MAX_STATE_MAGNITUDE,
+        );
+        const stepped =
+          !pilot.hasState ||
+          (Math.abs(nextX - pilot.lastStateX) <= MAX_STATE_STEP &&
+            Math.abs(nextY - pilot.lastStateY) <= MAX_STATE_STEP &&
+            nextDistance >= pilot.lastStateDistance - MAX_STATE_STEP);
+        if (!finite || !bounded || !stepped) break;
+        pilot.x = nextX;
+        pilot.y = nextY;
+        pilot.rot = nextRot;
+        pilot.distance = nextDistance;
+        pilot.lastStateX = nextX;
+        pilot.lastStateY = nextY;
+        pilot.lastStateDistance = nextDistance;
         pilot.hasState = true;
         break;
       case "emote":
@@ -315,6 +360,7 @@ wss.on("connection", (ws, req) => {
       case "ready":
         pilot.ready = Boolean(msg.ready);
         room.broadcastPeers();
+        room.maybeStart();
         break;
       case "finish":
         room.finish(pilot, num(msg.time), num(msg.d));

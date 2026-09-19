@@ -19,7 +19,13 @@ let consumed: string | null = null;
 
 /** Normalizes user/pasted input to a room code, or "" when invalid. */
 export function normalizeRoomCode(raw: string): string {
-  const code = (raw ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
+  let input = (raw ?? "").trim();
+  // Pasted invite URLs must not become the bogus code "HTTPS".
+  if (input.includes("#") && (/^https?:/i.test(input) || input.startsWith("#"))) {
+    try { input = new URLSearchParams(input.slice(input.indexOf("#") + 1)).get(KEY) ?? ""; }
+    catch { return ""; }
+  } else if (/^https?:/i.test(input)) return "";
+  const code = input.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
   return CODE_RE.test(code) ? code : "";
 }
 

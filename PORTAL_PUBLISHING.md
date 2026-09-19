@@ -5,17 +5,18 @@ Sunbird ships four explicit build targets through `VITE_PORTAL_TARGET`:
 | Target | Monetization path | Direct Stripe / VIP UI | Notes |
 | --- | --- | --- | --- |
 | `none` | Standalone/PWA model | Enabled | Default local and self-hosted build. |
-| `poki` | Poki SDK commercial + rewarded breaks | Disabled | No banner integration. |
-| `crazy` | CrazyGames SDK midgame + rewarded breaks | Disabled | Optional dashboard banner slot. |
+| `poki` | Poki SDK commercial + rewarded breaks | Coin-only VIP progression; no IAP | No banner integration; Poki rules prohibit IAP. |
+| `crazy` | CrazyGames SDK midgame + rewarded breaks | Coin-only VIP progression; no IAP | Optional dashboard banner slot; live multiplayer requires Full Launch approval. |
 | `generic` | None (clean build) | Disabled | For every other HTML5 portal — see matrix below. |
 
 ## Build commands
 
 ```bash
-npm run build:poki      # → sunbird-poki.zip
-npm run build:crazy     # → sunbird-crazy.zip
-npm run build:generic   # → sunbird-generic.zip
-npm run build:portals   # all three
+pnpm build:poki      # → sunbird-poki.zip
+pnpm build:crazy     # → sunbird-crazy.zip
+pnpm build:generic   # → sunbird-generic.zip
+pnpm build:portals   # all three
+pnpm verify:portals  # compliance gate over the three zips (0 = shippable)
 ```
 
 Each zip is fully self-contained (single inlined `index.html` + `icons/` + `fonts/`),
@@ -26,13 +27,15 @@ of any CDN — verified by serving the zip from a deep subpath and playing it.
 
 | Requirement | Enforced by | How Sunbird complies |
 | --- | --- | --- |
-| No external payment providers | Poki, CrazyGames, GD, Yandex | Stripe is imported via `@stripe/stripe-js/pure` (no script injection at import) **and** `ensureStripeJs()` refuses to run in any portal build. Paywall/checkout actions are double-gated. Verified: zero requests to `js.stripe.com` from portal zips. |
+| No external payment providers | Poki, CrazyGames, GD, Yandex | Stripe is imported via `@stripe/stripe-js/pure` (no script injection at import) **and** `ensureStripeJs()` refuses to run in any portal build. Web checkout is absent; portal VIP is earned with coins/rewarded ads. Verified: zero requests to `js.stripe.com` from portal zips. |
 | No external links out of the iframe | All portals | The only `window.open` is the Stripe tab — hard-gated behind `!isPortalBuild()`. No `<a href>` to external sites anywhere in the UI. |
 | Relative asset paths (served from CDN subpaths) | All portals | `base: "./"` in vite config; no absolute `/asset` references (grep-verified in built html). |
 | Silent when tab is hidden | CrazyGames QA, Poki QA | `visibilitychange` pauses gameplay **and** hard-mutes the master audio bus (`setHiddenMuted`). |
 | Silent + input-locked during ads | Poki, CrazyGames | `onAdOpened` → input disabled + master mute; `onAdClosed` restores. |
 | Audio only after user gesture | Chrome autoplay policy, all portals | `AudioContext` resumes exclusively inside input callbacks. |
 | `gameplayStart`/`gameplayStop` fired correctly | Poki, CrazyGames | Emitted on every transition in/out of the `playing` state. |
+| Portal mute honored over in-game toggle | CrazyGames (Full) | `game.settings.muteAudio` applied at boot + live via `addSettingsChangeListener` → master-bus `setPortalMuted` (takes priority, never touches saved prefs). |
+| Celebration signal on special moments | CrazyGames (Full) | `game.happytime()` fired sparingly — only on a new personal-best run. No-op on other targets. |
 | Loading-finished signal | Poki (`gameLoadingFinished`), CrazyGames (`loadingStop`) | Fired once boot completes; SDK load capped at 6 s so a blocked SDK never hangs the game. |
 | Works in a sandboxed/cross-origin iframe | All portals | Every `localStorage` access is try-wrapped with in-memory fallback; no service worker in portal builds; no `window.top` access beyond a try-wrapped embed check. |
 | No install prompts / PWA UX | All portals | `beforeinstallprompt` capture is suppressed in portal builds; manifest link stripped from portal zips. |
@@ -74,3 +77,20 @@ require their own SDK wrapper can inject it around the zip, and the game's
 - Confirm zero external requests in portal builds beyond the portal's own SDK.
 - Confirm the game is silent when the tab is hidden and while ads play.
 - Confirm keyboard-only, mouse-only, and touch-only playthroughs all work.
+
+## Per-portal submission notes (verified 2026-09-14)
+
+All three zips: ~627 KB zipped / ~1.3 MB single-file html + local icons/fonts —
+far under Poki's 8 MB initial-load target and CrazyGames' 20 MB mobile /
+50 MB initial bars. `pnpm verify:portals` re-checks every line below.
+
+| Portal | File | SDK signals | Submit where |
+| --- | --- | --- | --- |
+| Poki | `sunbird-poki.zip` | `gameLoadingFinished` on boot; `gameplayStart` on first input / every return; `gameplayStop` on pause, death, menu; `commercialBreak` at death→restart seam; `rewardedBreak` for Second Wind (reward only on positive result) | Poki for Developers → upload → test in Poki Inspector event log |
+| CrazyGames | `sunbird-crazy.zip` | `loadingStart` on SDK init → `loadingStop` on boot; `gameplayStart/Stop` bracket play; midgame ad at restart seam, rewarded for Second Wind; mute + input lock during ads | Developer portal → Submit a game → Preview tool (Basic → Full Launch) |
+| GameDistribution, Yandex, itch.io, Newgrounds, GameMonetize, Lagged, Coolmath, Kongregate, Armor, GamePix, Famobi, SoftGames | `sunbird-generic.zip` | No SDK, no remote loads at all; host wraps the zip with its own player/SDK | Each portal's upload flow; for Yandex-SDK-gated review add a `yandex` adapter in `src/sdk/platform.ts` (~40 lines, CrazyGames pattern) |
+
+Manual QA per submission (can't be scripted): play 2+ minutes on desktop
+Chrome/Edge AND one mobile browser; kill a run to hit the restart seam;
+take the Second Wind ad; background the tab mid-flight; confirm silence +
+pause in each case; confirm no portal-console errors.

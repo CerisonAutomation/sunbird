@@ -1,3 +1,4 @@
+import { glideLiftScale } from "./FlightPhysics";
 import * as THREE from "three";
 import {
   AIR_DRAG_DIVE,
@@ -54,6 +55,7 @@ export type BirdSkinColors = {
 };
 
 export class Bird {
+  private readonly terrainNormal = { nx: 0, ny: 1, tx: 1, ty: 0 };
   x = 50;
   y = 30;
   vx = 10;
@@ -107,15 +109,21 @@ export class Bird {
   private wingTuck = 0;
   private blink = 0;
   private glowPulse = 0;
+  private currentSkin: BirdSkinColors = {
+    body: 0xff7a45,
+    wing: 0xff9a62,
+    belly: 0xffe6c4,
+    beak: 0xffc447,
+  };
 
   constructor() {
-    this.bodyMat = new THREE.MeshLambertMaterial({ color: 0xff7a45 });
+    this.bodyMat = new THREE.MeshLambertMaterial({ color: 0xff7a45, emissive: 0xff7a45, emissiveIntensity: 0.08 });
     this.wingMat = new THREE.MeshLambertMaterial({ color: 0xff9a62 });
     this.bellyMat = new THREE.MeshLambertMaterial({ color: 0xffe6c4 });
     this.beakMat = new THREE.MeshLambertMaterial({ color: 0xffc447 });
-    const eyeW = new THREE.MeshLambertMaterial({ color: 0xfffaf2 });
-    const eyeP = new THREE.MeshLambertMaterial({ color: 0x2a1c28 });
-    this.lidMat = new THREE.MeshLambertMaterial({ color: 0xff7a45 });
+    const eyeW = new THREE.MeshBasicMaterial({ color: 0xfffaf2 });
+    const eyeP = new THREE.MeshBasicMaterial({ color: 0x2a1c28 });
+    this.lidMat = new THREE.MeshLambertMaterial({ color: 0xff7a45, emissive: 0xff7a45, emissiveIntensity: 0.08 });
 
     this.squash.add(this.makeBody());
 
@@ -174,7 +182,7 @@ export class Bird {
     this.root.add(this.glow);
     this.root.scale.setScalar(1.18);
 
-    const shadowGeo = new THREE.CircleGeometry(1.1, 16);
+    const shadowGeo = Bird.makeShadowGeometry();
     const shadowMat = new THREE.MeshBasicMaterial({
       color: 0x1a1020,
       transparent: true,
@@ -192,6 +200,36 @@ export class Bird {
     });
 
     this.root.add(this.squash);
+    // The bird is the primary gameplay affordance. Render it above foreground
+    // props so narrow screens never lose the player silhouette to terrain
+    // depth sorting or translucent haze.
+    this.root.renderOrder = 50;
+    this.squash.traverse((o) => {
+      if (o instanceof THREE.Mesh) o.renderOrder = 50;
+    });
+    this.shadow.renderOrder = 10;
+  }
+
+  /**
+   * Top-down gull silhouette (x = flight direction, y = wingspan) drawn as a
+   * flat shape: swept wings, fanned tail with a notch. Replaces the old blob
+   * disc so the ground shadow reads as the actual bird. Kept the same overall
+   * extent (~2.6 wingspan) so the altitude fade logic below is untouched.
+   */
+  private static makeShadowGeometry(): THREE.BufferGeometry {
+    const s = new THREE.Shape();
+    s.moveTo(1.0, 0); // beak
+    s.quadraticCurveTo(0.55, 0.55, 0.05, 1.3); // right leading edge → wingtip
+    s.lineTo(-0.28, 1.26); // wingtip trailing corner
+    s.quadraticCurveTo(-0.45, 0.6, -0.6, 0.18); // right trailing edge
+    s.lineTo(-0.95, 0.12); // tail fan, right
+    s.lineTo(-0.8, 0); // tail notch
+    s.lineTo(-0.95, -0.12); // tail fan, left
+    s.lineTo(-0.6, -0.18);
+    s.quadraticCurveTo(-0.45, -0.6, -0.28, -1.26);
+    s.lineTo(0.05, -1.3);
+    s.quadraticCurveTo(0.55, -0.55, 1.0, 0);
+    return new THREE.ShapeGeometry(s);
   }
 
   addTo(scene: THREE.Scene): void {
@@ -206,6 +244,11 @@ export class Bird {
     this.vy = 0;
     this.grounded = false;
     this.impact = 0;
+    this.altitude = 0;
+    this.airTime = 0;
+    this.apexY = y;
+    this.launchSpeed = 0;
+    this.launchSlope = 0;
     this.asleep = false;
     this.inWater = false;
     this.justLanded = false;
@@ -228,10 +271,13 @@ export class Bird {
   }
 
   applySkin(skin: BirdSkinColors): void {
+    this.currentSkin = skin;
     this.bodyMat.color.setHex(skin.body);
+    this.bodyMat.emissive.setHex(skin.body);
     this.wingMat.color.setHex(skin.wing);
     this.bellyMat.color.setHex(skin.belly);
     this.lidMat.color.setHex(skin.body);
+    this.lidMat.emissive.setHex(skin.body);
     this.beakMat.color.setHex(skin.beak);
   }
 
@@ -261,7 +307,7 @@ export class Bird {
 
     if (was) {
       /* ---------- carving the surface ---------- */
-      const n = terrain.normalAt(this.x);
+      const n = terrain.normalAt(this.x, this.terrainNormal);
       let vt = this.vx * n.tx + this.vy * n.ty;
 
       // gravity along the slope: downhill (ty<0) accelerates, uphill decelerates
@@ -271,7 +317,9 @@ export class Bird {
       const fr = diving ? GROUND_FRICTION_DIVE : GROUND_FRICTION;
       vt *= 1 - fr * dt;
 
-      if (vt < MIN_KEEP_SPEED) vt = lerp(vt, MIN_KEEP_SPEED, 1 - Math.pow(0.25, dt));
+      // Recovery floor, not a weak spring: the old blend could go negative
+      // on an uphill and trap a new player forever in the tutorial valley.
+      vt = Math.max(MIN_KEEP_SPEED, vt);
       if (vt > cap) vt = cap;
 
       this.vx = vt * n.tx;
@@ -282,7 +330,7 @@ export class Bird {
       // Follow the surface, then test whether it curves away from under us.
       const surf = terrain.heightAt(this.x) + BIRD_RADIUS;
       this.y = surf;
-      const n2 = terrain.normalAt(this.x);
+      const n2 = terrain.normalAt(this.x, this.terrainNormal);
       const curv = terrain.curvatureAt(this.x); // >0 convex (crest), <0 concave (valley)
       let launched = false;
       if (curv > 0) {
@@ -309,7 +357,7 @@ export class Bird {
       const sp = Math.max(0.001, this.speed());
       const lift = diving
         ? 0
-        : Math.min(0.85, GLIDE_LIFT_MAX * clamp(sp / GLIDE_LIFT_SPEED, 0, 1) * (opts.liftMult ?? 1));
+        : Math.min(0.85, GLIDE_LIFT_MAX * clamp(sp / GLIDE_LIFT_SPEED, 0, 1) * (opts.liftMult ?? 1)) * glideLiftScale(this.airTime);
       this.vy -= (diving ? GRAVITY_DIVE : GRAVITY_GLIDE) * gMult * (1 - lift) * dt;
 
       const k = (diving ? AIR_DRAG_DIVE : AIR_DRAG_GLIDE) * (opts.dragMult ?? 1);
@@ -331,7 +379,7 @@ export class Bird {
       /* ---------- touchdown ---------- */
       const surf = terrain.heightAt(this.x) + BIRD_RADIUS;
       if (this.y <= surf) {
-        const n = terrain.normalAt(this.x);
+        const n = terrain.normalAt(this.x, this.terrainNormal);
         const vn = this.vx * n.nx + this.vy * n.ny;
         let vt = this.vx * n.tx + this.vy * n.ty;
         const sp3 = Math.max(0.001, this.speed());
@@ -468,15 +516,26 @@ export class Bird {
     this.glowPulse += dt * 6;
     this.glow.intensity = fever ? 2.6 + Math.sin(this.glowPulse) * 0.9 : 0.55;
     this.glow.color.setHex(fever ? 0xffe08a : 0xfff4dc);
-    this.bodyMat.emissive.set(fever ? 0x552200 : 0x221108);
-    this.wingMat.emissive.set(fever ? 0x441800 : 0x000000);
-    this.bellyMat.emissive.set(fever ? 0x332200 : 0x000000);
+    if (fever) {
+      this.bodyMat.emissive.set(0x552200);
+      this.wingMat.emissive.set(0x441800);
+      this.bellyMat.emissive.set(0x332200);
+    } else {
+      this.bodyMat.emissive.setHex(this.currentSkin.body);
+      this.wingMat.emissive.set(0x000000);
+      this.bellyMat.emissive.set(0x000000);
+    }
 
     const h = terrain.heightAt(px);
     const alt = Math.max(0, py - h);
     this.shadow.position.set(px, h + 0.08, 0);
     const s = clamp(1.3 - alt * 0.045, 0.25, 1.3);
-    this.shadow.scale.setScalar(s);
+    // The silhouette breathes with the wings: span narrows at the top of each
+    // stroke and folds to a dart when tucked (dive/sleep). Local y maps to
+    // world wingspan after the flat rotation, so only y is modulated.
+    const span = s * (1 - 0.45 * this.wingTuck) * (1 - 0.14 * (flap / 0.55));
+    this.shadow.scale.set(s, span, 1);
+    this.shadow.rotation.z = Math.atan(terrain.slopeAt(px));
     (this.shadow.material as THREE.MeshBasicMaterial).opacity = 0.28 * s * (this.inWater ? 0.15 : 1);
   }
 

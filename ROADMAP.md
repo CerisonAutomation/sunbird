@@ -23,20 +23,75 @@ until proven otherwise. This file exists so the commit log can't overclaim.
 - Server-refereed race placements carry a visible "✓ refereed" stamp on the
   results card — honesty is the trust brand
 
-## 🟡 Written, tested, NOT deployed to a public host yet
+## 🟡 Written and tested, deployment verification still required
 - `rust/` — `sunbird-server` (rooms, 15 Hz state, server-refereed finishes).
-  **WIRED END-TO-END in dev**: `.env.example` + the vite `/mp` proxy connect
+  **WIRED END-TO-END in dev**: `.env.example` + the Vite `/mp` proxy connect
   the client to the Rust `/ws` socket; two real sockets joining the same room
-  and exchanging 15 Hz state is verified by test (`npm run test:mp`), and the
-  crate is CI-verified (fmt · clippy · tests · release build). Production
-  needs only a WebSocket-capable host + `VITE_MULTIPLAYER_URL=wss://…`.
-- `server/social/` — PGlite social layer (friends, squads, feed)
-- Without a configured URL the game still falls back to local squadron
-  pilots with human-sounding names — the lobby badge says which one you got.
+  and exchanging 15 Hz state is verified by test. The GCP VM rollout and a
+  browser-safe WSS hostname still require direct production verification.
+- `server/social/` — PGlite social layer (friends, squads, feed).
+  **Verified live**: `pnpm pvp:check` boots the real server on a scratch port
+  and runs the protocol smoke, the live two-client PvP suite and the
+  pilot-directory contract against it (`scripts/pvp-check.mjs`); CI runs it on
+  every push (`pvp-live` job).
+- Without a configured URL there is **no fabricated fallback**: the squadron
+  list, clubs and club chat start empty and the panel says the directory needs
+  the online service. Pilot Lookup still works offline from real data — the
+  pilots this device actually shared a room with (`src/game/pilots.ts`).
+
+## ✅ Shipped in this round
+- **Pilot Lookup** — a code lookup that resolves real pilots (name, presence,
+  club, best distance, rank) through `GET /social/players/:code`, a real
+  wingman request/accept flow (`/social/friends/requests|respond|cancel`), and
+  a locally remembered "flew with" list. Unknown codes and offline builds are
+  reported honestly; the invented wingmen, clubs and club chat
+  (`DEFAULT_LOCAL_FRIENDS`, `DEFAULT_LOCAL_CLUBS`, `INITIAL_CLUB_CHAT`) are
+  gone. See [docs/poki/REBUILD_REPORT.md](docs/poki/REBUILD_REPORT.md) §13.
+
+## 🟡 Written and tested in CI, not yet exercised in production
+- `protocol/contract.json` — the single machine-checked source of truth for the
+  wire protocol. Asserted by **both** implementations:
+  `src/game/__tests__/protocol-contract.test.ts` and
+  `rust/crates/sunbird-protocol/tests/contract.rs`. This exists because the
+  "Rust is the source of truth, TS mirrors it" comment had already gone false:
+  `ServerMessage::Snapshot` shipped in Rust with no TypeScript counterpart, so
+  the browser would have thrown on the first authoritative snapshot. The
+  mirror is now fixed *and* pinned.
+- `rust/crates/sunbird-server/src/validate.rs` — server-authoritative movement
+  envelope. Client `state` frames are now checked for finiteness, world bounds,
+  distance regression and a **time-aware** speed cap derived from the client's
+  own physics ceiling (234 u/s = 128 fever × 1.5 wingboost + 42 boost), then
+  canonicalised to wire precision. Rejections are dropped and counted as
+  `sunbird_legacy_state_rejected_total{reason=…}`; the seat is never dropped.
+- `rust/crates/sunbird-protocol/src/lib.rs` — `Limits` was the only type in the
+  protocol missing `rename_all = "camelCase"`, so `GET /v1/hello` emitted
+  `max_json_payload_bytes` and the browser client's parser threw. Fixed and
+  pinned by `hello_limits_are_camel_case_on_the_wire`. Found by the contract
+  suite, which is the only reason it was found.
+- `scripts/botsim.mjs` — 40 headless pilots on the real wire protocol, seeded
+  and reproducible. Gated in `.github/workflows/botsim.yml`: the Node reference
+  job reports cheat containment, the Rust job **gates** on it
+  (`--require-anticheat`). Measured locally against the reference server:
+  40/40 connected in 42 ms, roster 40/40, broadcast cadence p95 66.8 ms, 13
+  unique finish places, 4/4 mid-race resumes.
 
 ## 🔴 Aspirational (do not claim in commit messages)
-- Anti-cheat and server-side matchmaking are still aspirational; rooms today
-  are in-memory and trust the client's position stream.
+- Server-side matchmaking is still aspirational; rooms are in-memory.
+- Anti-cheat is **partial, not finished**. Movement plausibility is enforced
+  (above), but identity, rate limiting and score-submission trust are not.
+  Measured in CI for the record: the same 40 bots produce **16,082 relayed
+  cheats** against the unvalidated Node reference server and **0** against the
+  Rust one. Canonicalisation also cut per-client bandwidth 34.5%
+  (79.56 → 52.11 KB/s) at identical cadence.
+
+## Next (in order)
+1. Retire `scripts/mp-smoke.mjs` once this PR has been green a while — botsim
+   supersedes it (40 clients vs 2, and it is actually wired into CI)
+2. Add score rate limiting, idempotency, and deterministic replay validation
+   before ranked seasons accept public submissions.
+
+See `docs/archive/ARCHITECTURE_REVIEW-tmultiworlds-2026-09.md` for the full comparison against the proposed
+Bevy/Replicon rewrite, including what was rejected and why.
 
 ## ✅ Formerly "Next" — shipped in-repo (merged from both lines)
 1. ~~Deploy `sunbird-server`~~ / ~~deploy `backend/`~~ — both server stacks are

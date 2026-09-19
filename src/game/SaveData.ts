@@ -15,6 +15,7 @@ import { defaultRival, rankSeasonId, ratingDelta, RIVAL_BASE_RATING, seasonRewar
 import { seasonId } from "./season";
 import { emptyTournamentState, type TournamentState } from "./Tournaments";
 import { emptySocialState, type SocialState } from "./SocialSystem";
+import { storage } from "./Storage";
 
 export type HighScore = {
   date: string;
@@ -29,6 +30,8 @@ export type Quality = "auto" | "high" | "low";
 
 export type Settings = {
   mute: boolean;
+  /** Purchased double-tap boost can be disabled without losing ownership. */
+  doubleTapBoost: boolean;
   music: boolean;
   musicVolume: number;
   sfxVolume: number;
@@ -41,6 +44,8 @@ export type Settings = {
   /** Large-text mode: bumps every UI font a step for readability. */
   bigText: boolean;
   quality: Quality;
+  /** Distance unit preference: "km" (default) or "mi". */
+  distUnit: "km" | "mi";
 };
 
 export type LifetimeStats = {
@@ -79,6 +84,8 @@ export type SaveState = {
   ownedSkins: string[];
   activeSkin: string;
   armedBoosts: string[];
+  /** Permanent gameplay upgrades purchased with coins. */
+  ownedUpgrades: string[];
   settings: Settings;
   quests: { date: string; claimed: string[] };
   streak: { last: string; days: number; claimedDate: string };
@@ -107,6 +114,9 @@ export type SaveState = {
   /** Cosmetic trail currently equipped ("" = skin default). */
   activeTrail: string;
   pilotName: string;
+  /** True once the player picked/generated a name — stops the portal from
+    overwriting it with their platform handle on a later boot. */
+  pilotNameCustomized: boolean;
   bestPlace: number;
   racesRun: number;
   /** On-device Rival rating for the simulated 40-bird field. Local only —
@@ -128,6 +138,20 @@ export type SaveState = {
   events: { week: string; clearsThisWeek: number; month: string; clearsThisMonth: number; claimedTrailMonth: string };
   /** Local-first social graph (friends, clubs, DMs, challenges, replays). */
   social: SocialState;
+  /** Piggy Bank accumulator storage. */
+  piggyBank: { coins: number; maxCoins: number };
+  /** Prestige / Rebirth tier (+25% coin earning multiplier per level). */
+  prestige: { level: number; multiplier: number };
+  /** Wheel of Fortune / Daily Lucky Spin state. */
+  wheel: { lastFreeSpin: string; spinsToday: number };
+  /** Daily flight stipend claimed date. */
+  lastStipendClaimed?: string;
+  /** Squad team quests claimed record (questId -> dateStr). */
+  squadQuestsClaimed?: Record<string, string>;
+  /** Rank-season id (e.g. "R2026-09") whose division prize was claimed. */
+  rankPrizeSeason?: string;
+  /** The one-time Ace Wingman crate was bought (pays 250 for 240 — never re-sell). */
+  wingmanBundle?: boolean;
 };
 
 export type DuelState = {
@@ -148,6 +172,7 @@ export type ChallengeState = {
 
 const DEFAULT_SETTINGS: Settings = {
   mute: false,
+  doubleTapBoost: true,
   music: true,
   musicVolume: 0.8,
   sfxVolume: 0.9,
@@ -157,6 +182,7 @@ const DEFAULT_SETTINGS: Settings = {
   colorAssist: false,
   bigText: false,
   quality: "auto",
+  distUnit: "km",
 };
 
 function makeDeviceId(): string {
@@ -190,6 +216,7 @@ function defaults(): SaveState {
     ownedSkins: ["sunbird"],
     activeSkin: "sunbird",
     armedBoosts: [],
+    ownedUpgrades: [],
     settings: { ...DEFAULT_SETTINGS },
     quests: { date: "", claimed: [] },
     streak: { last: "", days: 0, claimedDate: "" },
@@ -213,6 +240,7 @@ function defaults(): SaveState {
     tournaments: emptyTournamentState(),
     activeTrail: "",
     pilotName: "",
+    pilotNameCustomized: false,
     bestPlace: 0,
     racesRun: 0,
     rival: defaultRival(),
@@ -224,6 +252,13 @@ function defaults(): SaveState {
     campaignClaimed: [],
     events: { week: "", clearsThisWeek: 0, month: "", clearsThisMonth: 0, claimedTrailMonth: "" },
     social: emptySocialState(),
+    piggyBank: { coins: 0, maxCoins: 1000 },
+    prestige: { level: 0, multiplier: 1.0 },
+    wheel: { lastFreeSpin: "", spinsToday: 0 },
+    lastStipendClaimed: "",
+    squadQuestsClaimed: {},
+    rankPrizeSeason: "",
+    wingmanBundle: false,
   };
 }
 
@@ -294,6 +329,8 @@ export class SaveData {
   /** Invoked (throttled) when a persist fails — lets the game observe data-
    *  loss risk instead of swallowing it silently. */
   onPersistError: (() => void) | null = null;
+  /** Optional platform SDK adapter for cloud save syncing (e.g. CrazyGames data.setItem). */
+  platformAdapter: { saveData?: (key: string, data: string) => Promise<void> } | null = null;
   private lastPersistErrorAt = 0;
 
   constructor() {
@@ -304,7 +341,7 @@ export class SaveData {
     const d = defaults();
     let raw: string | null = null;
     try {
-      raw = localStorage.getItem(SAVE_KEY) ?? localStorage.getItem(SAVE_KEY_V1);
+      raw = storage.getItem(SAVE_KEY) ?? storage.getItem(SAVE_KEY_V1);
       if (!raw) {
         this.persistNow(d);
         return d;
@@ -346,8 +383,10 @@ export class SaveData {
         ownedSkins: owned,
         activeSkin: typeof p.activeSkin === "string" ? p.activeSkin : "sunbird",
         armedBoosts: strArr(p.armedBoosts),
+        ownedUpgrades: strArr(p.ownedUpgrades),
         settings: {
           mute: Boolean(p.settings?.mute),
+          doubleTapBoost: p.settings?.doubleTapBoost === undefined ? true : Boolean(p.settings.doubleTapBoost),
           music: p.settings?.music === undefined ? true : Boolean(p.settings.music),
           musicVolume:
             p.settings?.musicVolume !== undefined
@@ -368,6 +407,7 @@ export class SaveData {
           colorAssist: Boolean(p.settings?.colorAssist),
           bigText: Boolean(p.settings?.bigText),
           quality: quality === "high" || quality === "low" ? quality : "auto",
+          distUnit: p.settings?.distUnit === "mi" ? "mi" : "km",
         },
         quests:
           p.quests && typeof p.quests.date === "string"
@@ -422,6 +462,7 @@ export class SaveData {
             : emptyTournamentState(),
         activeTrail: typeof p.activeTrail === "string" ? p.activeTrail : "",
         pilotName: typeof p.pilotName === "string" ? p.pilotName : "",
+        pilotNameCustomized: p.pilotNameCustomized === true,
         bestPlace: num(p.bestPlace),
         racesRun: num(p.racesRun),
         rival: parseRival(p.rival),
@@ -464,6 +505,30 @@ export class SaveData {
               }
             : d.events,
         social: parseSocial(p.social),
+        piggyBank:
+          p.piggyBank && typeof p.piggyBank === "object"
+            ? { coins: num(p.piggyBank.coins), maxCoins: num(p.piggyBank.maxCoins) || 1000 }
+            : d.piggyBank,
+        prestige:
+          p.prestige && typeof p.prestige === "object"
+            ? { level: num(p.prestige.level), multiplier: num(p.prestige.multiplier) || 1.0 }
+            : d.prestige,
+        wheel:
+          p.wheel && typeof p.wheel === "object"
+            ? { lastFreeSpin: String(p.wheel.lastFreeSpin ?? ""), spinsToday: num(p.wheel.spinsToday) }
+            : d.wheel,
+        // Optional claim records: these were missing from the parse literal,
+        // so EVERY reload silently dropped them — the daily stipend and squad
+        // quests could be re-claimed after each page load.
+        lastStipendClaimed: String(p.lastStipendClaimed ?? ""),
+        squadQuestsClaimed:
+          p.squadQuestsClaimed && typeof p.squadQuestsClaimed === "object" && !Array.isArray(p.squadQuestsClaimed)
+            ? Object.fromEntries(
+                Object.entries(p.squadQuestsClaimed as Record<string, unknown>).map(([k, v]) => [k, String(v)]),
+              )
+            : {},
+        rankPrizeSeason: String(p.rankPrizeSeason ?? ""),
+        wingmanBundle: Boolean(p.wingmanBundle),
       };
     } catch {
       // Corruption recovery: never destroy a player's data. If we actually read
@@ -473,7 +538,7 @@ export class SaveData {
       if (raw !== null) {
         this.recoveredFromCorruption = true;
         try {
-          localStorage.setItem(SAVE_KEY_CORRUPT, raw);
+          storage.setItem(SAVE_KEY_CORRUPT, raw);
         } catch {
           /* ignore — nothing more we can do */
         }
@@ -483,8 +548,12 @@ export class SaveData {
   }
 
   private persistNow(state: SaveState): void {
+    const raw = JSON.stringify(state);
     try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+      storage.setItem(SAVE_KEY, raw);
+      if (this.platformAdapter?.saveData) {
+        void this.platformAdapter.saveData(SAVE_KEY, raw);
+      }
     } catch {
       // A write that silently no-ops loses player progress with no signal. Call
       // the observer (if any) — throttled here so a full/blocked store can't
@@ -503,19 +572,70 @@ export class SaveData {
 
   recordRun(distance: number, coins: number, score: number, date: string, island = 0, biomeId = ""): void {
     const s = this.state;
-    s.totalCoins += coins;
-    s.wallet += coins;
+    // Apply prestige coin multiplier bonus
+    const prestigeBonus = Math.round(coins * ((s.prestige?.multiplier ?? 1.0) - 1));
+    const totalRunCoins = coins + prestigeBonus;
+
+    s.totalCoins += totalRunCoins;
+    s.wallet += totalRunCoins;
     s.runsPlayed += 1;
     s.tutorialRuns += 1;
     s.lifetime.distance += distance;
-    s.lifetime.coins += coins;
+    s.lifetime.coins += totalRunCoins;
+
+    // Accumulate +20% bonus coins into Piggy Bank
+    const bonusPiggy = Math.max(1, Math.round(totalRunCoins * 0.2));
+    if (!s.piggyBank) s.piggyBank = { coins: 0, maxCoins: 1000 };
+    s.piggyBank.coins = Math.min(s.piggyBank.maxCoins, s.piggyBank.coins + bonusPiggy);
+
     if (score > s.bestScore) s.bestScore = score;
     if (distance > s.bestDistance) s.bestDistance = distance;
     if (island > s.farthestIsland) s.farthestIsland = island;
     if (biomeId && !s.biomesSeen.includes(biomeId)) s.biomesSeen.push(biomeId);
-    s.highScores.push({ date, distance, coins, score, vip: s.vip, island });
+    s.highScores.push({ date, distance, coins: totalRunCoins, score, vip: s.vip, island });
     s.highScores.sort((a, b) => b.score - a.score);
     s.highScores = s.highScores.slice(0, 8);
+    this.persist();
+  }
+
+  smashPiggyBank(): number {
+    const s = this.state;
+    if (!s.piggyBank || s.piggyBank.coins <= 0) return 0;
+    const amount = s.piggyBank.coins;
+    s.piggyBank.coins = 0;
+    s.wallet += amount;
+    s.totalCoins += amount;
+    this.persist();
+    return amount;
+  }
+
+  performPrestige(): boolean {
+    const s = this.state;
+    if (s.nestBought < 5 && s.nestLevel < 5) return false;
+    s.nestBought = 0;
+    s.nestLevel = s.completedMissions.length;
+    if (!s.prestige) s.prestige = { level: 0, multiplier: 1.0 };
+    s.prestige.level += 1;
+    s.prestige.multiplier = Number((1.0 + s.prestige.level * 0.25).toFixed(2));
+    this.persist();
+    return true;
+  }
+
+  canFreeWheelSpin(today: string): boolean {
+    const s = this.state;
+    if (!s.wheel) s.wheel = { lastFreeSpin: "", spinsToday: 0 };
+    return s.wheel.lastFreeSpin !== today;
+  }
+
+  recordWheelSpin(today: string): void {
+    const s = this.state;
+    if (!s.wheel) s.wheel = { lastFreeSpin: "", spinsToday: 0 };
+    if (s.wheel.lastFreeSpin !== today) {
+      s.wheel.lastFreeSpin = today;
+      s.wheel.spinsToday = 1;
+    } else {
+      s.wheel.spinsToday += 1;
+    }
     this.persist();
   }
 
@@ -559,11 +679,11 @@ export class SaveData {
    * Returns the rating delta and any streak bonus actually granted.
    * Local only — never synced, never a server rank.
    */
-  recordRivalResult(place: number, field: number, mode: string, date: string): { delta: number; bonus: number; streak: number } {
+  recordRivalResult(place: number, field: number, mode: string, date: string, live = false): { delta: number; bonus: number; streak: number } {
     const r = this.state.rival;
     const p = Math.max(1, Math.min(Math.max(2, field), Math.floor(place)));
     const f = Math.max(2, Math.floor(field));
-    const delta = ratingDelta(p, f);
+    const delta = ratingDelta(p, f, live);
     const won = p <= Math.max(1, Math.ceil(f * 0.25));
     r.rating = Math.max(0, r.rating + delta);
     this.state.rankSeason.peak = Math.max(this.state.rankSeason.peak, r.rating);
@@ -801,6 +921,17 @@ export class SaveData {
     this.persist();
   }
 
+  hasUpgrade(id: string): boolean {
+    return this.state.ownedUpgrades.includes(id);
+  }
+
+  ownUpgrade(id: string): boolean {
+    if (this.state.ownedUpgrades.includes(id)) return false;
+    this.state.ownedUpgrades.push(id);
+    this.persist();
+    return true;
+  }
+
   consumeArmedBoosts(): string[] {
     const list = [...this.state.armedBoosts];
     this.state.armedBoosts = [];
@@ -942,7 +1073,7 @@ export class SaveData {
       for (const k of Object.keys(defaults())) {
         if (k in parsed) (allowed as Record<string, unknown>)[k] = (parsed as Record<string, unknown>)[k];
       }
-      localStorage.setItem(SAVE_KEY, JSON.stringify(allowed));
+      storage.setItem(SAVE_KEY, JSON.stringify(allowed));
       this.state = this.load();
       return true;
     } catch {

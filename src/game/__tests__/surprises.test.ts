@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BIG_LAUNCH_QUIPS, SLEEP_QUIPS, SPLASH_QUIPS, SurpriseEngine, pickSurprise, quip } from "../Surprises";
+import { BIG_LAUNCH_QUIPS, BOP_QUIPS, SLEEP_QUIPS, SPLASH_QUIPS, THUD_QUIPS, SurpriseEngine, pickSurprise, quip } from "../Surprises";
 
 describe("surprise engine", () => {
   it("never fires early in a run", () => {
@@ -41,5 +41,18 @@ describe("surprise engine", () => {
     expect(SPLASH_QUIPS).toContain(quip(SPLASH_QUIPS, 7));
     expect(SLEEP_QUIPS).toContain(quip(SLEEP_QUIPS, 123));
     expect(BIG_LAUNCH_QUIPS).toContain(quip(BIG_LAUNCH_QUIPS, 999));
+  });
+
+  it("thud/bop pools rotate without repeating until exhausted", () => {
+    for (const pool of [THUD_QUIPS, BOP_QUIPS]) {
+      expect(pool.length).toBeGreaterThan(0);
+      for (const w of pool) expect(w).toMatch(/!$/);
+      const seen = new Set(pool.map((_, i) => quip(pool, i)));
+      expect(seen.size).toBe(pool.length);
+      // rotation wraps cleanly back to the start
+      expect(quip(pool, pool.length)).toBe(quip(pool, 0));
+    }
+    expect(THUD_QUIPS).toContain(quip(THUD_QUIPS, 1)); // THUNK! follows THUD!
+    expect(BOP_QUIPS[0]).toBe("BOP!");
   });
 });

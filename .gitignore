@@ -51,3 +51,25 @@ sunbird-crazy.zip
 dist-generic/
 sunbird-generic.zip
 dist-itch/
+
+# botsim CI reports (uploaded as artifacts, never committed)
+botsim-*.json
+*.png  # screenshot artifacts — do not version
+
+# Browser test artifacts
+test-artifacts/
+test-results/
+playwright-report/
+
+dist-multiplayer/
+
+.cache/
+sunbird-social-data/
+
+# Poki build output + QA harness
+dist-poki/
+dist-dev/
+poki-upload/
+sunbird-poki.zip
+scripts-tmp/
+*.tsbuildinfo

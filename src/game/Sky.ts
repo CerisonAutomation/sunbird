@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { saturate, smoothstep } from "./math";
+import { drawSunDisc } from "./Sunbird";
 import type { TerrainPalette } from "./TerrainSystem";
 
 type SkyStop = {
@@ -72,35 +73,37 @@ const STOPS: { t: number; s: SkyStop }[] = [
   {
     t: 0.7,
     s: {
-      top: 0x4aa4ea,
-      horizon: 0xa8e4ff,
-      bottom: 0x7ec8e8,
-      fog: 0x8ed0ee,
+      top: 0x2e90e0,
+      // Deeper saturated blue — no more white-sky wash.
+      horizon: 0x50a8d8,
+      bottom: 0x58a8cc,
+      fog: 0x48a0c4,
       sun: 0xfff6c8,
-      farA: 0x6bb87a,
-      farB: 0x4d8aaa,
-      farC: 0x4a68a0,
-      water: 0x3a98c8,
-      waterDeep: 0x1a5888,
-      hemiSky: 0xb0e0ff,
-      hemiGround: 0x5a8a50,
+      farA: 0x5aac6e,
+      farB: 0x3e7a9a,
+      farC: 0x3a5a90,
+      water: 0x2a88c0,
+      waterDeep: 0x144e7e,
+      hemiSky: 0x78c4f8,
+      hemiGround: 0x4e7e44,
     },
   },
   {
     t: 1,
     s: {
-      top: 0x7ec8f5,
-      horizon: 0xffe0b8,
-      bottom: 0xf0c8a0,
-      fog: 0xe8d8c4,
-      sun: 0xfff2b8,
-      farA: 0x8ed89a,
-      farB: 0x78b0c8,
-      farC: 0x7a90c0,
-      water: 0x48b0d8,
-      waterDeep: 0x2a7098,
-      hemiSky: 0xffe0c8,
-      hemiGround: 0x80b060,
+      top: 0x58b8f0,
+      // Warm late-afternoon but no cream haze — clear golden light.
+      horizon: 0xf0c080,
+      bottom: 0xe0a870,
+      fog: 0x90c8e0,   // clear sky blue instead of the smoggy cream
+      sun: 0xfff0a8,
+      farA: 0x78c884,
+      farB: 0x60a0bc,
+      farC: 0x6080b0,
+      water: 0x38a0cc,
+      waterDeep: 0x1e6088,
+      hemiSky: 0xf0d8a0,
+      hemiGround: 0x70a050,
     },
   },
 ];
@@ -111,12 +114,11 @@ export class Sky {
   readonly hemi: THREE.HemisphereLight;
   readonly sunLight: THREE.DirectionalLight;
   private readonly skyMat: THREE.ShaderMaterial;
-  private readonly sun: THREE.Mesh;
+  private readonly sun: THREE.Sprite;
+  private readonly sunTex: THREE.CanvasTexture;
   private readonly sunGlow: THREE.Sprite;
   private readonly moon: THREE.Mesh;
   private readonly moonGlow: THREE.Sprite;
-  private readonly stars: THREE.Points;
-  private readonly starMat: THREE.ShaderMaterial;
   private readonly milkyWay: THREE.Sprite;
   private readonly milkyWayTex: THREE.CanvasTexture;
   private readonly nebulas: THREE.Sprite[] = [];
@@ -141,6 +143,9 @@ export class Sky {
   private hazeDensity = 1;
   private hazeGlow = false;
   private shadowSpan = 80;
+  private readonly topC = new THREE.Color();
+  private readonly horizonC = new THREE.Color();
+  private readonly bottomC = new THREE.Color();
 
   constructor() {
     this.skyMat = new THREE.ShaderMaterial({
@@ -192,10 +197,24 @@ export class Sky {
     const skyMesh = new THREE.Mesh(new THREE.SphereGeometry(420, 24, 16), this.skyMat);
     this.group.add(skyMesh);
 
-    const sunGeo = new THREE.SphereGeometry(10, 16, 12);
-    this.sun = new THREE.Mesh(
-      sunGeo,
-      new THREE.MeshBasicMaterial({ color: 0xfff2b0, fog: false, toneMapped: false }),
+    // The in-flight sun is the *same* disc as the title screen's: painted by
+    // Sunbird.drawSunDisc from SUN_STOPS, so the sun you start under and the
+    // sun you fly toward are one object rather than a flat yellow ball.
+    const sunCanvas = document.createElement("canvas");
+    sunCanvas.width = 256;
+    sunCanvas.height = 256;
+    drawSunDisc(sunCanvas.getContext("2d")!, 128, 128, 128);
+    this.sunTex = new THREE.CanvasTexture(sunCanvas);
+    this.sunTex.colorSpace = THREE.SRGBColorSpace;
+    this.sun = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: this.sunTex,
+        color: 0xfff2b0,
+        fog: false,
+        toneMapped: false,
+        transparent: true,
+        depthWrite: false,
+      }),
     );
     this.group.add(this.sun);
 
@@ -210,9 +229,6 @@ export class Sky {
     this.moonGlow = makeGlow(0xb8c8ff, 32);
     this.group.add(this.moonGlow);
 
-    this.stars = this.makeStars();
-    this.starMat = this.stars.material as THREE.ShaderMaterial;
-    this.group.add(this.stars);
 
     // Deep-space scenery: a milky way band, drifting nebulae, a few planets
     // and a passing satellite. All of it stays dim at sea level and fades in
@@ -278,7 +294,7 @@ export class Sky {
     // Soft, deep background cloud banks create altitude scale without adding
     // interaction noise. They are parallaxed independently from the hills.
     this.hazeTex = makeHazeTexture();
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 4; i++) {
       const mat = new THREE.SpriteMaterial({
         map: this.hazeTex,
         color: 0xffffff,
@@ -350,8 +366,9 @@ export class Sky {
     this.sunLight = new THREE.DirectionalLight(0xfff4d0, 1.0);
     this.sunLight.position.set(40, 60, 30);
     this.sunLight.castShadow = true;
-    this.sunLight.shadow.mapSize.width = 1024;
-    this.sunLight.shadow.mapSize.height = 1024;
+    const shadowRes = /Mobi|Android/i.test(navigator.userAgent) || window.innerWidth < 700 ? 512 : 1024;
+    this.sunLight.shadow.mapSize.width = shadowRes;
+    this.sunLight.shadow.mapSize.height = shadowRes;
     this.sunLight.shadow.camera.near = 10;
     this.sunLight.shadow.camera.far = 280;
     this.sunLight.shadow.camera.left = -80;
@@ -377,7 +394,7 @@ export class Sky {
     this.tintMix = mix;
   }
 
-  /** 0..1 how far into space the bird is — deepens the blue and shows stars. */
+  /** 0..1 how far into space the bird is — deepens the blue and reveals the nebula. */
   setAltitude(t: number): void {
     this.altT = t;
   }
@@ -411,9 +428,9 @@ export class Sky {
     (this.skyMat.uniforms.aurora!.value as number) = this.auroraIntensity;
     const t = saturate(daylight);
     const { a, b, u } = sampleStops(t);
-    const top = this.mixHex(a.top, b.top, u).clone();
-    const horizon = this.mixHex(a.horizon, b.horizon, u).clone();
-    const bottom = this.mixHex(a.bottom, b.bottom, u).clone();
+    const top = this.topC.copy(this.mixHex(a.top, b.top, u));
+    const horizon = this.horizonC.copy(this.mixHex(a.horizon, b.horizon, u));
+    const bottom = this.bottomC.copy(this.mixHex(a.bottom, b.bottom, u));
     if (this.tintMix > 0) {
       top.lerp(this.tmpC.setHex(this.tintTop), this.tintMix);
       horizon.lerp(this.tmpC.setHex(this.tintHorizon), this.tintMix * 0.85);
@@ -433,27 +450,22 @@ export class Sky {
     this.hemi.color.copy(this.mixHex(a.hemiSky, b.hemiSky, u));
     this.hemi.groundColor.copy(this.mixHex(a.hemiGround, b.hemiGround, u));
     this.sunLight.color.copy(this.mixHex(a.sun, b.sun, u));
-    // Brighter key + richer fill so terrain reads crisp and defined.
-    // Day grade lifted ~15% for a premium well-lit look under ACES.
-    this.sunLight.intensity = 0.46 + t * 0.86;
-    this.hemi.intensity = 0.8 + t * 0.46;
+    // Balanced key light: bright enough for crisp terrain, not so hot it blows out.
+    this.sunLight.intensity = 0.38 + t * 0.60;
+    this.hemi.intensity = 0.72 + t * 0.40;
 
-    const elev = 22 + t * 78;
+    // Keep the full daylight disc in the upper sky instead of clipping its crown.
+    const elev = 22 + t * 64;
     this.sun.position.set(36 + (1 - t) * 28, elev, -110);
     this.sunGlow.position.copy(this.sun.position);
-    (this.sun.material as THREE.MeshBasicMaterial).color.copy(this.mixHex(a.sun, b.sun, u));
-    this.sun.scale.setScalar(0.85 + t * 0.4);
+    (this.sun.material as THREE.SpriteMaterial).color.copy(this.mixHex(a.sun, b.sun, u));
+    this.sun.scale.setScalar((0.7 + t * 0.3) * 20);
 
     this.moon.position.set(-8, 20 + (1 - t) * 68, -120);
     this.moonGlow.position.copy(this.moon.position);
     const night = 1 - t;
     this.moon.visible = night > 0.15;
     this.moonGlow.material.opacity = night * 0.55;
-    this.starMat.uniforms.time!.value = time;
-    const starOpacity = Math.max(saturate((0.35 - t) / 0.35), this.altT * 0.9);
-    this.starMat.uniforms.uOpacity!.value = starOpacity;
-    this.stars.visible = starOpacity > 0.005;
-    this.stars.position.set(0, 0, 0);
 
     // Space scenery fades in with altitude (the stratosphere opens out) and is
     // also present at night, so a midnight coast shows the full deep sky.
@@ -491,9 +503,13 @@ export class Sky {
       -240,
     );
 
-    // Background haze kept light: thin altitude-readable banks, never overcast.
-    // (Density response cut ~40% — gameplay clouds in Collectibles are untouched.)
-    const hazeAlpha = (0.04 + this.hazeDensity * 0.055) * (1 - this.altT * 0.75) * (0.5 + t * 0.5);
+    // Background haze kept deliberately thin: altitude-readable banks, never
+    // overcast. Density response is cut a second time (~50% again) because the
+    // banks read as a grey wash over the hills rather than weather. Gameplay
+    // clouds in Collectibles are untouched — these are atmosphere only.
+    // Haze stays a very faint depth cue. Keep the horizon open so the bird,
+    // terrain silhouette, and daylight meter remain readable on small screens.
+    const hazeAlpha = (0.0004 + this.hazeDensity * 0.001) * (1 - this.altT * 0.8) * (0.5 + t * 0.5);
     for (const sprite of this.haze) {
       const mat = sprite.material as THREE.SpriteMaterial;
       const phase = sprite.userData.phase as number;
@@ -501,7 +517,7 @@ export class Sky {
       sprite.position.x = (sprite.userData.baseX as number) - camX * (1 - parallax);
       sprite.position.y = (sprite.userData.baseY as number) + Math.sin(time * (0.09 + parallax * 0.08) + phase) * 1.2;
       mat.color.setHex(this.hazeTint);
-      mat.opacity = hazeAlpha * (0.72 + (phase % 1) * 0.25) * (this.hazeGlow ? 1.25 : 1);
+      mat.opacity = hazeAlpha * (0.72 + (phase % 1) * 0.25) * (this.hazeGlow ? 1.12 : 1);
     }
 
     this.group.position.set(camX, 0, 0);
@@ -530,6 +546,7 @@ export class Sky {
         else mat.dispose();
       }
     });
+    this.sunTex.dispose();
     this.hazeTex.dispose();
     this.milkyWayTex.dispose();
     this.nebulaTex.dispose();
@@ -578,75 +595,7 @@ export class Sky {
     return { mesh, ring, glow };
   }
 
-  private makeStars(): THREE.Points {
-    const n = 420;
-    const pos = new Float32Array(n * 3);
-    const size = new Float32Array(n);
-    const col = new Float32Array(n * 3);
-    const phase = new Float32Array(n);
-    const tmp = new THREE.Color();
-    for (let i = 0; i < n; i++) {
-      pos[i * 3] = (Math.random() - 0.5) * 420;
-      pos[i * 3 + 1] = 15 + Math.random() * 210;
-      pos[i * 3 + 2] = -150 - Math.random() * 190;
-      size[i] = 0.5 + Math.random() * 1.7;
-      // Mostly white/blue-white, with a scatter of warm and cool giants.
-      const roll = Math.random();
-      if (roll < 0.08) tmp.setHex(0xffd9a0);
-      else if (roll < 0.16) tmp.setHex(0xa8ccff);
-      else if (roll < 0.2) tmp.setHex(0xffb0a0);
-      else tmp.setHex(0xf2f6ff);
-      col[i * 3] = tmp.r;
-      col[i * 3 + 1] = tmp.g;
-      col[i * 3 + 2] = tmp.b;
-      phase[i] = Math.random();
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-    geo.setAttribute("size", new THREE.BufferAttribute(size, 1));
-    geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
-    geo.setAttribute("phase", new THREE.BufferAttribute(phase, 1));
-    const mat = new THREE.ShaderMaterial({
-      transparent: true,
-      depthWrite: false,
-      fog: false,
-      toneMapped: false,
-      uniforms: {
-        time: { value: 0 },
-        uOpacity: { value: 0 },
-      },
-      vertexShader: `
-        attribute float size;
-        attribute vec3 color;
-        attribute float phase;
-        varying vec3 vColor;
-        varying float vPhase;
-        void main() {
-          vColor = color;
-          vPhase = phase;
-          vec4 mv = modelViewMatrix * vec4(position, 1.0);
-          gl_PointSize = size * (320.0 / max(1.0, -mv.z));
-          gl_Position = projectionMatrix * mv;
-        }
-      `,
-      fragmentShader: `
-        uniform float time;
-        uniform float uOpacity;
-        varying vec3 vColor;
-        varying float vPhase;
-        void main() {
-          vec2 p = gl_PointCoord - 0.5;
-          float d = length(p);
-          if (d > 0.5) discard;
-          float a = smoothstep(0.5, 0.04, d);
-          // Gentle twinkle, de-phased per star so the field shimmers.
-          float tw = 0.7 + 0.3 * sin(time * 2.4 + vPhase * 6.28318);
-          gl_FragColor = vec4(vColor, a * tw * uOpacity);
-        }
-      `,
-    });
-    return new THREE.Points(geo, mat);
-  }
+
 }
 
 function sampleStops(daylight: number): { a: SkyStop; b: SkyStop; u: number } {
@@ -679,16 +628,7 @@ function makeMilkyWayTexture(): THREE.CanvasTexture {
   band.addColorStop(1, "rgba(150,170,220,0)");
   g.fillStyle = band;
   g.fillRect(-420, -110, 840, 220);
-  // Scattered dust motes along the band.
-  for (let i = 0; i < 1400; i++) {
-    const y = (Math.random() - 0.5) * 200;
-    const x = (Math.random() - 0.5) * 780;
-    const a = Math.random() * 0.45 * Math.max(0, 1 - Math.abs(y) / 120);
-    g.fillStyle = `rgba(255,255,255,${a.toFixed(3)})`;
-    g.beginPath();
-    g.arc(x, y, Math.random() * 1.5, 0, Math.PI * 2);
-    g.fill();
-  }
+  // A smooth atmospheric band, without the old 1,400 speckle dots.
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
@@ -770,5 +710,3 @@ function hexAlpha(hex: number, a: number): string {
   const b = hex & 255;
   return "rgba(" + r + "," + g + "," + b + "," + a + ")";
 }
-
-

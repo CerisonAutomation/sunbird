@@ -1,3 +1,4 @@
+import { uploadDensePrefix } from "./bufferUpdates";
 import * as THREE from "three";
 import { clamp, lerp } from "./math";
 
@@ -33,6 +34,7 @@ export class ParticleFX {
   private readonly size: Float32Array;
   private readonly rings: THREE.Mesh[] = [];
   private budget = 1;
+  private recycleSlot = 0;
 
   constructor() {
     this.pos = new Float32Array(MAX * 3);
@@ -189,23 +191,43 @@ export class ParticleFX {
   }
 
   emitSplash(x: number, y: number): void {
-    for (let i = 0; i < 28; i++) {
-      const a = Math.random() * Math.PI;
-      const p = 6 + Math.random() * 14;
+    // Base spray column — droplets arc upward and fall back with gravity.
+    for (let i = 0; i < 46; i++) {
+      const a = (Math.random() - 0.5) * Math.PI * 1.5;
+      const p = 8 + Math.random() * 18;
+      const col = Math.random() < 0.3;
       this.spawn({
-        x,
+        x: x + (Math.random() - 0.5) * 1.8,
         y,
-        z: (Math.random() - 0.5) * 3,
-        vx: Math.cos(a) * p * (Math.random() < 0.5 ? -1 : 1) * 0.4,
-        vy: Math.sin(a) * p,
-        vz: (Math.random() - 0.5) * 8,
-        life: 0.5 + Math.random() * 0.4,
-        max: 0.8,
-        size: 0.5 + Math.random() * 0.7,
-        r: 0.75,
-        g: 0.9,
+        z: (Math.random() - 0.5) * 4,
+        vx: Math.sin(a) * p * 0.55,
+        vy: Math.cos(a) * p * (0.55 + Math.random() * 0.6),
+        vz: (Math.random() - 0.5) * 10,
+        life: 0.65 + Math.random() * 0.6,
+        max: 1.1,
+        size: 0.7 + Math.random() * 1.1,
+        r: col ? 0.55 : 0.75,
+        g: col ? 0.82 : 0.92,
         b: 1,
         type: "splash",
+      });
+    }
+    // Fine mist — smaller, lingers above the column.
+    for (let i = 0; i < 16; i++) {
+      this.spawn({
+        x: x + (Math.random() - 0.5) * 3,
+        y: y + 1 + Math.random() * 3,
+        z: (Math.random() - 0.5) * 5,
+        vx: (Math.random() - 0.5) * 6,
+        vy: 4 + Math.random() * 8,
+        vz: (Math.random() - 0.5) * 4,
+        life: 0.7 + Math.random() * 0.5,
+        max: 1.1,
+        size: 0.35 + Math.random() * 0.35,
+        r: 0.85,
+        g: 0.95,
+        b: 1,
+        type: "wake",
       });
     }
   }
@@ -258,69 +280,6 @@ export class ParticleFX {
     }
   }
 
-  emitBiomeAtmosphere(x: number, y: number, biomeId: string): void {
-    if (Math.random() > 0.45 * this.budget) return;
-    let r = 0.8, g = 0.9, b = 0.8;
-    let sz = 0.4;
-    let vx = (Math.random() - 0.5) * 4 - 3;
-    let vy = (Math.random() - 0.5) * 3 - 0.5;
-
-    if (biomeId === "sunset") {
-      r = 1.0; g = 0.65; b = 0.45;
-      sz = 0.55;
-    } else if (biomeId === "tropical") {
-      r = 0.4; g = 0.95; b = 0.85;
-      sz = 0.45;
-    } else if (biomeId === "desert") {
-      r = 0.95; g = 0.82; b = 0.45;
-      vx = -12 - Math.random() * 8;
-      sz = 0.35;
-    } else if (biomeId === "night") {
-      r = 0.65; g = 0.75; b = 1.0;
-      vy = (Math.random() - 0.5) * 1.5;
-      sz = 0.4;
-    } else if (biomeId === "aurora") {
-      const cy = Math.random() < 0.5;
-      r = cy ? 0.2 : 0.85;
-      g = cy ? 0.95 : 0.35;
-      b = 0.85;
-      sz = 0.5;
-    } else if (biomeId === "reef") {
-      const pink = Math.random() < 0.5;
-      r = pink ? 1.0 : 0.45;
-      g = pink ? 0.75 : 0.95;
-      b = pink ? 0.85 : 0.9;
-      vy = (Math.random() - 0.5) * 2 + 1.2; // bubbles drift upward
-      sz = 0.42;
-    } else if (biomeId === "volcano") {
-      const ember = Math.random() < 0.6;
-      r = 1.0;
-      g = ember ? 0.45 : 0.25;
-      b = ember ? 0.15 : 0.2;
-      vy = 1.5 + Math.random() * 2.5; // embers rise
-      sz = ember ? 0.34 : 0.5;
-    } else if (biomeId === "canyon") {
-      r = 0.95; g = 0.62; b = 0.4;
-      vx = -9 - Math.random() * 6; // red dust on the wind
-      sz = 0.38;
-    }
-
-    this.spawn({
-      x: x + 15 + Math.random() * 25,
-      y: y + (Math.random() - 0.5) * 18,
-      z: (Math.random() - 0.5) * 6,
-      vx,
-      vy,
-      vz: (Math.random() - 0.5) * 2,
-      life: 0.9 + Math.random() * 0.7,
-      max: 1.6,
-      size: sz,
-      r,
-      g,
-      b,
-      type: "wake",
-    });
-  }
 
   emitWingTrails(x: number, y: number, speed: number): void {
     if (this.budget < 0.5) return;
@@ -334,7 +293,7 @@ export class ParticleFX {
       vz: 0.8,
       life: 0.24,
       max: 0.24,
-      size: 0.35 * a,
+        size: 0.5 * a,
       r: 0.9,
       g: 0.95,
       b: 1.0,
@@ -355,6 +314,161 @@ export class ParticleFX {
       b: 1.0,
       type: "wake",
     });
+  }
+
+  /** Hard thud landing — biome-colored radial splat with upward debris spray.
+   *  26 particles mirroring the reference game's 'thud' burst, replacing the
+   *  plain emitDust call so bad landings read as a cinematic impact. */
+  emitThunk(x: number, y: number, r: number, g: number, b: number): void {
+    for (let i = 0; i < 34; i++) {
+      const a = (i / 34) * Math.PI * 2;
+      const s = 14 + Math.random() * 8;
+      const upBias = 8 + Math.random() * 6;
+      this.spawn({
+        x: x + (Math.random() - 0.5) * 1.5,
+        y: y + 0.5,
+        z: (Math.random() - 0.5) * 3,
+        vx: Math.cos(a) * s,
+        vy: Math.abs(Math.sin(a)) * s * 0.6 + upBias,
+        vz: (Math.random() - 0.5) * s * 0.4,
+        life: 0.85 + Math.random() * 0.5,
+        max: 1.2,
+        size: 0.95 + Math.random() * 0.8,
+        r: r * (0.75 + Math.random() * 0.2),
+        g: g * (0.75 + Math.random() * 0.2),
+        b: b * (0.75 + Math.random() * 0.2),
+        type: "splash",
+      });
+    }
+    this.burstRing(x, y + 0.5, 0xc8a87e);
+  }
+
+  /** Scaled perfect-launch burst — replaces the sparkle loop.
+   *  chain = launch combo; more chain → more particles and faster speed. */
+  emitPerfectBurst(x: number, y: number, chain: number): void {
+    const n = 14 + Math.min(16, chain * 2);
+    const speed = 22 + chain * 1.5;
+    const gold = chain >= 3;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const s = speed * (0.5 + Math.random() * 0.65);
+      const upBias = 10 + Math.random() * 6;
+      this.spawn({
+        x,
+        y: y + 1,
+        z: (Math.random() - 0.5) * 2.5,
+        vx: Math.cos(a) * s,
+        vy: Math.sin(a) * s * 0.5 + upBias,
+        vz: (Math.random() - 0.5) * s * 0.3,
+        life: 0.55 + Math.random() * 0.4,
+        max: 0.85,
+        size: 0.45 + Math.random() * 0.45,
+        r: gold ? 1.0 : 1.0,
+        g: gold ? 0.88 + Math.random() * 0.12 : 0.95,
+        b: gold ? 0.35 + Math.random() * 0.2 : 1.0,
+        type: "spark",
+      });
+    }
+  }
+
+  /** Shield water bounce — big cinematic splash column. Blue/white upward spray
+   *  with much more energy than the regular ocean splash. */
+  emitWaterBounce(x: number, y: number): void {
+    for (let i = 0; i < 44; i++) {
+      const a = (i / 44) * Math.PI * 2;
+      const upward = Math.random() < 0.7;
+      const p = upward ? 12 + Math.random() * 22 : 6 + Math.random() * 10;
+      this.spawn({
+        x: x + (Math.random() - 0.5) * 2,
+        y,
+        z: (Math.random() - 0.5) * 4,
+        vx: Math.cos(a) * p * (upward ? 0.35 : 0.8),
+        vy: upward ? Math.abs(Math.sin(a)) * p + 14 : Math.sin(a) * p * 0.3,
+        vz: (Math.random() - 0.5) * 10,
+        life: 0.55 + Math.random() * 0.5,
+        max: 0.9,
+        size: 0.55 + Math.random() * 0.7,
+        r: 0.65 + Math.random() * 0.25,
+        g: 0.88 + Math.random() * 0.1,
+        b: 1.0,
+        type: "splash",
+      });
+    }
+    this.burstRing(x, y + 1, 0x7fe8ff);
+    this.burstRing(x, y + 3, 0xbfffff);
+  }
+
+  /** Generic powerup bounce BOP — energetic upward burst, color-matched to the
+   *  source (sunflower=gold, balloon=pink, shield=cyan). */
+  emitBounceBop(x: number, y: number, r: number, g: number, b: number): void {
+    for (let i = 0; i < 20; i++) {
+      const a = (i / 20) * Math.PI * 2;
+      const s = 18 + Math.random() * 12;
+      this.spawn({
+        x: x + (Math.random() - 0.5) * 1.5,
+        y: y + 0.5,
+        z: (Math.random() - 0.5) * 3,
+        vx: Math.cos(a) * s * 0.6,
+        vy: Math.abs(Math.sin(a)) * s + 12,
+        vz: (Math.random() - 0.5) * 6,
+        life: 0.5 + Math.random() * 0.35,
+        max: 0.75,
+        size: 0.5 + Math.random() * 0.55,
+        r,
+        g,
+        b,
+        type: "confetti",
+      });
+    }
+  }
+
+  /** Fever entry explosion — 44 gold particles, large and energetic, filling
+   *  the screen with warmth. Mirrors the reference game's feverStart burst. */
+  emitFeverBurst(x: number, y: number): void {
+    for (let i = 0; i < 44; i++) {
+      const a = (i / 44) * Math.PI * 2;
+      const s = 28 + Math.random() * 12;
+      this.spawn({
+        x,
+        y: y + 1,
+        z: (Math.random() - 0.5) * 5,
+        vx: Math.cos(a) * s,
+        vy: Math.sin(a) * s * 0.6 + 6,
+        vz: (Math.random() - 0.5) * s * 0.4,
+        life: 0.8 + Math.random() * 0.5,
+        max: 1.1,
+        size: 0.55 + Math.random() * 0.55,
+        r: 1.0,
+        g: 0.72 + Math.random() * 0.2,
+        b: 0.25 + Math.random() * 0.2,
+        type: "spark",
+      });
+    }
+  }
+
+  /** Colorful pickup activation burst — replaces plain emitCollect for power-up
+   *  pickups so activating a power-up feels distinct from collecting a coin. */
+  emitPickup(x: number, y: number, r: number, g: number, b: number): void {
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2;
+      const s = 10 + Math.random() * 8;
+      this.spawn({
+        x,
+        y,
+        z: (Math.random() - 0.5) * 2,
+        vx: Math.cos(a) * s,
+        vy: Math.sin(a) * s + 4,
+        vz: (Math.random() - 0.5) * 4,
+        life: 0.35 + Math.random() * 0.2,
+        max: 0.5,
+        size: 0.4 + Math.random() * 0.4,
+        r,
+        g,
+        b,
+        type: "spark",
+      });
+    }
+    this.burstRing(x, y, (Math.round(r * 255) << 16) | (Math.round(g * 255) << 8) | Math.round(b * 255));
   }
 
   emitSonicBoom(x: number, y: number): void {
@@ -384,9 +498,9 @@ export class ParticleFX {
     const ring = this.rings.find((r) => !r.visible) ?? this.rings[0]!;
     ring.visible = true;
     ring.position.set(x, y, 0.8);
-    ring.scale.setScalar(0.4);
+    ring.scale.setScalar(0.65);
     const mat = ring.material as THREE.MeshBasicMaterial;
-    mat.opacity = 0.9;
+    mat.opacity = 1;
     mat.color.setHex(color);
     ring.userData.life = 1;
   }
@@ -408,8 +522,9 @@ export class ParticleFX {
       p.z += p.vz * dt;
       if (p.type === "dust" || p.type === "confetti" || p.type === "splash") p.vy -= 18 * dt;
       if (p.type === "spark") {
-        p.vx *= 0.92;
-        p.vy *= 0.92;
+        const drag = Math.pow(0.92, dt * 60);
+        p.vx *= drag;
+        p.vy *= drag;
       }
     }
 
@@ -436,12 +551,9 @@ export class ParticleFX {
       const posAttr = geo.getAttribute("position") as THREE.BufferAttribute;
       const colAttr = geo.getAttribute("color") as THREE.BufferAttribute;
       const sizeAttr = geo.getAttribute("size") as THREE.BufferAttribute;
-      posAttr.addUpdateRange(0, n * 3);
-      colAttr.addUpdateRange(0, n * 4);
-      sizeAttr.addUpdateRange(0, n);
-      posAttr.needsUpdate = true;
-      colAttr.needsUpdate = true;
-      sizeAttr.needsUpdate = true;
+      uploadDensePrefix(posAttr, n);
+      uploadDensePrefix(colAttr, n);
+      uploadDensePrefix(sizeAttr, n);
     }
     this.points.visible = n > 0;
 
@@ -488,7 +600,7 @@ export class ParticleFX {
     // from being promoted to and churning the old generation.
     let p: Particle;
     if (this.particles.length >= MAX) {
-      p = this.particles.shift()!; // at hard cap, recycle the oldest slot
+      p = this.particles[this.recycleSlot++ % MAX]!; // O(1) ring replacement at capacity
     } else {
       p = this.pool.pop() ?? {
         x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, life: 0, max: 0, size: 0, r: 1, g: 1, b: 1, type: "dust",
@@ -507,6 +619,6 @@ export class ParticleFX {
     p.g = fields.g;
     p.b = fields.b;
     p.type = fields.type;
-    this.particles.push(p);
+    if (this.particles.length < MAX) this.particles.push(p);
   }
 }

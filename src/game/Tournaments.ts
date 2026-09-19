@@ -71,7 +71,7 @@ const CATALOG: {
     cuts: { bronze: 600, silver: 1400, gold: 2600, diamond: 4200 },
   },
   {
-    name: "Zenith Trials",
+    name: "Skyline Trials",
     blurb: "Chain launches and touch the stratosphere.",
     icon: "🚀",
     mode: "zenith",
@@ -436,6 +436,63 @@ export const TRAILS: Record<string, { label: string; colors: [number, number, nu
       [0.29, 0.78, 1],
       [1, 0.85, 0.23],
       [0.54, 1, 0.42],
+    ],
+  },
+  /* shop trails — new additions */
+  trail_spark: {
+    label: "Sparklejet",
+    colors: [
+      [1, 0.95, 0.44],
+      [1, 0.9, 0.5],
+      [1, 1, 1],
+    ],
+  },
+  trail_aurora: {
+    label: "Aurorawave",
+    colors: [
+      [0.25, 0.88, 0.82],
+      [0.48, 0.41, 0.93],
+      [0.6, 0.98, 0.6],
+    ],
+  },
+  trail_lava: {
+    label: "Lavaflow",
+    colors: [
+      [1, 0.27, 0],
+      [0.55, 0.27, 0],
+      [1, 0.55, 0],
+    ],
+  },
+  trail_crystal: {
+    label: "Crystaline",
+    colors: [
+      [0.69, 0.88, 1],
+      [0.91, 0.97, 1],
+      [0.43, 0.78, 1],
+    ],
+  },
+  trail_shadow: {
+    label: "Shadowrift",
+    colors: [
+      [0.1, 0, 0.19],
+      [0.29, 0, 0.5],
+      [0.56, 0.38, 0.78],
+    ],
+  },
+  trail_cherry: {
+    label: "Sakuradrift",
+    colors: [
+      [1, 0.72, 0.77],
+      [1, 0.52, 0.63],
+      [1, 0.94, 0.96],
+    ],
+  },
+  trail_cosmic: {
+    label: "Cosmicray",
+    colors: [
+      [1, 0.43, 0.78],
+      [0.52, 0.37, 0.97],
+      [0.3, 0.79, 0.94],
     ],
   },
 };

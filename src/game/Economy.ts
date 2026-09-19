@@ -1,3 +1,5 @@
+import { SELL_AD_REMOVAL } from "./edition";
+
 export type SkinRarity = "starter" | "common" | "rare" | "epic" | "legendary" | "mythic";
 export type CollectionId = "starter" | "nature" | "elements" | "cosmic" | "seasonal" | "premium" | "tournament" | "achievement";
 
@@ -38,7 +40,7 @@ export const COLLECTIONS: { id: CollectionId; name: string; icon: string }[] = [
   { id: "achievement", name: "Achievement", icon: "🎖" },
 ];
 
-export const SKINS: SkinDef[] = [
+const BASE_SKINS: SkinDef[] = [
   {
     id: "sunbird",
     name: "Sunbird",
@@ -535,6 +537,22 @@ export const SKINS: SkinDef[] = [
   { id: "dark_matter", name: "Dark Matter", perk: "+4% speed · +4 s fever", price: 850, body: 0x1a1a2e, wing: 0x333355, belly: 0x4a4a6a, beak: 0x8888aa, speedMult: 1.04, feverBonus: 4, daylightBonus: 0, magnetAlways: false, rarity: "mythic", collection: "cosmic" },
 ];
 
+/**
+ * Cosmetics are a long-term collection goal. Keeping the original catalogue
+ * values separate makes the economy curve intentional and auditable rather
+ * than a wall of hand-edited numbers. Earn-only and real-money items retain
+ * their existing rules.
+ */
+function collectionPrice(price: number): number {
+  return price === 0 ? 0 : Math.ceil((price * 1.75) / 25) * 25;
+}
+
+export const SKINS: SkinDef[] = BASE_SKINS.map((skin) =>
+  skin.price === 0 || skin.goldOnly || skin.vipOnly || skin.prizeOnly
+    ? skin
+    : { ...skin, price: collectionPrice(skin.price) },
+);
+
 export function skinById(id: string): SkinDef {
   return SKINS.find((s) => s.id === id) ?? SKINS[0]!;
 }
@@ -545,16 +563,24 @@ export type BoostDef = {
   desc: string;
   price: number;
   icon: string;
+  permanent?: boolean;
 };
 
-export const BOOSTS: BoostDef[] = [
+const BASE_BOOSTS: BoostDef[] = [
   { id: "shield", name: "Sea Shield", desc: "Bounce off the ocean once", price: 60, icon: "🛡" },
   { id: "magnet", name: "Coin Magnet", desc: "Take off with 15 s of magnet", price: 40, icon: "🧲" },
   { id: "sunflask", name: "Sun Flask", desc: "+12 s daylight at takeoff", price: 50, icon: "☀" },
   { id: "headstart", name: "Head Start", desc: "Launch from 300 m at full speed", price: 90, icon: "🚀" },
   { id: "stormward", name: "Storm Ward", desc: "Ash clouds and gusts barely touch you", price: 70, icon: "🌩" },
   { id: "hotwings", name: "Hot Wings", desc: "Take off already in Fever", price: 80, icon: "🔥" },
+  { id: "doubletap", name: "Sunburst Trigger", desc: "Double-tap in flight for a powerful burst", price: 420, icon: "⚡", permanent: true },
 ];
+
+/** Consumables rise modestly; daily deals remain a valuable return visit. */
+export const BOOSTS: BoostDef[] = BASE_BOOSTS.map((boost) => ({
+  ...boost,
+  price: Math.ceil((boost.price * 1.25) / 5) * 5,
+}));
 
 /* ---------- shop trails (coins) — prize trails still come from cups ---------- */
 
@@ -567,7 +593,7 @@ export type ShopTrailDef = {
   css: string[];
 };
 
-export const SHOP_TRAILS: ShopTrailDef[] = [
+const BASE_SHOP_TRAILS: ShopTrailDef[] = [
   { id: "trail_ember", label: "Emberline", desc: "A streak of live coals", price: 300, css: ["#ff8a3a", "#ff4a2a", "#ffd27a"] },
   { id: "trail_tide", label: "Tideglass", desc: "Cool sea-green ribbon", price: 350, css: ["#3ae0c8", "#2a9ad8", "#c8fff2"] },
   { id: "trail_bloom", label: "Petalfall", desc: "Drifting pink petals", price: 350, css: ["#ff9ac8", "#ff6a9a", "#ffe0ee"] },
@@ -575,8 +601,20 @@ export const SHOP_TRAILS: ShopTrailDef[] = [
   { id: "trail_void", label: "Voidwake", desc: "Deep-space violet wake", price: 420, css: ["#6a3aff", "#2a1a6a", "#c8a8ff"] },
   { id: "trail_mint", label: "Mintcloud", desc: "Fresh mint vapor", price: 280, css: ["#7affc8", "#3ad89a", "#e0fff2"] },
   { id: "trail_rose", label: "Rosewind", desc: "Warm rose-gold shimmer", price: 380, css: ["#ffb0a0", "#ff7a6a", "#ffe8d8"] },
-  { id: "trail_neon", label: "Neonpulse", desc: "Electric arcade glow", price: 450, css: ["#3affff", "#ff3aff", "#ffff3a"] },
+  { id: "trail_neon",    label: "Neonpulse",  desc: "Electric arcade glow",      price: 450, css: ["#3affff", "#ff3aff", "#ffff3a"] },
+  { id: "trail_spark",   label: "Sparklejet", desc: "Glittering stardust burst",  price: 380, css: ["#fff176", "#ffe57f", "#ffffff"] },
+  { id: "trail_aurora",  label: "Aurorawave", desc: "Northern lights ribbon",     price: 490, css: ["#40e0d0", "#7b68ee", "#98fb98"] },
+  { id: "trail_lava",    label: "Lavaflow",   desc: "Molten rock and cinders",    price: 420, css: ["#ff4500", "#ff8c00", "#ffd700"] },
+  { id: "trail_crystal", label: "Crystaline", desc: "Shattered ice shards",       price: 400, css: ["#b0e0ff", "#e8f4ff", "#6ec6ff"] },
+  { id: "trail_shadow",  label: "Shadowrift", desc: "Dark matter in your wake",   price: 460, css: ["#1a0030", "#4a0080", "#9060c8"] },
+  { id: "trail_cherry",  label: "Sakuradrift",desc: "Cherry blossom flurry",      price: 360, css: ["#ffb7c5", "#ff85a1", "#fff0f5"] },
+  { id: "trail_cosmic",  label: "Cosmicray",  desc: "Supernova particle stream",  price: 500, css: ["#ff6ec7", "#845ef7", "#4cc9f0"] },
 ];
+
+export const SHOP_TRAILS: ShopTrailDef[] = BASE_SHOP_TRAILS.map((trail) => ({
+  ...trail,
+  price: Math.ceil((trail.price * 1.5) / 25) * 25,
+}));
 
 /** Deterministic daily deal: one boost at half price, same for everyone all day. */
 export function dailyDealBoost(dateStr: string): { id: string; price: number } {
@@ -586,19 +624,39 @@ export function dailyDealBoost(dateStr: string): { id: string; price: number } {
   return { id: def.id, price: Math.max(10, Math.floor(def.price / 2 / 5) * 5) };
 }
 
+/** Deterministic daily flash sale: one bird skin at 40% off, same for all pilots each day. */
+export function dailyFlashBird(dateStr: string): { id: string; price: number; originalPrice: number; discountPct: number } {
+  const candidates = SKINS.filter(s => s.price > 0 && !s.goldOnly && !s.vipOnly && !s.prizeOnly);
+  let h = 7919;
+  for (let i = 0; i < dateStr.length; i++) h = ((h << 5) + h + dateStr.charCodeAt(i)) >>> 0;
+  const def = candidates[h % candidates.length] || candidates[0]!;
+  const price = Math.max(50, Math.floor((def.price * 0.6) / 5) * 5);
+  return { id: def.id, price, originalPrice: def.price, discountPct: 40 };
+}
+
+/**
+ * The Gold pitch. The ad-removal bullet only exists in editions that are
+ * allowed to sell ad removal (`SELL_AD_REMOVAL`): portal editions let the
+ * platform own ad frequency and forbid in-app purchases (Poki REQ-20), so
+ * there the ternary folds to `[]` and the claim never reaches the bundle —
+ * `scripts/portal-markers.mjs` fails the build if that ever regresses.
+ */
+const GOLD_FEATURES = [
+  "Phoenix skin — permanent coin magnet & ember trail",
+  "2× coins on every flight",
+  "+10 s longer days",
+  ...(SELL_AD_REMOVAL ? ["No sponsored breaks, ever"] : []),
+  "Unlimited free second winds — the sun never wins",
+  "Fly yesterday's hills or wild random seeds",
+  "Unlocks the Nest Pass premium reward track",
+];
+
 export const GOLD = {
   sku: "sunbird_gold" as const,
-  price: "$2.99",
+  price: "● 500",
+  coinPrice: 500,
   name: "Sunbird Gold",
-  features: [
-    "Phoenix skin — permanent coin magnet & ember trail",
-    "2× coins on every flight",
-    "+10 s longer days",
-    "No sponsored breaks, ever",
-    "Unlimited free second winds — the sun never wins",
-    "Fly yesterday's hills or wild random seeds",
-    "Unlocks the Nest Pass premium reward track",
-  ],
+  features: GOLD_FEATURES,
 };
 
 /** One-time starter pack: the classic >90%-of-first-purchases offer. Shown
@@ -607,7 +665,8 @@ export const GOLD = {
  * one; its job is to convert, not to profit. */
 export const STARTER_PACK = {
   sku: "sunbird_starter" as const,
-  price: "$0.99",
+  price: "● 250",
+  coinPrice: 250,
   name: "First Flight Pack",
   coins: 1200,
   trailId: "trail_gold",
@@ -616,7 +675,9 @@ export const STARTER_PACK = {
 
 export const VIP = {
   sku: "sunbird_vip" as const,
-  price: "$1.99/mo",
+  price: "● 1,500",
+  /** Pure coin unlock — earnable directly through gameplay. */
+  coinPrice: 1500,
   name: "Sunbird VIP",
   features: [
     "Exclusive Aurora bird skin with a rainbow trail",
@@ -636,6 +697,8 @@ export const PROMO_CODES: Record<string, Promo> = {
   NEST250: { type: "coins", amount: 250 },
   FEATHER: { type: "coins", amount: 100 },
   AURORA: { type: "vip" },
+  KONAMI: { type: "coins", amount: 500 },
+  EASTER: { type: "coins", amount: 100 },
 };
 
 export type SkinView = {
@@ -645,6 +708,7 @@ export type SkinView = {
   locked: boolean;
   lockReason: "gold" | "vip" | null;
   affordable: boolean;
+  dealPrice?: number;
 };
 
 export type BoostView = {
@@ -661,3 +725,23 @@ export type ShopTrailView = {
   equipped: boolean;
   affordable: boolean;
 };
+
+export type WheelSector = {
+  id: string;
+  label: string;
+  icon: string;
+  kind: "coins" | "boost" | "vault";
+  value: number | string;
+  color: string;
+};
+
+export const WHEEL_SECTORS: WheelSector[] = [
+  { id: "c100", label: "100 Coins", icon: "●", kind: "coins", value: 100, color: "#ff8c00" },
+  { id: "c250", label: "250 Coins", icon: "●", kind: "coins", value: 250, color: "#e0392a" },
+  { id: "magnet", label: "Coin Magnet", icon: "🧲", kind: "boost", value: "magnet", color: "#3d8bf2" },
+  { id: "c500", label: "500 Coins", icon: "●", kind: "coins", value: 500, color: "#2f855a" },
+  { id: "headstart", label: "Head Start", icon: "🚀", kind: "boost", value: "headstart", color: "#6b46c1" },
+  { id: "c1000", label: "1,000 JACKPOT!", icon: "💎", kind: "coins", value: 1000, color: "#d69e2e" },
+  { id: "vault", label: "Vault Key", icon: "🥚", kind: "vault", value: 1, color: "#d63384" },
+  { id: "c150", label: "150 Coins", icon: "●", kind: "coins", value: 150, color: "#00a3c4" },
+];

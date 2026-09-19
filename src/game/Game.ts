@@ -1,20 +1,30 @@
+import { equalizedRace } from "./RaceRules";
+import { terrainCue, landingLookAhead } from "./FlightGuidance";
+import { ScreenHistory } from "./ScreenHistory";
+import { copyText, shareText } from "./Clipboard";
+import { replayOptions, shouldRebuildCasualWorld, type RunOptions } from "./Replay";
 import * as THREE from "three";
 import { Achievements } from "./Achievements";
 import { GameAudio } from "./Audio";
 import { BIOMES, biomeForIsland } from "./Biomes";
 import { TRACK_NAMES } from "./Music";
 import { Bird, type BirdStepOpts } from "./Bird";
+import { AttractPilot } from "./pilot";
 import { CameraRig } from "./CameraRig";
 import { PICKUP_STYLE, Collectibles, type CloudKind, type PickupKind } from "./Collectibles";
 import { evaluateNearMiss, FlowTuner, SessionGoals, type NearMiss } from "./Engagement";
-import { BIG_LAUNCH_QUIPS, FEVER_QUIPS, GEM_QUIPS, MILESTONE_QUIPS, SLEEP_QUIPS, SPLASH_QUIPS, SURRENDER_QUIPS, SurpriseEngine, quip } from "./Surprises";
-import { Fx } from "./Fx";
+import { BIG_LAUNCH_QUIPS, BOP_QUIPS, FEVER_QUIPS, GEM_QUIPS, MILESTONE_QUIPS, SLEEP_QUIPS, SPLASH_QUIPS, SURRENDER_QUIPS, THUD_QUIPS, SurpriseEngine, quip } from "./Surprises";
+import type { Fx } from "./Fx";
+import { DPR_COOLDOWN_SECONDS, nextBloomBudget, nextDpr, QUALITY_WINDOW_SECONDS } from "./quality";
 import { LaunchSystem, ratingLabel, type LaunchResult } from "./LaunchSystem";
-import { MASS_RACE_FIELD, MODES, modeById, RACE_FINISH, type ModeDef, type ModeId } from "./Modes";
+import { isRaceMode, MASS_RACE_FIELD, MODES, modeById, PVP_MODES, PVP_WORLDS, RACE_FINISH, type ModeDef, type ModeId, type PvpWorldCourse } from "./Modes";
 import { MassRace } from "./MassRace";
 import { FinishGate } from "./FinishGate";
-import { isMultiplayerConfigured, makeRoomCode, RealtimeClient } from "./Realtime";
+import { fetchPublicRooms, isMultiplayerConfigured, makeRoomCode, RealtimeClient, type AnyRealtimeClient } from "./Realtime";
+import { RoomWatcher, ROOM_POLL_MS, roomSummaryLine, summarizeRooms, type LiveRoom } from "./RoomBrowser";
 import { Leaderboard, loadPilotName, savePilotName, isLeaderboardOnline, type BoardMetric, type BoardPage, type BoardScope } from "./Leaderboard";
+import { generatePilotName } from "./pilotNameGenerator";
+import { setLocale, type SupportedLocale } from "../i18n";
 import { Tournaments, TRAILS, weekKey, type PrizeGrant } from "./Tournaments";
 import {
   dailyChallenge,
@@ -30,6 +40,10 @@ import {
 } from "./Challenges";
 import { bankMasteryRun, masteryPerks, masteryViews, NO_MASTERY_PERKS, type MasteryPerks } from "./Mastery";
 import { FirstFlight } from "./FirstFlight";
+import { bootStage, defer } from "./BootProgress";
+import { continueOffer, continuePlacementLabel, type ContinueOffer } from "./ContinueOffer";
+import { createWakeLock, type ScreenWakeLock } from "./WakeLock";
+import { detectDeviceProfile, describeDeviceProfile, deviceProfileTelemetry, type DeviceProfile } from "../sdk/device-report";
 import { campaignProgress, campaignViews, CAMPAIGN } from "./Campaign";
 import { monthKey, monthlyTheme, THEME_TRAIL_CLEARS, weeklyEvent } from "./Events";
 import { emptySquadState, SquadClient } from "./Squad";
@@ -55,44 +69,52 @@ import {
   FEVER_DURATION,
   FEVER_NEED,
   HEADSTART_DISTANCE,
+  ISLAND_PERIOD,
   MAGNET_TIME,
+  MANUAL_BOOST_COOLDOWN,
+  MANUAL_BOOST_SPEED,
+  MANUAL_BOOST_TIME,
   PHYS_DT,
   PICKUP_SUN_TIME,
   REFERRAL_BONUS,
+  STALL_SPEED,
   WATER_Y,
   ZENITH_ALT,
   ZENITH_DURATION,
   ZENITH_SLOWMO,
 } from "./constants";
-import { BOOSTS, COLLECTIONS, GOLD, PROMO_CODES, SHOP_TRAILS, SKINS, STARTER_PACK, VIP, dailyDealBoost, skinById, type BoostView, type ShopTrailView, type SkinDef, type SkinView } from "./Economy";
+import { BOOSTS, COLLECTIONS, GOLD, PROMO_CODES, SHOP_TRAILS, SKINS, STARTER_PACK, VIP, WHEEL_SECTORS, dailyDealBoost, dailyFlashBird, skinById, type BoostView, type ShopTrailDef, type ShopTrailView, type SkinDef, type SkinView } from "./Economy";
 import { nextWings, wingsFor, wingsProgress, wingsPromotion } from "./Career";
 import { GhostPlayer, GhostRecorder } from "./Ghost";
 import { fetchRivalGhost, publishGhost } from "./GhostNet";
 import { HUD, type CalendarCard, type CheckoutMode, type DailyCard, type GauntletCard, type HudSnapshot, type LoadoutView, type RivalCard, type SeedMode, type UiScreen, type UiState } from "./HUD";
-import { divisionFor, duelOpponent, duelSkillFor, featuredRivals, nextDivision, seasonReward } from "./pvp";
+import { divisionFor, duelOpponent, duelSkillFor, lobbyRivals, nextDivision, rankSeasonId, seasonReward } from "./pvp";
+import { PilotBook } from "./pilots";
+import { launchIntentFor, pvpCircuitFor } from "./launchRouting";
+import { countSharePlay, loadSharedRun, shareRun, sharingAvailable, type SharedRun } from "./SharedRun";
 import { Input } from "./Input";
 import { clamp, dateSeed, formatDatePretty, lerp, SeededRandom } from "./math";
 import { Missions, type MissionView, type QuestReward, type QuestView, type RunStats } from "./Missions";
 import { ParticleFX } from "./ParticleFX";
 import { TrailRibbon } from "./Trail";
 import { fetchServerEntitlements,
-  consumeStripeReturn,
-  ensureStripeJs,
   MockAdProvider,
-  MockPaymentProvider,
-  stripeConfigured,
-  stripeLinkFor,
+  CoinPaymentProvider,
   type AdProvider,
   type Sku,
 } from "./Payments";
 import { SaveData } from "./SaveData";
+import { SocialSystem } from "./SocialSystem";
 import { SeasonPass, seasonId, seasonLabel, XP_RULES } from "./SeasonPass";
-import { buildShareCard, shareOrDownload } from "./Social";
+import { FlightCues } from "./FlightCues";
+import { endlessSpeedScale } from "./FlightProgression";
 import { buildChallengeUrl, readChallengeFromUrl, type RivalChallenge } from "./Challenge";
 import { flag } from "./Flags";
 import { variant } from "./Experiments";
 import { buildRoomInviteUrl, normalizeRoomCode, readRoomInviteFromUrl } from "./RoomInvite";
-import { initPlatform, isPortalBuild, portalTarget, type PlatformAdapter } from "../sdk/platform";
+import { PORTAL_BANNER_ID, attachPortalErrorReporters, initPlatform, isCoarsePointer, isPortalBuild, portalTarget as getPortalTarget, type PlatformAdapter } from "../sdk/platform";
+import { CUSTOM_PILOT_NAMES, POKI_MULTIPLAYER, SQUAD_CHAT } from "./edition";
+import { GameplayEventSink } from "./GameplayEvents";
 import { LivingBackground } from "./LivingBackground";
 import { Sky } from "./Sky";
 import { Telemetry } from "./Telemetry";
@@ -115,6 +137,7 @@ export class Game {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene: THREE.Scene;
   private readonly save: SaveData;
+  private readonly social: SocialSystem;
   private readonly missions: Missions;
   private readonly achievements: Achievements;
   private readonly seasonPass: SeasonPass;
@@ -125,13 +148,34 @@ export class Game {
   private readonly camera: CameraRig;
   private readonly particles: ParticleFX;
   private readonly trail: TrailRibbon;
-  private readonly fx: Fx;
+  private fx: Fx | null = null;
+  private fxLoading = false;
+  private fxFailed = false;
+  private menuRenderAcc = 1 / 30;
+  private readonly attractPilot = new AttractPilot();
+  private readonly flightCues = new FlightCues();
+  private lastHudAt = -Infinity;
+  private lastHudVersion = -1;
   private readonly isMobile: boolean;
   private useBloom = false;
+  private bloomBudget = { enabled: false, goodWindows: 0, cooldown: 0 };
   private readonly sky: Sky;
-  private readonly mockPayments = new MockPaymentProvider();
+  private readonly mockPayments = new CoinPaymentProvider();
   private readonly ads: AdProvider = new MockAdProvider();
   private platform: PlatformAdapter | null = null;
+  /** Detaches the window error → `captureError` reporters (see platform boot). */
+  private detachPortalErrorReporters: (() => void) | null = null;
+  /**
+   * Every gameplayStart/gameplayStop that reaches a portal funnels through
+   * this sink — Poki forbids a gameplay event following an identical one.
+   * The adapter may not exist until the async SDK init lands; the sink
+   * records the phase either way so a late landing never replays a stale
+   * stop/start.
+   */
+  private readonly gameplaySink = new GameplayEventSink((phase) => {
+    if (phase === "start") this.platform?.gameplayStart();
+    else this.platform?.gameplayStop();
+  });
   private readonly telemetry = new Telemetry();
   private readonly ghostRecorder = new GhostRecorder();
   private readonly ghostPlayer = new GhostPlayer();
@@ -151,6 +195,7 @@ export class Game {
 
   private state: GameState = "menu";
   private screen: UiScreen = "main";
+  private readonly screenHistory = new ScreenHistory<UiScreen>("main");
   private uiVersion = 0;
   private viewsVersion = -1;
   private missionViews: MissionView[] = [];
@@ -170,6 +215,12 @@ export class Game {
   private runTime = 0;
   private disposed = false;
   private hidden = false;
+  /** The browser dropped the WebGL context (GPU reset, driver crash, a long
+   *  background stint). We stop drawing and wait for webglcontextrestored
+   *  instead of burning frames against a dead context. */
+  private contextLost = false;
+  /** Anti-oscillation lock-out for resolution changes, in seconds. */
+  private dprCooldown = 0;
   private timeScale = 1;
   private zenithTimer = 0;
   private hitStopTimer = 0;
@@ -183,10 +234,31 @@ export class Game {
   private perfTimer = 0;
   private qualityTimer = 0;
   private dpr = 1;
+  private renderWidth = 0;
+  private renderHeight = 0;
+  private renderDpr = 0;
+  private dustCooldown = 0;
   private particleBudget = 1;
   private deferredInstall: BeforeInstallPromptEvent | null = null;
   private readonly onBeforeInstall: (e: Event) => void;
   private readonly onInstalled: () => void;
+  private readonly onContextLost: (e: Event) => void;
+  private readonly onContextRestored: () => void;
+
+  /**
+   * Measured capability baseline (Poki Player Device Report, DEV-03). Probed
+   * once, before the renderer exists, and read for every quality decision —
+   * shadows, pixel ratio, particle budget. Never inferred from the UA alone.
+   */
+  private readonly deviceProfile: DeviceProfile = detectDeviceProfile();
+  /**
+   * Keeps the phone screen awake for the duration of a run (DEV-14: WakeLock is
+   * one of the APIs the Device Report tracks; a dimming screen mid-flight is
+   * the most common non-bug drop-off on mobile). No-op where unsupported.
+   */
+  private readonly wakeLock: ScreenWakeLock = createWakeLock();
+  /** Context-driven rewarded framing for the continue screen (MON-19). */
+  private continueOfferView: ContinueOffer | null = null;
 
   private daylight = DAYLIGHT_MAX;
   private startX = 64;
@@ -201,9 +273,18 @@ export class Game {
   private bonus = 0;
   private scoreAccum = 0;
   private splashCd = 0;
+  private thudCount = 0;
+  private bounceCount = 0;
+  private konamiBuffer: string[] = [];
+  /** Edge-trigger for the ocean-entry splash burst (see fixedUpdate). */
+  private wasInWater = false;
   private hintTimer = 0;
   private hint = "";
   private runCoins = 0;
+  /** The end-of-run 3× coin bonus claims once per run — the results card
+   * re-renders every frame, so without this flag the bonus was re-claimable
+   * forever (each claim tripled runCoins and re-armed the card). */
+  private multiplierClaimed = false;
   private runClouds = 0;
   private zeniths = 0;
   private pickups = 0;
@@ -218,6 +299,8 @@ export class Game {
   private splashQuipN = 0;
   private shield = 0;
   private boostTimer = 0;
+  private manualBoostCooldown = 0;
+  private wasDiving = false;
   private continuesUsed = 0;
   private continueTimer = 0;
   private adTimer = 0;
@@ -228,6 +311,16 @@ export class Game {
   private claimedQuests: QuestReward[] = [];
   private menuHold = 0;
   private needRelease = false;
+  /**
+   * Attract mode: the live sim flies behind the menu (see menuTick). Demo
+   * physics runs the real Bird.step with the pilot's hold decisions — no
+   * scoring, audio, saves or telemetry, so the backdrop can never leak
+   * into a run. resetRun(true) is the silent demo reset; startRun() takes
+   * over seamlessly because the first menu HOLD carries straight into it.
+   */
+  private demoAcc = 0;
+  private demoTime = 0;
+  private demoStuck = 0;
   private ghostWasAhead = false;
   private ghostPassed = false;
   private readonly launch = new LaunchSystem();
@@ -243,17 +336,27 @@ export class Game {
   private boardLoading = false;
   private lastPrize: PrizeGrant | null = null;
   private racePlace = 0;
+  /** Outcome of the in-flight run for the portal funnel (`complete` only when the goal was reached). */
+  private runOutcome: "complete" | "fail" = "fail";
   private raceField = 0;
   private raceFinishTime = 0;
-  private net: RealtimeClient | null = null;
+  private net: AnyRealtimeClient | null = null;
   private roomCode = "";
+  /** True when the current roomCode was entered/invited by another player
+   *  (vs. generated locally by host-room or by quick-match shuffle). Only
+   *  remote codes cause the client to adopt the host's seed on welcome —
+   *  our own codes should keep our selected format/world. */
+  private joiningRemoteRoom = false;
   /** Room invite (#room=) pending application on the first frame. */
   private pendingRoomInvite = "";
   private roomSize = 40;
   private roomSkill: "chill" | "sharp" | "ace" = "sharp";
   private roomMuted = false;
-  private lastEmoteAt = 0;
+  private lastEmoteWallAt = 0;
+  /** Run-clock stamp for the automatic crown emote on a personal best. */
+  private lastEmoteRunAt = 0;
   private draftBanner = 0;
+  private wasDrafting = false;
   /** Rival tracking: who beat you last time, for the revenge prompt. */
   private nemesis = "";
   private photoFinish = "";
@@ -262,14 +365,26 @@ export class Game {
   private lastRatingBonus = 0;
   private lastPlace = 0;
   private overtakeAcc = 0;
+  private closeCallAcc = 0;
+  private nextKnockoutDist = 500;
+  private knockoutWarned = false;
   /** Ranked 1v1 duel: one seeded opponent, flat ±16 rating swing. */
   private duelActive = false;
   /** Matchmaking search deadline (wall-clock ms; 0 = not searching). Wall
    *  clock, not frame dt — frame time is capped at 100 ms, so on slow
    *  devices an accumulated-dt countdown runs slower than real time. */
   private mmDeadline = 0;
+  private localRace = false;
+  private networkStartAt = 0;
   /** Deferred launch options for when the search resolves. */
   private mmOpts: { ranked: boolean; storm: boolean } | null = null;
+  /** Search phase: a live countdown while "searching", then "waiting" — the
+   *  search stays open and the pilot decides, instead of being dropped into an
+   *  AI race they never asked for. */
+  private mmPhase: "searching" | "waiting" = "searching";
+  /** Summary of public rooms seen during the search (real players, no fakes). */
+  private mmRooms = "";
+  private roomWatcher: RoomWatcher | null = null;
   /** The last launched match's options — powers the one-tap Rematch button. */
   private lastMatchOpts: { ranked: boolean; storm: boolean } | null = null;
   /** Stormfront mode: PvE hazards×PvP race hybrid — everyone flies the gauntlet. */
@@ -286,6 +401,14 @@ export class Game {
   private goldenHour = false;
   private nextMilestone = 500;
   private rivalBeatenToast = false;
+
+  /* ---- AUDS shared runs: async multiplayer by code (Poki builds) ---- */
+  /** The code published for the run on screen, "" until the player shares. */
+  private shareCode = "";
+  private runShareBusy = false;
+  private shareError = "";
+  /** The friend's run loaded from a code, waiting to be raced. */
+  private sharedRun: SharedRun | null = null;
   /** True once the DO's official finish place has been folded in this race. */
   private serverPlaceApplied = false;
   private duelResult: "" | "won" | "lost" = "";
@@ -302,6 +425,8 @@ export class Game {
   private eventRun = false;
   /** Squad (friends/clubs/chat) client + last action notice. */
   private squad: SquadClient | null = null;
+  /** The real pilots this device has flown with (see pilots.ts). */
+  private readonly pilots = new PilotBook();
   private squadNotice = "";
   private squadPoll = 0;
   private readonly flow = new FlowTuner();
@@ -324,6 +449,18 @@ export class Game {
   private coach: FirstFlight | null = null;
   private mode: ModeDef = modeById("daytrip");
   private modeId: ModeId = "daytrip";
+  private selectedPvpMode: ModeId = "pvp_sprint";
+  private selectedPvpWorld = "emerald";
+  private selectedCourse: PvpWorldCourse = PVP_WORLDS[0]!;
+
+  /** The race course in effect (selection, with legacy world-id fallback). */
+  private courseForRace(): PvpWorldCourse {
+    return (
+      this.selectedCourse ??
+      (this.selectedPvpWorld ? PVP_WORLDS.find((w) => w.id === this.selectedPvpWorld) : null) ??
+      PVP_WORLDS[0]!
+    );
+  }
   /** Permanent per-mode mastery perks (coin/daylight/fever/lift), refreshed each run. */
   private masteryPerk: MasteryPerks = NO_MASTERY_PERKS;
   private maxAltitude = 0;
@@ -349,10 +486,12 @@ export class Game {
   private windEmitAcc = 0;
   private trailFxAcc = 0;
   private powerFxAcc = 0;
-  private atmosphereFxAcc = 0;
   private hueT = 0;
   private lastBiomeId = "";
   private readonly onFocus: () => void;
+  private readonly onBlur: () => void;
+  private readonly onOrientationChange: () => void;
+  private readonly onFullscreenChange: () => void;
 
   private checkoutSku: Sku = "sunbird_gold";
   private checkoutBusy = false;
@@ -376,6 +515,7 @@ export class Game {
 
   constructor(private readonly host: HTMLElement) {
     this.save = new SaveData();
+    this.social = new SocialSystem(this.save);
     // Corruption recovery is a data-loss event worth knowing about: the blob is
     // parked (not destroyed), but the player is silently starting fresh unless
     // we say so. Track it once, and toast it below once the HUD exists.
@@ -391,44 +531,135 @@ export class Game {
     // unless we say so — route them through the same observability bus.
     this.save.onPersistError = () => this.telemetry.track("save_persist_failed", {});
     this.cups = new Tournaments(this.save.state.tournaments);
+    // First-boot name: if no pilotName was saved, generate one right now so the
+    // player has an identity for leaderboards, multiplayer, and the account
+    // screen before they ever touch a name field. The generator produces
+    // memorable <SkyWord><BirdWord><NN> pairs (e.g. NovaFalcon42).
+    const generatedFresh = !this.save.state.pilotName;
     this.pilotName = this.save.state.pilotName || loadPilotName(this.save.state.deviceId);
     this.save.state.pilotName = this.pilotName;
-    if (this.cups.rollover()) this.save.persist();
+    if (generatedFresh || this.cups.rollover()) this.save.persist();
     // Ranked season rollover can also land between sessions.
     const seasonEnd = this.save.ensureRankSeason();
     this.seed = this.today;
     this.squad = new SquadClient(this.save.state.deviceId, () => this.pilotName);
     this.squad.setOnChange(() => this.bump());
+    // The public pilot record needs the mark and the bird; the game is the only
+    // thing that knows them. Refresh it whenever a run might have improved it.
+    this.squad.setPublishStats({ bestDistance: this.save.state.bestDistance, skin: this.skin.id });
 
     host.classList.add("game-root");
     const canvas = document.createElement("canvas");
     canvas.className = "game-canvas";
     host.appendChild(canvas);
+    if (isPortalBuild()) {
+      // Portal pages are long (the game sits in an iframe on a scrollable
+      // host page): a wheel over the canvas must not scroll the page.
+      // In-game HTML panels keep their own scroll behavior untouched.
+      canvas.addEventListener("wheel", (ev) => ev.preventDefault(), { passive: false });
+    }
 
-    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+    // Embedded portal browsers often expose a desktop UA at a phone-sized
+    // viewport. Treat the narrow viewport as mobile too, otherwise we keep a
+    // 2x render target and shadows that make the flight feel laggy.
+    // Tablets count as mobile-class: iPads report desktop-ish UAs and wide
+    // viewports, so UA+width alone would hand them the desktop scheme.
+    // Poki requires mobile control/perf schemes on tablets — a coarse
+    // primary pointer (touch) is the robust signal.
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || isCoarsePointer() || window.innerWidth < 700;
     this.isMobile = isMobile;
-    this.renderer = new THREE.WebGLRenderer({
-      canvas,
-      antialias: !isMobile,
-      powerPreference: isMobile ? "low-power" : "high-performance",
-      stencil: false,
-      alpha: false,
-      premultipliedAlpha: true,
-      failIfMajorPerformanceCaveat: true,
-    });
+
+    // Try hardware-accelerated WebGL first; fall back to software (SwiftShader)
+    // so the game runs in sandboxed/headless environments (e.g. in-app browsers,
+    // CI, Electron without GPU) instead of showing an error screen.
+    let softwareMode = false;
+    try {
+      this.renderer = new THREE.WebGLRenderer({
+        canvas,
+        antialias: !isMobile,
+        powerPreference: isMobile ? "low-power" : "default",
+        stencil: false,
+        alpha: false,
+        premultipliedAlpha: true,
+        // A mobile browser may report a performance caveat even when its
+        // hardware WebGL path is substantially faster than software. Rejecting
+        // it here caused lag spikes on embedded portal browsers.
+        failIfMajorPerformanceCaveat: false,
+      });
+    } catch {
+      softwareMode = true;
+      this.renderer = new THREE.WebGLRenderer({
+        canvas,
+        antialias: false,
+        powerPreference: "default",
+        stencil: false,
+        alpha: false,
+        premultipliedAlpha: true,
+        failIfMajorPerformanceCaveat: false,
+      });
+    }
+
     this.renderer.setClearColor(0x87c8ee, 1);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.27;
-    this.renderer.shadowMap.enabled = true;
+    // 1.27 washed the highlights out under ACES; 1.16 keeps the sun bright
+    // but lets the hills hold their colour instead of turning milky.
+    this.renderer.toneMappingExposure = 1.16;
+    // Software renderer: disable shadows and cap pixel ratio to keep it usable.
+    // The device baseline does the same for measured-lite hardware (≤2 cores,
+    // ≤2 GB, no WebGL) — DEV-03 is "pick tiers from the probe", not from taste.
+    this.renderer.shadowMap.enabled = !softwareMode && this.deviceProfile.tier !== "lite";
     // PCFSoftShadowMap was removed in three r165+ — PCF with a slightly larger
     // shadow map is the soft look without the console warning every load.
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
-    this.dpr = this.preferredDpr();
+    this.dpr = softwareMode ? 1 : this.preferredDpr();
     this.renderer.setPixelRatio(this.dpr);
 
+    // EA-04/EA-05: the renderer (the expensive object) exists — the loading
+    // screen can now say so truthfully.
+    bootStage("engine");
+
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0x8ed0ee, 62, 380);
+    // Fog pushed well past the action: at near=62 the hills the bird is about
+    // to fly through were already washed out, which read as permanent mist.
+    // Keep the horizon readable. The old near fog started inside the play
+    // space and made the whole menu/gameplay read as a white cloud layer.
+    this.scene.fog = new THREE.Fog(0x8ed0ee, 600, 2600);
+
+    // WebGL context loss. A mobile GPU reset, a driver hiccup or a long
+    // background stint can drop the context; without preventDefault() the
+    // browser never restores it and the canvas stays frozen with no
+    // explanation. Three.js re-initialises its own GPU state on restore, so we
+    // only need to stop drawing, tell the player, and resume.
+    this.onContextLost = (e: Event) => {
+      e.preventDefault();
+      this.contextLost = true;
+      if (this.state === "playing") this.setState("paused");
+      this.audio.setHiddenMuted(true);
+      this.hud.toast("Graphics context lost — restoring…");
+      this.telemetry.track("webgl_context_lost", {});
+      // If the GPU never comes back, say so instead of leaving a dead canvas.
+      window.setTimeout(() => {
+        if (this.contextLost && !this.disposed) {
+          this.hud.toast("Graphics could not be restored — reload the page to keep flying");
+          this.telemetry.track("webgl_context_lost_unrecovered", {});
+        }
+      }, 8000);
+    };
+    this.onContextRestored = () => {
+      this.contextLost = false;
+      this.renderWidth = 0; // force a fresh buffer after GPU/context restoration
+      this.audio.setHiddenMuted(false);
+      // Rebuild the drawing buffer at the current size and drop the stale clock.
+      this.dprCooldown = 0;
+      this.last = performance.now();
+      this.acc = 0;
+      this.resize();
+      this.hud.toast("Graphics restored");
+      this.telemetry.track("webgl_context_restored", {});
+    };
+    canvas.addEventListener("webglcontextlost", this.onContextLost, false);
+    canvas.addEventListener("webglcontextrestored", this.onContextRestored, false);
 
     this.hud = new HUD(host);
     this.input = new Input(host, () => {
@@ -445,6 +676,7 @@ export class Game {
 
     this.terrain = new TerrainSystem(this.seed);
     this.scene.add(this.terrain.group);
+    bootStage("world");
 
     this.bird = new Bird();
     this.bird.addTo(this.scene);
@@ -458,7 +690,7 @@ export class Game {
     this.particles.addTo(this.scene);
     this.trail = new TrailRibbon();
     this.trail.addTo(this.scene);
-    this.fx = new Fx(this.renderer, this.scene, this.camera.camera);
+    // Optional post-processing is loaded only when a desktop flight needs it.
     this.sky = new Sky();
     this.scene.add(this.sky.group);
     this.sky.addLights(this.scene);
@@ -495,33 +727,75 @@ export class Game {
     const roomInvite = isMultiplayerConfigured() ? readRoomInviteFromUrl() : null;
     if (roomInvite) {
       this.roomCode = roomInvite;
+      this.joiningRemoteRoom = true;
       this.pendingRoomInvite = roomInvite;
     }
 
     this.onFocus = () => {
+      if (!this.hidden) {
+        this.audio.setHiddenMuted(false);
+        void this.audio.resumeExisting();
+      }
       if (this.checkoutWaiting && this.screen === "checkout") {
-        this.telemetry.track("stripe_return_focus", { sku: this.checkoutSku });
+        this.telemetry.track("checkout_return_focus", { sku: this.checkoutSku });
         this.hud.toast("Welcome back — confirm below if you finished paying", "info");
       }
     };
+    this.onBlur = () => {
+      this.audio.setHiddenMuted(true);
+      void this.audio.suspend();
+    };
+    this.onOrientationChange = () => {
+      try { window.scrollTo(0, 0); } catch { /* ignore */ }
+      this.resize();
+      window.setTimeout(() => this.resize(), 100);
+      window.setTimeout(() => this.resize(), 300);
+    };
+    this.onFullscreenChange = () => {
+      this.resize();
+      const doc = document as Document & { webkitFullscreenElement?: Element };
+      const isFull = Boolean(doc.fullscreenElement || doc.webkitFullscreenElement);
+      this.hud.setFullscreenActive(isFull);
+    };
     window.addEventListener("focus", this.onFocus);
+    window.addEventListener("blur", this.onBlur);
+    window.addEventListener("orientationchange", this.onOrientationChange);
+    document.addEventListener("fullscreenchange", this.onFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", this.onFullscreenChange);
+
+    // Easter egg: Konami code → 500 coins + confetti
+    const KONAMI = ["ArrowUp","ArrowUp","ArrowDown","ArrowDown","ArrowLeft","ArrowRight","ArrowLeft","ArrowRight","b","a"];
+    document.addEventListener("keydown", (e: KeyboardEvent) => {
+      this.konamiBuffer.push(e.key);
+      if (this.konamiBuffer.length > KONAMI.length) this.konamiBuffer.shift();
+      if (this.konamiBuffer.join(",") === KONAMI.join(",")) {
+        this.konamiBuffer = [];
+        this.hud.toast("✨ Cheat mode activated — you found the secret!", "gold");
+        this.save.addCoins(500);
+        if (this.state === "playing") this.particles.emitConfetti(0, 0);
+      }
+    });
 
     this.hud.onAction((action, id) => this.handleAction(action, id));
     this.onResize = () => this.resize();
     this.resizeObs = new ResizeObserver(() => this.resize());
     this.resizeObs.observe(host);
     window.addEventListener("resize", this.onResize);
+    window.visualViewport?.addEventListener("resize", this.onResize);
+    window.visualViewport?.addEventListener("scroll", this.onResize);
     this.onVis = () => {
       if (document.hidden) {
         this.hidden = true;
         if (this.state === "playing") this.setState("paused");
         // Portal QA requirement (and basic courtesy): a hidden tab is silent.
         this.audio.setHiddenMuted(true);
+        void this.audio.suspend();
       } else {
         this.hidden = false;
         this.last = performance.now();
         this.acc = 0;
         this.audio.setHiddenMuted(false);
+        void this.audio.resumeExisting();
       }
     };
     document.addEventListener("visibilitychange", this.onVis);
@@ -543,10 +817,6 @@ export class Game {
     this.raf = requestAnimationFrame(this.loop);
 
     this.goals.reset(this.today);
-    this.terrain.setDifficulty(this.flow.difficulty());
-    // Stripe.js is only fetched when the paywall actually opens — no third-
-    // party network chatter (or console noise) during normal play.
-    this.handleStripeReturn();
     // monthly VIP really lapses — surface it once per session
     this.vipActive = this.save.isVipActive();
     if (this.save.state.vip === false && this.save.state.vipUntil > 0) this.vipExpiredNotice = true;
@@ -566,25 +836,111 @@ export class Game {
       runs: this.save.state.runsPlayed,
       streak: this.save.state.streak.days,
     });
+    // Player Device Report (DEV-03): report the measured baseline once per
+    // session so our own quality-tier decisions can be compared against the
+    // platform's published distribution. Aggregate capability data only — no
+    // identifiers (REQ-32).
+    this.telemetry.track("device_profile", deviceProfileTelemetry(this.deviceProfile));
+    // The human-readable line rides along as a `summary` field: telemetry's
+    // debug channel prints it on localhost, which is where a tier surprise
+    // should be noticed (the production gate forbids console.* in shipped
+    // client code, so this is the sanctioned observability surface).
+    this.telemetry.track("device_summary", { summary: describeDeviceProfile(this.deviceProfile) });
     // Portal SDK initialization is intentionally late: the first interactive
     // menu frame should never wait on a third-party CDN.
     void initPlatform({
       onAdOpened: () => this.beginPortalAd(),
       onAdClosed: () => this.endPortalAd(),
+      onPortalMute: (muted) => this.audio.setPortalMuted(muted),
+      onPause: () => {
+        // Portal-side pause (in addition to visibilitychange): freeze the
+        // same way a hidden tab does — paused state + silenced audio.
+        if (this.state === "playing") this.setState("paused");
+        this.audio.setHiddenMuted(true);
+        void this.audio.suspend();
+      },
+      onResume: () => {
+        this.last = performance.now();
+        this.acc = 0;
+        this.audio.setHiddenMuted(false);
+        void this.audio.resumeExisting();
+      },
     }).then((adapter) => {
       if (this.disposed) return;
       this.platform = adapter;
+      // Level-2 playtest recordings capture whatever canvas the SDK is pointed
+      // at (Poki `playtestSetCanvas`). Without this the recordings Poki sends
+      // back have no gameplay in them.
+      adapter.playtestSetCanvas(this.renderer.domElement);
+      // Surface runtime failures in the portal's error dashboard, not only in
+      // a console nobody watches on a portal.
+      this.detachPortalErrorReporters = attachPortalErrorReporters(adapter);
       adapter.loadingFinished();
-      if (this.state === "playing") adapter.gameplayStart();
-      this.telemetry.track("portal_ready", { portal: adapter.name });
+      adapter.signalGameReady();
+      // Late-landing sync: if the player is already mid-flight when the
+      // SDK arrives, start fires once — the sink suppresses the repeat
+      // on the next genuine transition and never replays a stale phase.
+      if (this.state === "playing") this.gameplaySink.send("start");
+      this.telemetry.track("portal_ready", { portal: adapter.name, caps: adapter.capabilities().join(",") });
+
+      // Portal-native room invite (CrazyGames instant multiplayer): the
+      // platform can deep-link a room through invite params instead of the
+      // #room= URL hash the direct build uses.
+      const portalInvite = normalizeRoomCode(adapter.getInviteParam("room") ?? "");
+      if (portalInvite && !this.pendingRoomInvite) {
+        this.roomCode = portalInvite;
+        this.joiningRemoteRoom = true;
+        this.pendingRoomInvite = portalInvite;
+        this.telemetry.track("portal_invite", { code: portalInvite });
+        this.hud.toast(`🕊 Invited to room ${portalInvite}`, "quest");
+      }
+
+      // Portal identity → pilot name. The portal user's handle is their
+      // public name; honor it unless the player already picked their own.
+      void adapter.getIdentity().then((identity) => {
+        if (this.disposed || !identity?.name) return;
+        if (this.save.state.pilotNameCustomized) return;
+        const next = savePilotName(identity.name);
+        if (!next || next === this.pilotName) return;
+        this.pilotName = next;
+        this.save.state.pilotName = next;
+        this.save.persist();
+        this.telemetry.track("portal_identity", { linked: 1 });
+        this.bump();
+      });
+
+      // Portal ad banner: the host div is rendered by App for portal builds.
+      if (PORTAL_BANNER_ID) {
+        const host = document.getElementById(PORTAL_BANNER_ID);
+        if (host) adapter.mountBanner(host);
+      }
       this.bump();
     });
     if (seasonEnd) this.hud.toast(`⚔ Ranked season over · ${seasonEnd.division} reward +${seasonEnd.coins} coins`, "gold");
     // Warm the embedded main-menu leaderboard on boot so it isn't empty on
-    // the first frame (serves the cache first, so this never blocks paint).
-    void this.refreshBoard();
+    // the first frame. EA-05: this is background work — it is queued as idle
+    // work so the first interactive frame (and the boot bar's last stage) does
+    // not wait on a network round trip. The board serves its cache first, so
+    // arriving late costs the player nothing.
+    defer("menu-board-warmup", () => this.refreshBoard());
+    // EA-05: same for the music bus — the synth graph is created on the first
+    // gesture anyway (autoplay policy), so priming it here is pure headroom.
+    defer("audio-warmup", () => this.audio.setMusicEnabled(this.save.state.settings.music));
+    // The first flyable frame is what the player is actually waiting for: the
+    // world exists, the menu is interactive, and the loop is about to start.
+    bootStage("flight");
     this.bump();
     this.pushHud();
+    // Show name entry on first use
+    if (!this.save.state.pilotNameCustomized && this.state === "menu") {
+      this.setScreen("nameEntry");
+      this.hud.setValue("pilotNameInput", this.pilotName);
+    }
+  }
+
+  private createNetTransport(deviceId: string, pilotName: string, skinId: string): RealtimeClient {
+    // For now: Poki uses local multiplayer (AI rivals). Netlib P2P can be added post-launch.
+    return new RealtimeClient(deviceId, pilotName, skinId, 0.06);
   }
 
   dispose(): void {
@@ -593,12 +949,25 @@ export class Game {
     cancelAnimationFrame(this.raf);
     this.resizeObs.disconnect();
     window.removeEventListener("resize", this.onResize);
+    window.visualViewport?.removeEventListener("resize", this.onResize);
+    window.visualViewport?.removeEventListener("scroll", this.onResize);
+    document.removeEventListener("fullscreenchange", this.onFullscreenChange);
+    document.removeEventListener("webkitfullscreenchange", this.onFullscreenChange);
     document.removeEventListener("visibilitychange", this.onVis);
+    this.renderer.domElement.removeEventListener("webglcontextlost", this.onContextLost);
+    this.renderer.domElement.removeEventListener("webglcontextrestored", this.onContextRestored);
     window.removeEventListener("beforeinstallprompt", this.onBeforeInstall);
     window.removeEventListener("appinstalled", this.onInstalled);
     window.removeEventListener("focus", this.onFocus);
+    window.removeEventListener("blur", this.onBlur);
+    window.removeEventListener("orientationchange", this.onOrientationChange);
+    this.detachPortalErrorReporters?.();
+    this.detachPortalErrorReporters = null;
+    this.wakeLock.dispose();
     this.telemetry.flush();
+    this.squad?.dispose();
     this.telemetry.dispose();
+    this.board.dispose();
     this.weather.dispose();
     this.net?.disconnect();
     this.massRace.dispose();
@@ -610,7 +979,7 @@ export class Game {
     this.bird.dispose();
     this.particles.dispose();
     this.trail.dispose();
-    this.fx.dispose();
+    this.fx?.dispose();
     this.sky.dispose();
     this.collect.dispose();
     this.p1?.dispose(this.scene);
@@ -629,7 +998,7 @@ export class Game {
     try {
     const raw = Math.min(0.1, (now - this.last) / 1000);
     this.last = now;
-    if (this.hidden) return;
+    if (this.hidden || this.contextLost) return;
 
     this.handleHotkeys();
     this.pumpNetwork(raw);
@@ -644,11 +1013,13 @@ export class Game {
       this.roomCode = code;
       this.setScreen("live");
       this.preseatLobby();
-      this.hud.toast(`🎟 Invited to room ${code} — press START to fly`, "gold");
+      this.hud.toast(`🎟 Invited to room ${code} — ready up together to race`, "gold");
       this.telemetry.track("room_invite_opened", { room: code });
     }
-    // Club chat: light polling only while the Squad screen is on screen.
-    if (this.screen === "squad" && this.state === "menu" && this.squad?.live) {
+    // Club chat: light polling only while the Squad screen is on screen, and
+    // only in editions that have a chat surface at all (portal builds do not —
+    // Poki REQ-31). No dead network traffic, no chat endpoint in the log.
+    if (SQUAD_CHAT && this.screen === "squad" && (this.state === "menu" || this.state === "gameover") && this.squad?.live) {
       this.squadPoll += raw;
       if (this.squadPoll >= 4) {
         this.squadPoll = 0;
@@ -689,7 +1060,7 @@ export class Game {
       case "playing":
         if (this.countdown > 0) {
           const before = Math.ceil(this.countdown - 1);
-          this.countdown -= raw;
+          this.countdown = this.networkStartAt > 0 ? Math.max(0, (this.networkStartAt - Date.now()) / 1000) : this.countdown - raw;
           const after = Math.ceil(this.countdown - 1);
           if (after !== before) this.audio.chirp();
           if (this.countdown <= 0) this.audio.island();
@@ -750,13 +1121,53 @@ export class Game {
   }
 
   private menuTick(dt: number): void {
-    const h = this.terrain.heightAt(this.startX);
-    this.bird.x = this.startX;
-    this.bird.y = h + BIRD_RADIUS;
-    this.bird.vx = 6;
-    this.bird.vy = 0;
-    this.bird.grounded = true;
-    this.bird.rotation = Math.atan(this.terrain.slopeAt(this.startX));
+    // Attract mode: fly the actual game behind the menu. Same fixed-step
+    // contract as a run, but the pilot holds the button and nothing outside
+    // the scene (no score, audio, saves, telemetry) can hear it.
+    const calm = this.save.state.settings.reduceMotion;
+    if (calm) {
+      // Reduced motion: static perched bird, like the old painted backdrop.
+      const h = this.terrain.heightAt(this.startX);
+      this.bird.x = this.startX;
+      this.bird.y = h + BIRD_RADIUS;
+      this.bird.vx = 6;
+      this.bird.vy = 0;
+      this.bird.grounded = true;
+      this.bird.rotation = Math.atan(this.terrain.slopeAt(this.startX));
+      if (this.screen === "main") this.holdToStart(dt, 0.18);
+      return;
+    }
+    this.demoTime += dt;
+    this.demoAcc = Math.min(this.demoAcc + dt, 0.25);
+    let n = 0;
+    while (this.demoAcc >= PHYS_DT && n < 12) {
+      const hold = this.attractPilot.update(PHYS_DT, this.bird, this.terrain);
+      this.bird.step(PHYS_DT, { diving: hold, fever: false, speedMult: 1, boost: false }, this.terrain);
+      if (this.bird.justLanded && !calm && this.bird.impact > 5) {
+        this.particles.emitDust(
+          this.bird.x,
+          this.terrain.heightAt(this.bird.x) + 0.3,
+          this.bird.speed(),
+          this.terrain.slopeAt(this.bird.x),
+        );
+      }
+      this.demoAcc -= PHYS_DT;
+      n++;
+    }
+    if (!calm && this.bird.speed() > 48) this.emitTrail(dt);
+    // Watchdog: beached, stalled or flown off-screen → silent loop restart
+    // on the same island (resetRun pops nothing, banks nothing). Open water
+    // counts double: a drowning bird is never good backdrop, cut in ~1.5 s.
+    // (Needed because a swimming bird keeps speed ~9 and would otherwise
+    // bob past the stall trip and never trigger it.)
+    if (this.bird.speed() < 9 || this.bird.inWater) this.demoStuck += dt * (this.bird.inWater ? 2 : 1);
+    else this.demoStuck = 0;
+    if (this.demoTime > 90 || this.demoStuck > 3 || this.bird.x - this.startX > 4000) {
+      this.resetRun(true);
+      this.demoAcc = 0;
+      this.demoTime = 0;
+      this.demoStuck = 0;
+    }
     if (this.screen === "main") this.holdToStart(dt, 0.18);
   }
 
@@ -764,21 +1175,33 @@ export class Game {
     if (this.input.diving) {
       if (this.needRelease) return;
       this.menuHold += dt;
-      if (this.menuHold > threshold) {
-        if (this.state === "gameover" && this.portalEnabled()) void this.restartWithPortalBreak();
+      if (this.menuHold >= Math.min(threshold, 0.05)) {
+        if (this.state === "gameover") this.replayRun(true);
         else this.startRun();
       }
     } else {
+      if (this.menuHold > 0 && !this.needRelease) {
+        if (this.state === "gameover") this.replayRun(true);
+        else this.startRun();
+      }
       this.needRelease = false;
       this.menuHold = 0;
     }
   }
 
   private fixedUpdate(dt: number): void {
-    const skin = this.skin;
+    // Ranked races keep every pilot's flight model identical. Your equipped
+    // bird remains visible, but store perks never decide a competitive result.
+    const skin = this.gameplaySkin;
     const diving = this.input.diving && !this.bird.asleep;
+    if (diving && !this.wasDiving && !this.bird.grounded && this.state === "playing") {
+      this.audio.diveCue();
+      this.haptic(10);
+    }
+    this.wasDiving = diving;
     this.magnetTimer = Math.max(0, this.magnetTimer - dt);
     this.boostTimer = Math.max(0, this.boostTimer - dt);
+    this.manualBoostCooldown = Math.max(0, this.manualBoostCooldown - dt);
     this.runTime += dt;
     this.xpFlush -= dt;
     if (this.xpFlush <= 0) {
@@ -790,22 +1213,34 @@ export class Game {
     this.launch.tick(dt);
     this.launch.observeInput(diving, this.runTime);
 
+    // Touch-first power activation: a quick double tap triggers a short
+    // momentum burst. It is deliberately cooldown-gated and additive, so the
+    // hill timing remains the skill expression. A stalled bird can also use
+    // the same rescue burst once the cooldown is clear.
+    if (!this.fairRace && this.save.hasUpgrade("doubletap") && this.save.state.settings.doubleTapBoost && this.input.consumeBoost() && this.manualBoostCooldown <= 0) this.activateManualBoost("double_tap");
+    if (!this.fairRace && this.save.hasUpgrade("doubletap") && this.save.state.settings.doubleTapBoost && this.bird.grounded && this.bird.speed() < STALL_SPEED && this.manualBoostCooldown <= 0 && this.runTime > 1.2) {
+      this.activateManualBoost("stall_rescue");
+    }
+
     this.bird.step(
       dt,
       {
         diving,
         fever: this.feverOn,
-        speedMult: skin.speedMult * this.challengeMods.speedMult,
+        speedMult: skin.speedMult * this.challengeMods.speedMult * this.escalateMult(),
         boost: this.boostTimer > 0 || this.powers.boostOn(),
         liftMult: this.powers.liftMult() * this.masteryPerk.liftMult,
         // Slipstream: tucking behind a rival genuinely reduces your drag.
-        dragMult: this.powers.dragMult() * this.massRace.draftFor(this.bird.x, this.bird.y),
+        dragMult: this.powers.dragMult() * this.massRace.draftFor(this.bird.x, this.bird.y, dt),
         feather: this.powers.featherOn(),
         gravityMult: this.eventRun ? this.weeklyMods.gravityMult : 1,
       },
       this.terrain,
     );
 
+    const cue = this.flightCues.update(dt, this.bird, this.terrain.islandIndex(this.bird.x), this.terrain.localX(this.bird.x));
+    if (cue === "runup") this.audio.runup();
+    else if (cue === "apex") this.audio.apexChime();
     if (this.bird.justLaunched) this.onLaunch();
     if (this.bird.bounced) {
       this.bird.bounced = false;
@@ -900,9 +1335,15 @@ export class Game {
 
     // The rival field runs the same fixed-step contract as the player.
     if (this.massRace.active) {
-      this.massRace.step(dt, this.terrain, this.startX + this.mode.finish, this.runTime);
+      this.massRace.step(dt, this.terrain, this.startX + this.mode.finish, this.runTime, this.bird.x, this.bird.y);
       // Reward the player for holding a draft: visible, audible, scoring.
-      if (this.massRace.draft > 0.35) {
+      if (this.massRace.draft > 0.3) {
+        if (!this.wasDrafting) {
+          this.wasDrafting = true;
+          this.audio.diveCue();
+          this.haptic([10, 15, 20]);
+          this.popupAtBird("SLIPSTREAM", "power");
+        }
         this.draftBanner = Math.min(1, this.draftBanner + dt * 2);
         this.bonus += 14 * dt * this.massRace.draft;
         if (this.draftBanner > 0.98) {
@@ -910,7 +1351,91 @@ export class Game {
           this.particles.emitWind(this.bird.x, this.bird.y, 0.8);
         }
       } else {
+        if (this.wasDrafting && this.massRace.draft < 0.12) {
+          this.wasDrafting = false;
+          if (this.bird.speed() > 18) {
+            this.audio.chirp();
+            this.haptic([15, 10, 25]);
+            this.popupAtBird("SLINGSHOT! 🚀", "perfect");
+            this.bird.vx = Math.min(234, this.bird.vx + 6);
+            this.particles.emitWind(this.bird.x, this.bird.y + 0.5, 1.6);
+          }
+        }
         this.draftBanner = Math.max(0, this.draftBanner - dt);
+      }
+      // Wingtip buzz near-miss feedback
+      this.closeCallAcc += dt;
+      if (this.closeCallAcc >= 0.35 && !this.bird.asleep) {
+        const close = this.massRace.checkCloseCall(this.bird.x, this.bird.y, this.bird.speed());
+        if (close) {
+          this.closeCallAcc = 0;
+          this.audio.chirp();
+          this.haptic(10);
+          this.popupAtBird("WINGTIP BUZZ! +50", "splash");
+          this.bonus += 50;
+          this.particles.emitWind(this.bird.x, this.bird.y, 0.9);
+        }
+      }
+
+      // Typhoon blitz storm tailwinds
+      if (this.modeId === "pvp_typhoon" && !this.bird.asleep && !this.bird.grounded) {
+        this.bird.vx = Math.min(235, this.bird.vx + dt * 4.0);
+      }
+
+      // Sky Slalom launch surge
+      if (this.modeId === "pvp_slalom" && this.bird.justLaunched && this.lastLaunch?.rating === "perfect") {
+        this.bird.vx = Math.min(240, this.bird.vx + 6.5);
+        this.popupAtBird("WARP SLALOM! ⚡", "fever");
+        this.particles.emitWind(this.bird.x, this.bird.y, 1.4);
+      }
+
+      // Stratosphere ascent thermal super-lift
+      if (this.modeId === "pvp_zenith" && this.weather.inThermal) {
+        this.bird.vy = Math.min(180, this.bird.vy + dt * 25);
+      }
+
+      // Knockout mode elimination evaluation
+      if (this.modeId === "pvp_knockout" && !this.bird.asleep) {
+        const dist = this.bird.x - this.startX;
+        if (this.nextKnockoutDist <= 3500) {
+          if (dist >= this.nextKnockoutDist - 60 && dist < this.nextKnockoutDist - 15) {
+            if (!this.knockoutWarned) {
+              this.knockoutWarned = true;
+              this.hud.toast(`⚠️ ELIMINATION IN ${Math.round(this.nextKnockoutDist - dist)}m — OUTFLY THE PACK!`, "warn");
+              this.audio.chirp();
+              this.haptic([15, 15, 30]);
+            }
+          }
+          if (dist >= this.nextKnockoutDist) {
+            this.knockoutWarned = false;
+            const targetDist = this.nextKnockoutDist;
+            this.nextKnockoutDist += 500;
+            const standings = this.massRace.standings(this.bird.x, this.startX, this.pilotName, 40);
+            if (standings.place === standings.total) {
+              this.hud.toast(`💥 ELIMINATED at ${targetDist}m!`, "warn");
+              this.audio.rivalDown();
+              this.finishRun();
+            } else {
+            const victim = this.massRace.eliminateTrailing(targetDist);
+            if (victim) {
+              const remaining = standings.total - 1;
+              if (remaining === 1 && standings.place === 1) {
+                this.racePlace = 1;
+                this.raceField = standings.total;
+                this.raceFinishTime = this.runTime;
+                this.save.noteRacePlace(1, standings.total);
+                this.hud.toast(`👑 ROYALE VICTORY! SOLE SURVIVOR!`, "gold");
+                this.audio.fanfare();
+                this.finishRun();
+              } else {
+                this.hud.toast(`💥 ELIMINATED: ${victim.name}! ${remaining} remain`, "gold");
+                this.audio.ding();
+                this.haptic(10);
+              }
+            }
+            }
+          }
+        }
       }
       // Overtake / lead-change feedback, sampled at ~4 Hz so the 41-row
       // sort never runs per physics tick.
@@ -923,11 +1448,22 @@ export class Game {
           this.hud.toast(place === 1 ? "👑 LEAD! Hold it!" : `P${this.lastPlace} → P${place}!`, "gold");
           if (place === 1) {
             this.flash("perfect");
+            this.popupAtBird("👑 P1 LEAD!", "fever");
+            this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
             this.audio.purchase();
+            this.haptic([25, 15, 45]);
+            if (this.elapsed - this.lastEmoteRunAt >= 2.0) {
+              this.lastEmoteRunAt = this.elapsed;
+              this.sendEmote("👑");
+            }
           } else if (gain >= 3) {
             this.audio.ding();
+            this.haptic(10);
+            this.popupAtBird(`P${this.lastPlace} → P${place}`, "great");
+          } else {
+            this.audio.ding();
+            this.haptic(8);
           }
-          this.haptic(10);
         }
         this.lastPlace = place;
       }
@@ -946,10 +1482,10 @@ export class Game {
       this.bird.vx = Math.max(this.bird.vx, 34);
       this.bird.inWater = false;
       this.bird.grounded = false;
-      this.particles.emitSplash(this.bird.x, WATER_Y);
-      this.particles.burstRing(this.bird.x, this.bird.y, 0x7fe0ff);
+      this.particles.emitWaterBounce(this.bird.x, WATER_Y);
       this.audio.shield();
       this.hud.toast("Shield bounce!", "power");
+      this.popupAtBird(quip(BOP_QUIPS, this.bounceCount++), "bop");
       this.shake(0.6);
       this.haptic([15, 10, 15, 10, 30]);
     }
@@ -961,8 +1497,15 @@ export class Game {
       if (this.bird.impact > 5) {
         this.audio.land(this.bird.impact);
         this.shake(Math.min(0.55, this.bird.impact * 0.04));
-        this.particles.emitDust(this.bird.x, this.bird.y, this.bird.speed(), slope);
-      } else if (this.bird.impact < 2.4 && this.bird.speed() > 36 && diving && slope < -0.05) {
+        // Make hard contact read at a glance on small screens: the impact
+        // burst is larger and higher contrast than a dust puff.
+        if (this.bird.impact > 8) {
+          const ridge = this.terrain.biomeAt(this.bird.x).ridge;
+          this.particles.emitThunk(this.bird.x, this.bird.y, ((ridge >> 16) & 255) / 255, ((ridge >> 8) & 255) / 255, (ridge & 255) / 255);
+        } else {
+          this.particles.emitDust(this.bird.x, this.bird.y, this.bird.speed(), slope);
+        }
+      } else if (this.bird.landingQuality < LAND_PERFECT && this.bird.impact < 2.4 && this.bird.speed() > 36 && diving && slope < -0.05) {
         // tangential touchdown at speed on a downslope: reward the finesse
         this.bonus += 10;
         this.audio.butter();
@@ -970,7 +1513,9 @@ export class Game {
         this.particles.burstRing(this.bird.x, this.bird.y, 0xffffff);
       }
     }
-    if (this.bird.grounded && this.bird.speed() > 10) {
+    this.dustCooldown = Math.max(0, this.dustCooldown - dt);
+    if (this.bird.grounded && this.bird.speed() > 10 && this.dustCooldown <= 1e-6) {
+      this.dustCooldown = 1 / 30;
       this.particles.emitDust(this.bird.x, this.terrain.heightAt(this.bird.x) + 0.3, this.bird.speed(), slope);
     }
 
@@ -986,17 +1531,19 @@ export class Game {
       this.skimTime += dt;
       if (this.skimTime > 1.1 && this.skimCd <= 0) {
         this.skimCd = 1.4;
-        const pts = 6;
+        const pts = 15;
         this.bonus += pts;
         this.awardXp(XP_RULES.coin);
-        this.audio.butter();
+        this.audio.ridgeSkim();
+        this.haptic(8);
+        this.popupAtBird("RIDGE SKIM! +15", "power");
         this.hud.toast(`Ridge skim +${pts}`, "cloud");
         this.particles.emitDust(this.bird.x, this.terrain.heightAt(this.bird.x) + 0.4, this.bird.speed(), slope);
       }
     } else if (this.bird.altitude > 6 || this.bird.grounded) {
       this.skimTime = 0;
     }
-    if (this.feverOn || this.boostTimer > 0 || this.bird.speed() > 48 || ((skin.magnetAlways || skin.id === "aurora") && this.bird.speed() > 24)) {
+    if (this.feverOn || this.boostTimer > 0 || this.bird.speed() > 48 || ((this.gameplaySkin.magnetAlways || this.gameplaySkin.id === "aurora") && this.bird.speed() > 24)) {
       this.emitTrail(dt);
     }
 
@@ -1007,15 +1554,22 @@ export class Game {
       this.emitPowerFx();
     }
 
-    this.atmosphereFxAcc -= dt;
-    if (this.atmosphereFxAcc <= 0) {
-      const biomeFx = this.terrain.biomeAt(this.bird.x);
-      this.particles.emitBiomeAtmosphere(this.bird.x, this.bird.y, biomeFx.id);
-      this.atmosphereFxAcc = this.bird.altitude > 20 ? 0.08 : 0.19;
-    }
-
     this.splashCd -= dt;
-    if (this.bird.inWater && this.splashCd <= 0) {
+    // Ocean entry gets the full thunk treatment — spray ring, freeze, kick —
+    // then the swim itself is just the periodic bob below.
+    const wet = this.bird.inWater;
+    if (wet && !this.wasInWater) {
+      this.particles.emitSplash(this.bird.x, WATER_Y);
+      this.particles.burstRing(this.bird.x, WATER_Y + 1, 0xafe8ff);
+      this.audio.splash();
+      this.popupAtBird("SPLASH!", "splash");
+      if (!this.save.state.settings.reduceMotion) {
+        this.hitStopTimer = Math.max(this.hitStopTimer, 0.06);
+        this.shake(0.7);
+      }
+    }
+    this.wasInWater = wet;
+    if (wet && this.splashCd <= 0) {
       this.splashCd = 0.55;
       this.particles.emitSplash(this.bird.x, WATER_Y);
       this.audio.splash();
@@ -1095,7 +1649,7 @@ export class Game {
       }
     }
 
-    const magnetOn = this.feverOn || this.magnetTimer > 0 || skin.magnetAlways || this.powers.magnetOn();
+    const magnetOn = this.feverOn || this.magnetTimer > 0 || this.gameplaySkin.magnetAlways || this.powers.magnetOn();
     this.collect.update(dt, this.bird, this.terrain, magnetOn, this.elapsed, this.powers.magnetScale(), {
       onCoin: (x, y, gem) => {
         const base = gem ? 5 : 1;
@@ -1112,6 +1666,10 @@ export class Game {
         );
         this.runCoins += value;
         this.bonus += 4 * COIN_VALUE * value;
+        if (this.modeId === "pvp_coinrush") {
+          this.bird.vx = Math.min(225, this.bird.vx + 2.5);
+          this.popupAtBird("COIN TURBO! ⚡", "splash");
+        }
         this.awardXp(XP_RULES.coin);
         this.audio.ding(gem);
         this.particles.emitCollect(x, y);
@@ -1215,6 +1773,7 @@ export class Game {
 
     // Finish line (Race / Mass Race) — reached by distance, not by clock.
     if (this.mode.finish > 0 && !this.runRecorded && this.bird.x - this.startX >= this.mode.finish) {
+      this.runOutcome = "complete";
       if (this.massRace.active) {
         // Placing is decided by who has actually crossed, not by a script.
         const s = this.massRace.standings(this.bird.x, this.startX, this.pilotName, 8);
@@ -1235,9 +1794,21 @@ export class Game {
           if (!won) this.nemesis = rival.name;
           this.hud.toast(this.photoFinish, won ? "gold" : "warn");
           this.flash("perfect");
+          if (won) {
+            this.popupAtBird("PHOTO FINISH WIN!", "fever");
+            this.haptic([30, 20, 50, 20, 80]);
+          }
         } else if (s.place > 1) {
           const ahead = s.rows.find((r) => r.place === s.place - 1);
           if (ahead) this.nemesis = ahead.name;
+        }
+
+        if (s.place <= 3) {
+          this.popupAtBird(s.place === 1 ? "🥇 VICTORY!" : s.place === 2 ? "🥈 2ND PLACE!" : "🥉 3RD PLACE!", "fever");
+          this.flash("perfect");
+          this.haptic([40, 20, 60, 20, 100]);
+          this.particles.emitConfetti(this.bird.x, this.bird.y + 4);
+          this.particles.emitConfetti(this.bird.x + 3, this.bird.y + 6);
         }
 
         this.hud.toast(`FINISH · P${s.place} of ${s.total}`, s.place <= 3 ? "gold" : "island");
@@ -1262,11 +1833,12 @@ export class Game {
           if (won && this.save.ownTrail("trail_duelist")) this.hud.toast("✨ Duelist trail unlocked!", "gold");
           this.audio.purchase();
         } else if (this.rankedRace) {
-          const res = this.save.recordRivalResult(s.place, s.total, "massrace", this.today);
+          const live = this.massRace.remoteCount > 0;
+          const res = this.save.recordRivalResult(s.place, s.total, live ? "massrace-live" : "massrace", this.today, live);
           this.lastRatingDelta = res.delta;
           this.lastRatingBonus = res.bonus;
           this.hud.toast(
-            `Rival rating ${res.delta >= 0 ? "+" : ""}${res.delta} → ${this.save.state.rival.rating}${res.bonus > 0 ? ` · +${res.bonus}● streak` : ""}`,
+            `Rival rating ${res.delta >= 0 ? "+" : ""}${res.delta} → ${this.save.state.rival.rating}${res.bonus > 0 ? ` · +${res.bonus}● streak` : ""}${live ? " · live field" : ""}`,
             res.delta >= 0 ? "gold" : "warn",
           );
           this.audio.purchase();
@@ -1297,10 +1869,6 @@ export class Game {
         this.glow(0.8);
       } else if (!goldenNow && this.goldenHour) {
         this.goldenHour = false; // sun flask refilled the day
-      }
-      // Golden Hour magic: the air itself glitters — drifting amber motes.
-      if (this.goldenHour && Math.random() < dt * 6) {
-        this.particles.emitSparkle(this.bird.x + 6 + Math.random() * 18, this.bird.y + (Math.random() - 0.5) * 10, 1, 0.72, 0.25);
       }
       if (this.daylight <= 0 && !this.bird.asleep) {
         this.onDaylightOut();
@@ -1348,7 +1916,9 @@ export class Game {
     const combo = this.launch.combo;
     this.launchBannerText = ratingLabel(res.rating, combo);
     this.launchBannerT = res.rating === "perfect" ? 1.25 : 0.9;
-    this.audio.launchWhoosh(res.rating, res.speed);
+    const local = this.terrain.localX(this.bird.x);
+    if (local >= 845 && local < 954) this.audio.rampLaunch(res.speed);
+    else this.audio.launchWhoosh(res.rating, res.speed);
 
     if (res.rating === "perfect") {
       this.perfects += 1;
@@ -1358,13 +1928,16 @@ export class Game {
       this.audio.perfect();
       this.audio.duckMusic(0.32, 0.35);
       this.particles.burstRing(this.bird.x, this.bird.y, 0xffe08a);
-      for (let i = 0; i < 10 + combo * 4; i++) this.particles.emitSparkle(this.bird.x, this.bird.y);
+      this.particles.emitPerfectBurst(this.bird.x, this.bird.y, combo);
+      this.popupAtBird(combo >= 3 ? `PERFECT ×${combo}!` : "PERFECT!", "perfect");
       this.flash("perfect");
       this.glow(0.85);
       this.shake(0.35 + Math.min(0.4, combo * 0.06));
-      // Hit stop: 2-frame freeze for cinematic impact.
+      // Hit stop: 2-frame freeze for cinematic impact, 40 ms on the
+      // fever-clinching perfect (prototype parity: thuds 80 ms, fever 40 ms).
       if (!this.save.state.settings.reduceMotion) {
-        this.hitStopTimer = 2 / 60;
+        const clinchesFever = this.perfectChain >= FEVER_NEED && !this.feverOn;
+        this.hitStopTimer = clinchesFever ? 0.04 : 2 / 60;
       }
       this.haptic([50, 30, 50]);
       // A breath of slow-motion so the launch lands emotionally.
@@ -1386,6 +1959,7 @@ export class Game {
       this.awardXp(3);
       this.audio.butter();
       this.particles.burstRing(this.bird.x, this.bird.y, 0xc8f0ff);
+      this.popupAtBird("GREAT!", "great");
       this.camera.punch(3);
       this.haptic(9);
     } else {
@@ -1401,7 +1975,9 @@ export class Game {
     this.awardXp(XP_RULES.coin);
     this.audio.boing();
     this.particles.burstRing(this.bird.x, this.bird.y, 0xffcf33);
+    this.particles.emitBounceBop(this.bird.x, this.bird.y, 1.0, 0.85, 0.2);
     this.particles.emitConfetti(this.bird.x, this.bird.y + 1);
+    this.popupAtBird(quip(BOP_QUIPS, this.bounceCount++), "bop");
     this.camera.punch(4);
     this.hud.toast("🌻 Sunflower bounce +80", "gold");
     this.glow(0.55);
@@ -1420,10 +1996,22 @@ export class Game {
     } else if (q < 0.8) {
       this.launch.breakCombo();
       this.perfectChain = 0;
+      // The thunk: an 80 ms freeze on a hard thud, matching the prototype's
+      // hit-stop. Same path as the perfect-launch freeze above.
+      if (!this.save.state.settings.reduceMotion) {
+        this.hitStopTimer = Math.max(this.hitStopTimer, 0.08);
+      }
       if (this.bird.impact > 6) {
-        this.audio.land(this.bird.impact);
-        this.shake(Math.min(0.5, this.bird.impact * 0.035));
-        this.particles.emitDust(this.bird.x, this.bird.y, this.bird.speed(), 0);
+        // Contact sound and camera impulse are emitted once by the main step.
+        // Biome-colored thunk burst instead of plain dust.
+        const ridge = this.terrain.biomeAt(this.bird.x).ridge;
+        const tr = ((ridge >> 16) & 255) / 255;
+        const tg = ((ridge >> 8) & 255) / 255;
+        const tb = (ridge & 255) / 255;
+        // The main step emits the high-impact burst; keep this fallback for
+        // rough landings that are below that visual threshold.
+        if (this.bird.impact <= 8) this.particles.emitThunk(this.bird.x, this.bird.y, tr, tg, tb);
+        if (this.bird.impact > 10) this.popupAtBird(quip(THUD_QUIPS, this.thudCount++), "thud");
       }
     }
   }
@@ -1432,14 +2020,16 @@ export class Game {
     const was = this.feverOn;
     this.feverOn = true;
     this.feverReached = true;
-    this.feverTimer = FEVER_DURATION + this.skin.feverBonus + this.masteryPerk.feverBonus;
+    this.feverTimer = FEVER_DURATION + this.gameplaySkin.feverBonus + this.masteryPerk.feverBonus;
     if (!was) {
       this.audio.feverOn();
       this.audio.setMusicMode("fever");
       this.hud.toast("FEVER", "fever");
       this.flash("fever");
       this.glow(0.95);
+      this.particles.emitFeverBurst(this.bird.x, this.bird.y);
       this.particles.emitConfetti(this.bird.x, this.bird.y);
+      this.popupAtBird("ON FIRE!", "fever");
       this.hud.toast(quip(FEVER_QUIPS, this.perfectChain), "fever");
       this.telemetry.track("fever", { distance: Math.round(this.bird.x - this.startX) });
     }
@@ -1493,7 +2083,7 @@ export class Game {
     const pts = 30 + chainBonus;
     this.bonus += pts;
     this.awardXp(XP_RULES.cloud);
-    this.audio.boing();
+    this.audio.ringPass(this.ringChain);
     this.bird.vx += 8 + Math.min(14, this.ringChain * 2);
     this.particles.burstRing(x, y, 0xffd76a);
     this.particles.emitSonicBoom(x, y);
@@ -1502,7 +2092,8 @@ export class Game {
       this.hud.toast(`RING CHAIN ×${this.ringChain} +${pts}`, "gold");
       this.flash("fever");
       this.glow(0.6);
-      this.audio.fanfare();
+      // The ring chord already marks the chain; a five-note fanfare on every
+      // subsequent ring drowned out landing/timing cues.
     } else {
       this.hud.toast(`Through the ring +${pts}`, "gold");
     }
@@ -1522,6 +2113,8 @@ export class Game {
     this.audio.balloon();
     this.particles.emitConfetti(x, y + 1);
     this.particles.burstRing(x, y, 0xff6b6b);
+    this.particles.emitBounceBop(x, y, 1.0, 0.42, 0.75);
+    this.popupAtBird(quip(BOP_QUIPS, this.bounceCount++), "bop");
     this.camera.punch(6);
     this.shake(0.3);
     this.hud.toast("🎈 Balloon bounce! +150", "gold");
@@ -1544,10 +2137,11 @@ export class Game {
         this.zenithTimer = ZENITH_DURATION;
         this.camera.punch(9);
         this.particles.burstRing(this.bird.x, this.bird.y, 0xffffff);
-        for (let i = 0; i < 14; i++) this.particles.emitSparkle(this.bird.x, this.bird.y);
+        this.particles.emitPerfectBurst(this.bird.x, this.bird.y, 2);
+        this.popupAtBird(`SKY HIGH! +${pts}`, "zenith");
         this.audio.zenith();
         this.audio.duckMusic(0.6, 0.7);
-        this.hud.toast(`ZENITH +${pts}`, "zenith");
+        this.hud.toast(`SKYLINE +${pts}`, "zenith");
         this.flash("perfect");
         this.glow(0.8);
         this.haptic([60, 40, 80]);
@@ -1555,6 +2149,20 @@ export class Game {
       }
     }
     this.prevVy = vy;
+  }
+
+  private activateManualBoost(source: "double_tap" | "stall_rescue"): void {
+    this.manualBoostCooldown = MANUAL_BOOST_COOLDOWN;
+    this.boostTimer = Math.max(this.boostTimer, MANUAL_BOOST_TIME);
+    this.bird.vx += MANUAL_BOOST_SPEED;
+    this.bird.vy = Math.max(this.bird.vy, 9);
+    this.audio.boost();
+    this.particles.emitBounceBop(this.bird.x, this.bird.y, 1, 0.65, 0.2);
+    this.particles.burstRing(this.bird.x, this.bird.y, 0xffb347);
+    this.shake(0.28);
+    this.haptic([18, 12, 28]);
+    this.hud.toast(source === "double_tap" ? "DOUBLE TAP BOOST!" : "STALL RESCUE BOOST!", "power");
+    this.telemetry.track("manual_boost", { source });
   }
 
   private onPickup(kind: PickupKind, x: number, y: number): void {
@@ -1567,7 +2175,9 @@ export class Game {
     this.pickups += 1;
     this.bonus += 25;
     this.audio.powerup();
-    this.particles.emitCollect(x, y);
+    // Color-coded pickup burst using the pickup's own material color.
+    const pc = PICKUP_STYLE[kind].color;
+    this.particles.emitPickup(x, y, ((pc >> 16) & 255) / 255, ((pc >> 8) & 255) / 255, (pc & 255) / 255);
     this.haptic([40, 30, 40, 30, 100]);
     const wasLive = this.powers.has(kind);
     this.powers.add(kind);
@@ -1653,12 +2263,19 @@ export class Game {
 
   private computeHint(): string {
     const novice = this.save.state.tutorialRuns < 3;
+    const local = this.terrain.localX(this.bird.x);
+    const cue = terrainCue({ grounded: this.bird.grounded, localX: local,
+      altitude: this.bird.altitude, vy: this.bird.vy,
+      landingSlope: !this.bird.grounded && this.bird.altitude < 55 && this.bird.vy < -8
+        ? this.terrain.slopeAt(this.bird.x + landingLookAhead(this.bird.altitude, this.bird.vx, this.bird.vy)) : 0 });
+    if (cue) return cue;
     if (this.hintTimer > (novice ? 26 : 8)) {
       if (this.terrain.isOcean(this.bird.x + 40) && !this.terrain.isOcean(this.bird.x) && this.island < 2) return "Build speed — then RELEASE";
       return "";
     }
     const slope = this.terrain.slopeAt(this.bird.x);
     if (this.hintTimer < 2.6 && slope < -0.08) return "HOLD to dive";
+    if (novice && !this.fairRace && this.save.hasUpgrade("doubletap") && this.save.state.settings.doubleTapBoost && this.hintTimer >= 3 && this.hintTimer < 5.8) return "DOUBLE TAP for a boost";
     if (slope > 0.16 && this.bird.grounded && this.bird.speed() > 18) return "RELEASE to launch";
     // No thermal line here: the ♨ HUD chip already says "release!" — three
     // simultaneous thermal texts (toast + chip + hint) was the worst offender
@@ -1703,7 +2320,7 @@ export class Game {
     this.trail.setColor(c[0], c[1], c[2]);
     const show =
       this.state === "playing" &&
-      (this.feverOn || this.boostTimer > 0 || this.bird.speed() > 48 || ((this.skin.magnetAlways || this.skin.id === "aurora") && this.bird.speed() > 24));
+      (this.feverOn || this.boostTimer > 0 || this.bird.speed() > 48 || ((this.gameplaySkin.magnetAlways || this.gameplaySkin.id === "aurora") && this.bird.speed() > 24));
     if (show) this.trail.push(this.bird.x, this.bird.y);
     this.trail.update(dt, show ? 1 : 0);
   }
@@ -1737,6 +2354,13 @@ export class Game {
   }
 
   private render(visDt: number, rawDt: number): void {
+    // Keep input, matchmaking and clocks live; decorative menus only need 30 Hz.
+    if (this.state === "menu" || this.state === "paused") {
+      this.menuRenderAcc += rawDt;
+      if (this.menuRenderAcc < 1 / 30) return;
+      visDt = rawDt = this.menuRenderAcc;
+    }
+    this.menuRenderAcc = 0;
     const playing = this.state === "playing";
     const diving = playing && this.input.diving;
 
@@ -1745,7 +2369,7 @@ export class Game {
       return;
     }
 
-    const glow = this.feverOn || this.powers.has("goldenwings") || (this.skin.magnetAlways && this.bird.speed() > 30);
+    const glow = this.feverOn || this.powers.has("goldenwings") || (this.gameplaySkin.magnetAlways && this.bird.speed() > 30);
     // Render interpolation: draw the bird between the previous and current
     // physics step so motion stays smooth above 60 Hz. The menu, sleep and
     // game-over states step the bird directly (or not at all), so they draw
@@ -1755,10 +2379,19 @@ export class Game {
     const visY = lerp(this.prevBirdY, this.bird.y, interp);
     this.bird.syncVisual(visDt, diving, glow, this.elapsed, this.terrain, visX, visY);
     this.massRace.syncVisual(visDt, this.bird.x, interp);
+    if (this.massRace.active && this.state === "playing") {
+      const tags = this.massRace.getVisibleNameTags(this.camera.camera.position.x, this.bird.x, this.bird.y, this.startX);
+      this.hud.updateNameTags(tags, this.camera.camera, window.innerWidth, window.innerHeight);
+    } else {
+      this.hud.updateNameTags([], this.camera.camera, window.innerWidth, window.innerHeight);
+    }
     this.finishRemaining = this.finishGate.update(visDt, this.bird.x);
     this.updateTrailRibbon(visDt);
     this.particles.update(visDt);
-    this.camera.update(rawDt, this.bird, playing, this.terrain.heightAt(this.bird.x));
+    // Attract framing in the menu only: the demo bird leads into the open
+    // margin beside the card. Every other state keeps gameplay framing.
+    const attract = this.state === "menu" && !this.versus;
+    this.camera.update(rawDt, this.bird, playing, this.terrain.landingGround(this.bird.x, this.bird.vx), attract, this.feverOn);
     // Sink foreground props that would cross the bird's sight line (per-view
     // in split-screen so neither player loses their bird behind a tree).
     this.terrain.updateOcclusion(
@@ -1779,7 +2412,8 @@ export class Game {
     const size = this.renderer.getSize(this.tmpSize);
     this.renderer.setViewport(0, 0, size.x, size.y);
     this.renderer.setScissorTest(false);
-    if (this.useBloom) {
+    if (this.useBloom && playing) this.ensureFx();
+    if (this.useBloom && playing && this.fx) {
       this.updateGlowBase();
       this.fx.render(rawDt);
     } else {
@@ -1791,11 +2425,11 @@ export class Game {
   private applyWorldLook(x: number, altitude: number): void {
     const biome = this.terrain.biomeAt(x + 60);
     this.audio.setBiome(biome.musicMode);
-    const dayT = Math.max(0, Math.min(1, this.daylight / this.daylightMax()));
+    const dayT = this.state === "menu" ? 0.86 : Math.max(0, Math.min(1, this.daylight / this.daylightMax()));
     const altT = clamp((altitude - ALT_CLOUDS) / (ALT_STRATO - ALT_CLOUDS), 0, 1);
     const isAurora = biome.id === "aurora";
     const auroraVal = isAurora ? 0.9 : altT > 0.4 ? (altT - 0.4) * 1.3 : 0;
-    this.sky.setBiomeTint(biome.skyTop, biome.skyHorizon, biome.skyMix);
+    this.sky.setBiomeTint(biome.skyTop, biome.skyHorizon, this.state === "menu" ? biome.skyMix * 0.3 : biome.skyMix);
     this.sky.setBiomeAtmosphere(biome.cloudTint, biome.cloudDensity, biome.glow);
     this.sky.setFlightAltitude(altitude);
     this.sky.setAltitude(altT);
@@ -1803,10 +2437,13 @@ export class Game {
     const pal = this.sky.update(dayT, x, this.elapsed);
     this.terrain.setPalette(pal, x);
     if (this.scene.fog instanceof THREE.Fog) {
-      this.scene.fog.color.copy(this.sky.fogColor).lerp(this.tmpColor.setHex(biome.fogTint), 0.25);
+      this.scene.fog.color.copy(this.sky.fogColor).lerp(this.tmpColor.setHex(biome.fogTint), 0.12);
       // Thin the haze as we climb so the whole world opens up beneath the bird.
-      this.scene.fog.near = 62 + altT * 300;
-      this.scene.fog.far = 380 + altT * 900;
+      // Keep the playable horizon crisp on desktop and mobile. The previous
+      // near/far range put fog directly across the flight path, reading as a
+      // permanent cloud veil even in clear daytime biomes.
+      this.scene.fog.near = 560 + altT * 520;
+      this.scene.fog.far = 5000 + altT * 3000;
       this.renderer.setClearColor(this.scene.fog.color, 1);
     }
     this.altZone =
@@ -1857,20 +2494,33 @@ export class Game {
           [p2, 0, 0],
         ];
     for (const [racer, ox, oy] of views) {
+      // Each split viewport gets one authoritative bird. Rendering both
+      // meshes into both cameras made nearby racers visually stack or appear
+      // to teleport across the divider. Terrain and particles remain shared,
+      // while the focused racer stays unambiguous in their own lane.
+      p1.bird.root.visible = racer === p1;
+      p2.bird.root.visible = racer === p2;
       this.renderer.setViewport(ox, oy, w, h);
       this.renderer.setScissor(ox, oy, w, h);
       racer.camera.resize(w / Math.max(1, h));
       this.renderer.render(this.scene, racer.camera.camera);
     }
     this.renderer.setScissorTest(false);
+    p1.bird.root.visible = true;
+    p2.bird.root.visible = true;
   }
 
 
   /* ------------------------------------------------------------- run flow */
 
-  private startRun(opts?: { duel?: boolean; challenge?: "" | "daily" | `gauntlet${number}`; event?: boolean; storm?: boolean }): void {
+  private startRun(opts?: RunOptions): void {
     this.exitVersus();
     this.mode = modeById(this.modeId);
+    // Portal game events: open this attempt's measurement span. The run is a
+    // `fail` until the goal is actually reached (death/sun-out/elimination
+    // all keep it a fail).
+    this.runOutcome = "fail";
+    this.platform?.measure("run", this.modeId, "start");
     // Snapshot the record to beat BEFORE this run writes anything, so the
     // mid-run "new record" moment and the results "NEW BEST" banner compare
     // against the genuinely previous best.
@@ -1882,12 +2532,26 @@ export class Game {
     // explicit Yesterday/Random seed pick is honoured, and date-seeded
     // daily/gauntlet runs plus shared-field races (duels, events, stormfront,
     // mass races) keep their fixed seed so the field stays fair/comparable.
-    const casualRun =
-      this.seedMode === "today" && !opts?.duel && !opts?.challenge && !opts?.event && !opts?.storm && this.modeId !== "massrace";
+    const casualRun = shouldRebuildCasualWorld({
+      replay: Boolean(opts?.replay),
+      seedMode: this.seedMode,
+      duel: Boolean(opts?.duel),
+      challenge: typeof opts?.challenge === "string" ? opts.challenge : "",
+      event: Boolean(opts?.event),
+      storm: Boolean(opts?.storm),
+      raceMode: isRaceMode(this.modeId),
+    });
     if (casualRun) {
       this.rebuildWorld(`fly-${Math.random().toString(36).slice(2, 10)}`);
     } else if (opts?.challenge && this.seed !== this.today) {
       this.rebuildWorld(this.today);
+    } else if (isRaceMode(this.modeId)) {
+      const course = this.courseForRace();
+      this.startX = course.island * ISLAND_PERIOD + 64;
+      const targetSeed = `${this.seed}:${course.id}`;
+      if (this.seed !== targetSeed) {
+        this.rebuildWorld(targetSeed);
+      }
     }
     // Duels and challenges only apply when their action explicitly asks for
     // them; every other launch path resets to a plain run.
@@ -1924,12 +2588,20 @@ export class Game {
     this.weather.windMult = (this.eventRun ? this.weeklyMods.windMult : 1) * (this.stormfront ? 1.7 : 1);
     this.weather.stormfront = this.stormfront;
     if (this.stormfront) this.hud.toast("⛈ STORMFRONT — same storm for every pilot. Survive and outfly.", "warn");
-    // Mass Race: build the 40-bird grid on the *same* seed so the field is
+    // Mass Race & PvP Variants: build the 40-bird grid on the *same* seed so the field is
     // identical for anyone flying this race. Real players take over slots as
     // they join; unfilled slots keep flying as local squadron pilots.
-    if (this.modeId === "massrace") {
-      const fieldSize = this.duelActive ? 1 : this.roomSize;
+    if (isRaceMode(this.modeId)) {
+      this.massRace.configureMode(this.modeId);
+      const livePeers = !this.duelActive && !this.localRace && this.net?.connected ? this.net.roster() : null;
+      const fieldSize = this.duelActive ? 1 : livePeers ? Math.max(1, livePeers.length) : this.roomSize;
       this.massRace.spawn(fieldSize, `${this.seed}:${this.modeId}:${fieldSize}`, this.terrain, this.startX);
+      // Reserve actual human seats immediately; do not simulate 40 phantom
+      // opponents in a two-person room while waiting for the first packet.
+      if (livePeers) livePeers.forEach((peer, i) => {
+        const rival = this.massRace.rivals[i];
+        if (rival) { rival.id = peer.id; rival.name = peer.name; rival.kind = "remote"; rival.hue = peer.hue; }
+      });
       if (this.duelActive) {
         // Duel: one seeded opponent whose skill tracks your rating band.
         const opp = duelOpponent(`${this.seed}:${this.today}`, this.save.state.rival.rating);
@@ -1942,7 +2614,7 @@ export class Game {
       }
       // Time-shifted multiplayer: seat doppelgängers of real players from the
       // global board over local slots (name + skill from their best run).
-      if (!this.duelActive) {
+      if (!this.duelActive && !livePeers) {
         const page = this.board.peek("global", "distance");
         const rows = (page?.entries ?? [])
           .filter((en) => !en.you && en.name)
@@ -1958,6 +2630,7 @@ export class Game {
       this.lastRatingBonus = 0;
       this.lastPlace = 0;
       this.overtakeAcc = 0;
+      this.closeCallAcc = 0;
       // Duels are strictly 1v1 vs the seeded opponent — never let a stale
       // room connection promote remote pilots into the field.
       if (this.duelActive) this.disconnectRace();
@@ -1971,7 +2644,8 @@ export class Game {
     if (this.mode.finish > 0) this.finishGate.place(this.startX + this.mode.finish, this.terrain);
     else this.finishGate.hide();
 
-    const armed = this.save.consumeArmedBoosts();
+    // Race boosts are retained for a later solo flight, never spent invisibly.
+    const armed = this.fairRace ? [] : this.save.consumeArmedBoosts();
     for (const id of armed) this.applyBoost(id);
     if (this.eventRun) {
       const ev = weeklyEvent();
@@ -2057,7 +2731,30 @@ export class Game {
     const maxContinues = gold ? 99 : this.save.isVipActive() ? 2 : 1;
     if (this.continuesUsed < maxContinues && (gold || canCoins || canAd)) {
       this.continueTimer = CONTINUE_TIMEOUT;
+      // MON-19: the offer is context-driven, not a static button — the framing
+      // is chosen from what the run just did (record / near-best / streak /
+      // momentum) and falls back to the neutral card. It never changes what is
+      // on offer, only why the player might care; the standard non-ad options
+      // are rendered beside it either way (MON-05…MON-08).
+      const distance = this.lastRunDistance();
+      this.continueOfferView = continueOffer({
+        distance,
+        runCoins: this.runCoins,
+        personalBest: this.save.state.bestDistance,
+        streakDays: this.save.state.streak.days,
+        nearBest: this.save.state.bestDistance > 0 && distance >= this.save.state.bestDistance * 0.85,
+        isRecord: this.save.state.bestDistance > 0 && distance > this.save.state.bestDistance,
+        altitude: this.bird.y,
+        adAvailable: canAd,
+      });
       this.setState("continue");
+      // Poki game-events: measure the rewarded offer's exposure (visible) so
+      // the dashboard can compare it against `interact` when tapped. The label
+      // carries the offer kind so placement usage is measurable per context.
+      if (this.portalEnabled() && canAd) {
+        this.platform?.measure("button", continuePlacementLabel(this.continueOfferView.kind), "visible");
+      }
+      this.telemetry.track("continue_offer", { kind: this.continueOfferView.kind, distance: Math.round(distance) });
     } else {
       this.finishRun();
     }
@@ -2084,8 +2781,21 @@ export class Game {
     if (this.runRecorded) return;
     this.runRecorded = true;
     this.bird.asleep = true;
+    // The rival field is done: drop the (up to 41) frozen birds out of the
+    // scene the moment the run ends. They keep drawing behind the results
+    // card otherwise, on exactly the frame budget where weak phones die.
+    // Rivals stay allocated — the next startRun() re-seeds the field, and
+    // the server's official-place echo still needs the local finish times.
+    if (this.massRace.active) this.massRace.group.visible = false;
+    // Portal game events: one outcome per attempt — `complete` when the run
+    // reached its goal, `fail` when it ended by death/elimination/sun-out.
+    // (Poki funnel contract: send complete OR fail, never both, and a start
+    // without an outcome would break the drop-off funnel.)
+    this.platform?.measure("run", this.modeId, this.runOutcome);
     const stats = this.runStats();
     this.newBest = this.bestAtStart > 0 && stats.distance > this.bestAtStart;
+    // A personal best is the one moment CrazyGames wants celebrated site-wide.
+    if (this.newBest) this.platform?.happytime();
     this.telemetry.track("run_end", { mode: this.modeId, distance: Math.round(stats.distance), newBest: this.newBest });
 
     // A duel abandoned short of the line is a loss — no free retries on rating.
@@ -2107,7 +2817,6 @@ export class Game {
     );
     this.save.noteRecords(this.maxAltitude, this.launch.best);
     this.flow.noteRun(stats.distance, this.perfects, this.launch.goods + this.launch.greats + this.launch.perfects, this.save);
-    this.terrain.setDifficulty(this.flow.difficulty());
 
     // Publish this flight to the ghost network (daily seed only, best-per-
     // pilot kept server-side; silent no-op without a backend).
@@ -2148,6 +2857,7 @@ export class Game {
     // the just-earned rank. Local rows were already updated synchronously, so
     // this resolves to the new standing without a network round-trip.
     void this.refreshBoard(true);
+    this.squad?.setPublishStats({ bestDistance: this.save.state.bestDistance, skin: this.skin.id });
     const improvedCups = this.cups.submit(this.modeId, {
       distance: stats.distance,
       altitude: this.maxAltitude,
@@ -2264,6 +2974,10 @@ export class Game {
     }
     const lifetimeBefore = this.save.state.lifetime.distance;
     this.save.recordRun(stats.distance, this.runCoins, score, this.today, this.island, this.terrain.biomeAt(this.bird.x).id);
+    // Poki's own leaderboards (the SDK's init({ submitScore }) handshake) get
+    // the same run distance — best-effort, alongside the AUDS board the game
+    // UI reads. A platform without the handshake ignores it.
+    if (this.platform) void this.platform.submitPlatformScore(stats.distance);
     // CAREER WINGS promotion — a lifetime rank-up is rare; make it land.
     const promo = wingsPromotion(lifetimeBefore, this.save.state.lifetime.distance);
     if (promo) {
@@ -2380,13 +3094,24 @@ export class Game {
   }
 
   private resetRun(idle: boolean): void {
-    this.masteryPerk = masteryPerks(this.save, this.modeId);
-    this.startX = 64;
+    this.attractPilot.reset();
+    this.flightCues.reset();
+    this.masteryPerk = this.fairRace ? NO_MASTERY_PERKS : masteryPerks(this.save, this.modeId);
+    // Shared/daily/ranked seeds must not depend on an individual save's skill.
+    // Apply adaptive calibration only to an unshared casual flight, before sampling spawn.
+    this.terrain.setDifficulty(!isRaceMode(this.modeId) && this.seed.startsWith("fly-") ? this.flow.difficulty() : 1);
+    const course = isRaceMode(this.modeId) ? this.courseForRace() : null;
+    this.startX = course ? course.island * ISLAND_PERIOD + 64 : 64;
     const y = this.terrain.heightAt(this.startX) + BIRD_RADIUS;
     this.bird.reset(this.startX, y);
+    if (this.modeId === "pvp_sprint" || this.modeId === "pvp_typhoon") {
+      this.bird.vx = 42;
+    }
+    this.nextKnockoutDist = 500;
+    this.knockoutWarned = false;
     this.daylight = this.daylightMax();
-    this.island = 0;
-    this.lastIsland = 0;
+    this.island = course ? course.island : 0;
+    this.lastIsland = course ? course.island : 0;
     this.perfects = 0;
     this.perfectChain = 0;
     this.skimTime = 0;
@@ -2400,15 +3125,20 @@ export class Game {
     this.bonus = 0;
     this.scoreAccum = 0;
     this.splashCd = 0;
+    this.thudCount = 0;
+    this.bounceCount = 0;
+    this.wasInWater = false;
     this.hintTimer = 0;
     this.hint = idle ? "" : "HOLD to dive";
     this.runCoins = 0;
+    this.multiplierClaimed = false;
     this.runClouds = 0;
     this.zeniths = 0;
     this.pickups = 0;
     this.runRings = 0;
     this.ringChain = 0;
     this.ringChainTimer = 0;
+    this.dustCooldown = 0;
     this.runBalloons = 0;
     this.runSunflowers = 0;
     this.pendingXp = 0;
@@ -2416,10 +3146,12 @@ export class Game {
     this.trailFxAcc = 0;
     this.powerFxAcc = 0;
     this.trail.clear();
-    this.atmosphereFxAcc = 0;
     this.magnetTimer = 0;
     this.shield = 0;
     this.boostTimer = 0;
+    this.manualBoostCooldown = 0;
+    this.wasDiving = false;
+    this.wasDrafting = false;
     this.continuesUsed = 0;
     this.continueTimer = 0;
     this.timeScale = 1;
@@ -2460,7 +3192,6 @@ export class Game {
     this.recordBanner = "";
     this.goalPop = "";
     this.goalPopT = 0;
-    this.terrain.setDifficulty(this.flow.difficulty());
     this.maxAltitude = 0;
     this.maxSpeed = 0;
     this.launchBannerT = 0;
@@ -2468,12 +3199,13 @@ export class Game {
     this.lastLaunch = null;
     this.altZone = 0;
     this.countdown = 0;
+    this.networkStartAt = 0;
     this.versusGrace = 5;
     this.collect.reset();
     this.weather.reset();
     // Skin-borne weather perks: weatherproof birds fly warded, stealth birds slip past hazards.
-    this.weather.ward = this.skin.weatherProof ?? false;
-    this.weather.stealth = this.skin.stealth ?? false;
+    this.weather.ward = this.gameplaySkin.weatherProof ?? false;
+    this.weather.stealth = this.gameplaySkin.stealth ?? false;
     this.particles.clear();
     this.terrain.update(this.startX);
     if (idle) this.camera.setIntro(1);
@@ -2485,15 +3217,109 @@ export class Game {
   private handleAction(action: string, id: string): void {
     void this.audio.resume();
     switch (action) {
+      case "spin-wheel": {
+        if (!this.save.canFreeWheelSpin(this.today)) {
+          this.hud.toast("Wheel spin on cooldown until tomorrow", "info");
+          break;
+        }
+        const sectorIndex = Math.floor(Math.random() * WHEEL_SECTORS.length);
+        const sector = WHEEL_SECTORS[sectorIndex]!;
+        this.save.recordWheelSpin(this.today);
+        if (sector.kind === "coins" && typeof sector.value === "number") {
+          this.save.addCoins(sector.value);
+          this.hud.toast(`🎡 Wheel landed on ${sector.label}! +● ${sector.value}`, "gold");
+        } else if (sector.kind === "boost") {
+          this.save.armBoost("sunflask");
+          this.hud.toast(`🎡 Wheel landed on ${sector.label}! Sun Flask Armed!`, "gold");
+        } else if (sector.kind === "vault") {
+          this.buyMysteryVault();
+          this.hud.toast(`🎰 Wheel landed on Vault Key!`, "gold");
+        }
+        this.audio.fanfare();
+        this.bump();
+        break;
+      }
+      case "smash-piggy": {
+        const smashed = this.save.smashPiggyBank();
+        if (smashed > 0) {
+          this.audio.fanfare();
+          this.hud.toast(`🐷 Smashed Piggy Bank! +● ${smashed} coins!`, "gold");
+        } else {
+          this.hud.toast("Piggy Bank is empty!", "info");
+        }
+        this.bump();
+        break;
+      }
+      case "perform-prestige": {
+        if (this.save.performPrestige()) {
+          this.audio.chapterFanfare();
+          const p = this.save.state.prestige?.multiplier ?? 1.0;
+          this.hud.toast(`👑 Reborn with Solar Crown! Permanent ×${p.toFixed(1)} Coin Multiplier!`, "gold");
+        } else {
+          this.hud.toast("Need ● 50,000 coins to ascend Solar Crown prestige!", "warn");
+        }
+        this.bump();
+        break;
+      }
+      case "multiply-run-coins": {
+        // One claim per run. The old handler tripled runCoins on every click
+        // and the card re-armed from the live snapshot — an infinite 3× coin
+        // loop. Now it pays the bonus once and the card flips to a claimed
+        // chip (renderCoinMultiplierCard). No ad is shown, so no ad wording.
+        if (this.state === "gameover" && !this.multiplierClaimed && this.runCoins > 0) {
+          const bonus = this.runCoins * 2;
+          this.multiplierClaimed = true;
+          this.save.addCoins(bonus);
+          this.audio.chapterFanfare();
+          this.hud.toast(`3× flight bonus — +● ${bonus} coins`, "gold");
+        }
+        this.bump();
+        break;
+      }
       case "mode-select":
         this.setScreen("modes");
         break;
-      case "pick-mode":
+      case "pick-mode": {
+        // Route by intent (see launchRouting.ts): solo modes start a run, the
+        // mass race opens the lobby, and a PvP circuit opens the PvP OPTIONS
+        // with that circuit preselected. A card labelled PvP must never drop
+        // the player straight into an offline AI race.
+        const intent = launchIntentFor(id);
+        if (intent === "lobby") { this.setScreen("live"); break; }
+        if (intent === "pvp-options") {
+          const circuit = pvpCircuitFor(id);
+          if (circuit) {
+            this.selectedPvpMode = circuit;
+            this.mode = modeById(circuit);
+            this.hud.toast(`${this.mode.icon} ${this.mode.name} selected — ranked, casual, a room, or the AI flock`, "gold");
+          }
+          this.setScreen("live");
+          this.bump();
+          break;
+        }
         this.modeId = (id || "daytrip") as ModeId;
         this.mode = modeById(this.modeId);
         this.exitVersus();
         this.startRun();
         break;
+      }
+      case "ai-pvp": {
+        // The explicit offline route: race the neural flock right now, on the
+        // card's circuit when it names one, otherwise on the last selection.
+        const circuit = pvpCircuitFor(id) ?? this.selectedPvpMode;
+        const m = modeById(circuit);
+        this.selectedPvpMode = m.id;
+        this.modeId = m.id;
+        this.mode = m;
+        this.exitVersus();
+        this.cancelMatchmaking();
+        this.disconnectRace();
+        this.roomCode = "";
+        this.rankedRace = false;
+        this.hud.toast(`🤖 AI PvP · ${m.icon} ${m.name} vs the flock`, "info");
+        this.launchMatch({ ranked: false, storm: m.id === "pvp_typhoon" }, true);
+        break;
+      }
       case "versus":
         this.startVersus();
         break;
@@ -2501,39 +3327,60 @@ export class Game {
         if (this.state !== "ad" && this.state !== "continue") this.startRun();
         break;
       case "retry":
-        if (this.state !== "ad" && this.state !== "continue") {
-          if (this.portalEnabled()) void this.restartWithPortalBreak();
-          // Retrying keeps the flavour of the run you just flew: duels rematch,
-          // an unfinished challenge gets another attempt, plain runs stay plain.
-          else if (this.duelActive) this.startRun({ duel: true });
-          else if (this.challengeRun === "daily" && !this.save.isDailyDone(this.today)) this.startRun({ challenge: "daily" });
-          else if (this.challengeRun.startsWith("gauntlet")) {
-            const idx = Number(this.challengeRun.slice(8)) || 0;
-            if (!this.save.gauntletDone(weekKey()).includes(idx)) this.startRun({ challenge: this.challengeRun });
-            else this.startRun();
-          } else if (this.eventRun) this.startRun({ event: true });
-          else this.startRun();
-        }
+        if (this.state === "gameover") this.replayRun(true);
         break;
       case "pause":
         if (this.state === "playing") this.setState("paused");
         break;
+      case "toggle-fullscreen":
+        this.toggleFullscreen();
+        break;
       case "resume":
-        if (this.state === "paused") this.setState("playing");
+        // If the user hit resume (or ESC) while browsing a pause sub-screen,
+        // first drop back to the plain pause card rather than flying off
+        // unexpectedly. A second resume press/ESC gets them back to flight.
+        if (this.state === "paused" && this.screen !== "main") {
+          this.closePauseScreen();
+          break;
+        }
+        void this.resumeFromPause();
+        break;
+      case "restart-flight":
+        if (this.state === "paused" || this.state === "playing") {
+          if (this.state === "paused") this.closePauseScreen();
+          this.replayRun(false);
+        }
         break;
       case "menu":
+        // From a pause sub-screen, "Exit to menu" first closes the sub-screen so
+        // the confirmation flow (goToMenu returns to menu state) starts clean.
+        if (this.state === "paused") this.closePauseScreen();
         this.exitVersus();
         this.goToMenu();
+        break;
+      case "pause-to": {
+        // Navigate into a menu sub-screen WITHOUT forfeiting the paused run.
+        // Only valid during pause; otherwise fall through to setScreen below.
+        const target = id as UiScreen;
+        if (this.state === "paused") this.openPauseScreen(target);
+        else this.setScreen(target);
+        break;
+      }
+      case "open-practice":
+        this.setScreen("practice");
+        break;
+      case "practice-ranked":
+      case "practice-storm":
+        this.roomCode = "";
+        this.launchMatch({ ranked: true, storm: action === "practice-storm" }, true);
+        break;
+      case "open-progress":
+        this.setScreen("progress");
         break;
       case "open-shop":
         this.setScreen("shop");
         break;
       case "open-paywall":
-        ensureStripeJs();
-        if (this.portalEnabled()) {
-          this.hud.toast("This portal edition uses only portal rewards", "info");
-          break;
-        }
         this.restoreMessage = "";
         this.setScreen("paywall");
         this.telemetry.track("paywall_open", { from: this.state });
@@ -2581,13 +3428,111 @@ export class Game {
       case "board-refresh":
         void this.refreshBoard(true);
         break;
+      case "open-portal-leaderboard": {
+        // Poki's own leaderboard overlay (SDK showLeaderboard) — the platform
+        // renders and owns it, so there is nothing to guard beyond offering the
+        // button only when the capability is reported.
+        this.platform?.showLeaderboard();
+        this.telemetry.track("portal_leaderboard_open", { portal: this.platform?.name ?? "none" });
+        break;
+      }
       case "rename-pilot": {
-        const next = savePilotName(this.hud.readValue("pilotName") || this.pilotName);
+        // Portal builds broadcast the pilot name to real players (netlib rooms,
+        // floating name tags, rosters). Free text there would be an unmoderated
+        // channel into a kids' platform, so those editions ship no text field at
+        // all (edition CUSTOM_PILOT_NAMES) and only ever fly curated generated
+        // names. This case stays tolerant of a stale button: it cannot be
+        // reached on a portal, and if it ever were it would still not accept
+        // player-typed text. The direct/web build owns its own surfaces and
+        // keeps free rename.
+        const freeText = CUSTOM_PILOT_NAMES;
+        const requested = this.hud.readValue("pilotName") || this.pilotName;
+        const chosen = freeText ? requested : generatePilotName();
+        const next = savePilotName(chosen);
         this.pilotName = next;
         this.save.state.pilotName = next;
+        this.save.state.pilotNameCustomized = true;
+        if (freeText) this.hud.setValue("pilotName", next);
         this.save.persist();
         this.hud.toast(`Flying as ${next}`, "info");
         void this.refreshBoard(true);
+        break;
+      }
+      case "autogen-pilot": {
+        const gen = generatePilotName();
+        this.hud.setValue("pilotName", gen);
+        const next = savePilotName(gen);
+        this.pilotName = next;
+        this.save.state.pilotName = next;
+        this.save.state.pilotNameCustomized = true;
+        this.save.persist();
+        this.hud.toast(`Generated Pilot Name: ${next}`, "info");
+        void this.refreshBoard(true);
+        break;
+      }
+      case "set-language": {
+        if (id) {
+          setLocale(id as SupportedLocale);
+          this.hud.toast(`Language updated`, "info");
+          this.bump();
+        }
+        break;
+      }
+      case "set-dist-unit": {
+        if (id === "km" || id === "mi") {
+          this.save.state.settings.distUnit = id;
+          this.save.persist();
+          this.hud.toast(`Distances shown in ${id}`, "info");
+          this.bump();
+        }
+        break;
+      }
+      case "confirm-pilot-name": {
+        const nameInput = this.hud.readValue("pilotNameInput");
+        if (!nameInput || !nameInput.trim()) {
+          this.hud.toast("Please enter a pilot name", "warn");
+          break;
+        }
+        const next = savePilotName(nameInput);
+        this.pilotName = next;
+        this.save.state.pilotName = next;
+        this.save.state.pilotNameCustomized = true;
+        this.save.persist();
+        this.audio.fanfare();
+        // Easter egg: secret pilot names
+        const nameLower = next.toLowerCase();
+        if (nameLower === "icarus") {
+          this.hud.toast("🌊 Too close to the sun, Icarus…", "warn");
+        } else if (nameLower === "phoenix") {
+          this.hud.toast("🔥 Rise from the ashes, Phoenix!", "gold");
+        } else if (nameLower === "sunbird") {
+          this.hud.toast("🌟 You ARE the Sunbird.", "gold");
+          this.save.addCoins(250);
+        } else {
+          this.hud.toast(`Welcome, ${next}!`, "info");
+        }
+        this.setScreen("main");
+        break;
+      }
+      case "randomize-pilot-name": {
+        this.hud.setValue("pilotNameInput", generatePilotName());
+        break;
+      }
+      case "claim-rank-prize": {
+        // One prize per monthly season: the board re-renders from the live
+        // snapshot, so an unguarded claim button was an infinite coin loop.
+        const season = rankSeasonId();
+        if (this.save.state.rankPrizeSeason === season) {
+          this.hud.toast("Rank prize claimed — the next season starts a fresh one", "info");
+          break;
+        }
+        const reward = seasonReward(this.save.state.rival.rating);
+        this.save.state.rankPrizeSeason = season;
+        this.save.persist();
+        this.save.addCoins(reward.coins);
+        this.hud.toast(`Claimed ${reward.coins} Coins for ${reward.division.name} Rank! 🏆`, "achievement");
+        this.audio.fanfare();
+        this.bump();
         break;
       }
       case "claim-cup": {
@@ -2611,11 +3556,17 @@ export class Game {
         this.sendEmote(id || "👋");
         break;
       case "host-room": {
+        this.disconnectRace();
+        this.localRace = false;
         this.roomCode = makeRoomCode();
-        this.copyRoomInvite(this.roomCode);
-        this.modeId = "massrace";
-        this.mode = modeById("massrace");
-        this.startRun();
+        this.joiningRemoteRoom = false;
+        this.modeId = this.selectedPvpMode;
+        this.mode = modeById(this.selectedPvpMode);
+        this.rankedRace = false;
+        this.setScreen("live");
+        this.preseatLobby();
+        this.hud.toast(`Flock room ${this.roomCode} ready!`, "gold");
+        this.bump();
         break;
       }
       case "join-room": {
@@ -2624,26 +3575,118 @@ export class Game {
           this.hud.toast("Enter a 5-letter room code", "warn");
           break;
         }
+        this.disconnectRace();
+        this.localRace = false;
         this.roomCode = code;
-        this.modeId = "massrace";
-        this.mode = modeById("massrace");
-        this.startRun();
+        this.joiningRemoteRoom = true;
+        this.modeId = this.selectedPvpMode;
+        this.mode = modeById(this.selectedPvpMode);
+        this.rankedRace = false;
+        this.setScreen("live");
+        this.preseatLobby();
+        this.hud.toast(`Joined room ${code}`, "gold");
+        this.bump();
         break;
       }
+      case "select-pvp-mode": {
+        const mId = (id as ModeId) || "pvp_sprint";
+        this.selectedPvpMode = mId;
+        this.modeId = mId;
+        this.mode = modeById(mId);
+        // Selecting a new format while already in a private room MUST move
+        // you to a new room code — the existing room's seed is pinned to the
+        // old format on the server, so staying connected would have you
+        // flying Sprint while your invitees queued for Slalom. Same safety
+        // applies mid-matchmaking: tear down so the next preseating uses the
+        // new seed.
+        if (this.roomCode || this.mmOpts) {
+          this.cancelMatchmaking();
+          this.disconnectRace();
+          this.roomCode = this.roomCode ? makeRoomCode() : "";
+          if (this.roomCode) {
+            this.preseatLobby();
+            this.hud.toast(`New room ${this.roomCode} · ${this.mode.icon} ${this.mode.name}`, "gold");
+          }
+        }
+        this.hud.toast(`${this.mode.icon} ${this.mode.name}`, "gold");
+        this.bump();
+        break;
+      }
+      case "select-pvp-world": {
+        const wId = id || "emerald";
+        this.selectedPvpWorld = wId;
+        this.selectedCourse = PVP_WORLDS.find((w) => w.id === wId) ?? PVP_WORLDS[0]!;
+        // Same reseed safety as select-pvp-mode: changing the world while
+        // seated pins a fresh room code so the seed reflects the new course.
+        if (this.roomCode || this.mmOpts) {
+          this.cancelMatchmaking();
+          this.disconnectRace();
+          this.roomCode = this.roomCode ? makeRoomCode() : "";
+          if (this.roomCode) {
+            this.preseatLobby();
+            this.hud.toast(`New room ${this.roomCode} · ${this.selectedCourse.emoji} ${this.selectedCourse.name}`, "gold");
+          }
+        }
+        this.hud.toast(`${this.selectedCourse.emoji} ${this.selectedCourse.name}`, "gold");
+        this.bump();
+        break;
+      }
+      case "quick-match-shuffle": {
+        // "Just make it random": one tap picks a random format AND world so
+        // the big button is always the fastest path into a race.
+        const m = PVP_MODES[Math.floor(Math.random() * PVP_MODES.length)]!;
+        const w = PVP_WORLDS[Math.floor(Math.random() * PVP_WORLDS.length)]!;
+        this.selectedPvpMode = m.id;
+        this.selectedPvpWorld = w.id;
+        this.selectedCourse = w;
+        this.modeId = m.id;
+        this.mode = m;
+        this.hud.toast(`🎲 ${m.icon} ${m.name} on ${w.emoji} ${w.name}`, "gold");
+        this.bump();
+        break;
+      }
+      case "quick-match-instant": {
+        // "Quick Match" is the one-tap ONLINE path: it seats the player in
+        // public matchmaking for the chosen circuit. It used to force a local
+        // AI race (launchMatch(..., true)) while sitting under a "40 pilots,
+        // ready now" hero — the player asked for a PvP race and got bots.
+        // beginMatchmaking falls back to the AI flock only when no transport
+        // exists in this runtime, and now says so when it does.
+        const mode = modeById(this.selectedPvpMode);
+        this.modeId = mode.id;
+        this.mode = mode;
+        this.beginMatchmaking({ ranked: true, storm: mode.id === "pvp_typhoon" });
+        break;
+      }
+      case "start-room-now":
+        if (this.net) this.net.startNow();
+        this.modeId = this.selectedPvpMode;
+        this.mode = modeById(this.selectedPvpMode);
+        this.launchMatch({ ranked: false, storm: this.modeId === "pvp_typhoon" }, false);
+        break;
       case "copy-invite": {
         if (this.roomCode) this.copyRoomInvite(this.roomCode);
         else this.hud.toast("Host a room first to get an invite link", "warn");
         break;
       }
-      case "start-room": {
+      case "start-room":
+      case "ready-room": {
         if (!this.roomCode) {
-          this.hud.toast("Host or join a room first", "warn");
-          break;
+          this.roomCode = makeRoomCode();
         }
-        this.modeId = "massrace";
-        this.mode = modeById("massrace");
+        this.modeId = this.selectedPvpMode;
+        this.mode = modeById(this.selectedPvpMode);
         this.rankedRace = false;
-        this.startRun();
+        this.preseatLobby();
+        if (this.net) {
+          const isReady = !this.net.info().ready;
+          this.net.sendReady(isReady);
+          this.hud.toast(isReady ? "You are ready! ✓" : "Ready cancelled", "gold");
+        } else {
+          this.hud.toast("Starting race flock…", "info");
+          this.launchMatch({ ranked: false, storm: this.modeId === "pvp_typhoon" }, true);
+        }
+        this.bump();
         break;
       }
       case "quick-match":
@@ -2655,6 +3698,13 @@ export class Game {
         break;
       case "mm-cancel":
         this.cancelMatchmaking();
+        break;
+      case "mm-ai":
+        // Explicit opt-in only: the search never drops a pilot into a bot race.
+        this.takeAiFlock();
+        break;
+      case "mm-keep-search":
+        this.keepSearching();
         break;
       case "pvp-duel":
         this.roomCode = "";
@@ -2740,17 +3790,250 @@ export class Game {
         this.bump();
         break;
       }
+      case "claim-daily-stipend": {
+        // The card disables via the snapshot, but a double-tap can land before
+        // the re-render — the handler must be its own guard.
+        if (this.save.state.lastStipendClaimed === this.today) break;
+        this.save.addCoins(250);
+        this.save.state.lastStipendClaimed = this.today;
+        this.audio.chapterFanfare();
+        this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
+        this.hud.toast("🪙 Daily Flight Stipend Claimed! +● 250 coins!", "gold");
+        this.bump();
+        break;
+      }
+      case "buy-bundle": {
+        // One crate per save. It pays 250 coins for 240 — re-claimable it is
+        // an infinite +10/click coin faucet.
+        if (this.save.state.wingmanBundle) break;
+        if (!this.save.spend(240)) {
+          this.hud.toast("Need ● 240 coins to claim Ace Wingman Crate", "warn");
+          break;
+        }
+        this.save.state.wingmanBundle = true;
+        this.save.persist();
+        this.save.armBoost("shield");
+        this.save.armBoost("sunflask");
+        this.save.armBoost("magnet");
+        this.save.ownTrail("trail_tide");
+        this.save.equipTrail("trail_tide");
+        this.save.addCoins(250);
+        this.audio.chapterFanfare();
+        this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
+        this.hud.toast("📦 Ace Wingman Crate Unlocked! 3 Boosts + Tideglass Trail + 250 Coins!", "gold");
+        this.bump();
+        break;
+      }
+      case "claim-squad-quest": {
+        const questId = id;
+        const rewards: Record<string, number> = {
+          migration: 150,
+          drafting: 120,
+          precision: 100,
+        };
+        const coins = rewards[questId] ?? 100;
+        if (!this.save.state.squadQuestsClaimed) this.save.state.squadQuestsClaimed = {};
+        if (this.save.state.squadQuestsClaimed[questId] === this.today) {
+          this.hud.toast("Already claimed today!", "info");
+          break;
+        }
+        this.save.state.squadQuestsClaimed[questId] = this.today;
+        this.save.addCoins(coins);
+        this.audio.chapterFanfare();
+        this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
+        this.hud.toast(`🎁 Squadron Goal Claimed! +● ${coins} coins!`, "gold");
+        this.bump();
+        break;
+      }
+      case "squad-autonomous": {
+        this.squad?.enableAutonomous();
+        this.squadNotice = "⚡ Autonomous Squadron Hub active!";
+        this.audio.chapterFanfare();
+        this.bump();
+        break;
+      }
       case "open-squad":
         this.setScreen("squad");
         this.squadNotice = "";
-        void this.squad?.refresh();
+        if (this.squad) {
+          if (!this.squad.live || this.squad.isAutonomous) {
+            this.squad.enableAutonomous();
+          } else {
+            void this.squad.refresh().then(() => {
+              if (!this.squad?.state.registered) {
+                this.squad?.enableAutonomous();
+                this.bump();
+              }
+            }).catch(() => {
+              this.squad?.enableAutonomous();
+              this.bump();
+            });
+          }
+        }
+        break;
+      case "squad-page": {
+        const [kind, page] = id.split(":");
+        this.squad?.setPage(kind, Number(page));
+        break;
+      }
+      case "squad-copy-code": {
+        const code = this.squad?.state.myCode;
+        if (code) void copyText(code).then(ok => {
+          if (this.disposed) return;
+          if (ok) this.hud.toast("Friend code copied", "info"); else this.hud.offerCopy(code);
+        });
+        break;
+      }
+      case "squad-new-profile":
+        void this.squad?.startNewProfile(this.hud.readChecked("squadRecoveryConsent"));
         break;
       case "squad-refresh":
         this.squadNotice = "";
         void this.squad?.refresh();
         break;
+      case "share-run": {
+        // Publish this run so a friend can race the same hills against our
+        // mark. AUDS is Poki's store (it needs a Poki game id), so elsewhere
+        // the button is not rendered and this is unreachable.
+        if (this.runShareBusy) break;
+        this.runShareBusy = true;
+        this.shareError = "";
+        this.bump();
+        const run: SharedRun = {
+          v: 1,
+          name: this.racedName(),
+          seed: this.seed,
+          mode: this.modeId,
+          distance: Math.round(this.bird.x - this.startX),
+          timeMs: Math.round((this.raceFinishTime || this.runTime) * 1000),
+          place: this.racePlace,
+          bird: this.skin.id,
+        };
+        void shareRun(run).then((code) => {
+          if (this.disposed) return;
+          this.runShareBusy = false;
+          if (code) {
+            this.shareCode = code;
+            this.hud.toast("🔗 Run shared — send the code to a friend", "gold");
+          } else {
+            // Platform-neutral copy: this string ships in every edition, and
+            // the isolation gates reject the platform's name in other builds.
+            this.shareError = "Sharing isn't available in this build — no platform store is configured.";
+          }
+          this.bump();
+        });
+        break;
+      }
+      case "copy-share": {
+        if (!this.shareCode) break;
+        const code = this.shareCode;
+        void copyText(code).then((ok) => {
+          if (this.disposed) return;
+          this.hud.toast(ok ? `Run code ${code} copied` : `Run code: ${code}`, ok ? "gold" : "info");
+        });
+        break;
+      }
+      case "load-run": {
+        const code = this.hud.readValue("shareCode").trim();
+        if (!code) break;
+        this.runShareBusy = true;
+        this.shareError = "";
+        this.bump();
+        void loadSharedRun(code).then((run) => {
+          if (this.disposed) return;
+          this.runShareBusy = false;
+          if (!run) {
+            this.shareError = sharingAvailable()
+              ? "No shared run with that code — check the code and try again."
+              : "Run codes aren't available in this build — no platform store is configured.";
+            this.bump();
+            return;
+          }
+          this.sharedRun = run;
+          // Same hills, same mode, their mark: this is the existing rival
+          // challenge path, just delivered by code instead of a URL.
+          this.rival = { seed: run.seed, distance: run.distance, name: run.name, mode: run.mode };
+          this.rebuildWorld(run.seed);
+          this.seedMode = "random";
+          if (MODES.some((m) => m.id === run.mode)) {
+            this.modeId = run.mode as ModeId;
+            this.mode = modeById(this.modeId);
+          }
+          // Count the play — the AUDS counter endpoint is public by design.
+          void countSharePlay(code);
+          this.hud.toast(`🥊 ${run.name} flew ${run.distance.toLocaleString()} m here — beat it`, "quest");
+          this.telemetry.track("shared_run_loaded", { mode: this.modeId, distance: run.distance });
+          this.bump();
+        });
+        break;
+      }
+      case "race-share": {
+        if (!this.sharedRun) break;
+        this.exitVersus();
+        this.startRun();
+        break;
+      }
+      case "pilot-lookup": {
+        // Real lookup: the panel shows the directory's answer, including
+        // "no pilot with that code" and "this build is offline".
+        const code = this.hud.readValue("pilotCode").trim().toUpperCase();
+        void this.squad?.lookupPilot(code).then(() => this.bump());
+        break;
+      }
+      case "pilot-add": {
+        const code = id || this.squad?.state.lookup?.code || this.hud.readValue("pilotCode");
+        void this.squad?.addFriend(code).then((msg) => {
+          this.squadNotice = msg;
+          this.bump();
+        });
+        break;
+      }
+      case "pilot-copy": {
+        const code = id || this.squad?.state.lookup?.code || "";
+        if (!code) break;
+        void copyText(code).then((ok) => {
+          if (this.disposed) return;
+          this.hud.toast(ok ? `Pilot code ${code} copied` : "Copy the code from the field", "info");
+        });
+        break;
+      }
+      case "pilot-invite":
+      case "mate-invite": {
+        // Inviting a wingman is the same real artefact as inviting anyone:
+        // the room's invite link. No room yet → say so instead of pretending.
+        const who = id || "your wingman";
+        if (!this.roomCode) {
+          this.hud.toast("Create a private room first — then invites are one tap", "info");
+          break;
+        }
+        void this.invitePilot(this.roomCode, who);
+        break;
+      }
+      case "mate-wingman": {
+        const name = id;
+        if (name) this.squadNotice = this.squad?.rememberWingman(name) ?? "";
+        this.bump();
+        break;
+      }
+      case "mate-forget": {
+        if (id && this.pilots.forget(id)) {
+          this.hud.toast(`Forgot ${id}`, "info");
+          this.bump();
+        }
+        break;
+      }
+      case "req-accept":
+        void this.squad?.respondRequest(id, true);
+        break;
+      case "req-decline":
+        void this.squad?.respondRequest(id, false);
+        break;
+      case "req-cancel":
+        void this.squad?.cancelRequest(id);
+        break;
       case "squad-add": {
-        const code = this.hud.readValue("squadCode").trim().toUpperCase();
+        // Kept for older builds/links that still post a bare code.
+        const code = (this.hud.readValue("squadCode") || this.hud.readValue("pilotCode")).trim().toUpperCase();
         if (!code) break;
         void this.squad?.addFriend(code).then((msg) => {
           this.squadNotice = msg;
@@ -2783,8 +4066,16 @@ export class Game {
         void this.squad?.leaveClub();
         break;
       case "squad-chat": {
+        // Portal editions ship without a chat surface (Poki REQ-31: no chat in
+        // multiplayer surfaces; emotes are the sanctioned alternative). The
+        // action stays for the direct build; here it can only be reached by a
+        // stale DOM node.
+        if (!SQUAD_CHAT) break;
         const text = this.hud.readValue("chatText");
-        void this.squad?.sendChat(text).then(() => this.bump());
+        void this.squad?.sendChat(text).then(sent => {
+          if (sent && this.hud.readValue("chatText") === text) this.hud.clearValue("chatText");
+          this.bump();
+        });
         break;
       }
       case "room-size": {
@@ -2821,10 +4112,17 @@ export class Game {
         this.bump();
         break;
       case "room-close":
+        this.cancelMatchmaking();
+        this.disconnectRace();
         this.massRace.clear();
         this.roomCode = "";
-        this.hud.toast("Room closed", "warn");
+        this.joiningRemoteRoom = false;
+        this.hud.toast("You left the room", "info");
         this.bump();
+        break;
+      case "practice-race":
+        this.roomCode = "";
+        this.launchMatch({ ranked: false, storm: false }, true);
         break;
       case "pvp-casual":
         this.beginMatchmaking({ ranked: false, storm: false });
@@ -2835,19 +4133,21 @@ export class Game {
         this.mode = modeById("daytrip");
         this.startRun();
         break;
+      case "start-endless":
+        this.exitVersus();
+        this.modeId = "endless";
+        this.mode = modeById("endless");
+        this.startRun();
+        break;
       case "open-rank":
         this.setScreen("rank");
         break;
       case "open-live":
         this.setScreen("live");
-        // Seat into the public room immediately so the lobby shows real
-        // pilots before you commit — PvP should feel alive from the lobby.
-        this.preseatLobby();
+        // Browsing must not seat an unready spectator into public matchmaking.
         break;
       case "back":
-        this.checkoutOk = false;
-        this.checkoutWaiting = false;
-        this.setScreen(this.screen === "checkout" ? "paywall" : "main");
+        this.backScreen();
         break;
       case "buy-nest": {
         const price = this.save.nestUpgradePrice();
@@ -2876,28 +4176,19 @@ export class Game {
         this.buyTrail(id);
         break;
       case "starter-buy":
-        if (this.portalEnabled() || this.save.state.starterPack) break;
-        this.openCheckout("sunbird_starter");
+        this.buyCoinStarter();
         break;
       case "gold-buy":
-        if (this.portalEnabled()) break;
-        this.openCheckout("sunbird_gold");
+        this.buyCoinGold();
         break;
       case "vip-buy":
-        if (this.portalEnabled()) break;
-        this.openCheckout("sunbird_vip");
+        this.buyPortalVip();
         break;
-      case "checkout-pay":
-        this.payDemo();
+      case "buy-vault":
+        this.buyMysteryVault();
         break;
       case "checkout-cancel":
-        if (!this.checkoutBusy) this.setScreen("paywall");
-        break;
-      case "stripe-open":
-        this.openStripeTab();
-        break;
-      case "stripe-confirm":
-        this.confirmStripeManually();
+        if (!this.checkoutBusy) this.backScreen();
         break;
       case "restore":
         this.restore();
@@ -2906,15 +4197,13 @@ export class Game {
         this.redeem();
         break;
       case "copy-referral":
-        void navigator.clipboard?.writeText(this.save.state.referralCode);
-        this.hud.toast("Code copied", "info");
+        void this.copyWithFeedback(this.save.state.referralCode, "Code copied");
         break;
       case "redeem-referral":
         this.redeemReferral();
         break;
       case "copy-cloud":
-        void navigator.clipboard?.writeText(this.save.exportCode());
-        this.hud.toast("Save code copied", "info");
+        void this.copyWithFeedback(this.save.exportCode(), "Save code copied");
         break;
       case "import-cloud":
         this.importCloud();
@@ -2933,11 +4222,17 @@ export class Game {
         this.telemetry.track("rival_thrown", { distance: dist, mode: this.modeId });
         break;
       }
-      case "rematch":
-        // Same stakes, zero menu round-trips — back through the honest
-        // search so live pilots can seat into the new field.
-        if (this.state === "gameover" && this.lastMatchOpts) this.beginMatchmaking(this.lastMatchOpts);
+      case "rematch": {
+        // Same stakes, zero menu round-trips. An online race goes back through
+        // the honest search so live pilots can seat into the next field; a duel
+        // or an AI-flock race replays locally, exactly as it was flown.
+        if (this.state !== "gameover") break;
+        const opts = this.lastMatchOpts ?? { ranked: false, storm: false };
+        if (this.duelActive || this.versus) this.replayRun(true);
+        else if (this.localRace || !isMultiplayerConfigured()) this.launchMatch(opts, true);
+        else this.beginMatchmaking(opts);
         break;
+      }
       case "share":
         void this.shareRun();
         break;
@@ -2950,6 +4245,10 @@ export class Game {
       case "continue-ad":
         if (this.state === "continue") {
           if (this.portalEnabled()) {
+            // Poki game-events: the player chose the rewarded option. The label
+            // matches the `visible` event for the same offer kind (REQ-14).
+            const kind = this.continueOfferView?.kind ?? "standard";
+            this.platform?.measure("button", continuePlacementLabel(kind), "interact");
             void this.continueWithPortalReward();
           } else {
             this.adReason = "continue";
@@ -2992,6 +4291,12 @@ export class Game {
         this.save.persist();
         this.applySettings();
         break;
+      case "set-doubletap":
+        if (!this.save.hasUpgrade("doubletap")) break;
+        this.save.state.settings.doubleTapBoost = !this.save.state.settings.doubleTapBoost;
+        this.save.persist();
+        this.bump();
+        break;
       case "set-music":
         this.save.state.settings.music = !this.save.state.settings.music;
         this.save.persist();
@@ -2999,7 +4304,7 @@ export class Game {
         break;
       case "set-music-vol": {
         const cur = this.save.state.settings.musicVolume;
-        const next = cur >= 1 ? 0 : Math.round((cur + 0.25) * 100) / 100;
+        const next = id !== "" && Number.isFinite(Number(id)) ? Math.max(0, Math.min(1, Number(id) / 100)) : cur >= 1 ? 0 : Math.min(1, Math.round((cur + 0.25) * 100) / 100);
         this.save.state.settings.musicVolume = next;
         this.save.persist();
         this.applySettings();
@@ -3007,7 +4312,7 @@ export class Game {
       }
       case "set-sfx-vol": {
         const cur = this.save.state.settings.sfxVolume;
-        const next = cur >= 1 ? 0 : Math.round((cur + 0.25) * 100) / 100;
+        const next = id !== "" && Number.isFinite(Number(id)) ? Math.max(0, Math.min(1, Number(id) / 100)) : cur >= 1 ? 0 : Math.min(1, Math.round((cur + 0.25) * 100) / 100);
         this.save.state.settings.sfxVolume = next;
         this.save.persist();
         this.applySettings();
@@ -3016,7 +4321,7 @@ export class Game {
       }
       case "set-track": {
         const cur = this.save.state.settings.musicTrack;
-        const next = cur === "shuffle" ? 0 : cur >= TRACK_NAMES.length - 1 ? "shuffle" : cur + 1;
+        const next = id === "shuffle" ? "shuffle" : id !== "" && Number.isInteger(Number(id)) && Number(id) >= 0 && Number(id) < TRACK_NAMES.length ? Number(id) : cur === "shuffle" ? 0 : cur >= TRACK_NAMES.length - 1 ? "shuffle" : cur + 1;
         this.save.state.settings.musicTrack = next;
         this.save.persist();
         this.applySettings();
@@ -3046,7 +4351,7 @@ export class Game {
       case "set-quality": {
         const order = ["auto", "high", "low"] as const;
         const cur = this.save.state.settings.quality;
-        this.save.state.settings.quality = order[(order.indexOf(cur) + 1) % order.length]!;
+        this.save.state.settings.quality = id === "auto" || id === "high" || id === "low" ? id : order[(order.indexOf(cur) + 1) % order.length]!;
         this.save.persist();
         this.applySettings();
         break;
@@ -3081,17 +4386,33 @@ export class Game {
 
   private handleHotkeys(): void {
     if (this.input.consumePause()) {
+      if (this.hud.dismissCopy()) return;
+      if (this.mmOpts) { this.cancelMatchmaking(); return; }
       if (this.state === "playing") this.setState("paused");
-      else if (this.state === "paused") this.setState("playing");
-      else if (this.screen !== "main" && !this.checkoutBusy) this.setScreen("main");
+      else if (this.state === "paused") {
+        // ESC/P from a pause sub-screen collapses the sub-screen first (matching
+        // the button behaviour); from the bare pause card it resumes flight.
+        if (this.screen !== "main") this.closePauseScreen();
+        else void this.resumeFromPause();
+      }
+      else if (this.screen !== "main" && !this.checkoutBusy) this.backScreen();
     }
     if (this.input.consumeRestart()) {
       if (this.state === "gameover") {
-        if (this.portalEnabled()) void this.restartWithPortalBreak();
-        else this.startRun();
+        this.replayRun(true);
       } else if (this.state === "playing" || this.state === "paused") {
-        this.startRun();
+        this.replayRun(false);
       }
+    }
+    if (this.input.consumeMute()) {
+      // M works everywhere (menu, play, pause, sub-screens) — global toggle.
+      this.save.state.settings.mute = !this.save.state.settings.mute;
+      this.save.persist();
+      this.applySettings();
+      this.hud.toast(this.save.state.settings.mute ? "Sound off" : "Sound on", "info");
+    }
+    if (this.input.consumeFullscreen()) {
+      this.toggleFullscreen();
     }
   }
 
@@ -3106,13 +4427,36 @@ export class Game {
       // A graceful retreat still deserves a punchline.
       this.hud.toast(quip(SURRENDER_QUIPS, Math.round(this.bird.x)), "cloud");
     }
+    this.disconnectRace();
+    this.roomCode = "";
     this.duelActive = false;
     this.duelResult = "";
     this.challengeRun = "";
     this.challengeMods = NO_MODS;
+    // The demo flies the menu island, not whatever random hills the last run
+    // used — otherwise the backdrop (and the "Hills of …" label) is a dice
+    // roll per run: it flies once, then stalls on a brutal island. Wild
+    // keeps its current hills; dated modes return to their date. Guarded:
+    // a failed rebuild must never trap the player — worst case the menu
+    // shows the current hills.
+    if (this.seedMode !== "random") {
+      const menuSeed = this.seedMode === "today" ? this.today : dateSeed(new Date(Date.now() - 86400000));
+      if (this.seed !== menuSeed) {
+        try {
+          this.rebuildWorld(menuSeed);
+        } catch (err) {
+          console.error("Sunbird menu world rebuild failed, keeping hills:", err);
+        }
+      }
+    }
     this.resetRun(true);
+    this.demoAcc = 0;
+    this.demoTime = 0;
+    this.demoStuck = 0;
     this.setState("menu");
-    this.setScreen("main");
+    // Show name entry on first use
+    const screen = !this.save.state.pilotNameCustomized ? "nameEntry" : "main";
+    this.setScreen(screen);
     this.camera.setIntro(1);
   }
 
@@ -3133,8 +4477,10 @@ export class Game {
       this.bump();
       return;
     }
-    if (!this.save.spend(def.price)) {
-      this.hud.toast(`Need ${def.price - st.wallet} more coins`, "warn");
+    const flash = dailyFlashBird(this.today);
+    const price = def.id === flash.id ? flash.price : def.price;
+    if (!this.save.spend(price)) {
+      this.hud.toast(`Need ${price - st.wallet} more coins`, "warn");
       return;
     }
     this.save.ownSkin(id);
@@ -3142,7 +4488,7 @@ export class Game {
     this.applySkin();
     this.audio.purchase();
     this.hud.toast(`${def.name} is yours!`, "gold");
-    this.telemetry.track("skin_bought", { id, price: def.price });
+    this.telemetry.track("skin_bought", { id, price });
     this.bump();
   }
 
@@ -3150,6 +4496,10 @@ export class Game {
     const def = BOOSTS.find((b) => b.id === id);
     if (!def) return;
     const st = this.save.state;
+    if (def.permanent && this.save.hasUpgrade(id)) {
+      this.hud.toast("Already unlocked", "info");
+      return;
+    }
     if (st.armedBoosts.includes(id)) {
       this.hud.toast("Already armed for next flight", "info");
       return;
@@ -3160,9 +4510,10 @@ export class Game {
       this.hud.toast(`Need ${price - st.wallet} more coins`, "warn");
       return;
     }
-    this.save.armBoost(id);
+    if (def.permanent) this.save.ownUpgrade(id);
+    else this.save.armBoost(id);
     this.audio.purchase();
-    this.hud.toast(`${def.icon} ${def.name} armed`, "power");
+    this.hud.toast(`${def.icon} ${def.name} ${def.permanent ? "unlocked" : "armed"}`, "power");
     this.telemetry.track("boost_bought", { id, price });
     this.bump();
   }
@@ -3203,59 +4554,8 @@ export class Game {
 
   /* ----------------------------------------------------------- checkout */
 
-  private openCheckout(sku: Sku): void {
-    if (this.portalEnabled()) return;
-    this.checkoutSku = sku;
-    this.checkoutError = "";
-    this.checkoutOk = false;
-    this.checkoutWaiting = false;
-    this.setScreen("checkout");
-    this.telemetry.track("checkout_open", { sku, mode: this.checkoutMode() });
-  }
-
   private checkoutMode(): CheckoutMode {
-    return stripeConfigured(this.checkoutSku) ? "stripe" : "demo";
-  }
-
-  private payDemo(): void {
-    if (this.checkoutBusy) return;
-    this.checkoutBusy = true;
-    this.checkoutError = "";
-    this.bump();
-    this.telemetry.track("checkout_start", { sku: this.checkoutSku, mode: "demo" });
-    void this.mockPayments.purchase(this.checkoutSku).then((res) => {
-      if (this.disposed) return;
-      this.checkoutBusy = false;
-      if (res.ok) {
-        this.checkoutOk = true;
-        this.grantSku(this.checkoutSku, "demo_purchase");
-      } else {
-        this.checkoutError = res.error;
-        this.telemetry.track("purchase_fail", { error: res.error });
-      }
-      this.bump();
-    });
-  }
-
-  private openStripeTab(): void {
-    // Portals forbid external payment links, full stop. The entry actions are
-    // gated too, but this is the hard backstop for any future code path.
-    if (this.portalEnabled()) return;
-    const link = stripeLinkFor(this.checkoutSku, this.save.state.deviceId);
-    if (!link) return;
-    window.open(link, "_blank", "noopener,noreferrer");
-    this.checkoutWaiting = true;
-    this.telemetry.track("checkout_start", { sku: this.checkoutSku, mode: "stripe" });
-    this.bump();
-  }
-
-  private confirmStripeManually(): void {
-    const res = this.mockPayments.confirmManual(this.checkoutSku);
-    if (res.ok) {
-      this.checkoutOk = true;
-      this.grantSku(this.checkoutSku, "stripe_selfserve");
-    }
-    this.bump();
+    return "demo";
   }
 
   /** The one honest upsell moment: after the player proves they like the
@@ -3263,27 +4563,13 @@ export class Game {
    * screen — never mid-run, never modal, never repeated. */
   private starterNudged = false;
   private maybeNudgeStarter(): void {
-    if (this.starterNudged || this.portalEnabled()) return;
+    if (this.starterNudged) return;
     if (this.save.state.starterPack || this.save.state.gold) return;
     const runs = this.save.state.runsPlayed;
     if (runs < 3 || runs > 12) return;
     this.starterNudged = true;
     this.hud.toast(`🎁 First Flight Pack · ${STARTER_PACK.price} — 1,200 coins + Goldleaf trail`, "gold");
     this.telemetry.track("starter_nudge", { runs });
-  }
-
-  private handleStripeReturn(): void {
-    const sku = consumeStripeReturn();
-    if (!sku) return;
-    this.grantSku(sku, "stripe_redirect");
-    this.checkoutSku = sku;
-    this.checkoutOk = true;
-    this.setScreen("checkout");
-    this.setState("menu");
-    // Upgrade the receipt to server-verified once the webhook lands (webhooks
-    // typically beat the redirect, but poll once more after a short grace).
-    void this.syncServerEntitlements();
-    window.setTimeout(() => void this.syncServerEntitlements(), 5000);
   }
 
   /** Pull webhook-verified purchases from the backend and grant any missing.
@@ -3296,7 +4582,7 @@ export class Game {
         sku === "sunbird_gold" ? this.save.state.gold
         : sku === "sunbird_vip" ? this.save.isVipActive()
         : this.save.state.starterPack;
-      if (!owned) this.grantSku(sku, "stripe_webhook");
+      if (!owned) this.grantSku(sku, "payment_webhook");
     }
   }
 
@@ -3379,8 +4665,19 @@ export class Game {
 
   private importCloud(): void {
     const code = this.hud.readValue("cloudImport");
-    if (!code.trim()) return;
+    if (!code.trim()) {
+      this.cloudMessage = "Paste a save code first.";
+      this.bump();
+      return;
+    }
+    if (!this.hud.readChecked("confirmImport")) {
+      this.cloudMessage = "Confirm that you want to replace this device’s progress before importing.";
+      this.bump();
+      return;
+    }
+    this.hud.clearValue("confirmImport");
     if (this.save.importCode(code)) {
+      this.hud.clearValue("cloudImport");
       this.applySkin();
       this.applySettings();
       this.cloudMessage = "Save imported! Welcome back.";
@@ -3397,6 +4694,7 @@ export class Game {
     this.shareBusy = true;
     this.bump();
     try {
+      const { buildShareCard, shareOrDownload } = await import("./Social");
       // Fuse the two viral halves: the image card carries its own beat-me
       // link, so one share (not card + separate link) is the whole loop.
       // Gated behind challengeShare like throw-challenge — rollout-safe.
@@ -3411,11 +4709,27 @@ export class Game {
         skin: this.skin,
         referralCode: this.save.state.referralCode,
         seedLabel: this.seedLabel(),
+        flightPath: this.flightPath,
         challengeUrl,
       });
+      // Portal-native share sheet first: the platform owns the link
+      // formatting (and, on CrazyGames, appends its multiplayer invite
+      // params). A dismissed sheet counts as handled — the fallback below
+      // would just show the user a second sheet.
+      const platform = this.platform;
+      if (platform && platform.name !== "none") {
+        const handled = await platform.share(card.text);
+        if (handled) {
+          this.telemetry.track("share_run", { result: "shared" });
+          if (!this.disposed) this.hud.toast("Shared!", "gold");
+          return;
+        }
+      }
       const result = await shareOrDownload(card, undefined, !this.portalEnabled());
       this.telemetry.track("share_run", { result });
-      this.hud.toast(result === "shared" ? "Shared!" : "Image saved", "info");
+      if (this.disposed) return;
+      if (result === "unavailable") this.hud.offerCopy(card.text);
+      else if (result !== "cancelled") this.hud.toast(result === "shared" ? "Shared!" : result === "copied" ? "Flight link copied" : "Image download requested", "info");
     } catch {
       this.hud.toast("Couldn't build the share card", "warn");
     } finally {
@@ -3454,6 +4768,77 @@ export class Game {
     this.bump();
   }
 
+  /** Portal editions convert VIP into an in-game coin sink, with a rewarded
+   * ad route for players who are short. This keeps checkout out of iframe
+   * portals while giving the portal a clear, opt-in monetisation moment. */
+  private buyCoinGold(): void {
+    if (this.save.state.gold) return;
+    const price = GOLD.coinPrice;
+    if (!this.save.spend(price)) {
+      this.hud.toast(`Need ● ${(price - this.save.state.wallet).toLocaleString()} more coins`, "info");
+      return;
+    }
+    this.grantGold("coin_purchase");
+  }
+
+  private buyCoinStarter(): void {
+    if (this.save.state.starterPack) return;
+    const price = STARTER_PACK.coinPrice;
+    if (!this.save.spend(price)) {
+      this.hud.toast(`Need ● ${(price - this.save.state.wallet).toLocaleString()} more coins`, "info");
+      return;
+    }
+    this.grantStarter("coin_purchase");
+  }
+
+  private buyPortalVip(): void {
+    const price = VIP.coinPrice;
+    if (!this.save.spend(price)) {
+      this.hud.toast(`Need ● ${(price - this.save.state.wallet).toLocaleString()} more coins`, "info");
+      return;
+    }
+    this.save.grantVip();
+    this.vipActive = true;
+    this.vipExpiredNotice = false;
+    this.save.ownSkin("aurora");
+    this.save.claimVipDaily(this.today);
+    this.audio.purchase();
+    this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
+    this.hud.toast("VIP flight unlocked with coins ♛", "vip");
+    this.telemetry.track("vip_granted", { source: "portal_coins", price });
+    this.bump();
+  }
+
+  private buyMysteryVault(): void {
+    const price = 150;
+    if (!this.save.spend(price)) {
+      this.hud.toast(`Need ● ${(price - this.save.state.wallet).toLocaleString()} more coins`, "info");
+      return;
+    }
+    const rng = Math.random();
+    this.audio.fanfare();
+    this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
+
+    const unownedSkins = SKINS.map((s: SkinDef) => s.id).filter((id: string) => !this.save.state.ownedSkins.includes(id));
+    const unownedTrails = SHOP_TRAILS.map((t: ShopTrailDef) => t.id).filter((id: string) => !this.save.state.ownedUpgrades.includes(id));
+
+    if (rng < 0.35 && unownedSkins.length > 0) {
+      const pick = unownedSkins[Math.floor(Math.random() * unownedSkins.length)]!;
+      this.save.ownSkin(pick);
+      const skinDef = skinById(pick);
+      this.hud.toast(`🥚 Vault Hatched: ${skinDef.name} Bird Skin!`, "gold");
+    } else if (rng < 0.70 && unownedTrails.length > 0) {
+      const pick = unownedTrails[Math.floor(Math.random() * unownedTrails.length)]!;
+      this.save.ownTrail(pick);
+      this.hud.toast(`🥚 Vault Hatched: ${pick.replace("trail_", "").toUpperCase()} Trail!`, "gold");
+    } else {
+      const reward = 300 + Math.floor(Math.random() * 300);
+      this.save.addCoins(reward);
+      this.hud.toast(`🥚 Vault Jackpot: +● ${reward} bonus coins!`, "gold");
+    }
+    this.bump();
+  }
+
   private setSeedMode(mode: SeedMode): void {
     if (!this.save.state.gold && mode !== "today") {
       this.setScreen("paywall");
@@ -3486,12 +4871,32 @@ export class Game {
 
   /* --------------------------------------------------------------- helpers */
 
+  get socialSystem(): SocialSystem {
+    return this.social;
+  }
+
   private get skin(): SkinDef {
     return skinById(this.save.state.activeSkin);
   }
 
+  private get fairRace(): boolean {
+    return equalizedRace(this.modeId, this.rankedRace, this.localRace, this.duelActive);
+  }
+
+  /** Keep the chosen artwork, but not paid flight advantages in a live race. */
+  private get gameplaySkin(): SkinDef {
+    return this.fairRace ? skinById("sunbird") : this.skin;
+  }
+
+  /** Speed boost for modes with `escalate: true`. Grows with island index and
+   *  time so Endless mode feels genuinely harder as you go deeper. */
+  private escalateMult(): number {
+    if (!this.mode.escalate) return 1;
+    return endlessSpeedScale(this.island, this.runTime);
+  }
+
   private daylightMax(): number {
-    return (this.save.state.gold ? DAYLIGHT_MAX_GOLD : DAYLIGHT_MAX) + this.skin.daylightBonus + this.masteryPerk.daylightBonus;
+    return (this.save.state.gold && !this.fairRace ? DAYLIGHT_MAX_GOLD : DAYLIGHT_MAX) + this.gameplaySkin.daylightBonus + this.masteryPerk.daylightBonus;
   }
 
   private applySkin(): void {
@@ -3508,17 +4913,22 @@ export class Game {
     this.camera.setReduceMotion(s.reduceMotion);
     // Bloom is the expensive effect — desktop high/auto only, and never under
     // reduced-motion (a steady glow reads as flicker to some players).
-    this.useBloom = !s.reduceMotion && !this.isMobile && s.quality !== "low";
-    if (!this.useBloom) this.fx.setBase(0);
+    this.useBloom = !s.reduceMotion && !this.isMobile && s.quality === "high";
+    this.bloomBudget = { enabled: false, goodWindows: 0, cooldown: 0 };
+    if (!this.useBloom) this.fx?.setBase(0);
     // Accessibility classes live on <html> so every overlay inherits them.
     document.documentElement.classList.toggle("a11y-color", s.colorAssist);
     document.documentElement.classList.toggle("a11y-bigtext", s.bigText);
     this.dpr = this.preferredDpr();
-    this.particleBudget = s.quality === "low" ? 0.4 : 1;
+    // Mobile gets a lighter decorative particle stream by default. Gameplay
+    // events still render because critical emitters are short-lived and the
+    // adaptive quality loop can shed more work under sustained load.
+    this.particleBudget = s.quality === "low" ? 0.3 : this.isMobile ? 0.5 : 1;
     this.particles.setBudget(this.particleBudget);
     // Soft shadows are the single priciest feature on mobile GPUs — keep them
     // only when the user asked for high quality (auto tiers shed them first).
-    const wantShadows = s.quality === "high" || (s.quality === "auto" && this.frameEma < 1 / 30);
+    const wantShadows =
+      this.deviceProfile.tier !== "lite" && !this.isMobile && (s.quality === "high" || (s.quality === "auto" && this.frameEma < 1 / 30));
     if (this.renderer.shadowMap.enabled !== wantShadows) this.renderer.shadowMap.enabled = wantShadows;
     this.resize();
     this.bump();
@@ -3526,7 +4936,14 @@ export class Game {
 
   private preferredDpr(): number {
     const dev = Math.min(window.devicePixelRatio || 1, 2);
-    return this.save.state.settings.quality === "low" ? 1 : dev;
+    // Fill-rate is the dominant mobile cost for this Three.js scene. Tiny
+    // Wings-style clarity comes from a stable frame rate, so cap phones at
+    // 1x keeps the fill-rate stable on phones; native DPR is reserved for
+    // desktop/high quality settings where the GPU budget is predictable.
+    // DEV-03: a measured-lite device never gets a 2x buffer, whatever its UA
+    // claims — fill-rate is the first thing that dies on those GPUs.
+    if (this.deviceProfile.tier === "lite" || this.save.state.settings.quality === "low") return 1;
+    return this.isMobile ? 1 : dev;
   }
 
   private adaptQuality(raw: number): void {
@@ -3550,15 +4967,28 @@ export class Game {
       this.perfWorst = 0;
     }
     this.qualityTimer += raw;
-    if (this.qualityTimer < 2.5) return;
+    if (this.qualityTimer < QUALITY_WINDOW_SECONDS) return;
     this.qualityTimer = 0;
+    // One decision per window, and the anti-oscillation cooldown ticks with it.
+    this.dprCooldown = Math.max(0, this.dprCooldown - QUALITY_WINDOW_SECONDS);
     if (this.save.state.settings.quality !== "auto" || this.state !== "playing") return;
+
+    // Resolution is two-way: step down when the budget is blown, and back up
+    // when headroom returns, with a lock-out so it cannot oscillate. The old
+    // loop only ever stepped down, so one bad moment degraded the whole session.
+    this.bloomBudget = nextBloomBudget(this.bloomBudget, this.frameEma, !this.isMobile && !this.save.state.settings.reduceMotion && !this.versus);
+    this.useBloom = this.bloomBudget.enabled;
+    const previousDpr = this.dpr;
+    this.dpr = nextDpr(this.dpr, this.preferredDpr(), this.frameEma, this.dprCooldown);
+    if (this.dpr !== previousDpr) {
+      this.dprCooldown = DPR_COOLDOWN_SECONDS;
+      this.resize();
+      this.telemetry.track(this.dpr < previousDpr ? "quality_step_down" : "quality_step_up", {
+        dpr: this.dpr,
+      });
+    }
+
     if (this.frameEma > 1 / 40) {
-      if (this.dpr > 1) {
-        this.dpr = Math.max(1, this.dpr - 0.25);
-        this.resize();
-        this.telemetry.track("quality_step_down", { dpr: this.dpr });
-      }
       // At the floor resolution already? Kill soft shadows for the frame budget.
       if (this.renderer.shadowMap.enabled) {
         this.renderer.shadowMap.enabled = false;
@@ -3568,7 +4998,12 @@ export class Game {
         this.particleBudget = Math.max(0.3, this.particleBudget - 0.2);
         this.particles.setBudget(this.particleBudget);
       }
-    } else if (this.frameEma < 1 / 58 && this.renderer.shadowMap.enabled === false && this.save.state.settings.quality === "auto") {
+    } else if (
+      this.frameEma < 1 / 58 &&
+      !this.isMobile &&
+      this.deviceProfile.tier !== "lite" &&
+      this.renderer.shadowMap.enabled === false
+    ) {
       // Headroom is back — restore soft shadows (they were only shed under load).
       this.renderer.shadowMap.enabled = true;
       this.particleBudget = Math.min(1, this.particleBudget + 0.2);
@@ -3580,6 +5015,21 @@ export class Game {
     this.camera.bump(amount);
   }
 
+  /** A single in-flight import; low-power devices never allocate bloom targets. */
+  private ensureFx(): void {
+    if (this.fx || this.fxLoading || this.fxFailed || this.disposed) return;
+    this.fxLoading = true;
+    void import("./Fx").then(({ Fx: Effects }) => {
+      if (this.disposed || !this.useBloom) return;
+      const fx = new Effects(this.renderer, this.scene, this.camera.camera);
+      const size = this.renderer.getSize(this.tmpSize);
+      fx.resize(size.x, size.y, this.dpr);
+      this.fx = fx;
+    }).catch(() => {
+      this.fxFailed = true; // Plain rendering stays playable if the optional chunk fails.
+    }).finally(() => { this.fxLoading = false; });
+  }
+
   /** Ambient bloom from game state, refreshed once per rendered frame. */
   private updateGlowBase(): void {
     if (!this.useBloom) return;
@@ -3587,18 +5037,36 @@ export class Game {
     const fever = this.feverOn ? 0.5 : 0;
     const wings = this.powers.has("goldenwings") ? 0.45 : 0;
     const boost = this.boostTimer > 0 ? 0.25 : 0;
-    this.fx.setBase(0.1 + Math.max(golden, fever, wings, boost));
+    this.fx?.setBase(0.1 + Math.max(golden, fever, wings, boost));
   }
 
   /** Transient bloom spike on a trigger moment. */
   private glow(amount: number): void {
     if (!this.useBloom) return;
-    this.fx.pulse(amount);
+    this.fx?.pulse(amount);
   }
 
   private flash(kind: "perfect" | "fever" | "island" | "sleep"): void {
     if (this.save.state.settings.reduceMotion && kind !== "sleep") return;
     this.hud.flash(kind);
+  }
+
+  /** Project a world position to screen fractions [0..1, 0..1] for popups.
+   *  Returns [0.42, 0.5] as a safe fallback when projection fails. */
+  private projectToScreen(wx: number, wy: number): [number, number] {
+    const cam = this.camera.camera;
+    const v = new THREE.Vector3(wx, wy, 0).project(cam);
+    return [
+      Math.max(0.05, Math.min(0.95, (v.x + 1) / 2)),
+      Math.max(0.05, Math.min(0.95, (-v.y + 1) / 2)),
+    ];
+  }
+
+  /** Fire a floating impact text popup near the bird's current screen position. */
+  private popupAtBird(text: string, kind: "perfect" | "great" | "thud" | "bop" | "fever" | "zenith" | "splash" | "power"): void {
+    if (this.save.state.settings.reduceMotion) return;
+    const [sx, sy] = this.projectToScreen(this.bird.x, this.bird.y + 4);
+    this.hud.popup(text, kind, sx, sy);
   }
 
   private haptic(pattern: number | number[]): void {
@@ -3613,6 +5081,13 @@ export class Game {
   /** The SDK owns ad focus. Silence and freeze immediately, then restore only
    * after the callback so portal ads cannot leak game audio/input beneath them. */
   private beginPortalAd(): void {
+    // No gameplay event is sent here on purpose. The stop that precedes a
+    // break is already on the books from the state transition that halted
+    // play (death → gameover, or pause), and Poki's rules are explicit:
+    // a gameplayStop() may NOT follow another gameplayStop(), and ads that
+    // do not interrupt gameplay (a coin break from the shop) must not be
+    // wrapped in stop/start pairs at all. The sink dedupes the rare
+    // late-adapter case without ever producing the duplicate.
     this.input.setEnabled(false);
     this.audio.setAdMuted(true);
   }
@@ -3620,6 +5095,9 @@ export class Game {
   private endPortalAd(): void {
     this.audio.setAdMuted(false);
     this.input.setEnabled(true);
+    // If gameplay somehow already resumed while the break ran, the sink
+    // makes sure the portal catches up without a duplicate start.
+    if (this.state === "playing") this.gameplaySink.send("start");
   }
 
   private portalEnabled(): boolean {
@@ -3630,36 +5108,93 @@ export class Game {
 
   /* ------------------------------------------------------- matchmaking */
 
-  /**
-   * Honest search phase (the pattern every live racer uses):
-   *  1. connect to the public room and WAIT — up to MM_WINDOW seconds;
-   *  2. if enough real pilots are seated, launch immediately;
-   *  3. on timeout, launch anyway — remaining slots backfill with
-   *     leaderboard ghosts + squadron pilots, clearly labeled.
-   * Cancelable at any moment; canceling never kicks you from the room.
-   */
-  private static readonly MM_WINDOW = 8;
-  private static readonly MM_LAUNCH_AT = 4; // enough humans → go now
+  /** Opt into a public room, ready when connected, and launch only on the
+   * server's shared start. A timed-out search explicitly disconnects before
+   * starting local AI practice. Browsing or cancelling cannot block a room. */
+  private static readonly MM_WINDOW = 15;
+  /** After the window: how long we keep the seat and keep listening. */
+  private static readonly MM_KEEPALIVE = 600;
 
   private beginMatchmaking(opts: { ranked: boolean; storm: boolean }): void {
+    this.disconnectRace();
     this.roomCode = "";
+    this.localRace = false;
+    // Commit the selected PvP mode up-front so currentMatchSeed() uses the
+    // right mode+course and the server groups pilots into per-circuit rooms.
+    // Without this, matchmaking used the lobby's casual seed and pilots were
+    // shunted into an empty (or wrong) room the moment the race started.
+    this.modeId = this.selectedPvpMode;
+    this.mode = modeById(this.selectedPvpMode);
     if (!isMultiplayerConfigured()) {
-      // No server configured: skip the theater, launch with bots honestly.
-      this.launchMatch(opts);
+      // No transport in this runtime (e.g. a Poki iframe without WebRTC, or a
+      // direct build without VITE_MULTIPLAYER_URL). Say so instead of silently
+      // starting an offline race the player believes is online.
+      this.hud.toast("Online racing is unavailable here — starting an AI flock race", "info");
+      this.launchMatch(opts, true);
       return;
     }
     this.mmOpts = opts;
+    this.mmPhase = "searching";
+    this.mmRooms = "";
     this.mmDeadline = performance.now() + Game.MM_WINDOW * 1000;
     this.preseatLobby();
-    this.hud.setMatchmaking(true, this.liveCount(), this.roomSize, Game.MM_WINDOW);
+    this.startRoomWatch();
+    this.hud.setMatchmaking(true, this.liveCount(), this.roomSize, Game.MM_WINDOW, "searching", "");
     this.bump();
   }
 
   private cancelMatchmaking(): void {
     this.mmDeadline = 0;
     this.mmOpts = null;
+    this.mmPhase = "searching";
+    this.mmRooms = "";
+    this.roomWatcher?.stop();
+    this.closeRoomBrowser();
+    this.net?.sendReady(false);
+    this.disconnectRace();
     this.hud.setMatchmaking(false, 0, this.roomSize, 0);
     this.bump();
+  }
+
+  /** Releases the P2P browse connection (Poki only; a WS build has nothing to
+   *  release). Called when a search ends or is cancelled. */
+  private closeRoomBrowser(): void {
+    if (!POKI_MULTIPLAYER) return;
+    void import("./PokiNetlib").then((m) => m.closeLobbyBrowser()).catch(() => {
+      /* the connection is best-effort */
+    });
+  }
+
+  /** True while we asked the transport for a public room and have not been
+   *  seated/started yet. */
+  private searching(): boolean {
+    return this.mmDeadline > 0 && this.mmOpts !== null;
+  }
+
+  private startRoomWatch(): void {
+    if (!this.roomWatcher) {
+      this.roomWatcher = new RoomWatcher(
+        () => this.fetchLiveRooms(),
+        ROOM_POLL_MS,
+        (result) => {
+          if (!this.searching()) return;
+          this.mmRooms = result.rooms.length ? roomSummaryLine(summarizeRooms(result.rooms)) : "";
+          this.bump();
+        },
+      );
+    }
+    this.roomWatcher.start();
+  }
+
+  /** What is racing right now, on whichever transport this edition ships. */
+  private async fetchLiveRooms(): Promise<LiveRoom[]> {
+    if (!isMultiplayerConfigured()) return [];
+    if (POKI_MULTIPLAYER) {
+      // Compile-time gated: only the Poki bundle contains the P2P browser.
+      const { listPublicLobbies } = await import("./PokiNetlib");
+      return listPublicLobbies();
+    }
+    return fetchPublicRooms();
   }
 
   private liveCount(): number {
@@ -3670,54 +5205,156 @@ export class Game {
   /** Called every frame while a search is active. */
   private pumpMatchmaking(_raw: number): void {
     if (this.mmDeadline <= 0 || !this.mmOpts) return;
-    const secsLeft = (this.mmDeadline - performance.now()) / 1000;
-    const live = this.liveCount();
-    this.hud.setMatchmaking(true, live, this.roomSize, Math.max(0, secsLeft));
-    const enough = live + 1 >= Math.min(Game.MM_LAUNCH_AT, this.roomSize + 1);
-    if (enough || secsLeft <= 0) {
+    // If the run already started (a real start frame, or a local launch), the
+    // search is over — the overlay must never sit on top of gameplay.
+    if (this.state !== "menu") {
       const opts = this.mmOpts;
       this.mmOpts = null;
       this.mmDeadline = 0;
-      this.hud.setMatchmaking(false, live, this.roomSize, 0);
-      if (live > 0) this.hud.toast(`${live} live pilot${live === 1 ? "" : "s"} in the field`, "gold");
-      else this.hud.toast("No live pilots right now — flying player ghosts", "info");
-      this.launchMatch(opts);
+      this.roomWatcher?.stop();
+      this.closeRoomBrowser();
+      this.hud.setMatchmaking(false, 0, this.roomSize, 0);
+      this.hud.toast("No players found — starting AI race", "info");
+      if (opts) this.launchMatch(opts, true);
+      return;
+    }
+    const live = this.liveCount();
+    // Public entrants opt in by pressing Find race. The server, not each
+    // player's timer, decides when the room may launch.
+    if (this.net?.state === "lobby" && !this.net.info().ready) this.net.sendReady(true);
+    // Someone real is in the room — keep the search open until the room starts.
+    if (live > 0 && this.mmPhase === "waiting") this.mmPhase = "searching";
+    if (this.mmPhase === "waiting") {
+      this.hud.setMatchmaking(true, live, this.roomSize, 0, "waiting", this.mmRooms);
+      return;
+    }
+    const secsLeft = (this.mmDeadline - performance.now()) / 1000;
+    this.hud.setMatchmaking(true, live, this.roomSize, Math.max(0, secsLeft), "searching", this.mmRooms);
+    if (secsLeft <= 0) {
+      // The window elapsed with nobody to race. Do NOT launch a bot race — the
+      // pilot asked for live pilots. Keep the room, keep listening, and let
+      // them choose: wait longer, or take the AI flock deliberately.
+      this.mmPhase = "waiting";
+      this.mmDeadline = performance.now() + Game.MM_KEEPALIVE * 1000;
+      this.hud.setMatchmaking(true, live, this.roomSize, 0, "waiting", this.mmRooms);
+      this.hud.toast(this.mmRooms ? `Still searching — ${this.mmRooms}` : "Still searching for live pilots…", "info");
+      this.bump();
     }
   }
 
-  private launchMatch(opts: { ranked: boolean; storm: boolean }): void {
-    this.lastMatchOpts = opts;
-    this.modeId = "massrace";
-    this.mode = modeById("massrace");
-    this.rankedRace = opts.ranked;
-    this.stormfront = opts.storm;
-    this.startRun({ storm: opts.storm });
+  /** Leave the search running (another full window) without dropping the room. */
+  private keepSearching(): void {
+    if (!this.mmOpts) return;
+    this.mmPhase = "searching";
+    this.mmDeadline = performance.now() + Game.MM_WINDOW * 1000;
+    this.hud.toast("Searching again — inviting any pilot who is online", "info");
+    this.bump();
   }
 
+  /** Explicit "race the AI flock" opt-in from the search overlay. */
+  private takeAiFlock(): void {
+    const opts = this.mmOpts ?? this.lastMatchOpts ?? { ranked: false, storm: false };
+    this.mmOpts = null;
+    this.mmDeadline = 0;
+    this.mmPhase = "searching";
+    this.roomWatcher?.stop();
+    this.closeRoomBrowser();
+    this.hud.setMatchmaking(false, 0, this.roomSize, 0);
+    this.hud.toast("Racing the AI flock — offline practice", "info");
+    this.launchMatch(opts, true);
+  }
+
+  private launchMatch(opts: { ranked: boolean; storm: boolean }, local = false): void {
+    this.lastMatchOpts = opts;
+    this.localRace = local;
+    if (local) this.disconnectRace();
+    if (!isRaceMode(this.modeId)) {
+      this.modeId = this.selectedPvpMode;
+      this.mode = modeById(this.selectedPvpMode);
+    }
+    this.rankedRace = opts.ranked;
+    this.stormfront = opts.storm || this.modeId === "pvp_typhoon";
+    this.startRun({ storm: this.stormfront });
+  }
+
+  /** Instantiates the appropriate multiplayer backend for this build:
+   *  Poki uses WebRTC P2P via @poki/netlib; direct/crazy/generic keep the
+   *  existing WebSocket relay. The two classes share the same public API
+   *  so Game.ts doesn't need to branch elsewhere.
+   *
+   *  The Poki client is loaded via a DYNAMIC import guarded by a
+   *  compile-time constant (`VITE_PORTAL_TARGET === "poki"`). Rollup
+   *  can statically evaluate this: in non-Poki builds the branch is
+   *  dead-code-eliminated along with the dynamic import, so @poki/netlib
+   *  (~34 KB gz, with WebRTC + the wss:// signalling URL) is NEVER
+   *  emitted into direct/crazy/generic/none bundles. */
   /** Pre-seats the lobby so the Race screen shows live pilots immediately. */
   private preseatLobby(): void {
-    if (!isMultiplayerConfigured()) return;
     // Warm the ghost source too so the next grid can seat real names.
     void this.refreshBoard();
-    // Join with the massrace seed WITHOUT mutating the current mode — the
-    // player may still back out and start a plain 1P flight.
+    // Matchmaking and race entry must use the SAME room seed. Pre-seating with
+    // a different seed than connectRace() caused PvP modes to drop their lobby
+    // and land in a new empty room the moment the countdown ended — hence the
+    // "circuits aren't actually PvP" bug.
+    const seed = this.currentMatchSeed();
+    const remote = this.joiningRemoteRoom;
     if (!this.net) {
-      this.net = new RealtimeClient(this.save.state.deviceId, this.pilotName, this.skin.id, 0.06);
+      this.net = this.createNetTransport(this.save.state.deviceId, this.pilotName, this.skin.id);
       this.massRace.attachTransport(this.net);
     }
     this.net.setIdentity(this.racedName(), this.skin.id, 0.06);
-    this.net.connect(this.roomCode, `${this.seed}:massrace`);
+    this.net.connect(this.roomCode, seed, remote);
+  }
+
+  /** Stable seed for matchmaking/connect that identifies ONE race uniquely:
+   *  world (course) + mode (+ storm qualifier when on). Using the same seed
+   *  in preseatLobby and connectRace is what keeps pilots in the room they
+   *  matched into when the server fires the shared start. */
+  private currentMatchSeed(): string {
+    const mode = isRaceMode(this.modeId) ? this.modeId : this.selectedPvpMode;
+    const course = this.courseForRace();
+    let seed = `${this.today}:${mode}:${course.id}`;
+    if (this.mmOpts?.storm || (mode === "pvp_typhoon")) seed += ":storm";
+    return seed;
+  }
+
+  /** Adopt a server-sent seed (e.g. on a private-room 'start'). Parses the
+   *  mode:course suffixes so when you join a friend on Sprint/Emerald you
+   *  load Sprint/Emerald rather than your last-picked local default. Any
+   *  unrecognized seed is taken verbatim. */
+  private applySeedFromServer(serverSeed: string): void {
+    this.seed = serverSeed;
+    const parts = serverSeed.split(":");
+    // Expected shape: `<today>:<modeId>:<courseId>[:storm]`
+    if (parts.length >= 3) {
+      const modeId = parts[1] as ModeId;
+      const worldId = parts[2];
+      const mode = MODES.find((m) => m.id === modeId) ?? PVP_MODES.find((m) => m.id === modeId);
+      const world = PVP_WORLDS.find((w) => w.id === worldId);
+      if (mode) {
+        this.selectedPvpMode = mode.id;
+        this.modeId = mode.id;
+        this.mode = mode;
+      }
+      if (world) {
+        this.selectedPvpWorld = world.id;
+        this.selectedCourse = world;
+      }
+      this.stormfront = parts.includes("storm") || modeId === "pvp_typhoon";
+    }
+    this.rebuildWorld(serverSeed);
   }
 
   /** Opens (or reuses) a realtime seat for the current race seed. */
   private connectRace(): void {
-    if (!isMultiplayerConfigured()) return;
+    if (!isMultiplayerConfigured() && getPortalTarget() !== "poki") return;
+    if (this.net?.connected) { this.massRace.attachTransport(this.net); return; }
     if (!this.net) {
-      this.net = new RealtimeClient(this.save.state.deviceId, this.pilotName, this.skin.id, 0.06);
+      this.net = this.createNetTransport(this.save.state.deviceId, this.pilotName, this.skin.id);
       this.massRace.attachTransport(this.net);
     }
     this.net.setIdentity(this.racedName(), this.skin.id, 0.06);
-    this.net.connect(this.roomCode, `${this.seed}:${this.modeId}`);
+    this.net.connect(this.roomCode, this.currentMatchSeed(), this.joiningRemoteRoom);
   }
 
   private disconnectRace(): void {
@@ -3726,6 +5363,19 @@ export class Game {
   }
 
   /** Per-frame network pump: cadence, inbound emotes, outbound state. */
+  /**
+   * Remember the real pilots sharing our room: real names, the room code and
+   * how far they flew. This is the local, honest source behind the "Flew with"
+   * list in Pilot Lookup — it never invents anyone.
+   */
+  private recordRoomPilots(): void {
+    const net = this.net;
+    if (!net?.connected) return;
+    const code = net.info().code;
+    if (!code) return;
+    if (this.pilots.remember(net.roster(), code, Date.now())) this.bump();
+  }
+
   private pumpNetwork(raw: number): void {
     const net = this.net;
     if (!net) return;
@@ -3733,7 +5383,9 @@ export class Game {
     // Server-authoritative result: the DO ordered every live pilot's finish.
     // Blend it with the local bot field — humans ranked by the referee, bots
     // by simulation — and correct the shown place if the estimate was off.
-    if (!this.serverPlaceApplied && net.myPlace > 0 && this.raceFinishTime > 0 && this.massRace.active) {
+    // Gated on mode, not massRace.active: the pack is hidden the instant the
+    // run ends, but the referee's place echo lands a round-trip later.
+    if (!this.serverPlaceApplied && net.myPlace > 0 && this.raceFinishTime > 0 && isRaceMode(this.modeId)) {
       this.serverPlaceApplied = true;
       const botsAhead = this.massRace.rivals.filter(
         (r) => r.kind === "local" && r.finished && r.finishTime <= this.runTime,
@@ -3753,6 +5405,7 @@ export class Game {
         case "join":
           this.hud.toast(`🕊 ${e.name} joined the race`, "island");
           this.audio.chirp();
+          this.recordRoomPilots();
           break;
         case "leave":
           this.hud.toast(`👋 ${e.name} left`, "warn");
@@ -3761,10 +5414,57 @@ export class Game {
           this.hud.toast(`✅ ${e.name} is ready`, "cloud");
           break;
         case "finish":
-          this.hud.toast(`🏁 ${e.name} finished P${e.place}`, "gold");
+          // While we're still flying, every rival's finish matters. After we
+          // cross, the pack keeps finishing behind the results card — up to
+          // ~40 toasts that each re-render the whole card. The referee's
+          // official ordering already landed via `myPlace`, so stay silent.
+          if (this.state === "playing") this.hud.toast(`🏁 ${e.name} finished P${e.place}`, "gold");
           break;
-        case "start":
-          this.hud.toast("🚦 Live race — GO!", "gold");
+        case "interrupted":
+          this.serverPlaceApplied = false;
+          if (this.state === "playing" || this.state === "paused") {
+            this.massRace.clear();
+            this.networkStartAt = 0;
+            this.setState("menu");
+            this.setScreen("live");
+          }
+          this.hud.toast(e.message, "warn");
+          this.bump();
+          break;
+        case "welcome": {
+          // We just landed in a room whose seed may differ from what we asked
+          // for: either a friend's invite code (joiningRemoteRoom) or a
+          // quick-match that seated us into an existing fuller lobby. In both
+          // cases the server/host seed is authoritative for format+course —
+          // adopt it so the lobby UI and startRun() build the right terrain.
+          const shouldAdopt = (this.joiningRemoteRoom || Boolean(this.mmOpts)) && e.seed && e.seed !== this.currentMatchSeed();
+          if (shouldAdopt) {
+            this.roomCode = e.roomCode || this.roomCode;
+            this.applySeedFromServer(e.seed);
+            this.joiningRemoteRoom = false;
+            this.bump();
+          }
+          break;
+        }
+        case "start": {
+          if (this.mmOpts || (this.state === "menu" && this.screen === "live" && this.roomCode)) {
+            const opts = this.mmOpts ?? { ranked: false, storm: false };
+            this.mmOpts = null;
+            this.mmDeadline = 0;
+            this.hud.setMatchmaking(false, this.liveCount(), this.roomSize, 0);
+            this.roomWatcher?.stop();
+            this.closeRoomBrowser();
+            // Adopt the host/server seed as authoritative. When we joined a
+            // friend's private code this is the host's format+course; without
+            // parsing it the guest would rebuild Emerald/Sprint and fly the
+            // wrong terrain/finish against a host on Turquoise/Slalom.
+            if (net.seed) this.applySeedFromServer(net.seed);
+            this.launchMatch(opts);
+            this.networkStartAt = net.startsAt;
+            this.countdown = Math.max(0, (net.startsAt - Date.now()) / 1000);
+            this.hud.toast("Room ready — starting together", "gold");
+          }
+        }
           break;
       }
     }
@@ -3778,10 +5478,18 @@ export class Game {
       this.hud.toast("Emotes muted in this room", "info");
       return;
     }
-    if (this.elapsed - this.lastEmoteAt < 1.2) return; // simple spam guard
-    this.lastEmoteAt = this.elapsed;
+    // Rate-limit on wall-clock, not the run clock: the run clock is frozen in
+    // the menu, where the emote wheel is also visible.
+    const now = performance.now();
+    if (now - this.lastEmoteWallAt < 1200) return;
+    this.lastEmoteWallAt = now;
+    // Sender feedback is immediate: the flight HUD pops your own bubble and the
+    // floating nametag shows it, regardless of whether a net transport exists.
     this.massRace.showEmote("you", text);
+    this.hud.pulseEmote(text);
     this.net?.sendEmote(text);
+    // No toast here: the toast layer renders above the wheel and swallowed the
+    // click that sent the emote (feedback is the bubble, not a banner).
     this.audio.chirp();
     this.bump();
   }
@@ -3820,7 +5528,7 @@ export class Game {
       this.audio.fanfare();
     };
     if (st.lifetime.ghostBeats >= 10) grant("ghost", "Ghost unlocked — 10 ghost wins!");
-    if (st.lifetime.zeniths >= 25) grant("shadow", "Shadow unlocked — 25 zeniths banked!");
+    if (st.lifetime.zeniths >= 25) grant("shadow", "Shadow unlocked — 25 skyline moments banked!");
     if (st.duel.bestStreak >= 10) grant("mythic", "Mythic unlocked — 10-duel win streak!");
     if (st.ownedSkins.length >= 16) grant("rainbow", "Rainbow unlocked — 15-skin collection!");
     const tiers = this.cups.claimedTiers();
@@ -3860,10 +5568,42 @@ export class Game {
   }
 
   /** A portal-controlled commercial break at the natural death/restart seam. */
-  private async restartWithPortalBreak(): Promise<void> {
+  private replayRun(allowPortalBreak: boolean): void {
+    if (this.versus) { this.startVersus(); return; }
+    if (isRaceMode(this.modeId) && this.roomCode && !this.localRace) {
+      // An online race "replay" means going back through the search so the next
+      // round can seat real pilots. Bouncing the player to the menu (what this
+      // used to do) read as a broken replay button.
+      this.disconnectRace();
+      this.roomCode = "";
+      const opts = this.lastMatchOpts ?? { ranked: false, storm: false };
+      this.setState("menu");
+      this.setScreen("live");
+      if (isMultiplayerConfigured()) {
+        this.beginMatchmaking(opts);
+        return;
+      }
+      this.hud.toast("Online racing is unavailable here — replaying the AI flock", "info");
+      this.launchMatch(opts, true);
+      return;
+    }
+    // Local run: replay means the SAME course, so the ghost recorded from the
+    // run that just ended is a real opponent instead of a random island nobody
+    // ever flew. Without this the ghost feature could never be seen.
+    const options: RunOptions = {
+      ...replayOptions({ duel: this.duelActive, challenge: this.challengeRun,
+        dailyDone: this.save.isDailyDone(this.today), gauntletDone: this.save.gauntletDone(weekKey()),
+        event: this.eventRun, storm: this.stormfront }),
+      replay: true,
+    };
+    if (allowPortalBreak && this.portalEnabled()) void this.restartWithPortalBreak(options);
+    else this.startRun(options);
+  }
+
+  private async restartWithPortalBreak(options: RunOptions = {}): Promise<void> {
     const platform = this.platform;
     if (!platform || platform.name === "none") {
-      this.startRun();
+      this.startRun(options);
       return;
     }
     this.setState("ad");
@@ -3871,7 +5611,30 @@ export class Game {
     await platform.commercialBreak();
     if (this.disposed) return;
     this.endPortalAd();
-    this.startRun();
+    this.startRun(options);
+  }
+
+  /**
+   * Every resume-from-pause path (button, ESC, P) funnels through here. On
+   * portal builds the return into gameplay routes through commercialBreak()
+   * — the documented pause/unpause event order — while the sink keeps the
+   * surrounding stop/start pair duplicate-free. A rejected or absent break
+   * resolves immediately and the resume proceeds; a pause can never wedge
+   * the game in the ad state.
+   */
+  private async resumeFromPause(): Promise<void> {
+    if (this.state !== "paused") return;
+    // Collapse any pause sub-screen (shop/settings/...) before returning to flight.
+    this.closePauseScreen();
+    const platform = this.platform;
+    if (this.portalEnabled() && platform && platform.name !== "none") {
+      this.setState("ad");
+      this.telemetry.track("portal_break_request", { portal: platform.name, placement: "resume" });
+      await platform.commercialBreak();
+      if (this.disposed) return;
+      this.endPortalAd();
+    }
+    if (this.state === "paused" || this.state === "ad") this.setState("playing");
   }
 
   /** Rewarded continue never succeeds unless the platform explicitly grants it. */
@@ -3894,6 +5657,9 @@ export class Game {
   private setState(s: GameState): void {
     const previous = this.state;
     this.state = s;
+    // Leaving pause entirely collapses any open pause sub-screen state so the
+    // next pause opens cleanly on the base card.
+    if (s !== "paused") this.pauseScreenOrigin = null;
     this.acc = 0;
     this.last = performance.now();
     this.menuHold = 0;
@@ -3902,12 +5668,18 @@ export class Game {
       this.timeScale = 1;
       this.zenithTimer = 0;
     }
+    // Wake lock follows gameplay exactly: held while flying, released the
+    // moment the player is in a menu, paused, asleep, or watching a break.
+    if (s === "playing") this.wakeLock.acquire();
+    else this.wakeLock.release();
     if (s === "menu" || s === "ad") this.audio.setMusicMode("menu");
     else if (s === "gameover" || s === "continue") this.audio.setMusicMode("sleep");
     else if (s === "paused") this.audio.duckMusic(0.55, 3);
     else if (s === "playing") this.audio.setMusicMode(this.feverOn ? "fever" : this.stormfront ? "storm" : "play");
-    if (previous === "playing" && s !== "playing") this.platform?.gameplayStop();
-    if (previous !== "playing" && s === "playing") this.platform?.gameplayStart();
+    // Edge-triggered through the sink: stop exactly once per halt
+    // (death, pause, menu), start exactly once per resume.
+    if (previous === "playing" && s !== "playing") this.gameplaySink.send("stop");
+    if (previous !== "playing" && s === "playing") this.gameplaySink.send("start");
     this.bump();
   }
 
@@ -3931,14 +5703,72 @@ export class Game {
     return out;
   }
 
+  // ----- Pause overlay / sub-menu navigation --------------------------------
+  // When paused, sub-screens (shop, settings, scores, ...) show over the
+  // frozen flight without abandoning the run. `closePauseScreen()` returns to
+  // the plain pause card (the equivalent of "back to pause" from a sub-screen).
+
+  private pauseScreenOrigin: "main" | "paused" | null = null;
+
+  private openPauseScreen(target: UiScreen): void {
+    if (this.pauseScreenOrigin === null) this.pauseScreenOrigin = this.screen === "main" ? "main" : "paused";
+    // Re-seed history from main so back() lands back on the pause card.
+    this.screenHistory.resetTo("main");
+    this.setScreen(target);
+    // Data-heavy screens should refresh when opened from pause so the player
+    // sees current data, not a stale snapshot from the last menu visit.
+    if (target === "board") void this.refreshBoard();
+  }
+
+  private closePauseScreen(): void {
+    if (this.screen === "live" && this.state === "paused") this.disconnectRace();
+    this.checkoutOk = false;
+    this.checkoutWaiting = false;
+    this.pauseScreenOrigin = null;
+    this.screenHistory.resetTo("main");
+    this.setScreen("main");
+  }
+  // --------------------------------------------------------------------------
+
+  private backScreen(): void {
+    if (this.checkoutBusy) return;
+    // If we're in a pause sub-screen, "back" collapses to the pause card, not
+    // to the previous menu page (which would belong to the main menu stack).
+    if (this.state === "paused") {
+      this.closePauseScreen();
+      return;
+    }
+    this.checkoutOk = false;
+    this.checkoutWaiting = false;
+    if (this.screen === "live") { this.disconnectRace(); this.roomCode = ""; }
+    this.setScreen(this.screenHistory.back());
+  }
+
   private setScreen(s: UiScreen): void {
+    // Block sub-screens that would implicitly abandon or race a paused run.
+    // (Quick-launch grid deliberately omits "live" and "practice"; this is the
+    // belt-and-braces guard if anything else tries to navigate there.)
+    if (this.state === "paused" && (s === "live" || s === "practice")) {
+      this.hud.toast("Resume your flight first, then race.", "info");
+      return;
+    }
+    // If we ever navigate away from main while paused without going through
+    // openPauseScreen (e.g. clicking a score/settings button from a postcard
+    // or reward flow), mark origin so back returns us cleanly.
+    if (this.state === "paused" && s !== "main" && this.pauseScreenOrigin === null) {
+      this.pauseScreenOrigin = "paused";
+      this.screenHistory.resetTo("main");
+    }
+    this.screenHistory.visit(s);
+    if (this.screen === "live" && s !== "live" && this.state === "menu") this.net?.sendReady(false);
     if (s !== this.screen) this.audio.uiTick();
     this.screen = s;
     this.menuHold = 0;
     this.needRelease = true;
     // Every return to the home screen refreshes the embedded leaderboard so a
-    // just-finished run shows up immediately (cache-first, non-blocking).
-    if (s === "main") void this.refreshBoard();
+    // just-finished run shows up immediately (cache-first, non-blocking). Only
+    // do this for the real main menu — during pause, "main" is the pause card.
+    if (s === "main" && this.state !== "paused") void this.refreshBoard();
     this.bump();
   }
 
@@ -3952,27 +5782,50 @@ export class Game {
   }
 
   /** Copies the room invite link, preferring the native share sheet. */
+  /** Share the room invite link with a named pilot (real link, real toast). */
+  private async invitePilot(room: string, who: string): Promise<void> {
+    const link = `${location.origin}${location.pathname}?room=${encodeURIComponent(room)}`;
+    const ok = await copyText(link);
+    if (this.disposed) return;
+    this.hud.toast(
+      ok ? `Invite link for room ${room} copied — send it to ${who}` : `Room ${room} — copy the link from the lobby`,
+      ok ? "gold" : "info",
+    );
+  }
+
   private copyRoomInvite(code: string): void {
     const url = buildRoomInviteUrl(code);
     const text = `Join my Sunbird race room ${code}: ${url}`;
+    // Portal share first: on CrazyGames the native sheet carries its own
+    // multiplayer invite params, and on Poki the shareable URL embeds
+    // `room=CODE` (read back via getInviteParam) so friends land in the room.
+    const platform = this.platform;
+    if (platform && platform.name !== "none") {
+      void platform.share(text, { room: code }).then((handled) => {
+        if (this.disposed) return;
+        if (handled) this.hud.toast("Invite shared — send it to friends", "gold");
+        else this.shareText(text, `Invite link copied — send it to friends`);
+      });
+      return;
+    }
     this.shareText(text, `Invite link copied — send it to friends`);
   }
 
-  /** Native share sheet when available (mobile), clipboard + toast otherwise. */
+  private async copyWithFeedback(text: string, copiedToast: string): Promise<void> {
+    const copied = await copyText(text);
+    if (this.disposed) return;
+    if (copied) this.hud.toast(copiedToast, "info");
+    else this.hud.offerCopy(text);
+  }
+
+  /** Cancellation is deliberate. Never copy or download behind a dismissed sheet. */
   private shareText(text: string, copiedToast: string): void {
-    const nav = navigator as Navigator & { share?: (d: ShareData) => Promise<void> };
-    if (nav.share && flag("nativeShare")) {
-      void nav
-        .share({ title: "Sunbird", text })
-        .then(() => this.hud.toast("Shared!", "gold"))
-        .catch(() => {
-          void navigator.clipboard?.writeText(text).catch(() => undefined);
-          this.hud.toast(copiedToast, "gold");
-        });
-      return;
-    }
-    void navigator.clipboard?.writeText(text).catch(() => undefined);
-    this.hud.toast(copiedToast, "gold");
+    void shareText(text, flag("nativeShare")).then(result => {
+      if (this.disposed) return;
+      if (result === "shared") this.hud.toast("Shared!", "gold");
+      else if (result === "copied") this.hud.toast(copiedToast, "gold");
+      else if (result === "unavailable") this.hud.offerCopy(text);
+    });
   }
 
   private lastRunDistance(): number {
@@ -4162,18 +6015,24 @@ export class Game {
     const stats = this.state === "menu" ? null : this.runStats();
     this.missionViews = this.missions.view(stats);
     this.questViews = this.missions.questView(this.today, stats);
-    this.skinViews = SKINS.map((def) => ({
-      def,
-      owned: st.ownedSkins.includes(def.id),
-      equipped: st.activeSkin === def.id,
-      locked: (Boolean(def.goldOnly) && !st.gold) || (Boolean(def.vipOnly) && !st.vip),
-      lockReason: def.vipOnly && !this.save.isVipActive() ? "vip" : def.goldOnly && !st.gold ? "gold" : null,
-      affordable: st.wallet >= def.price,
-    }));
+    const flash = dailyFlashBird(this.today);
+    this.skinViews = SKINS.map((def) => {
+      const dealPrice = def.id === flash.id ? flash.price : undefined;
+      const price = dealPrice ?? def.price;
+      return {
+        def,
+        owned: st.ownedSkins.includes(def.id),
+        equipped: st.activeSkin === def.id,
+        locked: (Boolean(def.goldOnly) && !st.gold) || (Boolean(def.vipOnly) && !st.vip),
+        lockReason: def.vipOnly && !this.save.isVipActive() ? "vip" : def.goldOnly && !st.gold ? "gold" : null,
+        affordable: st.wallet >= price,
+        dealPrice,
+      };
+    });
     const deal = dailyDealBoost(this.today);
     this.boostViews = BOOSTS.map((def) => {
       const dealPrice = def.id === deal.id ? deal.price : undefined;
-      return { def, armed: st.armedBoosts.includes(def.id), affordable: st.wallet >= (dealPrice ?? def.price), dealPrice };
+      return { def, armed: def.permanent ? st.ownedUpgrades.includes(def.id) : st.armedBoosts.includes(def.id), affordable: st.wallet >= (dealPrice ?? def.price), dealPrice };
     });
     this.shopTrailViews = SHOP_TRAILS.map((def) => ({
       def,
@@ -4185,6 +6044,11 @@ export class Game {
   }
 
   private pushHud(): void {
+    const now = performance.now();
+    // Values refresh at 30 Hz; screen/action changes still commit immediately.
+    if (this.lastHudVersion === this.uiVersion && now - this.lastHudAt < 1000 / 30) return;
+    this.lastHudAt = now;
+    this.lastHudVersion = this.uiVersion;
     if (this.viewsVersion !== this.uiVersion) this.refreshViews();
     const st = this.save.state;
     const stats = this.runStats();
@@ -4196,13 +6060,17 @@ export class Game {
       state: this.state,
       screen: this.screen,
       checkoutSku: this.checkoutSku,
-      portalName: this.platform?.name ?? portalTarget(),
+      portalName: this.platform?.name ?? getPortalTarget(),
+      // Poki can render its own leaderboard overlay; the button only appears
+      // when the deployed SDK actually offers it.
+      portalLeaderboard: this.platform?.capabilities().includes("leaderboard") ?? false,
       version: this.uiVersion,
       distance: stats.distance,
       coins: this.runCoins,
+      multiplierClaimed: this.multiplierClaimed,
       daylight: this.daylight,
       daylightMax: this.daylightMax(),
-      fever: this.feverOn ? this.feverTimer / (FEVER_DURATION + this.skin.feverBonus + this.masteryPerk.feverBonus) : this.perfectChain / FEVER_NEED,
+      fever: this.feverOn ? this.feverTimer / (FEVER_DURATION + this.gameplaySkin.feverBonus + this.masteryPerk.feverBonus) : this.perfectChain / FEVER_NEED,
       feverOn: this.feverOn,
       multiplier: this.save.nestMultiplier() * (this.feverOn ? 2 : 1),
       bestDistance: st.bestDistance,
@@ -4226,6 +6094,8 @@ export class Game {
       ghostDelta: this.state === "playing" || this.state === "gameover" ? this.ghostDelta() : null,
       newBest: this.newBest,
       continueTimer: this.continueTimer,
+      continueReason: this.continueOfferView?.reason ?? "",
+      continueHighlight: this.continueOfferView?.highlight ?? false,
       continueCost: CONTINUE_COST,
       canAffordContinue: st.wallet >= CONTINUE_COST,
       adAvailable: this.portalEnabled() ? Boolean(this.platform && this.platform.name !== "none") : this.ads.isAvailable(),
@@ -4238,6 +6108,10 @@ export class Game {
       rivalBanner: this.rival && this.rivalResult === "" ? `${this.rival.name}|${this.rival.distance}` : "",
       seedMode: this.seedMode,
       wallet: st.wallet,
+      piggyCoins: st.piggyBank?.coins ?? 0,
+      prestigeLevel: st.prestige?.level ?? 0,
+      prestigeMult: st.prestige?.multiplier ?? 1.0,
+      canFreeSpin: this.save.canFreeWheelSpin(this.today),
       streakDays: st.streak.days,
       nestLevel: st.nestLevel,
       nestMult: this.save.nestMultiplier(),
@@ -4262,7 +6136,7 @@ export class Game {
       vipPrice: VIP.price,
       vipFeatures: VIP.features,
       checkoutMode: this.checkoutMode(),
-      checkoutUrl: stripeLinkFor(this.checkoutSku, st.deviceId) ?? "",
+      checkoutUrl: "",
       checkoutBusy: this.checkoutBusy,
       checkoutError: this.checkoutError,
       checkoutOk: this.checkoutOk,
@@ -4313,6 +6187,7 @@ export class Game {
       modeIcon: this.mode.icon,
       countdown: this.countdown,
       versus: this.versus,
+      splitLayout: this.input.splitMode,
       versusWinner: this.versusWinner,
       p1Stats: this.p1 && this.versus ? this.p1.stats : null,
       p2Stats: this.p2 && this.versus ? this.p2.stats : null,
@@ -4346,19 +6221,25 @@ export class Game {
       raceFinishM: this.mode.finish,
       raceField: this.raceField,
       raceFinishTime: this.raceFinishTime,
-      massRace: this.modeId === "massrace",
-      multiplayerLive: isMultiplayerConfigured(),
+      massRace: isRaceMode(this.modeId),
+      multiplayerLive: isMultiplayerConfigured() && !(this.state === "playing" && this.localRace),
       roster:
         this.massRace.active && this.state === "playing"
           ? this.massRace.roster(this.bird.x, this.startX, this.mode.finish, this.pilotName)
           : [],
-      roomCode: this.net?.info().code ?? this.roomCode,
-      roomCount: this.net?.info().count ?? this.massRace.fieldSize + 1,
+      roomCode: this.roomCode,
+      roomCount: this.net?.info().count ?? 0,
       roomCapacity: this.net?.info().capacity ?? MASS_RACE_FIELD,
+      roomReady: this.net?.info().ready ?? false,
+      roomReadyCount: (this.net?.roster().filter((p) => p.ready).length ?? 0) + (this.net?.info().ready ? 1 : 0),
       roomSize: this.roomSize,
       roomSkill: this.roomSkill,
       roomMuted: this.roomMuted,
-      roomRivals: this.massRace.rivals.slice(0, 12).map((r) => ({ id: r.id, name: r.name, skill: Math.round(r.skill * 100), hue: Math.round(r.hue * 360) })),
+      // Only the lobby screen can consume these — no per-frame allocs elsewhere.
+      roomRivals:
+        this.screen === "live"
+          ? this.massRace.rivals.slice(0, 12).map((r) => ({ id: r.id, name: r.name, skill: Math.round(r.skill * 100), hue: Math.round(r.hue * 360) }))
+          : [],
       netState: this.net?.info().state ?? "offline",
       netError: this.net?.info().error ?? "",
       draft: this.massRace.draft,
@@ -4367,21 +6248,15 @@ export class Game {
       photoFinish: this.photoFinish,
       rival: this.rivalCard(),
       loadout: this.loadoutView(),
-      lobbyRivals: (() => {
-        // Real pilots seated in the room always outrank seeded flavor text.
-        const live = (this.net?.roster() ?? [])
-          .slice(0, 3)
-          .map((p) => ({ name: p.name, tag: "in room · live" }));
-        if (live.length) return live;
-        // Next best: time-shifted doubles of real leaderboard players.
-        const page = this.board.peek("global", "distance");
-        const ghosts = (page?.entries ?? [])
-          .filter((en) => !en.you && en.name)
-          .slice(0, 3)
-          .map((en) => ({ name: en.name, tag: `best ${Math.round(en.distance).toLocaleString()} m` }));
-        if (ghosts.length) return ghosts;
-        return featuredRivals(`${this.seed}:massrace`);
-      })(),
+      // Lobby-only field: computed every frame before, including mid-flight
+      // and on the results card, where no one renders it.
+      lobbyRivals:
+        this.state === "menu" && this.screen === "live"
+          // Truth only: the pilots actually seated in this room. No padded
+          // name-pool rivals, no borrowed leaderboard names — an empty room
+          // renders as an empty room.
+          ? lobbyRivals(this.net?.roster() ?? [])
+          : [],
       raceRated: this.rankedRace,
       raceVerified: this.serverPlaceApplied,
       ratingDelta: this.lastRatingDelta,
@@ -4405,8 +6280,34 @@ export class Game {
       campaignDone: campaignProgress(st.campaignClaimed).done,
       campaignTotal: campaignProgress(st.campaignClaimed).total,
       squad: this.squad?.state ?? emptySquadState(),
+      recentPilots: this.pilots.all(),
+      share: {
+        available: sharingAvailable(),
+        code: this.shareCode,
+        busy: this.runShareBusy,
+        error: this.shareError,
+        loaded: this.sharedRun,
+      },
       squadNotice: this.squadNotice,
-      showTutorialHand: this.state === "playing" && st.tutorialRuns < 2 && this.hintTimer < 2.6 && !this.input.diving,
+      dailyFlash: dailyFlashBird(this.today),
+      stipendClaimed: this.save.state.lastStipendClaimed === this.today,
+      rankPrizeClaimed: this.save.state.rankPrizeSeason === rankSeasonId(),
+      wingmanBundle: this.save.state.wingmanBundle === true,
+      showTutorialHand:
+        this.state === "playing" &&
+        !this.input.diving &&
+        // First-flight coach: a brand-new player who has not held yet gets the
+        // demonstrative press hand for the whole "dive" step, not just the old
+        // 2.6 s — a static text line for up to two minutes is exactly the
+        // dead-air the baseline probe measured. The hand hides the instant the
+        // player dives (they've got it) and never outstays a completed coach.
+        (this.coach && !this.coach.done && this.coach.view().step === 0
+          ? true
+          : st.tutorialRuns < 2 && this.hintTimer < 2.6),
+      pvpModes: PVP_MODES,
+      pvpWorlds: PVP_WORLDS,
+      selectedPvpMode: this.selectedPvpMode,
+      selectedPvpWorld: this.selectedPvpWorld,
     };
     this.hud.update(snap);
   }
@@ -4414,6 +6315,8 @@ export class Game {
   /* ------------------------------------------------------- versus (2P) */
 
   private startVersus(): void {
+    this.disconnectRace();
+    this.roomCode = "";
     this.versus = true;
     this.modeId = "race";
     this.mode = modeById("race");
@@ -4431,8 +6334,8 @@ export class Game {
     this.p1.camera.setBaseFov(58);
     this.p2.camera.setBaseFov(58);
 
-    this.countdown = 3.99;
-    this.input.splitMode = "vertical";
+    this.countdown = 3;
+    this.resize(); // Resolve touch halves immediately, not after a later resize event.
     this.setState("playing");
     this.setScreen("main");
     void this.audio.resume();
@@ -4452,7 +6355,17 @@ export class Game {
           this.particles.burstRing(racer.bird.x, racer.bird.y, 0xc8f0ff);
         }
       },
-      onLand: () => undefined,
+      onLand: (_quality: number, racer: Racer) => {
+        if (racer.bird.impact <= 5) return;
+        this.audio.land(racer.bird.impact);
+        racer.camera.bump(Math.min(0.45, racer.bird.impact * 0.03));
+        if (racer.bird.impact > 6) {
+          const ridge = this.terrain.biomeAt(racer.bird.x).ridge;
+          this.particles.emitThunk(racer.bird.x, racer.bird.y, ((ridge >> 16) & 255) / 255, ((ridge >> 8) & 255) / 255, (ridge & 255) / 255);
+          this.particles.burstRing(racer.bird.x, racer.bird.y, racer.tint);
+          if (racer.bird.impact > 10) this.hud.toast(`${racer.label} SMASH!`, "thud");
+        }
+      },
       onCoin: (gem: boolean, x: number, y: number) => {
         this.audio.ding();
         this.particles.emitCollect(x, y);
@@ -4466,7 +6379,11 @@ export class Game {
         this.audio.powerup();
         this.particles.emitCollect(x, y);
       },
-      onSplash: () => this.audio.splash(),
+      onSplash: (racer: Racer) => {
+        this.audio.splash();
+        this.particles.burstRing(racer.bird.x, WATER_Y + 1, 0xafe8ff);
+        this.hud.toast(`${racer.label} SPLASH!`, "cloud");
+      },
     };
     p1.step(dt, this.input.diving, this.terrain, this.particles, ev);
     p2.step(dt, this.input.diving2, this.terrain, this.particles, ev);
@@ -4509,14 +6426,82 @@ export class Game {
     if (this.p2) this.p2.bird.root.visible = false;
   }
 
+  private toggleFullscreen(): void {
+    const doc = document as Document & {
+      webkitFullscreenElement?: Element;
+      mozFullScreenElement?: Element;
+      msFullscreenElement?: Element;
+      webkitExitFullscreen?: () => Promise<void>;
+      webkitCancelFullScreen?: () => Promise<void>;
+      mozCancelFullScreen?: () => Promise<void>;
+      msExitFullscreen?: () => Promise<void>;
+    };
+    const docEl = (document.documentElement || document.body) as HTMLElement & {
+      webkitRequestFullscreen?: () => Promise<void>;
+      webkitRequestFullScreen?: () => Promise<void>;
+      mozRequestFullScreen?: () => Promise<void>;
+      msRequestFullscreen?: () => Promise<void>;
+    };
+    const isFull = Boolean(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
+    if (!isFull) {
+      const req = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.webkitRequestFullScreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
+      if (req) {
+        try {
+          const res = req.call(docEl);
+          if (res && typeof res.then === "function") {
+            res.then(() => {
+              this.hud.toast("Full screen mode", "gold");
+              this.resize();
+            }).catch(() => {
+              this.hud.toast("Full screen mode unavailable", "info");
+            });
+          } else {
+            this.hud.toast("Full screen mode", "gold");
+            this.resize();
+          }
+        } catch {
+          this.hud.toast("Full screen mode unavailable", "info");
+        }
+      } else {
+        this.hud.toast("Full screen not supported on this browser", "info");
+      }
+    } else {
+      const exit = doc.exitFullscreen || doc.webkitExitFullscreen || doc.webkitCancelFullScreen || doc.mozCancelFullScreen || doc.msExitFullscreen;
+      if (exit) {
+        try {
+          const res = exit.call(doc);
+          if (res && typeof res.then === "function") {
+            res.then(() => {
+              this.hud.toast("Exited full screen", "info");
+              this.resize();
+            }).catch(() => {});
+          } else {
+            this.hud.toast("Exited full screen", "info");
+            this.resize();
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+
   private resize(): void {
-    const w = this.host.clientWidth || window.innerWidth;
-    const h = this.host.clientHeight || window.innerHeight;
-    this.renderer.setPixelRatio(this.dpr);
-    this.renderer.setSize(w, h, false);
-    this.camera.resize(w / Math.max(1, h));
-    this.camera.setBaseFov(50);
-    this.fx.resize(w, h, this.dpr);
+    const vv = typeof window !== "undefined" ? window.visualViewport : null;
+    const w = Math.round(vv?.width ?? (this.host.clientWidth || window.innerWidth));
+    const h = Math.round(vv?.height ?? (this.host.clientHeight || window.innerHeight));
+    // A ResizeObserver and window resize can report the same size. Avoid
+    // resetting canvas storage / bloom targets twice (or on unchanged DPR).
+    if (w !== this.renderWidth || h !== this.renderHeight || this.dpr !== this.renderDpr) {
+      if (this.dpr !== this.renderDpr) this.renderer.setPixelRatio(this.dpr);
+      this.renderer.setSize(w, h, false);
+      this.camera.resize(w / Math.max(1, h));
+      this.camera.setBaseFov(50);
+      this.fx?.resize(w, h, this.dpr);
+      this.renderWidth = w;
+      this.renderHeight = h;
+      this.renderDpr = this.dpr;
+    }
     if (this.p1 && this.p2) {
       const vertical = w / Math.max(1, h) >= 1.25;
       this.input.splitMode = this.versus ? (vertical ? "vertical" : "horizontal") : "off";

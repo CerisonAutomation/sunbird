@@ -5,6 +5,7 @@ import {
   duelOpponent,
   duelSkillFor,
   featuredRivals,
+  lobbyRivals,
   medalFor,
   nextDivision,
   ratingDelta,
@@ -52,6 +53,13 @@ describe("ratingDelta", () => {
   it("clamps out-of-range places", () => {
     expect(ratingDelta(0, 40)).toBe(ratingDelta(1, 40));
     expect(ratingDelta(99, 40)).toBe(ratingDelta(40, 40));
+  });
+
+  it("live fields scale the same math up, symmetrically", () => {
+    expect(ratingDelta(1, 41, true)).toBe(Math.round(ratingDelta(1, 41) * 1.5));
+    expect(ratingDelta(1, 41, true)).toBe(-ratingDelta(41, 41, true));
+    expect(ratingDelta(1, 41, true)).toBeGreaterThan(ratingDelta(1, 41));
+    expect(ratingDelta(41, 41, true)).toBeLessThan(ratingDelta(41, 41));
   });
 });
 
@@ -101,5 +109,29 @@ describe("helpers", () => {
   it("medals", () => {
     expect(medalFor(1)).toBe("🥇");
     expect(medalFor(4)).toBe("#4");
+  });
+
+  // The lobby used to pad itself with deterministic name-pool "rivals" and
+  // borrowed leaderboard names. Both were fiction. These pin the honest
+  // version: real roster in, real rows out, nothing invented when empty.
+  it("lobbyRivals shows only the pilots actually seated in the room", () => {
+    const rows = lobbyRivals([
+      { name: "Wren", ready: true, skin: "sunbird" },
+      { name: "Bex", ready: false, skin: "kestrel" },
+    ]);
+    expect(rows.map((r) => r.name)).toEqual(["Wren", "Bex"]);
+    expect(rows.every((r) => r.tag.includes("live"))).toBe(true);
+    expect(rows[0]).toMatchObject({ ready: true, skin: "sunbird" });
+  });
+
+  it("lobbyRivals invents nobody when the room is empty", () => {
+    expect(lobbyRivals([])).toEqual([]);
+  });
+
+  it("lobbyRivals caps the list at one screen of pilots", () => {
+    const many = Array.from({ length: 60 }, (_, i) => ({ name: `P${i}`, ready: false, skin: "s" }));
+    const rows = lobbyRivals(many);
+    expect(rows).toHaveLength(39);
+    expect(rows[38]!.name).toBe("P38");
   });
 });

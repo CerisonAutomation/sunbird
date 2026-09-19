@@ -3,18 +3,37 @@
 // Implements the `POST /score` half of LEADERBOARD_API.md: accepts a finished
 // run, keeps the best row per pilot (best by distance), and enforces the
 // documented plausibility gates + optional HMAC signing (v1.1).
-import { createHmac, timingSafeEqual } from "node:crypto";
-import { getRow, putRow } from "./_lib/store";
-import { boundedNum, handleOptions, json, sanitize, todayStr } from "./_lib/http";
+import { getRow, putRow, storageHealth } from "./_lib/store.js";
+import { boundedNum, handleOptions, json, sanitize, todayStr } from "./_lib/http.js";
 
-export const config = { runtime: "nodejs" };
+export const config = { runtime: "edge" };
 
 const SALT = process.env.LEADERBOARD_SALT ?? "";
+const WINDOW_MS = 60_000;
+const MAX_WRITES_PER_KEY = 30;
+const writes = new Map<string, { started: number; count: number }>();
 
-function sign(deviceId: string, distance: number, score: number): string {
-  return createHmac("sha256", SALT)
-    .update(`${deviceId}|${distance}|${score}`)
-    .digest("hex");
+function clientAddress(request: Request): string {
+  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") || "unknown";
+}
+
+function allowed(key: string): boolean {
+  const now = Date.now();
+  const prior = writes.get(key);
+  if (!prior || now - prior.started >= WINDOW_MS) {
+    writes.set(key, { started: now, count: 1 });
+    return true;
+  }
+  if (prior.count >= MAX_WRITES_PER_KEY) return false;
+  prior.count += 1;
+  return true;
+}
+
+async function sign(deviceId: string, distance: number, score: number): Promise<string> {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(SALT), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const bytes = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${deviceId}|${distance}|${score}`));
+  return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 /**
@@ -50,10 +69,22 @@ function parseDayMs(iso: string): number | null {
 export default async function handler(request: Request): Promise<Response> {
   if (request.method === "OPTIONS") return handleOptions();
   if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
+  const contentLength = Number(request.headers.get("content-length") || 0);
+  if (contentLength > 16_384) return json({ error: "payload too large" }, 413);
+  if (process.env.VERCEL_ENV === "production") {
+    const storage = await storageHealth();
+    if (!storage.persistent || !storage.ok) return json({ error: "leaderboard storage unavailable" }, 503);
+    // Production is fail-closed: LEADERBOARD_SALT is part of the deployment.
+    // An unset salt would make every submission unsigned, so a live board
+    // must refuse to run open rather than accept unsigned scores.
+    if (!SALT) return json({ error: "leaderboard signing not configured" }, 503);
+  }
 
   let body: unknown;
   try {
-    body = await request.json();
+    const raw = await request.text();
+    if (raw.length > 16_384) return json({ error: "payload too large" }, 413);
+    body = JSON.parse(raw);
   } catch {
     return json({ error: "bad json" }, 400);
   }
@@ -72,23 +103,23 @@ export default async function handler(request: Request): Promise<Response> {
   };
 
   if (!row.deviceId) return json({ error: "missing deviceId" }, 400);
+  if (!allowed(`${clientAddress(request)}:${row.deviceId}`)) {
+    return json({ error: "rate limit exceeded" }, 429);
+  }
 
   // Plausibility gates (documented in LEADERBOARD_API.md), enforced whether
   // or not signing is configured.
   if (row.distance > 60_000) return json({ error: "implausible distance" }, 422);
   if (row.score > row.distance * 40 + 50_000) return json({ error: "implausible score" }, 422);
 
-  // Signing (v1.1): when LEADERBOARD_SALT is set, an unsigned/badly-signed
-  // post is rejected.
+  // Signing (v1.1): REQUIRED in production (fail-closed check above); in
+  // every environment where a salt is configured, an unsigned/badly-signed
+  // post is rejected. Previews without a salt stay lenient by design —
+  // their boards are memory-only and never rank globally.
   if (SALT) {
     const provided = sanitize(p.sig, 128);
-    const expected = sign(row.deviceId, row.distance, row.score);
-    // Compare length first (a fixed 64-hex digest), then constant-time bytes.
-    const providedBuf = Buffer.from(provided);
-    const expectedBuf = Buffer.from(expected);
-    const same =
-      providedBuf.length === expectedBuf.length &&
-      timingSafeEqual(providedBuf, expectedBuf);
+    const expected = await sign(row.deviceId, row.distance, row.score);
+    const same = provided.length === expected.length && [...provided].every((char, index) => char === expected[index]);
     if (!same) return json({ error: "invalid signature" }, 403);
   }
 
