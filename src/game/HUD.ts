@@ -2335,32 +2335,41 @@ function menuLinks(items: MenuDestination[]): string {
 
 function renderNameEntry(_s: HudSnapshot): string {
   return `
-    ${head("✨ Welcome to Sunbird")}
-    <p class="tagline" style="text-align: center; margin: 16px 0 24px;">Every pilot needs an identity. What's yours?</p>
+    <div class="name-entry-hero">
+      ${sunSVG({ size: 48, className: "name-entry-sun" })}
+      ${sunbirdSVG({ width: 72, className: "name-entry-bird", animateWings: true, title: "Sunbird" })}
+    </div>
+
+    <div class="name-entry-headline">
+      <h2 class="name-entry-title">Welcome, Pilot</h2>
+      <p class="name-entry-sub">Every legend starts with a name.</p>
+    </div>
 
     <div class="name-entry-form">
-      <div class="name-input-wrapper">
-        <input
-          type="text"
-          data-ui
-          data-ref="pilotNameInput"
-          class="name-input"
-          placeholder="Your pilot name"
-          maxlength="14"
-          aria-label="Pilot name"
-          autocomplete="off"
-        />
-        <div class="name-char-count"><span>0</span>/14</div>
+      <label class="name-entry-label" for="pilot-name-input">Your call sign</label>
+      <div class="name-input-row">
+        <div class="name-input-wrapper">
+          <input
+            type="text"
+            id="pilot-name-input"
+            data-ui
+            data-ref="pilotNameInput"
+            placeholder="e.g. Rook, Ivy, Vale…"
+            maxlength="14"
+            aria-label="Pilot name"
+            autocomplete="off"
+          />
+          <div class="name-char-count"><span>0</span>/14</div>
+        </div>
+        <button class="name-random-btn" data-ui data-action="randomize-pilot-name" title="Suggest a name" aria-label="Random name">🎲</button>
       </div>
 
-      <button class="primary-btn" data-ui data-action="confirm-pilot-name">
-        Take to the Skies 🕊
+      <button class="primary-btn name-entry-cta" data-ui data-action="confirm-pilot-name">
+        Take to the Skies ›
       </button>
     </div>
 
-    <div class="name-entry-hint">
-      <p>💡 You can change your name anytime in Settings</p>
-    </div>
+    <p class="name-entry-footer">You can rename yourself anytime in Settings.</p>
   `;
 }
 

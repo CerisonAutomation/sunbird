@@ -3479,6 +3479,10 @@ export class Game {
         this.setScreen("main");
         break;
       }
+      case "randomize-pilot-name": {
+        this.hud.setValue("pilotNameInput", generatePilotName());
+        break;
+      }
       case "claim-rank-prize": {
         // One prize per monthly season: the board re-renders from the live
         // snapshot, so an unguarded claim button was an infinite coin loop.
