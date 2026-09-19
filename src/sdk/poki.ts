@@ -194,8 +194,27 @@ setLoadingNet(() => {
 export class PokiAdapter implements PlatformAdapter {
   readonly name = "poki" as const;
   readonly ready = true;
+  private submitScoreFn: ((leaderboard: string, score: number) => void) | null = null;
 
-  constructor(private readonly events: PlatformEvents) {}
+  constructor(private readonly events: PlatformEvents) {
+    // Wire Poki's leaderboard submitScore callback
+    void this.setupLeaderboardSubmit();
+  }
+
+  private async setupLeaderboardSubmit(): Promise<void> {
+    const sdk = this.sdk;
+    if (!sdk?.init) return;
+
+    try {
+      await sdk.init({
+        submitScore: (fn) => {
+          this.submitScoreFn = fn;
+        },
+      });
+    } catch {
+      // SDK init may fail in local sandbox; that's OK
+    }
+  }
 
   private get sdk(): PokiSdk | undefined {
     return window.PokiSDK;
@@ -559,5 +578,16 @@ export class PokiAdapter implements PlatformAdapter {
   }
   getSettings(): { muteAudio: boolean; disableChat: boolean } {
     return { muteAudio: this.isMuted(), disableChat: false };
+  }
+
+  /* error reporting */
+  captureError(err: string | Error): void {
+    const sdk = this.sdk;
+    if (!sdk?.captureError) return;
+    try {
+      sdk.captureError(err);
+    } catch {
+      /* Poki error capture is best-effort */
+    }
   }
 }
