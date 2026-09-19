@@ -1066,6 +1066,147 @@ h2 {
   font-weight: 500;
 }
 
+/* ============ Shared promo card system (shop + hangar upsell cards) ============
+   All promotional cards (wheel, piggy, prestige, stipend, flash, bundle, vault)
+   share .pc as a base. Use CSS custom properties for per-card colour theming.   */
+.pc {
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  padding: 12px 14px;
+  margin: 12px 0;
+  background: linear-gradient(135deg, var(--pc-bg1), var(--pc-bg2));
+  border: 1.5px solid var(--pc-border);
+  box-shadow: 0 3px 0 var(--pc-shadow, transparent);
+}
+
+/* Row variant: emoji + text body + action side-by-side */
+.pc-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pc-icon {
+  font-size: 28px;
+  flex: 0 0 36px;
+  text-align: center;
+  line-height: 1;
+}
+
+.pc-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.pc-body b {
+  font-family: var(--display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--pc-title, inherit);
+  display: block;
+  line-height: 1.25;
+}
+
+.pc-body span {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--pc-sub, inherit);
+  display: block;
+  margin-top: 2px;
+}
+
+/* Header row inside complex cards (flash, bundle) */
+.pc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+/* Small badge/pill inside a card header */
+.pc-badge {
+  display: inline-flex;
+  align-items: center;
+  background: var(--pc-title, #333);
+  color: #fff;
+  font-family: var(--display);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.pc-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pc-sub, #666);
+  white-space: nowrap;
+}
+
+/* Preview column (flash sale bird image) */
+.pc-preview {
+  flex: 0 0 80px;
+  text-align: center;
+}
+
+/* Action column */
+.pc-action {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Price row (strikethrough + current price) */
+.pc-price {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.pc-price s {
+  color: #b0bec5;
+  font-size: 13px;
+}
+
+.pc-price b {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--pc-title, inherit);
+}
+
+/* "Unlocked / claimed" green confirmation state */
+.pc-claimed {
+  display: inline-flex;
+  align-items: center;
+  background: #e8f5e9;
+  color: #1b5e20;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ---- Per-card colour themes (CSS custom properties) ---- */
+/* Blue — wheel, bundle */
+.pc--blue  { --pc-bg1:#e3f2fd; --pc-bg2:#bbdefb; --pc-border:#90caf9; --pc-title:#0d47a1; --pc-sub:#1565c0; }
+/* Pink — piggy */
+.pc--pink  { --pc-bg1:#fff0f5; --pc-bg2:#ffd1dc; --pc-border:#f8a5c2; --pc-title:#8c1145; --pc-sub:#ad2d5f; }
+/* Purple — prestige */
+.pc--purple{ --pc-bg1:#f3e5f5; --pc-bg2:#e1bee7; --pc-border:#ce93d8; --pc-title:#4a148c; --pc-sub:#6a1b9a; }
+/* Gold — stipend, vault */
+.pc--gold  { --pc-bg1:#fff8dc; --pc-bg2:#ffe082; --pc-border:#e0c068; --pc-title:#6d4c00; --pc-sub:#8c6d1f; --pc-shadow:#d0a44840; }
+/* Red — flash sale */
+.pc--red   { --pc-bg1:#ffebee; --pc-bg2:#ffcdd2; --pc-border:#ef9a9a; --pc-title:#b71c1c; --pc-sub:#7f0000; }
+/* Vault gold — slightly deeper */
+.pc--vault { --pc-bg1:#fff8dc; --pc-bg2:#ffe8a0; --pc-border:#e2c070; --pc-title:#5d3d0f; --pc-sub:#78531e; --pc-shadow:#d0a44840; }
+
 .table-title {
   margin: 12px 0 6px;
   font-size: 13px;
@@ -1793,9 +1934,7 @@ label { font-size: 12px; font-weight: 600; color: #666; margin-bottom: 6px; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 .modal-content { animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-.toast { border-radius: 8px; padding: 12px 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 12px; }
-.toast.success { background: #4caf50; color: white; }
-.toast.error { background: #f44336; color: white; }
+/* .toast is already fully defined above (lines ~1069+); do not redefine here */
 
 .error-message { color: #d32f2f; font-size: 12px; margin-top: 4px; }
 .spinner { width: 16px; height: 16px; border: 2px solid #f3f3f3; border-top: 2px solid #ff7a45; border-radius: 50%; animation: spin 1s linear infinite; }

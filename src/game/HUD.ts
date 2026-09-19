@@ -1691,7 +1691,7 @@ function renderBoard(s: HudSnapshot): string {
         <div class="prize-tier bronze"><span>🥉 3rd Place</span><b>100 Coins</b></div>
       </div>
       ${s.rankPrizeClaimed
-        ? `<div class="tag" style="width:100%; text-align:center; font-size:12px; font-weight:600; color:#2e7d32; background:#e8f5e9; border-radius:8px; padding:8px;">✓ Claimed · next prize at the season rollover</div>`
+        ? `<div class="pc-claimed" style="width:100%; justify-content:center; padding:8px;">✓ Claimed · next prize at the season rollover</div>`
         : `<button class="primary-btn gold wide" data-ui data-action="claim-rank-prize">Claim Rank Prize 🏆</button>`}
     </div>
     <button class="soft-btn wide" data-ui data-action="board-refresh">${s.boardLoading ? "Refreshing…" : "↻ Refresh"}</button>
@@ -2437,36 +2437,36 @@ function renderProgress(s: HudSnapshot): string {
     ${s.rivalBanner ? renderRivalBanner(s.rivalBanner) : ""}
     ${seedPicker}
 
-    <div class="wheel-card">
-      <span style="font-size:32px; flex:0 0 36px;">🎡</span>
-      <div style="flex:1; min-width:0;">
-        <b style="font:600 15px var(--display); color:#0d47a1; display:block;">Daily Lucky Wheel</b>
-        <span style="font-size:11px; color:#1565c0; display:block;">Spin to win up to ● 1,000 Coins & Mystery Vault Keys!</span>
+    <div class="pc pc--blue pc-row">
+      <span class="pc-icon">🎡</span>
+      <div class="pc-body">
+        <b>Daily Lucky Wheel</b>
+        <span>Spin to win up to ● 1,000 Coins &amp; Mystery Vault Keys!</span>
       </div>
       ${s.canFreeSpin
-        ? `<button class="primary-btn gold" data-ui data-action="spin-wheel" style="padding:8px 12px; font-size:13px;">Free Spin! 🎡</button>`
-        : `<button class="soft-btn" disabled style="padding:8px 12px; font-size:12px; opacity:0.65;">🎡 Spins again tomorrow</button>`}
+        ? `<button class="primary-btn gold" data-ui data-action="spin-wheel">Free Spin! 🎡</button>`
+        : `<button class="soft-btn" disabled>🎡 Tomorrow</button>`}
     </div>
 
-    <div class="piggy-card">
-      <span style="font-size:32px; flex:0 0 36px;">🐷</span>
-      <div style="flex:1; min-width:0;">
-        <b style="font:600 15px var(--display); color:#8c1145; display:block;">Coin Piggy Bank</b>
-        <span style="font-size:11px; color:#ad2d5f; display:block;">+20% flight bonus accumulated: ● ${s.piggyCoins} / 1,000</span>
+    <div class="pc pc--pink pc-row">
+      <span class="pc-icon">🐷</span>
+      <div class="pc-body">
+        <b>Coin Piggy Bank</b>
+        <span>+20% flight bonus accumulated: ● ${s.piggyCoins} / 1,000</span>
       </div>
       ${s.piggyCoins >= 50
-        ? `<button class="primary-btn gold" data-ui data-action="smash-piggy" style="padding:8px 12px; font-size:13px;">Smash 🔨</button>`
+        ? `<button class="primary-btn gold" data-ui data-action="smash-piggy">Smash 🔨</button>`
         : `<span class="tag need">Fly to fill</span>`}
     </div>
 
     ${s.nestLevel >= 5 || s.prestigeLevel > 0
-      ? `<div class="prestige-card" style="background:linear-gradient(135deg,#f3e5f5,#e1bee7); border:1px solid #ce93d8; border-radius:16px; padding:12px 14px; margin:12px 0; display:flex; align-items:center; gap:12px;">
-          <span style="font-size:32px; flex:0 0 36px;">👑</span>
-          <div style="flex:1; min-width:0;">
-            <b style="font:600 15px var(--display); color:#4a148c; display:block;">Solar Crown Prestige ${s.prestigeLevel > 0 ? `Rank ${s.prestigeLevel}` : ""}</b>
-            <span style="font-size:11px; color:#6a1b9a; display:block;">Permanent coin boost: +${Math.round((s.prestigeMult - 1) * 100)}%</span>
+      ? `<div class="pc pc--purple pc-row">
+          <span class="pc-icon">👑</span>
+          <div class="pc-body">
+            <b>Solar Crown Prestige ${s.prestigeLevel > 0 ? `Rank ${s.prestigeLevel}` : ""}</b>
+            <span>Permanent coin boost: +${Math.round((s.prestigeMult - 1) * 100)}%</span>
           </div>
-          <button class="primary-btn gold" data-ui data-action="perform-prestige" style="padding:8px 12px; font-size:12px;">Rebirth 👑</button>
+          <button class="primary-btn gold" data-ui data-action="perform-prestige">Rebirth 👑</button>
         </div>`
       : ""}
 
@@ -2648,36 +2648,34 @@ function renderShop(s: HudSnapshot, browse: ShopBrowse): string {
     ${head("Shop", "back", `<span class="pill coin">● ${s.wallet.toLocaleString()}</span>`)}
     <p class="shop-intro">YOUR HANGAR <span>Find your wings. Make them yours.</span></p>
 
-    <div class="shop-stipend-card">
-      <div style="display:flex; align-items:center; gap:10px;">
-        <span style="font-size:26px;">🪙</span>
-        <div>
-          <b style="font:600 15px var(--display); color:#6d4c00; display:block;">Daily Flight Stipend</b>
-          <span style="font-size:12px; color:#8c6d1f;">Daily test &amp; hangar allowance</span>
-        </div>
+    <div class="pc pc--gold pc-row">
+      <span class="pc-icon">🪙</span>
+      <div class="pc-body">
+        <b>Daily Flight Stipend</b>
+        <span>Daily test &amp; hangar allowance</span>
       </div>
       ${s.stipendClaimed
         ? `<span class="tag on">Claimed Today ✓</span>`
-        : `<button class="primary-btn gold" data-ui data-action="claim-daily-stipend" style="min-height:38px; padding:6px 14px;">Claim +● 250</button>`
+        : `<button class="primary-btn gold" data-ui data-action="claim-daily-stipend">Claim +● 250</button>`
       }
     </div>
 
-    <div class="shop-flash-card">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-        <span style="background:#d32f2f; color:#fff; font:700 11px var(--display); padding:3px 8px; border-radius:6px; letter-spacing:0.5px;">🔥 DAILY FLASH SALE · 40% OFF</span>
-        <span style="font-size:11px; color:#c62828; font-weight:600;">Resets at Midnight</span>
+    <div class="pc pc--red">
+      <div class="pc-header">
+        <span class="pc-badge">🔥 DAILY FLASH SALE · 40% OFF</span>
+        <span class="pc-label" style="color:#c62828;">Resets at Midnight</span>
       </div>
-      <div style="display:flex; align-items:center; gap:14px;">
-        <div style="flex:0 0 85px; text-align:center;">${flashSvg}</div>
-        <div style="flex:1; min-width:0;">
-          <b style="font:700 16px var(--display); color:#b71c1c; display:block;">${flashDef.name}</b>
-          <span style="font-size:12px; color:#7f0000; display:block; margin:2px 0 6px;">${flashDef.perk}</span>
-          <div style="display:flex; align-items:baseline; gap:8px;">
-            <s style="color:#b0bec5; font-size:13px;">● ${flashDef.price}</s>
-            <b style="color:#d32f2f; font-size:16px;">● ${flash.price}</b>
+      <div class="pc-row">
+        <div class="pc-preview">${flashSvg}</div>
+        <div class="pc-body">
+          <b>${flashDef.name}</b>
+          <span>${flashDef.perk}</span>
+          <div class="pc-price">
+            <s>● ${flashDef.price}</s>
+            <b>● ${flash.price}</b>
           </div>
         </div>
-        <div style="display:flex; flex-direction:column; gap:6px;">
+        <div class="pc-action">
           ${flashOwned
             ? `<span class="tag on">Owned ✓</span>`
             : s.wallet >= flash.price
@@ -2701,36 +2699,35 @@ function renderShop(s: HudSnapshot, browse: ShopBrowse): string {
     </div>
     <p class="shop-rules">Bird perks are for solo play. Live races use equal flight equipment; your appearance stays yours.</p>
 
-    <div class="shop-bundle-card">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-        <span style="background:#1976d2; color:#fff; font:700 11px var(--display); padding:3px 8px; border-radius:6px; letter-spacing:0.5px;">📦 ACE PILOT CRATE · SAVE 54%</span>
-        <span style="font-size:11px; color:#1565c0; font-weight:600;">Value Pack</span>
+    <div class="pc pc--blue">
+      <div class="pc-header">
+        <span class="pc-badge">📦 ACE PILOT CRATE · SAVE 54%</span>
+        <span class="pc-label">Value Pack</span>
       </div>
-      <div class="offer-row">
-        <span class="offer-art">✈️</span>
-        <div class="offer-copy">
+      <div class="pc-row" style="margin-bottom:10px;">
+        <span class="pc-icon">✈️</span>
+        <div class="pc-body">
           <b>Ace Wingman Bundle</b>
-          <span>3 Boosts (Shield, Flask, Magnet) + Tideglass Trail + 250 Bonus Coins</span>
+          <span>3 Boosts · Tideglass Trail · +250 Coins</span>
         </div>
-        ${s.wingmanBundle
-          ? `<span class="tag offer-tag ok">✓ Unlocked</span>`
-          : s.wallet >= 240
-            ? `<button class="primary-btn gold offer-claim" data-ui data-action="buy-bundle" data-id="wingman">Claim · ● 240</button>`
-            : `<span class="tag need offer-tag">Need ● ${240 - s.wallet}</span>`
-        }
       </div>
+      ${s.wingmanBundle
+        ? `<span class="pc-claimed" style="justify-content:center;">✓ Unlocked</span>`
+        : s.wallet >= 240
+          ? `<button class="primary-btn gold wide" data-ui data-action="buy-bundle" data-id="wingman">Claim · ● 240</button>`
+          : `<button class="primary-btn gold wide" data-ui data-action="buy-bundle" data-id="wingman" disabled>Need ● ${240 - s.wallet} more</button>`
+      }
     </div>
 
-    <div class="mystery-vault-card">
-      <span class="offer-art">🥚</span>
-      <div class="offer-copy vault">
+    <div class="pc pc--vault pc-row">
+      <span class="pc-icon">🥚</span>
+      <div class="pc-body">
         <b>Golden Mystery Vault</b>
         <span>35% Rare Bird · 35% Radiant Trail · 30% Coin Jackpot</span>
       </div>
-      ${
-        s.wallet >= 150
-          ? `<button class="primary-btn gold offer-claim" data-ui data-action="buy-vault">Open · ● 150</button>`
-          : `<span class="tag need">Need ● ${150 - s.wallet}</span>`
+      ${s.wallet >= 150
+        ? `<button class="primary-btn gold" data-ui data-action="buy-vault">Open · ● 150</button>`
+        : `<span class="tag need">Need ● ${150 - s.wallet}</span>`
       }
     </div>
 
