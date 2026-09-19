@@ -205,13 +205,20 @@ export class Leaderboard {
   private cache = new Map<string, BoardPage>();
   private inflight = new Map<string, Promise<BoardPage>>();
   private lastError = "";
+  private readonly onOnline = () => this.uploadBest();
 
   constructor(private readonly deviceId: string) {
     if (readLocal().length === 0) writeLocal(benchmarkRows());
     // A run finished offline still belongs on the global board — retry the
     // push the moment connectivity returns.
     if (typeof window !== "undefined") {
-      window.addEventListener("online", () => this.uploadBest());
+      window.addEventListener("online", this.onOnline);
+    }
+  }
+
+  dispose(): void {
+    if (typeof window !== "undefined") {
+      window.removeEventListener("online", this.onOnline);
     }
   }
 

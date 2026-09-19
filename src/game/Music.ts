@@ -567,6 +567,7 @@ export class Music {
   private baseLevel = 0;
   private isTronTrack = false;
   private isChipTrack = false;
+  private viralGlissandoTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private readonly ctx: AudioContext,
@@ -691,10 +692,12 @@ export class Music {
 
   /** Viral pitch glissando / star-power glide during boost or fever onset. */
   triggerViralGlissando(): void {
+    if (this.viralGlissandoTimer !== null) clearTimeout(this.viralGlissandoTimer);
     const originalTranspose = this.transpose;
     this.transpose += 2;
-    setTimeout(() => {
+    this.viralGlissandoTimer = setTimeout(() => {
       this.transpose = originalTranspose;
+      this.viralGlissandoTimer = null;
     }, 1400);
   }
 
@@ -803,6 +806,10 @@ export class Music {
   }
 
   dispose(): void {
+    if (this.viralGlissandoTimer !== null) {
+      clearTimeout(this.viralGlissandoTimer);
+      this.viralGlissandoTimer = null;
+    }
     if (this.timer !== null) window.clearInterval(this.timer);
     this.timer = null;
     this.bus.disconnect();
