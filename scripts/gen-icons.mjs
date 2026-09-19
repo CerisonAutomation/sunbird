@@ -293,10 +293,21 @@ for (const [name, size, opts] of [
 
 console.log("---");
 
-// Generate the animated icon (Poki-style animated tile)
+// Generate the animated icon (Poki-style animated tile).
+// Prefers real gameplay footage if it exists; falls back to the procedural
+// placeholder (gen-animated-icon.mjs) otherwise.
 import { execSync } from "node:child_process";
-try {
-  execSync("node scripts/gen-animated-icon.mjs", { stdio: "inherit", cwd: join(__dirname, "..") });
-} catch {
-  console.warn("Animated icon generation skipped (ImageMagick convert required).");
+import { existsSync, statSync } from "node:fs";
+const animatedDir = join(__dirname, "..", "public", "animated");
+const webpPath = join(animatedDir, "sunbird-animated.webp");
+const hasGameCapture = existsSync(webpPath) && statSync(webpPath).size > 100000;
+
+if (!hasGameCapture) {
+  try {
+    execSync("node scripts/gen-animated-icon.mjs", { stdio: "inherit", cwd: join(__dirname, "..") });
+  } catch {
+    console.warn("Animated icon generation skipped (ImageMagick convert required).");
+  }
+} else {
+  console.log("Animated icons: real gameplay footage already present — skipping placeholder generation");
 }
