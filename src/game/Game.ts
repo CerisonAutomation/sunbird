@@ -932,6 +932,7 @@ export class Game {
     this.telemetry.flush();
     this.squad?.dispose();
     this.telemetry.dispose();
+    this.board.dispose();
     this.weather.dispose();
     this.net?.disconnect();
     this.massRace.dispose();
