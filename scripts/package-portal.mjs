@@ -66,7 +66,11 @@ function stageHtml() {
 }
 
 /** `index.html` + the directories that ship beside it (and nothing else). */
-const ENTRY_DIRS = ["icons", "fonts", "i18n", "animated"];
+// `public/animated/` holds the Poki tile-icon GIF: a submission asset for the
+// catalogue, not something the game loads. It stays out of the portal bundle
+// (it alone took each zip from ~860 KB to ~3.1 MB) and out of `audit:zips`'
+// allowlist, which is index.html + icons/ + fonts/ + i18n/.
+const ENTRY_DIRS = ["icons", "fonts", "i18n"];
 const ENTRIES = ["index.html", ...ENTRY_DIRS];
 
 /** Write a staged bundle into `target` (fresh every run). */
