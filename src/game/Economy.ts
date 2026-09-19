@@ -601,7 +601,14 @@ const BASE_SHOP_TRAILS: ShopTrailDef[] = [
   { id: "trail_void", label: "Voidwake", desc: "Deep-space violet wake", price: 420, css: ["#6a3aff", "#2a1a6a", "#c8a8ff"] },
   { id: "trail_mint", label: "Mintcloud", desc: "Fresh mint vapor", price: 280, css: ["#7affc8", "#3ad89a", "#e0fff2"] },
   { id: "trail_rose", label: "Rosewind", desc: "Warm rose-gold shimmer", price: 380, css: ["#ffb0a0", "#ff7a6a", "#ffe8d8"] },
-  { id: "trail_neon", label: "Neonpulse", desc: "Electric arcade glow", price: 450, css: ["#3affff", "#ff3aff", "#ffff3a"] },
+  { id: "trail_neon",    label: "Neonpulse",  desc: "Electric arcade glow",      price: 450, css: ["#3affff", "#ff3aff", "#ffff3a"] },
+  { id: "trail_spark",   label: "Sparklejet", desc: "Glittering stardust burst",  price: 380, css: ["#fff176", "#ffe57f", "#ffffff"] },
+  { id: "trail_aurora",  label: "Aurorawave", desc: "Northern lights ribbon",     price: 490, css: ["#40e0d0", "#7b68ee", "#98fb98"] },
+  { id: "trail_lava",    label: "Lavaflow",   desc: "Molten rock and cinders",    price: 420, css: ["#ff4500", "#ff8c00", "#ffd700"] },
+  { id: "trail_crystal", label: "Crystaline", desc: "Shattered ice shards",       price: 400, css: ["#b0e0ff", "#e8f4ff", "#6ec6ff"] },
+  { id: "trail_shadow",  label: "Shadowrift", desc: "Dark matter in your wake",   price: 460, css: ["#1a0030", "#4a0080", "#9060c8"] },
+  { id: "trail_cherry",  label: "Sakuradrift",desc: "Cherry blossom flurry",      price: 360, css: ["#ffb7c5", "#ff85a1", "#fff0f5"] },
+  { id: "trail_cosmic",  label: "Cosmicray",  desc: "Supernova particle stream",  price: 500, css: ["#ff6ec7", "#845ef7", "#4cc9f0"] },
 ];
 
 export const SHOP_TRAILS: ShopTrailDef[] = BASE_SHOP_TRAILS.map((trail) => ({
@@ -690,6 +697,8 @@ export const PROMO_CODES: Record<string, Promo> = {
   NEST250: { type: "coins", amount: 250 },
   FEATHER: { type: "coins", amount: 100 },
   AURORA: { type: "vip" },
+  KONAMI: { type: "coins", amount: 500 },
+  EASTER: { type: "coins", amount: 100 },
 };
 
 export type SkinView = {

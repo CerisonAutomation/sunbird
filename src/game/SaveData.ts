@@ -44,6 +44,8 @@ export type Settings = {
   /** Large-text mode: bumps every UI font a step for readability. */
   bigText: boolean;
   quality: Quality;
+  /** Distance unit preference: "km" (default) or "mi". */
+  distUnit: "km" | "mi";
 };
 
 export type LifetimeStats = {
@@ -180,6 +182,7 @@ const DEFAULT_SETTINGS: Settings = {
   colorAssist: false,
   bigText: false,
   quality: "auto",
+  distUnit: "km",
 };
 
 function makeDeviceId(): string {
@@ -404,6 +407,7 @@ export class SaveData {
           colorAssist: Boolean(p.settings?.colorAssist),
           bigText: Boolean(p.settings?.bigText),
           quality: quality === "high" || quality === "low" ? quality : "auto",
+          distUnit: p.settings?.distUnit === "mi" ? "mi" : "km",
         },
         quests:
           p.quests && typeof p.quests.date === "string"

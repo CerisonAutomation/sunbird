@@ -421,12 +421,6 @@ export class PokiAdapter implements PlatformAdapter {
     } catch { /* recorder optional */ }
   }
 
-  /** Forward a runtime error to the portal's error dashboard. */
-  captureError(err: string | Error): void {
-    try {
-      this.sdk?.captureError?.(err);
-    } catch { /* diagnostics must never throw */ }
-  }
 
   /** Device class as the portal sees it (tablets are "tablet", not "mobile"). */
   deviceCategory(): "mobile" | "tablet" | "desktop" | null {

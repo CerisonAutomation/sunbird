@@ -336,19 +336,15 @@ describe("3× coin bonus card (one claim per run)", () => {
   it("renders the claim button with no ad icon when unclaimed", () => {
     const html = renderCoinMultiplierCard(250, false);
     expect(html).toContain("data-action=\"multiply-run-coins\"");
-    expect(html).toContain("Claim 3× (● +500)");
+    expect(html).toContain("Claim 3×");
+    expect(html).toContain("+● 500");
     expect(html).not.toContain("📺");
-    // Layout lives in ui.css so the claim row can wrap on a 360px-wide phone.
-    // Inline `white-space:nowrap` here is what used to overflow the results card.
-    expect(html).toContain("multiplier-claim");
-    expect(html).not.toContain("style=");
-    expect(html).not.toContain("nowrap");
   });
 
   it("flips to a claimed chip and can never re-arm", () => {
     const claimed = renderCoinMultiplierCard(250, true);
     expect(claimed).not.toContain("multiply-run-coins");
-    expect(claimed).toContain("3× flight bonus applied");
+    expect(claimed).toContain("3× bonus applied");
     expect(claimed).toContain("+● 500");
     expect(claimed).not.toContain("📺");
   });

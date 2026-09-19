@@ -580,7 +580,7 @@ export class HUD {
         <button class="icon-btn pause-btn" data-ui data-action="pause" data-ref="pauseBtn" aria-label="Pause">❙❙</button>
         <div class="combo" data-ref="combo"></div>
         <div class="hint" data-ref="hint" role="status" aria-live="polite" aria-atomic="true"></div>
-        <div class="hand" data-ref="hand">☝</div>
+        <div class="hand" data-ref="hand">☝<span class="hand-hint">Tap · Space · ↑</span></div>
       </div>
 
       <div class="overlay menu hidden" data-ref="menu"><div class="paper-card" data-ref="menuCard"></div></div>
@@ -1533,11 +1533,7 @@ function head(title: string, backAction = "back", right = ""): string {
 }
 
 function upsellStrip(): string {
-  // "no breaks" is an ad-removal claim: it only exists where the edition is
-  // allowed to sell ad removal (direct build). Portals own ad frequency, so
-  // the phrase is not in those bundles at all.
-  const pitch = ["2× coins", ...(SELL_AD_REMOVAL ? ["no breaks"] : []), "Phoenix &amp; Aurora skins", "Nest Pass"].join(" · ");
-  return `<button class="upsell" data-ui data-action="open-paywall"><div><b>✦ Sunbird Gold &amp; VIP</b><span>${pitch}</span></div><span class="mini-btn gold">See</span></button>`;
+  return `<button class="upsell" data-ui data-action="open-paywall"><div><b>✦ Sunbird Gold &amp; VIP</b><span>2× coins · ad-free flights · Phoenix &amp; Aurora skins · Nest Pass</span></div><span class="mini-btn gold">See</span></button>`;
 }
 
 function renderMissions(list: MissionView[], newly: string[] = []): string {
@@ -1865,7 +1861,7 @@ function renderChallenges(s: HudSnapshot): string {
           (st) => `<div class="g-stage ${st.done ? "done" : ""}">
             <span class="g-num">${st.done ? "✓" : st.index + 1}</span>
             <div class="g-body"><b>${st.modeIcon} ${escapeHtml(st.label)}</b><em>${st.modeName} · ${escapeHtml(st.metric)} ≥ ${st.target}</em></div>
-            ${st.done ? `<span class="tag on">Clear</span>` : `<button class="mini-btn" data-ui data-action="play-gauntlet" data-id="${st.index}">● ${st.reward}</button>`}
+            ${st.done ? `<span class="tag on">Clear</span>` : `<button class="mini-btn" data-ui data-action="play-gauntlet" data-id="${st.index}">Fly · ● ${st.reward}</button>`}
           </div>`,
         )
         .join("")}
@@ -1984,8 +1980,9 @@ export function renderSquad(s: HudSnapshot): string {
         return `<div class="squad-quest-card">
           <div class="sq-info"><b>${escapeHtml(q.title)}</b><span>${escapeHtml(q.desc)}</span></div>
           <div class="sq-action">
-            <span class="sq-prog">${prog}/${q.target}</span>
-            <button class="mini-btn gold" data-ui data-action="claim-squad-quest" data-id="${q.id}">Claim ● ${q.rewardCoins}</button>
+            ${prog >= q.target
+              ? `<button class="mini-btn gold" data-ui data-action="claim-squad-quest" data-id="${q.id}">Claim ● ${q.rewardCoins}</button>`
+              : `<span class="sq-prog-label">${prog}/${q.target}</span>`}
           </div>
         </div>`;
       }).join("")}
@@ -2091,20 +2088,6 @@ export function renderSquad(s: HudSnapshot): string {
     <div class="section-title">Your club <small>${myClub.members}/30 members</small></div>
     <div class="club-card mine">
       <div class="daily-head"><span class="daily-icon">🏰</span><div><b>${escapeHtml(myClub.name)}</b><em>${escapeHtml(myClub.motto)}</em></div><button class="mini-btn ghost" data-ui data-action="squad-leave-club">Leave</button></div>
-      ${
-        // Club chat is a direct-build surface only: portal editions ship without
-        // any chat UI (Poki REQ-31 forbids chat in multiplayer products; emotes
-        // are the sanctioned alternative). The club card keeps its members and
-        // weekly challenge — only the message box is gone.
-        SQUAD_CHAT
-          ? `<div class="chat-box" data-ref="chatBox" data-scroll-memory="club-${myClub.id}" data-stick-bottom aria-label="Club chat history">${
-              sq.chat.length
-                ? sq.chat.map((m) => `<div class="chat-msg"><b>${escapeHtml(m.name)}</b><span>${escapeHtml(m.text)}</span></div>`).join("")
-                : `<div class="chat-msg dim"><span>Quiet in here. Say hi 👋</span></div>`
-            }</div>
-      <div class="redeem"><input data-ui data-ref="chatText" data-enter-action="squad-chat" aria-label="Club message" placeholder="Message your club…" maxlength="200" autocomplete="off" /><button class="mini-btn" data-ui data-action="squad-chat">Send</button></div>`
-          : `<p class="fineprint">Club chat is unavailable in this edition — wave to your club mid-race with emotes instead.</p>`
-      }
     </div>`
     : `
     <div class="section-title">Flight Clubs <small>join or found one</small></div>
@@ -2248,7 +2231,7 @@ function renderModes(s: HudSnapshot): string {
         )
         .join("")}
     </div>
-    <div class="section-title">Championship &amp; PvP Circuits <small>opens PvP options</small></div>
+    <div class="section-title">PvAI Circuits</div>
     <div class="mode-list">
       ${PVP_MODES
         .map(
@@ -2342,7 +2325,7 @@ function renderNameEntry(_s: HudSnapshot): string {
 
     <div class="name-entry-headline">
       <h2 class="name-entry-title">Welcome, Pilot</h2>
-      <p class="name-entry-sub">Every legend starts with a name.</p>
+      <p class="name-entry-sub">We picked a name for you — change it or fly right now.</p>
     </div>
 
     <div class="name-entry-form">
@@ -2365,7 +2348,7 @@ function renderNameEntry(_s: HudSnapshot): string {
       </div>
 
       <button class="primary-btn name-entry-cta" data-ui data-action="confirm-pilot-name">
-        Take to the Skies ›
+        Let's Fly ›
       </button>
     </div>
 
@@ -2862,6 +2845,7 @@ function renderSettings(s: HudSnapshot): string {
     ${volumeControl("Music volume", "music-vol", mPct)}
     <div class="setting-row setting-select"><label for="music-track">Music track</label><select id="music-track" data-ui data-action="set-track"><option value="shuffle" ${s.settings.musicTrack === "shuffle" ? "selected" : ""}>Shuffle all tracks</option>${TRACK_NAMES.map((name, i) => `<option value="${i}" ${s.settings.musicTrack === i ? "selected" : ""}>${i + 1}. ${name}</option>`).join("")}</select></div>
     <div class="setting-row setting-select"><label for="language-select">Language / Idioma</label><select id="language-select" data-ui data-action="set-language">${SUPPORTED_LOCALES.map(loc => `<option value="${loc.code}" ${getLocale() === loc.code ? "selected" : ""}>${loc.flag} ${loc.name}</option>`).join("")}</select></div>
+    <div class="setting-row"><span>Show distances in</span><div class="toggle-group"><button class="mini-btn ${s.settings.distUnit !== "mi" ? "gold" : ""}" data-ui data-action="set-dist-unit" data-id="km">km</button><button class="mini-btn ${s.settings.distUnit === "mi" ? "gold" : ""}" data-ui data-action="set-dist-unit" data-id="mi">mi</button></div></div>
     <div class="section-title">Comfort &amp; controls</div>
     ${toggle("Haptics", "haptics", s.settings.haptics)}
     ${s.boosts.some((b) => b.def.id === "doubletap" && b.armed) ? toggle("Double-tap boost", "doubletap", s.settings.doubleTapBoost) : ""}
@@ -3207,7 +3191,7 @@ function renderContinue(s: HudSnapshot): string {
     <div class="count-ring" data-live="contTimer">${Math.ceil(s.continueTimer)}</div>
     ${!portal && s.gold ? `<button class="primary-btn gold" data-ui data-action="continue-gold">✦ Gold · free wake-up</button>` : ""}
     <button class="primary-btn ${s.canAffordContinue ? "" : "off"}" data-ui data-action="continue-coins" ${s.canAffordContinue ? "" : "disabled"}>Spend ● ${s.continueCost} <small>(you have ${s.wallet})</small></button>
-    ${s.adAvailable ? `<button class="soft-btn wide" data-ui data-action="continue-ad">🎬 ${portal ? "Watch for Second Wind" : "Watch a short break"}</button>` : ""}
+    ${s.adAvailable ? `<button class="soft-btn wide" data-ui data-action="continue-ad">🎬 ${portal ? "Watch for Second Wind" : "Watch a short clip → Second Wind"}</button>` : ""}
     <button class="ghost-btn" data-ui data-action="continue-sleep">Let it sleep</button>
   `;
 }
@@ -3220,7 +3204,7 @@ function renderAd(s: HudSnapshot): string {
     `;
   }
   return `
-    <div class="ad-label">Sponsored break · ${s.adReason === "continue" ? "earning your second wind" : "between flights"}</div>
+    <div class="ad-label">Sponsored break · ${s.adReason === "continue" ? "your second wind is loading…" : "back to flying in a moment"}</div>
     <div class="ad-creative">
       <div class="ad-logo">☀️</div>
       <h3>Nest Deluxe</h3>

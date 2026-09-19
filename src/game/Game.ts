@@ -275,6 +275,7 @@ export class Game {
   private splashCd = 0;
   private thudCount = 0;
   private bounceCount = 0;
+  private konamiBuffer: string[] = [];
   /** Edge-trigger for the ocean-entry splash burst (see fixedUpdate). */
   private wasInWater = false;
   private hintTimer = 0;
@@ -762,6 +763,19 @@ export class Game {
     document.addEventListener("fullscreenchange", this.onFullscreenChange);
     document.addEventListener("webkitfullscreenchange", this.onFullscreenChange);
 
+    // Easter egg: Konami code → 500 coins + confetti
+    const KONAMI = ["ArrowUp","ArrowUp","ArrowDown","ArrowDown","ArrowLeft","ArrowRight","ArrowLeft","ArrowRight","b","a"];
+    document.addEventListener("keydown", (e: KeyboardEvent) => {
+      this.konamiBuffer.push(e.key);
+      if (this.konamiBuffer.length > KONAMI.length) this.konamiBuffer.shift();
+      if (this.konamiBuffer.join(",") === KONAMI.join(",")) {
+        this.konamiBuffer = [];
+        this.hud.toast("✨ Cheat mode activated — you found the secret!", "gold");
+        this.save.addCoins(500);
+        if (this.state === "playing") this.particles.emitConfetti(0, 0);
+      }
+    });
+
     this.hud.onAction((action, id) => this.handleAction(action, id));
     this.onResize = () => this.resize();
     this.resizeObs = new ResizeObserver(() => this.resize());
@@ -920,6 +934,7 @@ export class Game {
     // Show name entry on first use
     if (!this.save.state.pilotNameCustomized && this.state === "menu") {
       this.setScreen("nameEntry");
+      this.hud.setValue("pilotNameInput", this.pilotName);
     }
   }
 
@@ -3463,6 +3478,15 @@ export class Game {
         }
         break;
       }
+      case "set-dist-unit": {
+        if (id === "km" || id === "mi") {
+          this.save.state.settings.distUnit = id;
+          this.save.persist();
+          this.hud.toast(`Distances shown in ${id}`, "info");
+          this.bump();
+        }
+        break;
+      }
       case "confirm-pilot-name": {
         const nameInput = this.hud.readValue("pilotNameInput");
         if (!nameInput || !nameInput.trim()) {
@@ -3475,7 +3499,18 @@ export class Game {
         this.save.state.pilotNameCustomized = true;
         this.save.persist();
         this.audio.fanfare();
-        this.hud.toast(`Welcome, ${next}!`, "info");
+        // Easter egg: secret pilot names
+        const nameLower = next.toLowerCase();
+        if (nameLower === "icarus") {
+          this.hud.toast("🌊 Too close to the sun, Icarus…", "warn");
+        } else if (nameLower === "phoenix") {
+          this.hud.toast("🔥 Rise from the ashes, Phoenix!", "gold");
+        } else if (nameLower === "sunbird") {
+          this.hud.toast("🌟 You ARE the Sunbird.", "gold");
+          this.save.addCoins(250);
+        } else {
+          this.hud.toast(`Welcome, ${next}!`, "info");
+        }
         this.setScreen("main");
         break;
       }

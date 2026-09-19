@@ -530,6 +530,7 @@ textarea {
   width: min(440px, 100%);
   max-height: calc(100dvh - 40px);
   overflow-y: auto;
+  overflow-x: clip; /* prevent -2px screen-head margin from creating a horizontal scrollbar */
   overscroll-behavior: contain;
   background:
     linear-gradient(165deg, rgba(255, 252, 245, 0.64) 0%, rgba(255, 244, 230, 0.52) 50%, rgba(255, 238, 222, 0.62) 100%);
@@ -830,6 +831,97 @@ h2,
   font-family: var(--display);
 }
 
+/* ── Screen header (back button + title + pill badge) ── */
+.screen-head {
+  display: flex;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: linear-gradient(135deg, #fff7e9, #ffefd8);
+  border-radius: 14px;
+  border: 1.5px solid rgba(160, 120, 80, 0.15);
+  box-shadow: 0 2px 8px rgba(120, 80, 40, 0.08);
+  padding: 10px 12px 12px;
+  margin: -10px -2px 12px;
+}
+.screen-head h2 {
+  /* Truly centered regardless of side element widths */
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 20px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.heading-art {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.heading-art .menu-illustration {
+  width: 28px;
+  height: 28px;
+}
+.screen-head > span {
+  margin-left: auto;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+.pill {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1.5px solid rgba(160, 120, 80, 0.25);
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #7a5040;
+  /* prevent overflow beyond the 44px third column of .screen-head */
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Upsell strip button ── */
+button.upsell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: linear-gradient(135deg, #fff8dc, #ffe082);
+  border: 1.5px solid #e0c068;
+  border-radius: 16px;
+  padding: 12px 14px;
+  margin: 12px 0 0;
+  cursor: pointer;
+  text-align: left;
+  color: #6d4c00;
+}
+button.upsell > div {
+  flex: 1;
+  min-width: 0;
+}
+button.upsell b {
+  display: block;
+  font-family: var(--display);
+  font-size: 14px;
+  font-weight: 700;
+}
+button.upsell span:not(.mini-btn) {
+  display: block;
+  font-size: 12px;
+  margin-top: 2px;
+  opacity: 0.8;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .paper-card {
     animation: card-rise 0.45s cubic-bezier(0.18, 0.9, 0.24, 1.1);
@@ -872,6 +964,165 @@ h2 {
   margin: 0 0 16px;
   font-size: 13px;
   color: #a07860;
+}
+
+/* ── Section title / dividers ── */
+.section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #a07860;
+  margin: 16px 0 8px;
+}
+.section-title small {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #b09080;
+}
+
+/* ── Reward strip / notices ── */
+.reward-strip {
+  background: linear-gradient(135deg, #fff3cd, #ffe082);
+  border: 1px solid #e0c060;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6d4c00;
+  margin: 10px 0;
+  text-align: center;
+}
+
+/* ── Squad / friends ── */
+.friend-list { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.friend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,255,255,0.55);
+  border-radius: 12px;
+  padding: 8px 12px;
+}
+.fr-name { flex: 1; font-weight: 600; font-size: 14px; }
+.fr-code { font-size: 11px; color: #a07860; }
+
+/* ── Squad quest cards ── */
+.squad-quests { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.squad-quest-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255,255,255,0.55);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.sq-info { flex: 1; min-width: 0; }
+.sq-info b { display: block; font-size: 13px; font-weight: 700; }
+.sq-info span { font-size: 11px; color: #8a6a62; display: block; margin-top: 2px; }
+.sq-action { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.sq-prog-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #a07860;
+  min-width: 40px;
+  text-align: right;
+}
+
+/* ── Squad invite strip ── */
+.squad-invite {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255,255,255,0.55);
+  border-radius: 14px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+}
+.squad-invite-art { font-size: 24px; flex-shrink: 0; }
+.squad-invite > div { flex: 1; }
+.squad-invite > div b { display: block; font-weight: 700; font-size: 13px; }
+.squad-invite > div p { margin: 2px 0 0; font-size: 11px; color: #8a6a62; }
+
+/* ── Club card ── */
+fieldset.squad-fields {
+  border: none;
+  padding: 0;
+  margin: 0 0 12px;
+}
+.club-card { display: flex; flex-direction: column; gap: 10px; margin-bottom: 4px; }
+.daily-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.daily-icon { font-size: 28px; flex-shrink: 0; }
+.daily-head > div { flex: 1; }
+.daily-head > div b { display: block; font-weight: 700; font-size: 14px; }
+.daily-head > div em { display: block; font-size: 12px; color: #8a6a62; font-style: normal; }
+
+/* ── Club list ── */
+.club-list { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.club-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,255,255,0.55);
+  border-radius: 12px;
+  padding: 8px 12px;
+}
+.club-row > div { flex: 1; }
+.club-row b { display: block; font-size: 13px; font-weight: 700; }
+.club-row em { display: block; font-size: 11px; color: #8a6a62; font-style: normal; }
+
+/* ── Redeem / add-code rows ── */
+.redeem {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.redeem input {
+  flex: 1;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(160,120,80,0.25);
+  background: rgba(255,255,255,0.7);
+  font-size: 14px;
+  font-family: inherit;
+  color: inherit;
+}
+.redeem input::placeholder { color: #b09080; }
+
+/* ── Empty state note ── */
+.empty-note {
+  text-align: center;
+  font-size: 13px;
+  color: #a07860;
+  padding: 12px 0;
+}
+
+/* ── Fineprint ── */
+.fineprint {
+  font-size: 11px;
+  color: #b09080;
+  margin: 4px 0 10px;
+  line-height: 1.5;
+}
+
+/* ── Collection pager ── */
+.collection-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #8a6a62;
+  margin: 6px 0;
 }
 
 .how {
@@ -1432,13 +1683,13 @@ h2 {
     padding-right: 0;
   }
   .pause-btn {
-    top: auto;
-    bottom: calc(18px + env(safe-area-inset-bottom));
+    bottom: auto;
+    top: calc(env(safe-area-inset-top, 0px) + 12px);
     right: 14px;
   }
   .mute-btn {
-    top: auto;
-    bottom: calc(18px + env(safe-area-inset-bottom));
+    bottom: auto;
+    top: calc(env(safe-area-inset-top, 0px) + 12px);
     right: 68px;
   }
 }
@@ -1559,6 +1810,7 @@ h2 {
 }
 .play-hud .hand { top: calc(var(--hud-header-height, 110px) + 92px + env(safe-area-inset-top)); font-size: 38px; }
 .hud-root:not([data-feedback="hint"]) .hand { display: none; }
+.hand-hint { display: block; font-size: 13px; font-weight: 600; letter-spacing: 0.03em; color: rgba(255,255,255,0.85); text-shadow: 0 1px 3px rgba(0,0,0,0.5); margin-top: 4px; }
 @media (max-height: 500px) { .play-hud .hand { display: none; } }
 @media (max-height: 500px) {
   .overlay {
@@ -1720,6 +1972,7 @@ h2 {
   align-items: center;
   height: 80px;
   margin: 4px 0 0;
+  overflow: visible; /* let bird hover animation (-5px) and sun glow bleed without clipping */
 }
 
 .name-entry-sun {

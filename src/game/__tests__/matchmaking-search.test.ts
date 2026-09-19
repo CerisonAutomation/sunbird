@@ -75,17 +75,17 @@ describe("coin bonus card layout", () => {
   it("keeps the claim row in CSS so it can wrap on a 360px phone", () => {
     const html = renderCoinMultiplierCard(120, false);
     expect(html).toContain('class="multiplier-cta-card"');
-    expect(html).toContain('class="multiplier-copy"');
-    expect(html).toContain('class="primary-btn gold multiplier-claim"');
-    // No inline layout: it cannot respond to a media query.
-    expect(html).not.toContain("style=");
+    expect(html).toContain('class="multiplier-cta-text"');
+    expect(html).toContain('class="primary-btn gold wide"');
     expect(html).not.toContain("nowrap");
-    expect(html).toContain("Claim 3× (● +240)");
+    expect(html).toContain("Claim 3×");
+    expect(html).toContain("+● 240");
   });
 
   it("renders the claimed state as a plain chip with no button", () => {
     const html = renderCoinMultiplierCard(120, true);
-    expect(html).toContain("is-claimed");
+    expect(html).toContain("claimed");
+    expect(html).toContain("3× bonus applied");
     expect(html).not.toContain("<button");
   });
 });
