@@ -2335,23 +2335,32 @@ function menuLinks(items: MenuDestination[]): string {
 
 function renderNameEntry(_s: HudSnapshot): string {
   return `
-    ${head(t("identity.welcome", undefined, "Welcome to Sunbird"))}
-    <p class="tagline">Every pilot has a name. What's yours?</p>
+    ${head("✨ Welcome to Sunbird")}
+    <p class="tagline" style="text-align: center; margin: 16px 0 24px;">Every pilot needs an identity. What's yours?</p>
+
     <div class="name-entry-form">
-      <input
-        type="text"
-        data-ui
-        data-ref="pilotNameInput"
-        class="name-input"
-        placeholder="Enter your pilot name"
-        maxlength="14"
-        aria-label="Pilot name"
-      />
-      <button class="primary-btn wide" data-ui data-action="confirm-pilot-name">
-        Take to the skies
+      <div class="name-input-wrapper">
+        <input
+          type="text"
+          data-ui
+          data-ref="pilotNameInput"
+          class="name-input"
+          placeholder="Your pilot name"
+          maxlength="14"
+          aria-label="Pilot name"
+          autocomplete="off"
+        />
+        <div class="name-char-count"><span>0</span>/14</div>
+      </div>
+
+      <button class="primary-btn" data-ui data-action="confirm-pilot-name">
+        Take to the Skies 🕊
       </button>
     </div>
-    <p class="fineprint">You can change your name anytime in Settings.</p>
+
+    <div class="name-entry-hint">
+      <p>💡 You can change your name anytime in Settings</p>
+    </div>
   `;
 }
 
