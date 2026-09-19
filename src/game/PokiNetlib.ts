@@ -18,6 +18,7 @@
  * See https://github.com/poki/netlib and developers.poki.com/guide/game-dev-tools.
  */
 import { Network, type Peer, type LobbyListEntry } from "@poki/netlib";
+import { generatePilotName } from "./pilotNameGenerator";
 import type {
   NetTransport,
   RemoteSnapshot,
@@ -173,12 +174,13 @@ export class PokiNetlibClient implements NetTransport {
     this.errorText = "";
     this.tracks.clear();
 
-    const mockPeers = [
-      { id: "auto_1", name: "Zephyr Wing", skin: "phoenix", hue: 0.12 },
-      { id: "auto_2", name: "Echo Falcon", skin: "aurora", hue: 0.55 },
-      { id: "auto_3", name: "Solaris Ace", skin: "solstice", hue: 0.82 },
-      { id: "auto_4", name: "Cloud Swift", skin: "stormcrow", hue: 0.38 },
-    ];
+    const SKINS = ["phoenix", "aurora", "solstice", "stormcrow", "sunbird", "midnight"];
+    const mockPeers = Array.from({ length: 4 }, (_, i) => ({
+      id: `auto_${i + 1}`,
+      name: generatePilotName(),
+      skin: SKINS[i % SKINS.length]!,
+      hue: (i * 0.21 + 0.08) % 1,
+    }));
     for (const p of mockPeers) {
       const t = this.track(p.id);
       t.name = p.name;
@@ -852,7 +854,7 @@ export class PokiNetlibClient implements NetTransport {
         emote: this.clock - t.emoteAt < 2.5 ? t.emote : "",
         emoteAt: t.emoteAt,
         ready: t.ready,
-        latencyMs: peer ? Math.round(peer.latency.average) : 0,
+        latencyMs: peer?.latency ? Math.round(peer.latency.average) : 0,
         you: false,
       });
     }

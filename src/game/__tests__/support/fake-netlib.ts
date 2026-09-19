@@ -144,8 +144,39 @@ export class FakeNetwork extends Emitter {
   }
 
   async list(filter?: Record<string, unknown>, _sort?: unknown, limit?: number): Promise<FakeLobby[]> {
-    if (!filter?.public) return [];
-    const rows = [...signaler.lobbies.values()].filter((l) => l.public);
+    // Accept both the simple { public: true } shape AND the MongoDB-style
+    // { $and: [{ public: { $eq: true } }, ...] } shape that PokiNetlibClient uses.
+    const wantsPublic =
+      filter?.public === true ||
+      (Array.isArray(filter?.$and) &&
+        (filter.$and as Record<string, unknown>[]).some(
+          (c) =>
+            c.public === true ||
+            (c.public as Record<string, unknown> | undefined)?.$eq === true,
+        ));
+    if (!wantsPublic) return [];
+    let rows = [...signaler.lobbies.values()].filter((l) => l.public);
+    // Apply simple $and conditions the tests rely on: hasPassword, playerCount $gt.
+    if (Array.isArray(filter?.$and)) {
+      for (const cond of filter.$and as Record<string, unknown>[]) {
+        if ((cond.hasPassword as Record<string, unknown> | undefined)?.$eq === false) {
+          rows = rows.filter((l) => !l.hasPassword);
+        }
+        if (typeof (cond.playerCount as Record<string, unknown> | undefined)?.$gt === "number") {
+          const min = (cond.playerCount as Record<string, unknown>).$gt as number;
+          rows = rows.filter((l) => l.playerCount > min);
+        }
+        // customData.mode filter
+        const modeMatch = (cond as Record<string, unknown>)["customData.mode"] as
+          | Record<string, unknown>
+          | undefined;
+        if (modeMatch?.$eq !== undefined) {
+          rows = rows.filter(
+            (l) => l.customData?.mode === modeMatch.$eq,
+          );
+        }
+      }
+    }
     return typeof limit === "number" ? rows.slice(0, limit) : rows;
   }
 
