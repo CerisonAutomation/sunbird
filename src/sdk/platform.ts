@@ -411,8 +411,17 @@ function ensureSdk(): Promise<PlatformName> {
       const script = document.createElement("script");
       script.src = CRAZY_SRC;
       script.async = true;
-      script.dataset.sunbirdSdk = "crazy";
-      script.onload = () => { script.dataset.loaded = "true"; resolve("crazy"); };
+      script.dataset.sunbirdSdk = target;
+      script.onload = () => {
+        const isReady = target === "poki" ? Boolean(window.PokiSDK) : Boolean(window.CrazyGames?.SDK);
+        if (isReady) {
+          script.dataset.loaded = "true";
+          resolve(target);
+        } else {
+          // Script loaded but SDK wasn't defined; treat as load failure
+          resolve("none");
+        }
+      };
       script.onerror = () => resolve("none");
       document.head.appendChild(script);
     });

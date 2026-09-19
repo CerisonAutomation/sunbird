@@ -919,6 +919,11 @@ export class Game {
     this.pushHud();
   }
 
+  private createNetTransport(deviceId: string, pilotName: string, skinId: string): RealtimeClient {
+    // For now: Poki uses local multiplayer (AI rivals). Netlib P2P can be added post-launch.
+    return new RealtimeClient(deviceId, pilotName, skinId, 0.06);
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
@@ -5240,18 +5245,8 @@ export class Game {
     const seed = this.currentMatchSeed();
     const remote = this.joiningRemoteRoom;
     if (!this.net) {
-      // The dynamic import of PokiNetlib resolves on the next tick; attach
-      // and connect once the client is ready. In the meantime the HUD shows
-      // "connecting…" via netState.
-      void this.makeNet().then((client) => {
-        if (this.disposed) return;
-        this.net = client;
-        this.massRace.attachTransport(this.net);
-        this.net.setIdentity(this.racedName(), this.skin.id, 0.06);
-        this.net.connect(this.roomCode, seed, remote);
-        this.bump();
-      });
-      return;
+      this.net = this.createNetTransport(this.save.state.deviceId, this.pilotName, this.skin.id);
+      this.massRace.attachTransport(this.net);
     }
     this.net.setIdentity(this.racedName(), this.skin.id, 0.06);
     this.net.connect(this.roomCode, seed, remote);
@@ -5298,29 +5293,11 @@ export class Game {
 
   /** Opens (or reuses) a realtime seat for the current race seed. */
   private connectRace(): void {
-    if (!isMultiplayerConfigured() || this.localRace) return;
-    const seed = this.currentMatchSeed();
-    const remote = this.joiningRemoteRoom;
-    if (this.net?.connected) {
-      // Already seated in a room — if it's a different race than we're about
-      // to start, drop and rejoin so we don't race against a stale lobby.
-      if (this.net.seed !== seed && this.net.state === "lobby") {
-        this.disconnectRace();
-      } else {
-        this.massRace.attachTransport(this.net);
-        return;
-      }
-    }
+    if (!isMultiplayerConfigured() && portalTarget() !== "poki") return;
+    if (this.net?.connected) { this.massRace.attachTransport(this.net); return; }
     if (!this.net) {
-      void this.makeNet().then((client) => {
-        if (this.disposed) return;
-        this.net = client;
-        this.massRace.attachTransport(this.net);
-        this.net.setIdentity(this.racedName(), this.skin.id, 0.06);
-        this.net.connect(this.roomCode, seed, remote);
-        this.bump();
-      });
-      return;
+      this.net = this.createNetTransport(this.save.state.deviceId, this.pilotName, this.skin.id);
+      this.massRace.attachTransport(this.net);
     }
     this.net.setIdentity(this.racedName(), this.skin.id, 0.06);
     this.net.connect(this.roomCode, seed, remote);
