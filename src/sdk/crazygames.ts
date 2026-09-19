@@ -469,6 +469,23 @@ export class CrazyGamesAdapter implements PlatformAdapter {
     }
   }
 
+  /*
+   * CrazyGames surfaces leaderboards through its own site chrome rather than an
+   * in-game overlay, and it has no playtest recorder or error-report hook in
+   * the v3 SDK — so these stay inert here. They exist on the interface so the
+   * game can call them unconditionally.
+   */
+  showLeaderboard(_id?: number | null): void {}
+  playtestSetCanvas(_canvas: HTMLCanvasElement | HTMLCanvasElement[] | null): void {}
+  captureError(_err: string | Error): void {}
+  deviceCategory(): "mobile" | "tablet" | "desktop" | null { return null; }
+  /** CrazyGames requires the same brokered navigation for external links. */
+  openExternalLink(url: string): void {
+    try {
+      (window as unknown as { open?: (u: string, t: string) => void }).open?.(url, "_blank");
+    } catch { /* inert */ }
+  }
+
   async requestAccountLink(): Promise<boolean> {
     const prompt = this.user?.showAccountLinkPrompt;
     if (!prompt) return false;

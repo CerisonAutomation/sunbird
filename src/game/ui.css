@@ -4659,6 +4659,25 @@ button:focus-visible, .toggle:focus-visible {
   min-width: 0;
 }
 
+/* Portal editions show the (generated) pilot name read-only — same footprint
+   as the direct build's text field, minus the caret. */
+.pilot-name-readonly {
+  flex: 1;
+  min-width: 0;
+  border: 2px solid #ead8c4;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 14px;
+  font-weight: 700;
+  background: #fff;
+  color: var(--ink);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .mini-btn.autogen-btn {
   background: linear-gradient(135deg, #ffc847, #f09513);
   color: #4a2800;

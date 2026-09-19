@@ -13,7 +13,7 @@ import type { ActivePower } from "./PowerUps";
 import type { SessionGoal } from "./Engagement";
 import { PVP_MODES, type ModeDef, type PvpWorldCourse, type ModeId } from "./Modes";
 import type { RacerStats } from "./Racer";
-import { LEADERBOARD_CLOUD_LABEL, PORTAL_DISPLAY_NAME, PORTAL_EDITION_NOTE, SQUAD_CHAT } from "./edition";
+import { CUSTOM_PILOT_NAMES, LEADERBOARD_CLOUD_LABEL, PORTAL_DISPLAY_NAME, PORTAL_EDITION_NOTE, SELL_AD_REMOVAL, SQUAD_CHAT } from "./edition";
 import { leaderboardBackend } from "./Leaderboard";
 import type { BoardMetric, BoardPage, BoardScope } from "./Leaderboard";
 import type { TournamentView } from "./Tournaments";
@@ -123,6 +123,8 @@ export type HudSnapshot = {
   vipDaysLeft: number;
   vipExpiredNotice: boolean;
   adsLeftToday: number;
+  /** True when the portal offers its own leaderboard overlay. */
+  portalLeaderboard: boolean;
   ghostDelta: number | null;
   /** True when this finished run beat the previous personal-best distance. */
   newBest: boolean;
@@ -1528,7 +1530,11 @@ function head(title: string, backAction = "back", right = ""): string {
 }
 
 function upsellStrip(): string {
-  return `<button class="upsell" data-ui data-action="open-paywall"><div><b>✦ Sunbird Gold &amp; VIP</b><span>2× coins · no breaks · Phoenix &amp; Aurora skins · Nest Pass</span></div><span class="mini-btn gold">See</span></button>`;
+  // "no breaks" is an ad-removal claim: it only exists where the edition is
+  // allowed to sell ad removal (direct build). Portals own ad frequency, so
+  // the phrase is not in those bundles at all.
+  const pitch = ["2× coins", ...(SELL_AD_REMOVAL ? ["no breaks"] : []), "Phoenix &amp; Aurora skins", "Nest Pass"].join(" · ");
+  return `<button class="upsell" data-ui data-action="open-paywall"><div><b>✦ Sunbird Gold &amp; VIP</b><span>${pitch}</span></div><span class="mini-btn gold">See</span></button>`;
 }
 
 function renderMissions(list: MissionView[], newly: string[] = []): string {
@@ -1656,11 +1662,24 @@ function renderBoard(s: HudSnapshot): string {
       .join("")}</div>
     <div class="board-list">${rows}</div>
     ${page && page.yourRank > 0 ? `<div class="board-rank">Your rank · <b>#${page.yourRank}</b> of ${page.total}</div>` : ""}
-    <div class="redeem pilot-name-row">
+    ${s.portalLeaderboard
+      ? `<button class="soft-btn wide" data-ui data-action="open-portal-leaderboard">🏆 ${PORTAL_DISPLAY_NAME} leaderboard</button>`
+      : ""}
+    ${
+      CUSTOM_PILOT_NAMES
+        ? `<div class="redeem pilot-name-row">
       <input data-ui data-ref="pilotName" aria-label="Pilot name" maxlength="14" placeholder="Pilot name" value="${escapeHtml(s.pilotName)}" />
       <button class="mini-btn autogen-btn" data-ui data-action="autogen-pilot" title="Autogenerate random pilot name">🎲 Random</button>
       <button class="mini-btn primary" data-ui data-action="rename-pilot">Save</button>
-    </div>
+    </div>`
+        : /* Portal editions broadcast this name to real players, so it is a
+           curated generated name rather than free text — read-only display
+           plus the dice, no typing surface at all. */
+          `<div class="redeem pilot-name-row">
+      <span class="pilot-name-readonly" aria-label="Pilot name">${escapeHtml(s.pilotName)}</span>
+      <button class="mini-btn autogen-btn" data-ui data-action="autogen-pilot" title="Roll a new pilot name">🎲 Random</button>
+    </div>`
+    }
     <div class="prize-card">
       <div class="section-title">🏆 Tournament Rank Prizes</div>
       <div class="prize-grid">
@@ -2902,7 +2921,12 @@ function renderAccount(s: HudSnapshot): string {
       }</div>
       <p class="fineprint">VIP gifts ${VIP_DAILY_GIFT} coins every day you play and adds a fourth daily quest. ${
         s.vip ? "" : "Cancel anytime — no auto-renewal in this build; your 30 days simply run out."
-      } Sponsored breaks respect a hard cap: <b>${s.adsLeftToday}</b> left today.</p>
+      }${
+        /* Only the direct build schedules its own interstitials; on a portal the
+           platform owns ad frequency, so the game must not describe (or count)
+           breaks it does not control. */
+        s.portalName === "none" ? ` Sponsored breaks respect a hard cap: <b>${s.adsLeftToday}</b> left today.` : ""
+      }</p>
     </div>
     <div class="section-title">Invite friends</div>
     <div class="sheet">
@@ -3169,7 +3193,7 @@ function renderAd(s: HudSnapshot): string {
     <div class="ad-bar"><i data-live="adBar"></i></div>
     <div class="ad-actions">
       <button class="mini-btn" data-ui data-action="ad-skip" data-live="adSkip" disabled>Skip in ${Math.ceil(s.adTimer)}</button>
-      ${s.gold ? "" : `<button class="mini-btn gold" data-ui data-action="ad-gold">✦ Remove breaks</button>`}
+      ${s.gold || !SELL_AD_REMOVAL ? "" : `<button class="mini-btn gold" data-ui data-action="ad-gold">✦ Remove breaks</button>`}
     </div>
   `;
 }

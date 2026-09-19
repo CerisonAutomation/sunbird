@@ -59,6 +59,22 @@ export const PORTAL_FORBIDDEN_MARKERS = [
   [/data-action=["']squad-chat/, "club chat send button"],
   [/Club chat history/, "club chat log"],
   [/Friends &amp; club chat|Friends & club chat/, "chat promise in the Squad menu copy"],
+  // Player-authored text and ad-removal purchases are both platform policy
+  // violations, and both were live in the shipped bundle until the compliance
+  // pass:
+  //   • REQ-20 — no in-app purchases and no UI implying them ("no 'remove ads'
+  //     purchase"). Gold's pitch claimed "No sponsored breaks, ever"; the
+  //     bullet now only exists when edition SELL_AD_REMOVAL is true, so a
+  //     portal bundle containing this string means the gate regressed.
+  //   • Content & player safety — portals broadcast the pilot name to real
+  //     players (netlib rooms, rosters, name tags) and must not collect
+  //     personal data, so portal editions render the name read-only
+  //     (edition CUSTOM_PILOT_NAMES) with a 🎲 roll instead of a text field.
+  [/No sponsored breaks/i, "ad-removal purchase claim in the paywall (REQ-20)"],
+  [/[Rr]emove ads|No ads,? ever|Ad-?free forever/i, "ad-removal purchase claim (REQ-20)"],
+  [/no breaks/i, "\"no breaks\" ad-removal claim in the Gold upsell strip (REQ-20)"],
+  [/[Rr]emove breaks/, "\"Remove breaks\" ad-removal purchase button (REQ-20)"],
+  [/data-ref=["']pilotName/, "free-text pilot name input (no player-authored text or personal data on portals)"],
   // The self-hosted stack (Rust/TS room server, social service, leaderboard
   // backend) is the DIRECT-BUILD path. Portal editions blank
   // VITE_MULTIPLAYER_URL / VITE_SOCIAL_URL / VITE_LEADERBOARD_URL at build
