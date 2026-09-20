@@ -19,6 +19,7 @@ import { SunbirdPage } from "./SunbirdPage";
  */
 
 const CARD = '[data-ref="menuCard"]';
+const OVER = '[data-ref="over"]';
 
 /** One finger, pressed → dragged in `steps` → lifted, with frame-paced moves. */
 async function fingerDrag(cdp: CDPSession, x: number, y: number, dx: number, dy: number, steps = 14): Promise<void> {
@@ -302,6 +303,54 @@ test.describe("mobile touch", () => {
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
     expect(await page.evaluate(() => document.documentElement.scrollTop)).toBe(0);
     expect(await page.locator('[data-action="pause"]').isVisible()).toBe(true);
+    expect(app.errors).toEqual([]);
+  });
+
+  test("the results card scrolls and its bare backdrop flies again", async ({ page, context }) => {
+    test.setTimeout(240000);
+    const app = new SunbirdPage(page);
+    const cdp = await context.newCDPSession(page);
+    await app.open();
+    await app.ready();
+    await app.fly();
+
+    // No debug hook ships, so the run is flown until the physics actually ends
+    // it — the same way results.spec.ts reaches this screen. Daylight drains
+    // whether or not we dive, so this taps for a while and then lets the run
+    // coast out; tapping stops the moment the results card is up, because a
+    // dive input in the `gameover` state restarts the run by design.
+    for (let i = 0; i < 40 && !(await page.locator(OVER).isVisible().catch(() => false)); i++) {
+      await page.keyboard.press("Space");
+      await page.waitForTimeout(700);
+      // A portal build offers a Second Wind first; the direct build does not.
+      const decline = page.locator('[data-action="continue-sleep"]');
+      if (await decline.isVisible().catch(() => false)) {
+        await decline.click();
+        await page.waitForTimeout(1500);
+      }
+    }
+    await expect(page.locator(OVER)).toBeVisible({ timeout: 90000 });
+
+    // The results card is the tallest surface in the game and its own scroller,
+    // so a finger drag inside it must pan it rather than doing nothing.
+    const card = page.locator(`${OVER} .paper-card`);
+    const range = await card.evaluate(el => el.scrollHeight - el.clientHeight);
+    expect(range, "the results card should have something to scroll").toBeGreaterThan(50);
+    const box = await card.boundingBox();
+    await fingerDrag(cdp, box!.x + box!.width / 2, box!.y + box!.height * 0.75, 0, -260);
+    expect(await card.evaluate(el => el.scrollTop), "finger drag scrolls the results card").toBeGreaterThan(20);
+
+    // Tap-anywhere on the backdrop flies again. The backdrop tap and the card's
+    // own primary button are one affordance with two hit areas, so they must
+    // dispatch the same action — the backdrop used to send `restart-flight`,
+    // which Game only honours while paused or playing, making it a silent no-op
+    // here. It only ever appeared to work because a touch on the bare overlay
+    // also armed the dive gesture and `holdToStart()` restarted the run.
+    await expect(page.locator(`${OVER} .play-again-btn`)).toHaveAttribute("data-action", "retry");
+    const point = await barePixel(page, OVER);
+    await fingerPress(cdp, point.x, point.y);
+    await expect(page.locator(OVER)).toBeHidden({ timeout: 20000 });
+    await expect(page.locator('[data-action="pause"]')).toBeVisible({ timeout: 20000 });
     expect(app.errors).toEqual([]);
   });
 });

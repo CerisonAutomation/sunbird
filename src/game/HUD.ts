@@ -380,6 +380,31 @@ export function emoteWheelVisible(s: Pick<HudSnapshot, "massRace">): boolean {
   return Boolean(s.massRace);
 }
 
+/**
+ * The action behind the results card's primary button — and behind a tap on the
+ * bare backdrop beside that card, which is the same affordance with a larger hit
+ * area.
+ *
+ * A placed mass race rematches at the same stakes (an online field goes back
+ * through the honest search; a duel or an AI flock replays locally). Every other
+ * run just flies again.
+ *
+ * Both callers must agree, so the decision lives here instead of being
+ * re-derived inline at each site. It previously existed only inside the render
+ * string, and the backdrop tap dispatched `restart-flight` — an action `Game`
+ * honours only while paused or playing, so tapping the results backdrop was a
+ * silent no-op. It looked like it worked because a touch on the bare overlay
+ * also armed the dive gesture and `holdToStart()` restarted the run that way;
+ * once overlays stopped arming gameplay gestures (they own the finger, so the
+ * card can scroll and the tap can land) that accidental path disappeared and the
+ * dead action was exposed.
+ */
+export function resultsPrimaryAction(
+  s: Pick<HudSnapshot, "massRace" | "racePlace" | "duelWas">,
+): "rematch" | "retry" {
+  return s.massRace && s.racePlace > 0 && !s.duelWas ? "rematch" : "retry";
+}
+
 export class HUD {
   readonly root: HTMLDivElement;
   private readonly menuSky: MenuSky;
@@ -758,7 +783,9 @@ export class HUD {
         return;
       }
       if (e.target === this.overEl) {
-        handler("restart-flight", "");
+        // Tap-anywhere on the results screen flies again — same action, same
+        // conditions as the card's own primary button (see resultsPrimaryAction).
+        handler(this.currentSnapshot ? resultsPrimaryAction(this.currentSnapshot) : "retry", "");
         return;
       }
       if (e.target === this.menuEl && this.currentSnapshot && this.currentSnapshot.screen !== "main") {
@@ -3120,7 +3147,7 @@ function renderGameOver(s: HudSnapshot): string {
     <div class="results-kicker">${escapeHtml(s.modeName)} · flight recap</div>
     <h2>${t("hud.gameover.title", undefined, "Flight completed")}</h2>
     <p class="tagline">${s.massRace ? "Your place, your progress, your next race." : "A little farther. A little smoother. One more flight?"}</p>
-    <div class="result-actions"><button class="play-again-btn" data-ui data-action="${s.massRace && s.racePlace > 0 && !s.duelWas ? "rematch" : "retry"}">${s.massRace && s.roomCode ? "Back to race lobby" : s.massRace && s.racePlace > 0 ? "Race again · same stakes" : t("hud.gameover.flyAgain", undefined, "Fly Again")}</button><button class="soft-btn" data-ui data-action="menu">${t("hud.gameover.mainMenu", undefined, "Main Menu")}</button></div>
+    <div class="result-actions"><button class="play-again-btn" data-ui data-action="${resultsPrimaryAction(s)}">${s.massRace && s.roomCode ? "Back to race lobby" : s.massRace && s.racePlace > 0 ? "Race again · same stakes" : t("hud.gameover.flyAgain", undefined, "Fly Again")}</button><button class="soft-btn" data-ui data-action="menu">${t("hud.gameover.mainMenu", undefined, "Main Menu")}</button></div>
     ${!s.massRace ? `<p class="fineprint replay-note">Fly again replays this exact course so you can race the ghost of the run you just flew 👻</p>` : ""}
     ${s.newBest ? `<div class="new-best">👑 NEW BEST · ${formatDistance(s.distance)}<small>your farthest flight yet</small></div>` : ""}
     ${s.boardScope === "global" && s.boardMetric === "distance" && s.board && s.board.yourRank > 0 ? `<div class="reward-strip rank-strip">Leaderboard rank · <b>#${s.board.yourRank}</b> of ${s.board.total}</div>` : ""}
