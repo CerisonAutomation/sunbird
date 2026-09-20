@@ -2168,7 +2168,18 @@ fieldset.squad-fields {
   /* Decorative idle loops only — never feedback, warnings or loading state.
      (.trail-swatch is deliberately absent: its `animation` shorthand is itself
      !important at a class specificity, so it already outran the old blanket
-     freeze and this keeps that behaviour unchanged.) */
+     freeze and this keeps that behaviour unchanged.)
+
+     `.speedlines` is the one in-flight effect in this list, and it earns its
+     place: it is `position: absolute; inset: 0`, painted with a repeating
+     conic gradient *and* a `mask-image` radial gradient, and `spinlines`
+     rotates that whole masked surface forever at 1.4s/turn. A masked gradient
+     cannot be cached as a compositor layer, so every frame re-rasterizes the
+     full viewport — the most expensive animation in the game, running
+     continuously even while `opacity: 0` (it only fades in above 0.55 speed).
+     Stopping the *rotation* costs nothing perceptible at ≤6deg and keeps the
+     speed feedback itself, which is the opacity fade, not the spin. */
+  .speedlines,
   .hero-bird,
   .hero-sun,
   .hero-sun-wrap,

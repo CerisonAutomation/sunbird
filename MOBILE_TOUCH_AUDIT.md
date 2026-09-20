@@ -197,6 +197,28 @@ After: `.touch-ripple` `0.38s` and visibly mid-animation at `opacity 1.00`;
 `.spinner` `1s infinite`; `.sun-fill.low` `0.8s infinite`. Live animations at
 rest on the home screen: **0 before, 0 after** — the ambience stayed off.
 
+### A regression this fix introduced, and its correction
+
+Un-freezing animations is not free: it also un-froze `.speedlines`, which the
+old blanket rule had been stopping. That element is `position: absolute;
+inset: 0`, painted with a `repeating-conic-gradient` **and** a `mask-image`
+radial gradient, and `spinlines` rotates the whole masked surface every 1.4s —
+forever, and even while `opacity: 0` (it only fades in above 0.55 speed). A
+masked gradient cannot be cached as a compositor layer, so each frame
+re-rasterizes the full viewport. That made it the most expensive animation in
+the game, running continuously on exactly the small screens the block exists to
+protect. Caught by `document.getAnimations()` at 320×568 and 568×320 during the
+orientation-suite investigation; `.speedlines` is now in the decorative freeze
+list, which returns live animations at those viewports to **0**, matching the
+original. The speed feedback itself is the opacity fade, not the ≤6deg spin, so
+nothing perceptible is lost.
+
+This is recorded because it is the kind of bug a scoped freeze can introduce:
+replacing `* { animation-duration: 0.01ms }` with an allowlist means every
+animation *not* on the list starts running, and the ones that were expensive
+were expensive for a reason. The list has to be derived from enumeration
+(`document.getAnimations()` per viewport), not from reading the keyframe names.
+
 ---
 
 ## 5. F5 — gameplay gestures leaked into menus
@@ -362,6 +384,29 @@ artifact — so these specs cannot observe source CSS edits at all without a fre
 `eslint src scripts api --max-warnings 0` clean · `vitest run` **1176 passed,
 8 skipped** (was 1165) · `vite build` clean · `scripts/audit-ui.mjs` PASSED
 (17 pre-existing warnings).
+
+**One flake, pre-existing and load-dependent.** `pnpm test:orientation` (51
+tests across 7 specs, both projects) intermittently fails
+`[desktop] session-layout.spec.ts … fit at 320×568` with
+`.hud-header overlaps .flight-messages`. This was investigated rather than
+waved off, because the CI job passed on `main` and failed on this branch:
+
+| Source | Run 1 | Run 2 | In isolation |
+| --- | --- | --- | --- |
+| Base commit `620c265` | **1 failed** / 50 passed | **1 failed** / 50 passed | 4/4 passed |
+| This branch, before the `.speedlines` correction | 2 failed / 49 | 1 failed / 50 | 4/4 passed |
+| This branch, after the `.speedlines` correction | **51 passed** | 1 failed / 50 | 4/4 passed |
+
+The base commit fails it too, with the identical assertion, so it is not a
+regression from this change — it only surfaces under full-suite load and never
+in isolation, and it is a layout race (the failing run aborts at 3.9s against
+6.7s for a passing one, i.e. the overlap is sampled before the versus HUD
+settles; `expectNoOverlaps` waits only two `requestAnimationFrame`s). Blocking
+webfonts does not reproduce it, and the build inlines its six faces, so font
+metrics are not the trigger. The `.speedlines` correction removes the one way
+this change could have made the race *more* likely — continuous main-thread
+rasterization during that window — and brings live animations at 320×568 and
+568×320 back to 0, matching the base commit exactly.
 
 ---
 
