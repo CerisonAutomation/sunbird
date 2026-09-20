@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Input } from "../Input";
 let input: Input | undefined;
-afterEach(() => { input?.dispose(); document.body.innerHTML = ""; });
+afterEach(() => { input?.dispose(); vi.restoreAllMocks(); document.body.innerHTML = ""; });
 function fixture(mark = vi.fn()) {
   const host = document.createElement("div");
   document.body.append(host);
@@ -267,5 +267,69 @@ describe("standardised movement keys (Poki EN-02)", () => {
     for (const code of ["Space", "Enter", "KeyW", "ArrowDown"]) {
       expect(key(button, code).defaultPrevented).toBe(false);
     }
+  });
+});
+
+describe("orientation and cancelled touch recovery", () => {
+  function point(host: HTMLElement, id: number, type: string, x: number, y: number) {
+    const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y });
+    Object.defineProperty(event, "pointerId", { value: id });
+    host.dispatchEvent(event);
+  }
+
+  it("releases old split touches on rotation and routes fresh ones to the new halves", () => {
+    const { host, input } = fixture();
+    vi.spyOn(host, "getBoundingClientRect").mockReturnValue({ left: 20, top: 30, width: 800, height: 400 } as DOMRect);
+    input.splitMode = "vertical";
+    point(host, 1, "pointerdown", 100, 100);
+    point(host, 2, "pointerdown", 700, 100);
+    input.splitMode = "vertical"; // Duplicate resize must not release active input.
+    expect(input.diving).toBe(true);
+    expect(input.diving2).toBe(true);
+    input.splitMode = "horizontal";
+    expect(input.diving).toBe(false);
+    expect(input.diving2).toBe(false);
+    vi.spyOn(host, "getBoundingClientRect").mockReturnValue({ left: 20, top: 30, width: 400, height: 800 } as DOMRect);
+    point(host, 1, "pointerup", 100, 40); // Old-orientation release is not a flick.
+    expect(input.consumeBoost()).toBe(false);
+    point(host, 3, "pointerdown", 100, 700);
+    expect(input.diving).toBe(false);
+    expect(input.diving2).toBe(true);
+    point(host, 4, "pointerdown", 100, 100);
+    expect(input.diving).toBe(true);
+    point(host, 3, "pointercancel", 100, 100);
+    expect(input.diving).toBe(true);
+    expect(input.diving2).toBe(false);
+  });
+
+  it("does not interpret a cancelled pointer or a menu release as a boost", () => {
+    const { host, input } = fixture();
+    let now = 1000;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    point(host, 1, "pointerdown", 150, 300);
+    now += 100;
+    point(host, 1, "pointercancel", 150, 200);
+    expect(input.diving).toBe(false);
+    expect(input.consumeBoost()).toBe(false);
+    now += 100;
+    point(host, 2, "pointerdown", 150, 300);
+    expect(input.consumeBoost()).toBe(false); // Not the second tap of a double-tap.
+    point(host, 99, "pointerup", 150, 100); // Never tracked (e.g. a UI button).
+    expect(input.consumeBoost()).toBe(false);
+    expect(input.diving).toBe(true);
+  });
+
+  it("preserves keyboard holds when the touch layout changes", () => {
+    const { host, input } = fixture();
+    key(host, "Space");
+    key(host, "KeyL");
+    input.splitMode = "horizontal";
+    input.splitMode = "vertical";
+    expect(input.diving).toBe(true);
+    expect(input.diving2).toBe(true);
+    key(host, "Space", "keyup");
+    key(host, "KeyL", "keyup");
+    expect(input.diving).toBe(false);
+    expect(input.diving2).toBe(false);
   });
 });

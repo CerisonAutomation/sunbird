@@ -26,8 +26,8 @@ test("AI race social controls are optional, keyboard-dismissible and never steal
   await card.locator('[data-action="open-practice"]').click();
   await card.locator('[data-action="room-size"][data-id="5"]').click();
   await expect(card.locator('[data-action="room-size"][data-id="5"]')).toHaveAttribute("aria-pressed", "true");
-  await card.locator('[data-action="practice-race"]').click();
-  const toggle = page.getByRole("button", { name: "Emotes", exact: true });
+  await card.getByRole("button", { name: /Race the AI flock ·/ }).click();
+  const toggle = page.getByRole("button", { name: /Emotes$/ });
   await expect(toggle).toBeVisible();
   await expect(page.locator(".emote-options")).toBeHidden();
   await toggle.click(); await expect(toggle).toHaveAttribute("aria-expanded", "true");

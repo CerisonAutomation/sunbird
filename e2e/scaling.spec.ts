@@ -13,6 +13,10 @@ const SIZES: { name: string; width: number; height: number }[] = [
   { name: "1031x580 (Poki max scaling)", width: 1031, height: 580 },
   { name: "phone landscape", width: 844, height: 390 },
   { name: "phone portrait", width: 390, height: 844 },
+  { name: "small phone portrait", width: 320, height: 568 },
+  { name: "small phone landscape", width: 568, height: 320 },
+  { name: "tablet portrait", width: 768, height: 1024 },
+  { name: "tablet landscape", width: 1024, height: 768 },
 ];
 
 for (const size of SIZES) {
@@ -34,13 +38,15 @@ for (const size of SIZES) {
       expect(cover.w, "canvas width covers the viewport").toBeGreaterThanOrEqual(size.width);
       expect(cover.h, "canvas height covers the viewport").toBeGreaterThanOrEqual(size.height);
 
-    // The main menu must be visible at this size.
-    await expect(page.locator('[data-ref="menuCard"] h1')).toBeVisible();
-    await expect(page.locator('[data-action="open-live"]')).toBeVisible();
+      // Check bounds and overflow, not just visibility behind a clipped card.
+      await app.expectMenuFits();
+      await expect(page.locator('[data-ref="menuCard"] h1')).toBeVisible();
+      await expect(page.locator('[data-action="open-live"]')).toBeVisible();
 
       // A race lobby must also fit (the densest screen).
       await app.openMenu("open-live", "Race Lobby");
       await expect(page.locator('[data-action="quick-match-instant"]')).toBeVisible();
+      await app.expectMenuFits();
 
       expect(app.errors).toEqual([]);
     });

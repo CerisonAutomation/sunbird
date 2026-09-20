@@ -28,7 +28,15 @@ export class Input {
   private padP1 = false;
   private padP2 = false;
   /** In versus mode a tap is routed to a player by which half of the screen it lands on. */
-  splitMode: "off" | "vertical" | "horizontal" = "off";
+  private split: "off" | "vertical" | "horizontal" = "off";
+  get splitMode(): "off" | "vertical" | "horizontal" { return this.split; }
+  set splitMode(mode: "off" | "vertical" | "horizontal") {
+    if (mode === this.split) return;
+    this.split = mode;
+    // Fingers belonged to the old screen halves. Require a fresh touch after
+    // rotation, but keep independent keyboard/gamepad holds intact.
+    this.onPointerEnd();
+  }
   private readonly touches = new Map<number, 1 | 2>();
   private first = false;
   private lastTapDownAt = 0;
@@ -53,7 +61,7 @@ export class Input {
     this.onFirstGesture = onFirstGesture;
     this.boundPointerDown = (e) => this.onPointerDown(e);
     this.boundPointerUp = (e) => this.onPointerUp(e);
-    this.boundPointerCancel = (e: PointerEvent) => this.onPointerUp(e);
+    this.boundPointerCancel = (e: PointerEvent) => this.onPointerUp(e, true);
     this.boundKeyDown = (e) => this.onKeyDown(e);
     this.boundKeyUp = (e) => this.onKeyUp(e);
     this.boundContext = (e) => e.preventDefault();
@@ -230,7 +238,8 @@ export class Input {
     return e.clientY - r.top > r.height / 2 ? 2 : 1;
   }
 
-  private onPointerUp(e: PointerEvent): void {
+  private onPointerUp(e: PointerEvent, cancelled = false): void {
+    if (!this.touches.has(e.pointerId)) return; // UI/old-orientation releases aren't gestures.
     const now = performance.now();
     const duration = now - this.lastTapDownAt;
     const dy = e.clientY - this.lastTapY;
@@ -238,12 +247,12 @@ export class Input {
 
     // Upward flick / swipe-up gesture for mobile rocket boost:
     // dy <= -35px, duration < 320ms, vertical bias (|dy| > |dx| * 0.7)
-    if (dy <= -35 && duration < 320 && Math.abs(dy) > Math.abs(dx) * 0.7) {
+    if (!cancelled && dy <= -35 && duration < 320 && Math.abs(dy) > Math.abs(dx) * 0.7) {
       this.boostPressed = true;
     }
 
-    this.lastTapDuration = duration;
-    this.lastTapUpAt = now;
+    this.lastTapDuration = cancelled ? 0 : duration;
+    this.lastTapUpAt = cancelled ? 0 : now;
 
     const who = this.touches.get(e.pointerId);
     this.touches.delete(e.pointerId);
@@ -273,6 +282,8 @@ export class Input {
     this.touches.clear();
     this.held = false;
     this.p2Touch = false;
+    this.lastTapDownAt = this.lastTapUpAt = this.lastTapDuration = 0;
+    this.boostPressed = false;
   }
 
   private resetHeld(): void {
