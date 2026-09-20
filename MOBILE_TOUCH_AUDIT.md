@@ -19,14 +19,16 @@
 | # | Finding | Severity | Status |
 | --- | --- | --- | --- |
 | F1 | Menu cards would not scroll under a finger unless the drag happened to start on a `<button>` | **Critical** | ✅ Fixed |
-| F2 | Tap-to-dismiss on non-button surfaces (pause → resume, game over → restart, backdrop → back) was dead on touch | **Critical** | ✅ Fixed |
+| F2 | Tap-to-dismiss on non-button surfaces (pause → resume, backdrop → back) was dead on touch | **Critical** | ✅ Fixed |
 | F3 | The ≤640px "performance" block froze every animation to 0.01ms, deleting the tap ripple, spinners and three in-game warnings | **Critical** | ✅ Fixed |
 | F4 | `transform: none !important` cancelled every button `:active` press state on phones | **High** | ✅ Fixed |
 | F5 | Gameplay gestures (dive hold, double-tap boost, gold ripple) fired on touches landing on a menu | **Medium** | ✅ Fixed |
+| F10 | Tap-anywhere on the results screen dispatched `restart-flight`, which `Game` ignores in the `gameover` state — a silent no-op | **Critical** | ✅ Fixed (§3.1) |
+| F11 | Un-freezing animations also un-froze `.speedlines`: a full-screen masked conic gradient rotating forever, even at `opacity: 0` | **High** | ✅ Fixed — a regression *introduced by* the F3 fix (§4.1) |
 | F6 | Non-passive `touchstart`/`touchmove` on `window` makes every touch on the page pay a main-thread round-trip | **Medium** | ⚠️ Reduced, not removed — see §6 |
 | F7 | Nested scroll surfaces with `overscroll-behavior: contain` trap the finger | **Medium** | 📋 Recommended |
 | F8 | `user-scalable=no, maximum-scale=1.0` blocks pinch-zoom (WCAG 1.4.4) | **Low** (a11y) | 📋 Documented trade-off |
-| F9 | Dead/deprecated declarations: `-webkit-overflow-scrolling`, `scroll-behavior: smooth` on a fixed body | **Low** | 📋 Recommended |
+| F9 | Dead/deprecated declarations: `-webkit-overflow-scrolling` (×4), `scroll-behavior: smooth` on a fixed body | **Low** | ✅ Removed |
 
 Already correct and left alone: touch-target sizing, tap-delay suppression,
 host-page scroll containment, safe-area insets, `pointercancel` recovery,
@@ -130,11 +132,55 @@ if (e.target === this.menuEl && screen !== "main") { handler("back", ""); return
 | --- | --- | --- |
 | Tap bare pause overlay → resume | ✗ `clicks=[]`, `touchstart` prevented on `DIV.overlay` | ✅ **measured** resumed |
 | Tap backdrop beside card → back | ✗ stayed on Shop | ✅ **measured** returned home |
-| Tap game-over overlay → restart | ✗ same handler shape | ✅ same guard; **not separately measured** — reaching a real game-over in this harness needs a full flight, and `.overlay.gameover` is an `.overlay` so it takes the identical path |
+| Tap game-over overlay → fly again | ✗ `touchstart` prevented | ✅ click now lands — but that exposed a second, separate bug, see §3.1 |
 
 On a phone this meant the pause screen could only be left via its buttons, and
 the "tap anywhere" convention players expect from every other mobile game was
 silently absent.
+
+### 3.1 F10 — the results backdrop dispatched an action that does nothing
+
+Letting the click through on the results screen did **not** make tap-anywhere
+work; it exposed a second bug underneath. At a real game over on a Pixel 7
+profile, the tap was delivered and nothing happened:
+
+```
+clicks on bare overlay: ["over"]        ← the click now lands
+=> tap-anywhere restarted the flight? NO (still on results)
+```
+
+`HUD.ts` dispatched `restart-flight`, and `Game` guards that action:
+
+```ts
+case "restart-flight":
+  if (this.state === "paused" || this.state === "playing") { … }   // gameover is not covered
+```
+
+On a results card the state is `gameover`, so the branch fell through silently.
+
+**Why nobody noticed:** the affordance used to work by accident. A touch on the
+bare overlay also armed the dive gesture, and `holdToStart()` restarts the run
+when `input.diving` and the state is `gameover`. A/B measured:
+
+| Source | Click delivered | Restarted |
+| --- | --- | --- |
+| Base commit `620c265` | ✗ suppressed | ✅ yes — via the dive gesture |
+| F1/F2 fix only | ✅ delivered | ✗ **no** — dead action exposed |
+| F1/F2 fix + this fix | ✅ delivered | ✅ yes — via `retry` |
+
+So fixing the click suppression *regressed* this one screen, because the two
+paths had been masking each other. This is the bug behind "tapping anywhere will
+start race".
+
+**Fix.** The backdrop tap and the card's own primary button are one affordance
+with two hit areas, so they now share a single decision, `resultsPrimaryAction()`:
+a placed mass race rematches at the same stakes, everything else replays the run.
+The inline expression that existed only in the render string is replaced by the
+same call, so the two cannot drift apart again.
+
+Geometry at 412×915, for context: the results card is 380×835 inside a
+412×915 overlay, leaving ~15% bare backdrop (a strip along the top and bottom),
+and the card itself has 435px of scroll — both now work under a finger.
 
 ---
 
@@ -197,7 +243,7 @@ After: `.touch-ripple` `0.38s` and visibly mid-animation at `opacity 1.00`;
 `.spinner` `1s infinite`; `.sun-fill.low` `0.8s infinite`. Live animations at
 rest on the home screen: **0 before, 0 after** — the ambience stayed off.
 
-### A regression this fix introduced, and its correction
+### 4.1 F11 — a regression this fix introduced, and its correction
 
 Un-freezing animations is not free: it also un-froze `.speedlines`, which the
 old blanket rule had been stopping. That element is `position: absolute;
@@ -319,11 +365,11 @@ Deliberately left for a human decision, because each is a trade-off rather than 
    zoom mid-flight. Counter-arguments are real: iOS ≥10 ignores
    `user-scalable=no` anyway, and portal iframes generally want a locked
    viewport. Left as shipped.
-4. **Dead declarations (F9).** `-webkit-overflow-scrolling: touch` at
-   `menu-polish.css:851` and `ui.css:3051` has been a no-op since iOS 13;
-   `scroll-behavior: smooth` on `body, #root` applies to two elements that are
-   `position: fixed; overflow: hidden` and can never scroll. Both are safe to
-   delete.
+4. **Dead declarations (F9) — done.** `-webkit-overflow-scrolling: touch` has
+   been a no-op since iOS 13; it appeared at four sites (`menu-polish.css`,
+   `ui.css` ×2, `index.css`). `scroll-behavior: smooth` sat on the
+   `body, #root` rule, and both are `position: fixed; inset: 0; overflow:
+   hidden`, so they can never scroll. All five declarations removed.
 5. **The phone visual gate is unenforced.** `visual-baselines.spec.ts` serves
    `poki-upload/` — a tracked-but-stale 1.5MB artifact — rather than a fresh
    build, so it cannot observe source CSS changes at all without a
@@ -358,6 +404,37 @@ than `locator.tap()`, because `tap()` only reproduces a touch that lands on a
 control — and every bug here came from a finger landing somewhere else. A
 `barePixel()` helper finds a pixel inside a container that is *not* covered by
 any control, which is what makes the tests pin the actual failure mode.
+
+**Whole-app navigation sweep.** Every reachable menu screen was driven with real
+CDP finger gestures — tap the control, finger-drag the card, tap back — on a
+Pixel 7 profile. All 17 navigate, scroll and return cleanly, with no page errors:
+
+| Screen | Card overflow | Finger-drag scrolled | Back to home |
+| --- | --- | --- | --- |
+| Shop | 1340px | 293px ✓ | ✓ |
+| Settings | 678px | 293px ✓ | ✓ |
+| Leaderboard | 83px | 83px ✓ | ✓ |
+| Your progress | 1085px | 293px ✓ | ✓ |
+| Tournaments | 0 (fits) | n/a | ✓ |
+| Account | 423px | 293px ✓ | ✓ |
+| Challenges | 1225px | 293px ✓ | ✓ |
+| The Long Campaign | 456px | 293px ✓ | ✓ |
+| Rival Rank | 356px | 293px ✓ | ✓ |
+| Nest Pass | 0 (fits) | n/a | ✓ |
+| Trophy Case | 0 (fits) | n/a | ✓ |
+| Island Atlas | 0 (fits) | n/a | ✓ |
+| High glides | 0 (fits) | n/a | ✓ |
+| Squad | 388px | 293px ✓ | ✓ |
+| Race Lobby | 508px | 293px ✓ | ✓ |
+| AI PvP | 900px | 293px ✓ | ✓ |
+
+In flight: finger-tap on the pause button shows Resume, and a finger-tap on the
+bare pause backdrop resumes. Two harness notes, because both produced false
+alarms before being understood: a CDP touch at coordinates outside the viewport
+is *clamped to the edge* rather than ignored (an un-scrolled `open-board` at
+y=1377 landed on the CTA and started a flight), so every tap now scrolls its
+target into view first; and the results card needs ~30s of real flying to reach,
+since no debug hook ships and daylight drains whether or not you dive.
 
 **No new failures.** Full `--project=phone` run: 56 passed / 26 failed. Each
 failing spec was re-run against the original source and produced the *identical*
@@ -415,6 +492,9 @@ rasterization during that window — and brings live animations at 320×568 and
 | File | Change |
 | --- | --- |
 | `src/game/Input.ts` | `SCROLL_SURFACES` selector + `isScrollSurface()` / `isOverlaySurface()` / `ownsTouch()`; overlay touches are never cancelled and never arm a gameplay gesture; the three duplicated touch handlers collapse into one |
-| `src/index.css` | ≤640px block: blanket animation freeze replaced with a decorative-only list; `filter`/`box-shadow` pulses swapped to compositor-only `pulse-soft`; `transform: none !important` on buttons removed |
+| `src/game/HUD.ts` | new exported `resultsPrimaryAction()`; the results backdrop tap dispatches it instead of the dead `restart-flight`; the render string's inline copy of that condition now calls the same helper |
+| `src/index.css` | ≤640px block: blanket animation freeze replaced with a decorative-only list (including `.speedlines`); `filter`/`box-shadow` pulses swapped to compositor-only `pulse-soft`; `transform: none !important` on buttons removed; dead `scroll-behavior: smooth` and `-webkit-overflow-scrolling` dropped |
+| `src/game/ui.css`, `src/game/menu-polish.css` | dead `-webkit-overflow-scrolling: touch` dropped (3 sites) |
 | `src/game/__tests__/input-ui.test.ts` | +11 tests, new `describe("menu overlays keep native scrolling and tapping")` |
-| `e2e/mobile-touch.spec.ts` | new — 9 browser tests over real CDP touch |
+| `src/game/__tests__/results-actions.test.ts` | new — 9 tests: the pure decision across every branch, plus the click wiring dispatching `retry`/`rematch` and the no-snapshot fallback |
+| `e2e/mobile-touch.spec.ts` | new — 10 browser tests over real CDP touch |

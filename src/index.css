@@ -89,7 +89,6 @@ body,
   touch-action: none;
   overscroll-behavior: none;
   overscroll-behavior-y: none;
-  scroll-behavior: smooth;
 }
 
 input,
@@ -494,7 +493,6 @@ textarea {
   pointer-events: auto;
   overflow: auto;
   touch-action: pan-y;
-  -webkit-overflow-scrolling: touch;
 }
 
 .overlay.menu {
