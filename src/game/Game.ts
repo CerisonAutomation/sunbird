@@ -1,3 +1,4 @@
+import { splitLayout, splitViews } from "./Viewport";
 import { equalizedRace } from "./RaceRules";
 import { terrainCue, landingLookAhead } from "./FlightGuidance";
 import { ScreenHistory } from "./ScreenHistory";
@@ -509,6 +510,7 @@ export class Game {
   private resetTimer = 0;
 
   private readonly resizeObs: ResizeObserver;
+  private orientationTimers: number[] = [];
   private readonly onVis: () => void;
   private readonly onResize: () => void;
   private readonly loop: (t: number) => void;
@@ -748,8 +750,10 @@ export class Game {
     this.onOrientationChange = () => {
       try { window.scrollTo(0, 0); } catch { /* ignore */ }
       this.resize();
-      window.setTimeout(() => this.resize(), 100);
-      window.setTimeout(() => this.resize(), 300);
+      // Mobile browsers may report the old dimensions during orientationchange.
+      // Coalesce recovery passes, and never let them outlive this game instance.
+      this.orientationTimers.forEach(id => window.clearTimeout(id));
+      this.orientationTimers = [100, 300].map(delay => window.setTimeout(() => this.resize(), delay));
     };
     this.onFullscreenChange = () => {
       this.resize();
@@ -948,6 +952,8 @@ export class Game {
     this.disposed = true;
     cancelAnimationFrame(this.raf);
     this.resizeObs.disconnect();
+    this.orientationTimers.forEach(id => window.clearTimeout(id));
+    this.orientationTimers = [];
     window.removeEventListener("resize", this.onResize);
     window.visualViewport?.removeEventListener("resize", this.onResize);
     window.visualViewport?.removeEventListener("scroll", this.onResize);
@@ -2480,20 +2486,10 @@ export class Game {
     this.audio.setMusicIntensity(playing ? Math.min(1, lead.bird.speed() / 90 * 0.5 + Math.min(1, lead.bird.altitude / ALT_HIGH) * 0.3) : 0);
 
     const size = this.renderer.getSize(this.tmpSize);
-    const vertical = size.x / Math.max(1, size.y) >= 1.25;
-    const w = vertical ? Math.floor(size.x / 2) : size.x;
-    const h = vertical ? size.y : Math.floor(size.y / 2);
+    const views = splitViews(size.x, size.y, this.renderer.getPixelRatio());
     this.renderer.setScissorTest(true);
-    const views: [Racer, number, number][] = vertical
-      ? [
-          [p1, 0, 0],
-          [p2, w, 0],
-        ]
-      : [
-          [p1, 0, h],
-          [p2, 0, 0],
-        ];
-    for (const [racer, ox, oy] of views) {
+    for (const [index, racer] of [p1, p2].entries()) {
+      const { x: ox, y: oy, width: w, height: h } = views[index]!;
       // Each split viewport gets one authoritative bird. Rendering both
       // meshes into both cameras made nearby racers visually stack or appear
       // to teleport across the divider. Terrain and particles remain shared,
@@ -6487,9 +6483,13 @@ export class Game {
   }
 
   private resize(): void {
-    const vv = typeof window !== "undefined" ? window.visualViewport : null;
-    const w = Math.round(vv?.width ?? (this.host.clientWidth || window.innerWidth));
-    const h = Math.round(vv?.height ?? (this.host.clientHeight || window.innerHeight));
+    if (this.disposed) return;
+    // CSS sizes the canvas/HUD to the host. A keyboard or pinch zoom can shrink
+    // visualViewport without resizing that host; using it would stretch WebGL
+    // and make its split layout disagree with pointer coordinates and the HUD.
+    const w = this.host.clientWidth;
+    const h = this.host.clientHeight;
+    if (w <= 0 || h <= 0) return; // Ignore transient hidden/rotation dimensions.
     // A ResizeObserver and window resize can report the same size. Avoid
     // resetting canvas storage / bloom targets twice (or on unchanged DPR).
     if (w !== this.renderWidth || h !== this.renderHeight || this.dpr !== this.renderDpr) {
@@ -6503,8 +6503,7 @@ export class Game {
       this.renderDpr = this.dpr;
     }
     if (this.p1 && this.p2) {
-      const vertical = w / Math.max(1, h) >= 1.25;
-      this.input.splitMode = this.versus ? (vertical ? "vertical" : "horizontal") : "off";
+      this.input.splitMode = this.versus ? splitLayout(w, h) : "off";
     }
   }
 }

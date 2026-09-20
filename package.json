@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:orientation": "playwright test e2e/orientation.spec.ts e2e/scaling.spec.ts e2e/layout.spec.ts e2e/menu-layout.spec.ts e2e/session-layout.spec.ts e2e/flight.spec.ts e2e/results-layout.spec.ts",
     "test:coverage": "vitest run --coverage",
     "verify": "pnpm typecheck && pnpm typecheck:server && pnpm test && pnpm test:server && pnpm build",
     "verify:prod": "node scripts/verify-prod.mjs",

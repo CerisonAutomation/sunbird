@@ -59,6 +59,10 @@ export class MenuSky {
   // Cached per-resize scenery (rebuilt only when the canvas really changes).
   private skyGrad: CanvasGradient | null = null;
   private hazeGrad: CanvasGradient | null = null;
+  private sunGrad: CanvasGradient | null = null;
+  private sunX = 0;
+  private sunY = 0;
+  private sunR = 0;
   private hillFar: Path2D | null = null;
   private hillMid: Path2D | null = null;
   private hillNear: Path2D | null = null;
@@ -208,11 +212,11 @@ export class MenuSky {
     sunGrad.addColorStop(0.5, "rgba(255, 210, 100, 0.45)");
     sunGrad.addColorStop(0.8, "rgba(255, 185, 80,  0.18)");
     sunGrad.addColorStop(1,   "rgba(255, 160, 60,  0)");
-    // Store for draw() — gradient can't be cached as a field; rebuild is free.
-    (this as any)._sunGrad = sunGrad;
-    (this as any)._sunX = sx;
-    (this as any)._sunY = sy;
-    (this as any)._sunR = sunR;
+    // Cache the glow with the rest of the per-resize scenery.
+    this.sunGrad = sunGrad;
+    this.sunX = sx;
+    this.sunY = sy;
+    this.sunR = sunR;
 
     // Rolling hills: three layers with Poki video palette
     this.hillFar  = this.buildHill(0.60, 1.4, 1.9);   // back: purple moors
@@ -253,10 +257,7 @@ export class MenuSky {
     }
 
     // Sun glow (behind everything else)
-    const sx: number = (this as any)._sunX ?? w * 0.62;
-    const sy: number = (this as any)._sunY ?? h * 0.42;
-    const sunR: number = (this as any)._sunR ?? Math.min(w, h) * 0.18;
-    const sunGrad = (this as any)._sunGrad as CanvasGradient | undefined;
+    const { sunX: sx, sunY: sy, sunR, sunGrad } = this;
     if (sunGrad) {
       ctx.fillStyle = sunGrad;
       ctx.fillRect(0, 0, w, h);

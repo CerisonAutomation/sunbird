@@ -54,6 +54,32 @@ jobs:
           path: dist/
           retention-days: 14
 
+  orientation:
+    name: Portrait · Landscape · Rotation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Test the production build in both orientations
+        run: pnpm test:orientation
+      - name: Preserve browser failure traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orientation-test-results
+          path: test-results/
+          retention-days: 7
+
   verify-prod:
     name: Production gate (audit + budget + determinism)
     runs-on: ubuntu-latest

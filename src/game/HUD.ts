@@ -963,6 +963,7 @@ export class HUD {
     const inPlay = s.state === "playing" || s.state === "paused" || s.state === "continue";
     this.playHud.classList.toggle("hidden", !inPlay);
     this.playHud.classList.toggle("versus", s.versus);
+    if (this.playHud.dataset.splitLayout !== s.splitLayout) this.playHud.dataset.splitLayout = s.splitLayout;
     if (this.root.dataset.uiState !== s.state) this.root.dataset.uiState = s.state;
     const flying = String(inPlay);
     if (this.root.dataset.flying !== flying) this.root.dataset.flying = flying;
