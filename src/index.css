@@ -2143,10 +2143,67 @@ fieldset.squad-fields {
   font-style: italic;
 }
 
-/* ============ Mobile performance optimization (< 640px) ============ */
+/* ============ Mobile performance optimization (< 640px) ============
+   What actually costs a phone GPU is filters, backdrop blur, large shadows and
+   repaint-heavy gradient sweeps — all removed below. Animation *duration* is
+   not one of those costs: transform/opacity animations are compositor work.
+
+   This block used to freeze every animation on the page (`* {
+   animation-duration: 0.01ms !important; animation-iteration-count: 1
+   !important }`), which silently deleted the game's feedback language on
+   exactly the devices that depend on it. Measured on a 412px viewport:
+
+     .touch-ripple   touch-ripple-expand 0.38s forwards → 0.00001s  (tap feedback invisible)
+     .spinner        spin 0.8s infinite                 → 0.00001s once (loader never turned)
+     .sun-fill.low   pulse 0.8s infinite                → frozen (low-sun warning dead)
+     .hand.show      press 1s infinite                  → frozen (hold-to-dive hint dead)
+     .pu.expiring    pu-blink 0.5s infinite             → frozen (power-up expiry warning dead)
+
+   `forwards`-filled animations were worse than cosmetic: they jumped straight
+   to the end keyframe, so a ripple that ends at opacity 0 was never painted at
+   all. Only the decorative idle loops are stopped now; feedback, warnings and
+   loading indicators keep moving. Players who need stillness already get it
+   from prefers-reduced-motion, which is the mechanism built for that. */
 @media (max-width: 640px) {
-  /* Disable all non-critical animations for speed */
-  * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  /* Decorative idle loops only — never feedback, warnings or loading state.
+     (.trail-swatch is deliberately absent: its `animation` shorthand is itself
+     !important at a class specificity, so it already outran the old blanket
+     freeze and this keeps that behaviour unchanged.) */
+  .hero-bird,
+  .hero-sun,
+  .hero-sun-wrap,
+  .logo-mark,
+  .bird-badge.you svg,
+  .lobby-bird,
+  .name-entry-bird,
+  .gold-badge.big,
+  .zzz,
+  .score-table .spark,
+  .skeleton,
+  .loading-placeholder {
+    animation: none !important;
+  }
+
+  /* `pulse` animates filter: brightness() and `claim-pulse` animates
+     box-shadow. Those two really are expensive on a phone — both repaint every
+     frame instead of compositing — so they are the legitimate half of the old
+     freeze. Swap them for an opacity breath rather than deleting them: the
+     low-sun warning, the busy button and the claimable reward still pulse,
+     they just pulse on the compositor. */
+  .sun-fill.low,
+  .count-ring,
+  .pchip.gust,
+  .pchip.thermal,
+  .nearmiss,
+  .primary-btn.busy,
+  .tier-card.unlocked .tier-reward:not(.claimed):not(:disabled) {
+    animation-name: pulse-soft !important;
+  }
+  @keyframes pulse-soft { 50% { opacity: 0.6; } }
+
+  /* Instant state changes read as responsive, and unlike animations no
+     transition here has a fill mode that can strand an element mid-state. */
+  * { transition-duration: 0.01ms !important; }
 
   /* Remove expensive visual effects */
   .overlay { background: rgba(20, 16, 40, 0.5); }
@@ -2162,10 +2219,13 @@ fieldset.squad-fields {
   button { filter: none !important; }
   .logo { filter: none; }
 
-  /* Disable transform transitions on buttons */
-  .primary-btn, .soft-btn, .mini-btn, .icon-btn {
-    transform: none !important;
-  }
+  /* This used to read `.primary-btn, .soft-btn, .mini-btn, .icon-btn {
+     transform: none !important; }` — labelled "disable transform transitions",
+     but a transition is already instant above, and the !important transform
+     instead cancelled every :active press state (`translateY(3px)`,
+     `scale(0.92)`, …). Combined with a transparent tap highlight and an
+     invisible ripple, a phone got no confirmation at all that a button had
+     been pressed. The press transform is compositor-only, so it stays. */
 }
 
 /* ====== POLISH: Forms, Modals, States - Rest ====== */
