@@ -2432,9 +2432,9 @@ export class Game {
     this.massRace.syncVisual(visDt, this.bird.x, interp);
     if (this.massRace.active && this.state === "playing") {
       const tags = this.massRace.getVisibleNameTags(this.camera.camera.position.x, this.bird.x, this.bird.y, this.startX);
-      this.hud.updateNameTags(tags, this.camera.camera, window.innerWidth, window.innerHeight);
+      this.hud.updateNameTags(tags, this.camera.camera, this.renderWidth, this.renderHeight);
     } else {
-      this.hud.updateNameTags([], this.camera.camera, window.innerWidth, window.innerHeight);
+      this.hud.updateNameTags([], this.camera.camera, this.renderWidth, this.renderHeight);
     }
     this.finishRemaining = this.finishGate.update(visDt, this.bird.x);
     this.updateTrailRibbon(visDt);

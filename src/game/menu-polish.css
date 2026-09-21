@@ -319,9 +319,8 @@
 }
 
 @keyframes heroSunPulse {
-  0% { filter: drop-shadow(0 0 14px rgba(255, 185, 50, 0.45)); }
-  50% { filter: drop-shadow(0 0 28px rgba(255, 170, 30, 0.8)); }
-  100% { filter: drop-shadow(0 0 14px rgba(255, 185, 50, 0.45)); }
+  0%, 100% { transform: scale(1); opacity: 0.92; }
+  50% { transform: scale(1.06); opacity: 1; }
 }
 
 /* Sun + hero bird are vertically centred on the hero in EVERY orientation so
@@ -647,10 +646,8 @@
 }
 
 .home-record {
-  background: rgba(255, 255, 255, 0.35) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
-  backdrop-filter: blur(10px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  background: rgba(255, 255, 255, 0.72) !important;
+  border: 1px solid rgba(255, 255, 255, 0.65) !important;
 }
 
 .pause-card {
@@ -675,15 +672,11 @@
 }
 
 .overlay.ad {
-  background: rgba(10, 8, 20, 0.45) !important;
-  -webkit-backdrop-filter: blur(16px) !important;
-  backdrop-filter: blur(16px) !important;
+  background: rgba(10, 8, 20, 0.72) !important;
 }
 
 .ad-card {
-  background: rgba(20, 18, 38, 0.78) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
-  backdrop-filter: blur(20px) !important;
+  background: rgba(20, 18, 38, 0.92) !important;
   border: 1.5px solid rgba(255, 255, 255, 0.2) !important;
 }
 
@@ -691,17 +684,13 @@
 .skin-card,
 .boost-row,
 .trail-card {
-  background: linear-gradient(165deg, rgba(255, 255, 255, 0.65), rgba(255, 246, 232, 0.45)) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
-  backdrop-filter: blur(10px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.65) !important;
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.88), rgba(255, 246, 232, 0.80)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.80) !important;
   border-radius: 16px;
 }
 
 .mystery-vault-card {
-  background: linear-gradient(135deg, rgba(255, 248, 220, 0.68), rgba(255, 232, 160, 0.52)) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  backdrop-filter: blur(12px) !important;
+  background: linear-gradient(135deg, rgba(255, 248, 220, 0.90), rgba(255, 232, 160, 0.80)) !important;
   border: 1px solid rgba(255, 255, 255, 0.7) !important;
 }
 
@@ -709,8 +698,6 @@
 .shop-filters button,
 .board-filters button,
 .board-scopes button {
-  -webkit-backdrop-filter: blur(8px) !important;
-  backdrop-filter: blur(8px) !important;
   touch-action: manipulation;
   min-height: 44px;
 }
@@ -718,19 +705,15 @@
 /* Settings components */
 .setting-row,
 .volume-control {
-  background: rgba(255, 255, 255, 0.38) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-  backdrop-filter: blur(8px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.55) !important;
+  background: rgba(255, 255, 255, 0.72) !important;
+  border: 1px solid rgba(255, 255, 255, 0.70) !important;
   border-radius: 14px;
   padding: 10px 14px;
   margin-bottom: 8px;
 }
 
 .danger-zone {
-  background: rgba(255, 240, 240, 0.42) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-  backdrop-filter: blur(8px) !important;
+  background: rgba(255, 240, 240, 0.80) !important;
   border: 1px solid rgba(255, 200, 200, 0.6) !important;
   border-radius: 14px;
   padding: 12px;
@@ -740,27 +723,23 @@
 .board-podium .podium-spot,
 .board-table,
 .score-table {
-  background: rgba(255, 255, 255, 0.38) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
-  backdrop-filter: blur(10px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.55) !important;
+  background: rgba(255, 255, 255, 0.72) !important;
+  border: 1px solid rgba(255, 255, 255, 0.70) !important;
   border-radius: 16px;
 }
 
 .board-row.me {
-  background: rgba(255, 245, 200, 0.55) !important;
+  background: rgba(255, 245, 200, 0.80) !important;
 }
 
 /* Nest pass */
 .tier-card {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.42)) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-  backdrop-filter: blur(8px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.76)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.75) !important;
 }
 
 .tier-reward {
-  background: rgba(255, 255, 255, 0.55) !important;
+  background: rgba(255, 255, 255, 0.72) !important;
   border: 1px solid rgba(255, 255, 255, 0.65) !important;
   touch-action: manipulation;
   min-height: 44px;
@@ -770,90 +749,72 @@
   padding-block: 7px;
   min-height: 0;
   margin-bottom: 2px;
-  background: linear-gradient(135deg, rgba(255, 248, 220, 0.68), rgba(255, 235, 170, 0.52)) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
-  backdrop-filter: blur(10px) !important;
+  background: linear-gradient(135deg, rgba(255, 248, 220, 0.90), rgba(255, 235, 170, 0.80)) !important;
   border: 1px solid rgba(255, 255, 255, 0.7) !important;
 }
 
 /* Trophies & achievements */
 .trophy {
-  background: rgba(255, 255, 255, 0.45) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-  backdrop-filter: blur(8px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.55) !important;
+  background: rgba(255, 255, 255, 0.76) !important;
+  border: 1px solid rgba(255, 255, 255, 0.70) !important;
   border-radius: 16px;
 }
 
 .trophy.unlocked {
-  background: linear-gradient(145deg, rgba(255, 250, 230, 0.68), rgba(255, 238, 200, 0.52)) !important;
+  background: linear-gradient(145deg, rgba(255, 250, 230, 0.88), rgba(255, 238, 200, 0.78)) !important;
   border: 1px solid rgba(255, 255, 255, 0.75) !important;
 }
 
 /* Game modes */
 .mode-card {
-  background: linear-gradient(145deg, rgba(255, 253, 245, 0.65), rgba(245, 235, 218, 0.48)) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
-  backdrop-filter: blur(10px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.65) !important;
+  background: linear-gradient(145deg, rgba(255, 253, 245, 0.90), rgba(245, 235, 218, 0.82)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.80) !important;
   border-radius: 16px;
   touch-action: manipulation;
   min-height: 64px;
 }
 
 .mode-card.on {
-  background: linear-gradient(145deg, rgba(255, 248, 225, 0.82), rgba(255, 235, 185, 0.68)) !important;
+  background: linear-gradient(145deg, rgba(255, 248, 225, 0.92), rgba(255, 235, 185, 0.85)) !important;
   border-color: rgba(255, 190, 70, 0.85) !important;
 }
 
 /* Multiplayer & Race Lobby */
 .race-section {
-  background: rgba(255, 255, 255, 0.42) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
-  backdrop-filter: blur(10px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  background: rgba(255, 255, 255, 0.76) !important;
+  border: 1px solid rgba(255, 255, 255, 0.72) !important;
   border-radius: 18px;
 }
 
 .room-flock {
-  background: rgba(255, 255, 255, 0.32) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-  backdrop-filter: blur(8px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  background: rgba(255, 255, 255, 0.68) !important;
+  border: 1px solid rgba(255, 255, 255, 0.60) !important;
   border-radius: 14px;
 }
 
 /* Results & game over */
 .results-grid .stat-tile {
-  background: rgba(255, 255, 255, 0.48) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-  backdrop-filter: blur(8px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  background: rgba(255, 255, 255, 0.80) !important;
+  border: 1px solid rgba(255, 255, 255, 0.72) !important;
   border-radius: 16px;
 }
 
 .race-hero {
-  background: linear-gradient(145deg, rgba(255, 250, 230, 0.68), rgba(255, 238, 200, 0.52)) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
-  backdrop-filter: blur(10px) !important;
+  background: linear-gradient(145deg, rgba(255, 250, 230, 0.88), rgba(255, 238, 200, 0.80)) !important;
   border: 1px solid rgba(255, 255, 255, 0.72) !important;
   border-radius: 18px;
 }
 
 .reward-strip,
 .vs-stat {
-  background: rgba(255, 255, 255, 0.42) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-  backdrop-filter: blur(8px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.55) !important;
+  background: rgba(255, 255, 255, 0.76) !important;
+  border: 1px solid rgba(255, 255, 255, 0.68) !important;
   border-radius: 12px;
 }
 
 .vs-hero {
-  background: linear-gradient(145deg, rgba(255, 248, 225, 0.75), rgba(255, 232, 180, 0.58)) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
-  backdrop-filter: blur(10px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.7) !important;
+  background: linear-gradient(145deg, rgba(255, 248, 225, 0.90), rgba(255, 232, 180, 0.80)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.75) !important;
   border-radius: 18px;
 }
 
@@ -864,20 +825,16 @@
 .island-step,
 .squad-card,
 .club-card {
-  background: rgba(255, 255, 255, 0.45) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-  backdrop-filter: blur(8px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.58) !important;
+  background: rgba(255, 255, 255, 0.78) !important;
+  border: 1px solid rgba(255, 255, 255, 0.70) !important;
   border-radius: 14px;
 }
 
 /* Paywall & Checkout */
 .paywall-tier,
 .checkout-card {
-  background: linear-gradient(165deg, rgba(255, 252, 245, 0.68), rgba(255, 242, 228, 0.55)) !important;
-  -webkit-backdrop-filter: blur(14px) !important;
-  backdrop-filter: blur(14px) !important;
-  border: 1.5px solid rgba(255, 255, 255, 0.7) !important;
+  background: linear-gradient(165deg, rgba(255, 252, 245, 0.90), rgba(255, 242, 228, 0.84)) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.75) !important;
   border-radius: 20px;
 }
 
@@ -984,6 +941,7 @@ button,
   display: block; height: 100%; border-radius: 99px;
   background: linear-gradient(90deg, #e8a830, #f5c842);
   transition: width 0.4s ease;
+  will-change: width;
 }
 .trophy-collection > summary {
   display: flex; justify-content: space-between; align-items: center;
