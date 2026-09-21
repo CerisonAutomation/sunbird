@@ -851,6 +851,12 @@ export class HUD {
         this.shopBrowse.query = field.value.slice(0, 80);
         if (this.shopSnapshot) this.renderStatic(this.shopSnapshot);
       }
+      if (field instanceof HTMLInputElement && field.dataset.ref === "pilotNameInput") {
+        // The counter is decorative, but it must not lie: it rendered a hardcoded
+        // "0/14" and never moved while the player typed.
+        const count = field.closest(".name-input-wrapper")?.querySelector(".name-char-count span");
+        if (count) count.textContent = String(field.value.length);
+      }
       if (field instanceof HTMLInputElement && field.type === "range") {
         const output = field.parentElement?.querySelector("output");
         if (output) output.textContent = `${field.value}%`;
@@ -2344,20 +2350,26 @@ function menuLinks(items: MenuDestination[]): string {
   return items.map(item => `<button class="destination" data-ui data-action="${item.action}" data-icon="${item.icon}"><span class="destination-art">${menuIcon(item.icon)}</span><span class="destination-copy"><b>${item.title}</b><span>${item.detail}</span></span><span class="destination-arrow" aria-hidden="true">↗</span></button>`).join("");
 }
 
-function renderNameEntry(_s: HudSnapshot): string {
-  return `
-    <div class="name-entry-hero">
-      ${sunSVG({ size: 48, className: "name-entry-sun" })}
-      ${sunbirdSVG({ width: 72, className: "name-entry-bird", animateWings: true, title: "Sunbird" })}
-    </div>
-
-    <div class="name-entry-headline">
-      <h2 class="name-entry-title">Welcome, Pilot</h2>
-      <p class="name-entry-sub">We picked a name for you — change it or fly right now.</p>
-    </div>
-
-    <div class="name-entry-form">
-      <label class="name-entry-label" for="pilot-name-input">Your call sign</label>
+function renderNameEntry(s: HudSnapshot): string {
+  // The first-run welcome screen is a name surface like any other, so it obeys
+  // the same edition split as the board's pilot-name row: portal editions
+  // broadcast this name to real players and allow no unmoderated player-authored
+  // text, so they get a curated generated name and a dice — no typing surface at
+  // all, and the field is not in those bundles. The direct/web/itch build owns
+  // its own surfaces and keeps free rename.
+  //
+  // The portal variant deliberately uses a <span>, not a <label for=…>: there is
+  // no input for it to point at, and a dangling label is an accessibility defect.
+  //
+  // The direct build's field is pre-filled from the snapshot, the same way the
+  // board's rename field is. Boot used to do it with `setValue("pilotNameInput")`
+  // immediately after `setScreen("nameEntry")`, but the screen renders on the
+  // next HUD push, so the ref did not exist yet and the call was a silent no-op:
+  // the field came up empty and "Let's Fly" — the primary CTA, under copy that
+  // says "We picked a name for you" — only toasted "Please enter a pilot name".
+  // A first-run player who did not notice the dice had no way past the screen.
+  const field = CUSTOM_PILOT_NAMES
+    ? `<label class="name-entry-label" for="pilot-name-input">Your call sign</label>
       <div class="name-input-row">
         <div class="name-input-wrapper">
           <input
@@ -2369,18 +2381,42 @@ function renderNameEntry(_s: HudSnapshot): string {
             maxlength="14"
             aria-label="Pilot name"
             autocomplete="off"
+            value="${escapeHtml(s.pilotName)}"
           />
-          <div class="name-char-count"><span>0</span>/14</div>
+          <div class="name-char-count"><span>${s.pilotName.length}</span>/14</div>
         </div>
         <button class="name-random-btn" data-ui data-action="randomize-pilot-name" title="Suggest a name" aria-label="Random name">🎲</button>
-      </div>
+      </div>`
+    : `<span class="name-entry-label">Your call sign</span>
+      <div class="name-input-row">
+        <span class="pilot-name-readonly name-entry-plate" aria-label="Pilot name">${escapeHtml(s.pilotName)}</span>
+        <button class="name-random-btn" data-ui data-action="randomize-pilot-name" title="Roll a new name" aria-label="Random name">🎲</button>
+      </div>`;
+
+  return `
+    <div class="name-entry-hero">
+      ${sunSVG({ size: 48, className: "name-entry-sun" })}
+      ${sunbirdSVG({ width: 72, className: "name-entry-bird", animateWings: true, title: "Sunbird" })}
+    </div>
+
+    <div class="name-entry-headline">
+      <h2 class="name-entry-title">Welcome, Pilot</h2>
+      <p class="name-entry-sub">We picked a name for you — ${CUSTOM_PILOT_NAMES ? "change it" : "roll it"} or fly right now.</p>
+    </div>
+
+    <div class="name-entry-form">
+      ${field}
 
       <button class="primary-btn name-entry-cta" data-ui data-action="confirm-pilot-name">
         Let's Fly ›
       </button>
     </div>
 
-    <p class="name-entry-footer">You can rename yourself anytime in Settings.</p>
+    <p class="name-entry-footer">${
+      CUSTOM_PILOT_NAMES
+        ? "You can rename yourself anytime in Settings."
+        : "Roll the dice for a different call sign — you can roll again anytime."
+    }</p>
   `;
 }
 

@@ -3484,6 +3484,23 @@ export class Game {
         break;
       }
       case "confirm-pilot-name": {
+        if (!CUSTOM_PILOT_NAMES) {
+          // Portal editions render no typing surface, so the curated generated
+          // name on the plate *is* the name. Falling through to the free-text
+          // guard below would toast "Please enter a pilot name" forever and trap
+          // a first-run player on the welcome screen with no way out. The
+          // typed-name easter eggs are skipped with it — there is nothing typed,
+          // and "sunbird" awarding coins would otherwise be free to farm.
+          const curated = savePilotName(this.pilotName);
+          this.pilotName = curated;
+          this.save.state.pilotName = curated;
+          this.save.state.pilotNameCustomized = true;
+          this.save.persist();
+          this.audio.fanfare();
+          this.hud.toast(`Welcome, ${curated}!`, "info");
+          this.setScreen("main");
+          break;
+        }
         const nameInput = this.hud.readValue("pilotNameInput");
         if (!nameInput || !nameInput.trim()) {
           this.hud.toast("Please enter a pilot name", "warn");
@@ -3511,7 +3528,22 @@ export class Game {
         break;
       }
       case "randomize-pilot-name": {
-        this.hud.setValue("pilotNameInput", generatePilotName());
+        const gen = generatePilotName();
+        if (CUSTOM_PILOT_NAMES) {
+          // Free-text build: fill the field and let "Let's Fly" commit it, so a
+          // player can keep rolling without each roll silently saving.
+          this.hud.setValue("pilotNameInput", gen);
+          break;
+        }
+        // Portal build: there is no field to fill, so `setValue` would be a
+        // no-op and the dice would be dead. Commit the roll and re-render the
+        // plate instead. `pilotNameCustomized` stays false until the player
+        // confirms, so a reload still lands on the welcome screen.
+        const next = savePilotName(gen);
+        this.pilotName = next;
+        this.save.state.pilotName = next;
+        this.save.persist();
+        this.bump();
         break;
       }
       case "claim-rank-prize": {
@@ -5343,7 +5375,15 @@ export class Game {
 
   /** Opens (or reuses) a realtime seat for the current race seed. */
   private connectRace(): void {
-    if (!isMultiplayerConfigured() && getPortalTarget() !== "poki") return;
+    // Compile-time edition constant, not a runtime `getPortalTarget() !== "poki"`
+    // comparison. The minifier folds positive `TARGET === "poki"` branches but
+    // not a negative early-return, so the literal survived into the CrazyGames
+    // and generic bundles and tripped their cross-portal isolation gate — the
+    // same trap `src/sdk/net.ts` documents having already fallen into.
+    // Identical semantics: POKI_MULTIPLAYER is true only in the Poki build, so
+    // Poki still never bails here and every other edition still bails unless a
+    // multiplayer backend is configured.
+    if (!isMultiplayerConfigured() && !POKI_MULTIPLAYER) return;
     if (this.net?.connected) { this.massRace.attachTransport(this.net); return; }
     if (!this.net) {
       this.net = this.createNetTransport(this.save.state.deviceId, this.pilotName, this.skin.id);
