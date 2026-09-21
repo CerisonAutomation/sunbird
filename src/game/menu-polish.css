@@ -141,8 +141,8 @@
 .danger-zone { margin-top: 20px; border-top: 1px solid #decfbd; padding-top: 10px; }
 .danger-zone summary { min-height: 44px; padding: 12px 0; font-size: 13px; color: #71574c; cursor: pointer; }
 /* Shop: compact collection index, explicit cost and ownership. */
-.overlay .collection { border: 1px solid #e1d1bd; border-radius: 14px; background: #fffaf2; margin: 8px 0; }
-.overlay .collection .coll-head { margin: 0; padding: 12px; min-height: 48px; cursor: pointer; gap: 8px; flex-wrap: wrap; }
+.overlay .collection { border: 1px solid #e1d1bd; border-radius: 14px; background: #fffaf2; margin: 5px 0; }
+.overlay .collection .coll-head { margin: 0; padding: 8px 12px; min-height: 40px; cursor: pointer; gap: 8px; flex-wrap: wrap; }
 .overlay .collection .coll-head::before { content: "+"; font-weight: 700; color: #856144; }
 .overlay .collection[open] .coll-head::before { content: "−"; }
 .overlay .collection summary { list-style: none; }
@@ -151,8 +151,8 @@
 .overlay .collection .skin-grid { padding: 0 10px 10px; gap: 10px; }
 .overlay .skin-card { min-width: 0; border-radius: 16px; }
 .overlay .skin-card :is(.sk-perk,.tag) { white-space: normal; overflow-wrap: anywhere; }
-.overlay .shop-section { border-top: 1px solid #decfbd; margin-top: 14px; padding: 0 0 8px; }
-.overlay .shop-section > summary { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 52px; cursor: pointer; font-size: 14px; font-weight: 700; }
+.overlay .shop-section { border-top: 1px solid #decfbd; margin-top: 10px; padding: 0 0 6px; }
+.overlay .shop-section > summary { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; font-size: 14px; font-weight: 700; }
 .overlay .shop-section > summary span { color: #71574c; font-size: 11px; font-weight: 400; }
 .overlay .shop-section > summary::after { content: "+"; }
 .overlay .shop-section[open] > summary::after { content: "−"; }
@@ -319,15 +319,19 @@
   100% { filter: drop-shadow(0 0 14px rgba(255, 185, 50, 0.45)); }
 }
 
+/* Sun + hero bird are vertically centred on the hero in EVERY orientation so
+   the bird always sits level with the sun (portrait == landscape). We centre
+   with top:50% + negative margin-top (not translateY) because .hero-bird's
+   float animation owns `transform`. */
 .menu-hero .hero-sun-wrap {
-  display:block !important; position:absolute; right:16px; top:44px;
-  width:108px; height:108px; margin:0; z-index:1;
+  display:block !important; position:absolute; right:16px; top:50%; margin-top:-54px;
+  width:108px; height:108px; z-index:1;
   animation: heroSunPulse 4.2s ease-in-out infinite;
 }
 .menu-hero .hero-sun { width:100%; height:100%; opacity:1; }
 .menu-hero .hero-bird {
-  display:block !important; position:absolute; left:auto; right:42px; top:58px;
-  width:92px; height:82px; margin:0; z-index:2;
+  display:block !important; position:absolute; left:auto; right:42px; top:50%; margin-top:-41px;
+  width:92px; height:82px; z-index:2;
   animation: heroBirdFloat 3.8s ease-in-out infinite;
 }
 .sb-reduce-motion .hero-bird { animation: none !important; }
@@ -350,6 +354,10 @@
 .home-launch .launch-copy b { display:block; font:600 26px/1.1 var(--display); letter-spacing:-.02em; margin:3px 0; }
 .home-launch .launch-copy > span { font:400 11px/1.5 var(--body); margin:0; }
 .home-launch .launch-arrow { flex:0 0 30px; font-size:25px; margin:0; text-align:center; }
+/* Vector arrows: sized here, coloured by currentColor. Text arrows rendered
+   as emoji/tofu on phones; these always draw identically. */
+.home-launch .launch-arrow .arrow-glyph { width:26px; height:26px; display:block; margin:0 auto; }
+.destination-grid .destination-arrow .arrow-glyph { width:12px; height:12px; display:block; }
 .home-section-title { display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin:20px 0 10px; letter-spacing:0; }
 .home-section-title > span { font:600 15px/1.3 var(--display); color:#514737; }
 .home-section-title > small { font:700 8px/1.4 var(--body); letter-spacing:.12em; color:#786d59; white-space:nowrap; }
@@ -401,10 +409,11 @@
   .menu-hero .hero { min-height:140px; padding:16px; }
   .paper-card.menu-hero h1 { font-size:32px; }
   .menu-hero .hero-kicker { font-size:8px; letter-spacing:.12em; }
-  /* Keep the illustration below the title and clear of the 44px sound button. */
-  .menu-hero .hero-sun-wrap { width:60px; height:60px; right:8px; top:96px; }
+  /* Keep the illustration in the reserved right band, clear of the 44px sound
+     button, and level with the sun exactly like landscape (centred on hero). */
+  .menu-hero .hero-sun-wrap { width:60px; height:60px; right:8px; top:50%; margin-top:-30px; }
   .menu-hero .hero-sun { width:60px; height:60px; }
-  .menu-hero .hero-bird { width:50px; height:42px; top:104px; right:24px; }
+  .menu-hero .hero-bird { width:50px; height:42px; top:50%; margin-top:-21px; right:24px; }
   .menu-hero .hero-title { max-width:calc(100% - 70px); }
   .menu-hero .home-launch { gap:10px; padding:12px; min-height:82px; }
   .home-launch .launch-art { flex-basis:38px; height:38px; }
@@ -422,9 +431,9 @@
   .menu-hero .hero-title { max-width:75%; }
   .paper-card.menu-hero h1 { font-size:32px; margin:0; }
   .menu-hero .hero-kicker, .menu-hero .hero-sub { display:none; }
-  .menu-hero .hero-sun-wrap { top:0; width:70px; height:70px; right:38px; }
+  .menu-hero .hero-sun-wrap { top:50%; margin-top:-35px; width:70px; height:70px; right:38px; }
   .menu-hero .hero-sun { width:70px; height:70px; }
-  .menu-hero .hero-bird { top:14px; width:60px; height:44px; right:54px; }
+  .menu-hero .hero-bird { top:50%; margin-top:-22px; width:60px; height:44px; right:54px; }
   .menu-hero .home-launch { min-height:68px; padding:10px 14px; margin-bottom:16px; }
   .home-launch .launch-art { flex-basis:40px; height:40px; }
   .home-launch .launch-copy b { font-size:23px; }
@@ -440,16 +449,16 @@
 .heading-art { display:inline-block; width:32px; height:32px; flex:0 0 32px; }
 .shop-intro { font:700 9px/1.5 var(--body); letter-spacing:.16em; color:#73684e; margin:0 0 12px; }
 .shop-intro span { display:block; font:500 15px/1.5 var(--display); letter-spacing:0; color:#485340; margin-top:3px; }
-.shop-hero { position:relative; isolation:isolate; overflow:hidden; min-height:174px; gap:22px; padding:20px 24px; background:linear-gradient(125deg,#fff8d5,#ffeab1); border:1px solid #e8ca84; box-shadow:inset 0 1px #fff8dd,0 4px 0 #c4cbb452; }
+.shop-hero { position:relative; isolation:isolate; overflow:hidden; min-height:132px; gap:12px; padding:12px 16px; background:linear-gradient(125deg,#fff8d5,#ffeab1); border:1px solid #e8ca84; box-shadow:inset 0 1px #fff8dd,0 4px 0 #c4cbb452; }
 .shop-hero .menu-horizon { opacity:.35; }
-.shop-hero-bird { width:128px; height:128px; display:flex; align-items:center; justify-content:center; border-radius:50%; background:#fff5d478; filter:none; }
+.shop-hero-bird { width:92px; height:92px; display:flex; align-items:center; justify-content:center; border-radius:50%; background:#fff5d478; filter:none; }
 .shop-hero-bird svg { max-width:100%; height:auto; filter:drop-shadow(0 6px 2px #52634320); }
 .shop-preview-label { display:block; font:700 8px/1.4 var(--body); letter-spacing:.12em; color:#586148; margin-bottom:6px; }
 .shop-hero-name { font:600 27px/1.2 var(--display); color:#975d1c; overflow-wrap:anywhere; }
 .shop-hero-perk { color:#4e5c45; font-size:12px; line-height:1.5; margin:7px 0 10px; }
 .shop-preview-action .mini-btn { background:#ffd46c; color:#634219; border-color:#d8a74c; }
 .shop-preview-action .mini-btn:disabled { background:#ece4ce; color:#6a6052; }
-.shop-jumps { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:18px 0; }
+.shop-jumps { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:10px 0; }
 .shop-jumps .soft-btn { display:flex; align-items:center; justify-content:center; gap:8px; margin:0; padding:10px 8px; background:#fffaf0; border:1px solid #d8c8ad; font:600 14px var(--display); box-shadow:0 3px 0 #cfbb9640; }
 .shop-jumps svg { flex:0 0 32px; width:32px; height:32px; }
 .shop-browser, .shop-hero, .shop-section { scroll-margin-top:74px; }
@@ -459,11 +468,11 @@
 .shop-filters button[aria-pressed="true"] { background:#ffdc7d; border-color:#cba04d; color:#66441f; box-shadow:inset 0 0 0 1px #ffffff45; }
 .shop-match-count { color:#6b614e; font:400 11px/1.5 var(--body); margin:8px 0 12px; }
 .collection-art { flex:0 0 30px; width:30px; height:30px; }
-.overlay .collection .coll-head { gap:8px; padding:12px; }
+.overlay .collection .coll-head { gap:8px; padding:8px 12px; }
 .overlay .collection .coll-count { font-size:10px; color:#68634f; padding:0; background:none; }
 .overlay .collection .coll-head b { font:600 15px var(--display); }
 .overlay .collection .skin-grid { gap:12px; padding:4px 12px 14px; }
-.overlay .skin-card { border:1px solid #d5c7ac; padding:12px 10px; gap:6px; box-shadow:0 3px 0 #cabb9d40; background:linear-gradient(160deg,#fffdf4,#f0e8d5); }
+.overlay .skin-card { border:1px solid #d5c7ac; padding:8px 8px; gap:4px; box-shadow:0 3px 0 #cabb9d40; background:linear-gradient(160deg,#fffdf4,#f0e8d5); }
 .overlay .skin-card:hover { transform:none; }
 .overlay .skin-card.equipped { border:2px solid #668a60; background:linear-gradient(140deg,#f4f6df,#dfebd2); box-shadow:none; }
 .overlay .skin-card.r-rare { background:linear-gradient(150deg,#fffaf0,#e0ebf3); }
@@ -500,8 +509,8 @@
 @media(max-width:420px) {
   .heading-art { flex-basis:24px; width:24px; height:24px; }
   .screen-head h2 { gap:5px; }
-  .shop-hero { padding:16px 12px; gap:12px; min-height:150px; }
-  .shop-hero-bird { width:80px; height:90px; }
+  .shop-hero { padding:12px 10px; gap:10px; min-height:118px; }
+  .shop-hero-bird { width:72px; height:72px; }
   .shop-hero-name { font-size:22px; }
   .shop-preview-label { font-size:7px; }
   .shop-jumps { gap:6px; }
@@ -513,6 +522,17 @@
   .next-flight { padding:12px; gap:8px; }
   .next-flight-art { width:28px; height:28px; flex-basis:28px; }
   .next-flight b { font-size:16px; }
+  .pc .pc-body b { font-size:13px; }
+  .pc .pc-body span { font-size:11.5px; line-height:1.4; }
+  .pc-icon { flex-basis:30px; font-size:24px; }
+  button.upsell { padding:8px 10px; gap:6px; }
+  button.upsell b { font-size:12.5px; }
+  button.upsell span:not(.mini-btn) { font-size:11px; line-height:1.4; }
+  .shop-rules { font-size:10.5px; line-height:1.5; }
+  .shop-filters button { padding:6px 8px; font-size:11.5px; }
+  .shop-jumps svg { flex-basis:24px; width:24px; height:24px; }
+  .pc-row .primary-btn { font-size:13px; padding-left:10px; padding-right:10px; }
+  .shop-intro span { font-size:10.5px; }
 }
 .a11y-bigtext .shop-match-count, .a11y-bigtext .shop-hero-perk, .a11y-bigtext .next-flight p { font-size:14px; }
 .race-fairness { display:flex; align-items:center; gap:8px; font:400 11px/1.5 var(--body); color:#526248; padding:10px; background:#edf0df; border:1px solid #c6d0b7; border-radius:12px; }
@@ -528,7 +548,8 @@
 .shop-hero .menu-horizon { opacity:.12; }
 .menu-hero .hero-sub { max-width:190px; }
 @media(max-width:420px) { .menu-hero .hero-sub { max-width:150px; font-size:11px; } }
-@media(max-height:400px) and (min-width:550px) { .menu-hero .hero-sun-wrap { top:0; } .menu-hero .hero-bird { top:18px; } }
+/* (centering handled above; keep the pair level with the sun on short heroes) */
+@media(max-height:400px) and (min-width:550px) { .menu-hero .hero-sun-wrap { top:50%; margin-top:-35px; } .menu-hero .hero-bird { top:50%; margin-top:-22px; } }
 .squad-invite { display:flex; align-items:center; gap:12px; padding:14px; border-radius:16px; border:1px solid #e5c678; background:linear-gradient(120deg,#fff9dc,#ffecb3); margin:14px 0; text-align:left; }
 .squad-invite-art { flex:0 0 40px; width:40px; height:40px; }
 .squad-invite > div { flex:1; min-width:0; }
@@ -730,6 +751,9 @@
 }
 
 .upsell {
+  padding-block: 7px;
+  min-height: 0;
+  margin-bottom: 2px;
   background: linear-gradient(135deg, rgba(255, 248, 220, 0.68), rgba(255, 235, 170, 0.52)) !important;
   -webkit-backdrop-filter: blur(10px) !important;
   backdrop-filter: blur(10px) !important;
@@ -850,6 +874,7 @@
 .cup-list {
   overscroll-behavior: contain;
   touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 
 button,

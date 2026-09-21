@@ -21,6 +21,10 @@ test("menu CTA actionability", async ({ page }, info) => {
     const t0 = Date.now();
     const at = () => Date.now() - t0;
     await expect(page.locator("#boot-shell")).toHaveCount(0);
+    // First run shows the welcome screen; accept the pre-filled name exactly
+    // like SunbirdPage.ready so the measured leg is menu → flight.
+    const welcome = page.locator('[data-action="confirm-pilot-name"]');
+    if (await welcome.isVisible().catch(() => false)) await welcome.click();
     const bootDone = at();
     const cta = page.getByRole("button", { name: "Play free flight now", exact: true });
     await cta.waitFor({ state: "visible" });

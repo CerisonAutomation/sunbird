@@ -1,6 +1,6 @@
 import { browseSkins, newShopBrowse, nextBird, type ShopBrowse } from "./ShopBrowse";
 import { flightTakeaway } from "./FlightGuidance";
-import { menuIcon, menuHorizon } from "./MenuIcons";
+import { menuIcon, menuHorizon, arrowUpRightSvg, arrowRightSvg } from "./MenuIcons";
 import { paginate } from "./Pagination";
 import { flockLoadingMark } from "./FlockLoading";
 import { PLAY_DESTINATIONS, COLLECTION_DESTINATIONS, PROGRESS_DESTINATIONS, type MenuDestination } from "./MenuCatalog";
@@ -247,6 +247,8 @@ export type HudSnapshot = {
   raceFinishTime: number;
   massRace: boolean;
   multiplayerLive: boolean;
+  /** True when this build has any live-race transport (URL or Poki Netlib). */
+  multiplayerConfigured: boolean;
   /* --- live room + roster --- */
   roster: RosterBird[];
   roomCode: string;
@@ -473,6 +475,7 @@ export class HUD {
   private matchmakingRooms!: HTMLElement;
   private matchmakingAi!: HTMLElement;
   private matchmakingKeep!: HTMLElement;
+  private matchmakingReady!: HTMLElement;
   private draftMeter!: HTMLElement;
   private finishCd!: HTMLElement;
   private lastFinishCd = "";
@@ -677,6 +680,7 @@ export class HUD {
         <div class="matchmaking-label" data-ref="matchmakingLabel">Reading the sky…</div>
         <div class="matchmaking-rooms hidden" data-ref="matchmakingRooms"></div>
         <div class="btn-row mm-actions">
+          <button class="primary-btn mm-ready hidden" data-ui data-ref="matchmakingReady" data-action="mm-ready">Ready up ✓</button>
           <button class="primary-btn gold mm-ai hidden" data-ui data-ref="matchmakingAi" data-action="mm-ai">🤖 Race the AI flock instead</button>
           <button class="soft-btn mm-keep hidden" data-ui data-ref="matchmakingKeep" data-action="mm-keep-search">Keep searching</button>
           <button class="soft-btn mm-cancel" data-ui data-action="mm-cancel">Cancel</button>
@@ -734,6 +738,7 @@ export class HUD {
     secsLeft: number,
     phase: "searching" | "waiting" = "searching",
     rooms = "",
+    ready: "none" | "unready" | "ready" = "none",
   ): void {
     this.matchmakingEl.classList.toggle("hidden", !on);
     if (!on) return;
@@ -743,15 +748,23 @@ export class HUD {
     this.matchmakingCount.textContent = live > 0
       ? `${live} live pilot${live === 1 ? "" : "s"} in this room`
       : "Waiting for the first live pilot";
-    this.matchmakingLabel.textContent = searching
-      ? secsLeft > 0.5
+    this.matchmakingLabel.textContent = ready === "ready"
+      ? "You're ready — the race launches when every pilot is ready, with a 6s countdown."
+      : ready === "unready"
         ? live > 0
-          ? `Race starts when the room is ready · ${Math.ceil(secsLeft)}s left on the clock`
-          : `Looking for pilots on this circuit · ${Math.ceil(secsLeft)}s`
-        : "Starting the room…"
-      : "The search stays open — anyone who arrives can still join this room";
+          ? "A pilot is in the room — ready up! The race launches when everyone is ready."
+          : "Ready up now and the race launches the moment a pilot joins you."
+        : searching
+          ? secsLeft > 0.5
+            ? `Looking for pilots on this circuit · ${Math.ceil(secsLeft)}s`
+            : "Reading the sky…"
+          : "The search stays open — anyone who arrives can still join this room";
     this.matchmakingRooms.textContent = rooms;
     this.matchmakingRooms.classList.toggle("hidden", !rooms);
+    // Nobody auto-readies: the Ready toggle is the only way into a live start.
+    this.matchmakingReady.classList.toggle("hidden", ready === "none");
+    this.matchmakingReady.textContent = ready === "ready" ? "Ready ✓ — tap to cancel" : "Ready up ✓";
+    this.matchmakingReady.setAttribute("aria-pressed", ready === "ready" ? "true" : "false");
     this.matchmakingAi.classList.toggle("hidden", searching);
     this.matchmakingKeep.classList.toggle("hidden", searching);
   }
@@ -760,7 +773,12 @@ export class HUD {
     this.root.addEventListener("keydown", e => {
       if (e.key === "Enter" && !e.isComposing && e.target instanceof HTMLInputElement && e.target.dataset.enterAction) {
         e.preventDefault(); e.stopPropagation();
-        this.menuCard.querySelector<HTMLButtonElement>(`button[data-action="${e.target.dataset.enterAction}"]`)?.click();
+        const action = e.target.dataset.enterAction;
+        const btn = this.menuCard.querySelector<HTMLButtonElement>(`button[data-action="${action}"]`);
+        // Prefer the visible button (keeps focus/press feedback); actions
+        // without a dedicated button (e.g. Friend code → direct add) still fire.
+        if (btn) btn.click();
+        else handler(action, "");
         return;
       }
       if (e.key === "Escape" && this.emoteWheel.contains(e.target as Node) && this.emoteWheel.querySelector('[aria-expanded="true"]')) {
@@ -783,9 +801,10 @@ export class HUD {
         return;
       }
       if (e.target === this.overEl) {
-        // Tap-anywhere on the results screen flies again — same action, same
-        // conditions as the card's own primary button (see resultsPrimaryAction).
-        handler(this.currentSnapshot ? resultsPrimaryAction(this.currentSnapshot) : "retry", "");
+        // The results backdrop is deliberately inert. A stray tap (or a drag
+        // that ends on the backdrop while scrolling the recap) must never
+        // launch another race — the recap is for reading, and restarting is
+        // an explicit choice on the card's own buttons.
         return;
       }
       if (e.target === this.menuEl && this.currentSnapshot && this.currentSnapshot.screen !== "main") {
@@ -1515,6 +1534,7 @@ export class HUD {
     this.matchmakingRooms = grab("matchmakingRooms");
     this.matchmakingAi = grab("matchmakingAi");
     this.matchmakingKeep = grab("matchmakingKeep");
+    this.matchmakingReady = grab("matchmakingReady");
     this.goalStrip = grab("goalStrip");
     this.goalPop = grab("goalPop");
     this.standingsEl = grab("standings");
@@ -1783,7 +1803,7 @@ function renderLive(s: HudSnapshot): string {
 
         <div class="room-actions-bar">
           <button class="primary-btn gold large-btn" data-ui data-action="start-room-now">⚡ Start Race Now (${s.roomCount > 1 ? "Launch Room" : "Fill with AI flock"})</button>
-          <button class="soft-btn ${s.roomReady ? "on" : ""}" data-ui data-action="ready-room" aria-pressed="${s.roomReady}">${s.roomReady ? "Cancel ready" : "Ready up ✓"}</button>
+          <button class="soft-btn ${s.roomReady ? "on" : ""}" data-ui data-action="ready-room" aria-pressed="${s.roomReady}" ${connected ? "" : "disabled"} title="${connected ? "" : "Race connection lost — close the room to race again"}">${s.roomReady ? "Cancel ready" : "Ready up ✓"}</button>
         </div>
 
         <div class="room-flock" aria-label="Pilots in this room">
@@ -1832,13 +1852,21 @@ function renderLive(s: HudSnapshot): string {
       <section class="race-section room-entry" aria-label="Invite friends">
         <div class="room-entry-crest">${menuIcon("online")}</div>
         <h3>Fly with your flock</h3>
-        <p>Create a private room with a custom code and link. Race your squad on any course!</p>
+        ${s.multiplayerConfigured
+          ? `<p>Create a private room with a custom code and link. Race your squad on any course!</p>
         <button class="primary-btn" data-ui data-action="host-room">Create Private Room</button>
         <label class="field-label" for="race-room-code">Or enter a friend's room code</label>
         <div class="redeem">
           <input id="race-room-code" data-ui data-ref="roomCode" data-enter-action="join-room" aria-label="Room code" maxlength="2048" placeholder="Code or invite link" autocomplete="off" autocapitalize="characters" spellcheck="false" />
           <button class="mini-btn" data-ui data-action="join-room">Join</button>
-        </div>
+        </div>`
+          : `<p class="pilot-note island" role="note">Live rooms are not available in this edition. AI practice and same-screen 1v1 below still race.</p>
+        <button class="primary-btn" data-ui data-action="host-room" disabled>Create Private Room</button>
+        <label class="field-label" for="race-room-code">Or enter a friend's room code</label>
+        <div class="redeem">
+          <input id="race-room-code" data-ui data-ref="roomCode" data-enter-action="join-room" aria-label="Room code" maxlength="2048" placeholder="Code or invite link" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+          <button class="mini-btn" data-ui data-action="join-room" disabled>Join</button>
+        </div>`}
       </section>
       <nav class="destination-grid" aria-label="More ways to race">
         <button class="destination" data-ui data-action="open-practice"><span class="destination-art">${menuIcon("compass")}</span><span class="destination-copy"><b>AI Practice</b><span>Custom opponent count &amp; skill</span></span></button>
@@ -2074,7 +2102,7 @@ export function renderSquad(s: HudSnapshot): string {
     <div class="section-title">🔍 Pilot Lookup <small>${sq.live && !sq.isAutonomous ? "online directory" : "offline build"}</small></div>
     <p class="fineprint">Look a pilot up by their exact code. Results come from the pilot directory — nothing here is invented, and an unknown or unreachable code says so.</p>
     <div class="redeem">
-      <input data-ui data-ref="pilotCode" data-enter-action="pilot-lookup" aria-label="Pilot code" placeholder="Pilot code (SUN-9F3K2A)" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${escapeHtml(sq.pilotQuery)}" />
+      <input data-ui data-ref="pilotCode" data-enter-action="pilot-add" aria-label="Friend code" placeholder="Friend code (SUN-9F3K2A)" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${escapeHtml(sq.pilotQuery)}" />
       <button class="mini-btn" data-ui data-action="pilot-lookup">${sq.lookupBusy ? "Looking…" : "Look up"}</button>
     </div>
     ${lookupCard}
@@ -2092,7 +2120,7 @@ export function renderSquad(s: HudSnapshot): string {
       .map((f) => {
         const presence = f.local ? "met in a race" : f.online ? "● online" : "○ offline";
         const best = f.bestDistance && f.bestDistance > 0 ? ` · best ${Math.round(f.bestDistance).toLocaleString()} m` : "";
-        return `<div class="friend-row"><span class="fr-name">🐦 ${escapeHtml(f.name)}</span><span class="fr-code">${escapeHtml(presence)}${f.code ? ` · ${escapeHtml(f.code)}` : ""}${best}</span><button class="mini-btn ghost" data-ui data-action="squad-remove" aria-label="Remove ${escapeHtml(f.name)}" data-id="${escapeHtml(f.code || f.name)}">✕</button></div>`;
+        return `<div class="friend-row"><span class="fr-name">🐦 ${escapeHtml(f.name)} <small>${escapeHtml(presence)}${best}</small></span><span class="fr-code">${escapeHtml(f.code || "")}</span><button class="mini-btn ghost" data-ui data-action="squad-remove" aria-label="Remove ${escapeHtml(f.name)}" data-id="${escapeHtml(f.code || f.name)}">✕</button></div>`;
       })
       .join("")}</div>${pages("friends", page)}`;
   })();
@@ -2117,12 +2145,27 @@ export function renderSquad(s: HudSnapshot): string {
 
   const friends = `${lookupPanel}${wingmen}${flewWith}`;
   const myClub = sq.clubs.find((c) => c.id === sq.myClubId);
+  const clubChat = SQUAD_CHAT && myClub
+    ? `
+    <div class="club-chat">
+      <div class="chat-box" data-ref="chatBox" data-scroll-memory="squad-chat" data-stick-bottom role="log" aria-label="Club chat history">
+        ${sq.chat.length
+          ? sq.chat.map((m) => `<div class="chat-line"><b>${escapeHtml(m.name)}</b><span>${escapeHtml(m.text)}</span></div>`).join("")
+          : `<div class="empty-note">Say hello to your club — messages stay between members.</div>`}
+      </div>
+      <div class="redeem">
+        <input data-ui data-ref="chatText" data-enter-action="squad-chat" aria-label="Club message" placeholder="Message your club" maxlength="140" autocomplete="off" />
+        <button class="mini-btn" data-ui data-action="squad-chat">Send</button>
+      </div>
+    </div>`
+    : "";
   const clubs = myClub
     ? `
     <div class="section-title">Your club <small>${myClub.members}/30 members</small></div>
     <div class="club-card mine">
       <div class="daily-head"><span class="daily-icon">🏰</span><div><b>${escapeHtml(myClub.name)}</b><em>${escapeHtml(myClub.motto)}</em></div><button class="mini-btn ghost" data-ui data-action="squad-leave-club">Leave</button></div>
-    </div>`
+    </div>
+    ${clubChat}`
     : `
     <div class="section-title">Flight Clubs <small>join or found one</small></div>
     ${
@@ -2141,10 +2184,26 @@ export function renderSquad(s: HudSnapshot): string {
     ? `<div class="reward-strip" style="background:linear-gradient(135deg,#fff8e1,#ffe082); color:#5d4037; border:1px solid #ffcc80; margin-bottom:12px;">📴 Offline build · wingman requests and pilot lookup need the online service. Pilots you actually raced with still work.</div>`
     : "";
 
+  // A lost Squad key never blocks the pilot: flight progress, coins and
+  // birds live in the save file, not in the Squad service. The honest path
+  // is an explicit, confirmed re-enrollment into a fresh profile.
+  const recovery = sq.credentialError && !sq.isAutonomous
+    ? `<section class="squad-recovery" role="region" aria-label="Squad profile recovery">
+        <div class="section-title">Squad profile recovery <small>key missing</small></div>
+        <p>${escapeHtml(sq.error || "This browser cannot unlock the saved Squad profile.")} Your flight progress, coins and birds are untouched — only the Squad identity is locked.</p>
+        <label class="recovery-consent"><input type="checkbox" data-ui data-ref="squadRecoveryConsent" /> I understand this creates a separate Squad profile.</label>
+        <div class="room-actions-bar">
+          <button class="primary-btn" data-ui data-action="squad-new-profile" ${sq.busy || sq.loading ? "disabled" : ""}>Create a new Squad profile</button>
+          <button class="soft-btn" data-ui data-action="squad-refresh" ${sq.loading ? "disabled" : ""}>Try reconnecting</button>
+        </div>
+      </section>`
+    : "";
+
   return `
     ${head("Squad", "back", sq.myCode ? `<span class="pill">${escapeHtml(sq.myCode)}</span>` : "")}
     <p class="tagline">A little flock. A bigger adventure.</p>
     ${hubBanner}
+    ${recovery}
     ${sq.myCode ? `<div class="squad-invite"><span class="squad-invite-art">${menuIcon("squad")}</span><div><b>Your friend code</b><p>Share it with someone you want to fly with.</p></div><button class="mini-btn" data-ui data-action="squad-copy-code">Copy code</button></div>` : ""}
     ${notice}
     ${quests}
@@ -2347,7 +2406,7 @@ function renderAtlas(s: HudSnapshot): string {
 }
 
 function menuLinks(items: MenuDestination[]): string {
-  return items.map(item => `<button class="destination" data-ui data-action="${item.action}" data-icon="${item.icon}"><span class="destination-art">${menuIcon(item.icon)}</span><span class="destination-copy"><b>${item.title}</b><span>${item.detail}</span></span><span class="destination-arrow" aria-hidden="true">↗</span></button>`).join("");
+  return items.map(item => `<button class="destination" data-ui data-action="${item.action}" data-icon="${item.icon}"><span class="destination-art">${menuIcon(item.icon)}</span><span class="destination-copy"><b>${item.title}</b><span>${item.detail}</span></span><span class="destination-arrow" aria-hidden="true">${arrowUpRightSvg()}</span></button>`).join("");
 }
 
 function renderNameEntry(s: HudSnapshot): string {
@@ -2445,7 +2504,7 @@ function renderMain(s: HudSnapshot): string {
       </div>
     </header>
 
-    <button class="primary-btn home-launch" data-ui data-action="pvp-practice" aria-label="Play free flight now"><span class="launch-art">${menuIcon("flight")}</span><span class="launch-copy"><small>${t("onboarding.skyIsYours", undefined, "THE SKY IS YOURS")}</small><b>Fly now</b><span>${t("onboarding.launchSub", undefined, "Hold to dive · release to glide")}</span></span><span class="launch-arrow" aria-hidden="true">→</span></button>
+    <button class="primary-btn home-launch" data-ui data-action="pvp-practice" aria-label="Play free flight now"><span class="launch-art">${menuIcon("flight")}</span><span class="launch-copy"><small>${t("onboarding.skyIsYours", undefined, "THE SKY IS YOURS")}</small><b>Fly now</b><span>${t("onboarding.launchSub", undefined, "Hold to dive · release to glide")}</span></span><span class="launch-arrow" aria-hidden="true">${arrowRightSvg()}</span></button>
     <div class="home-section-title"><span>${t("hud.menu.chooseAdventure", undefined, "Choose your adventure")}</span><small>01 — PLAY</small></div>
     <nav class="destination-grid play-destinations" aria-label="Choose how to play">${menuLinks(PLAY_DESTINATIONS)}</nav>
     <div class="home-section-title"><span>${t("hud.menu.makeItYours", undefined, "Make it yours")}</span><small>02 — HANGAR</small></div>
