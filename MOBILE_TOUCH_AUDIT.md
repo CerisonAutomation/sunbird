@@ -498,3 +498,47 @@ rasterization during that window — and brings live animations at 320×568 and
 | `src/game/__tests__/input-ui.test.ts` | +11 tests, new `describe("menu overlays keep native scrolling and tapping")` |
 | `src/game/__tests__/results-actions.test.ts` | new — 9 tests: the pure decision across every branch, plus the click wiring dispatching `retry`/`rematch` and the no-snapshot fallback |
 | `e2e/mobile-touch.spec.ts` | new — 10 browser tests over real CDP touch |
+
+---
+
+## 11. Adjacent production blockers found while verifying
+
+Driving the *shipping artifacts* rather than reading source turned up four
+defects outside the touch path. Three were already failing CI on `main`. All are
+fixed in `c5cc795`; they are recorded here because two were found by the mobile
+work and one is a mobile-first-run defect.
+
+| # | Defect | Found by | Status |
+| --- | --- | --- | --- |
+| P1 | `renderNameEntry()` was never gated on `CUSTOM_PILOT_NAMES`, so the Poki bundle shipped a free-text pilot-name input — player-authored text broadcast to real players, which the `ROOT-07` upload gate exists to stop. The board's row was gated; the first-run screen was not. | `pnpm verify:upload` failing on a freshly built artifact | ✅ Fixed — read-only plate + dice, mirroring the board row |
+| P2 | On the **direct** build, "Let's Fly" was a dead end: boot called `setValue("pilotNameInput", …)` immediately after `setScreen("nameEntry")`, but the screen renders on the next HUD push, so the ref did not exist and the pre-fill was a silent no-op. The field came up empty under copy reading *"We picked a name for you"*, and the primary CTA only toasted *"Please enter a pilot name"*. | Chasing why a policy test would not leave the welcome screen | ✅ Fixed — field renders from the snapshot; portal path commits the curated name |
+| P3 | `generatePilotName()` had no length clamp while everything downstream enforces 14 chars. `"Thunder"+"Peregrine"+42` is 18, so a first-run player was stored and shown a name their own field could not hold — counter read `17/14`, and confirming silently truncated it into a *different* name. | The P2 fix made the generated name visible for the first time | ✅ Fixed — rolls until it fits; counter now live |
+| P4 | `connectRace()` guarded on a runtime `getPortalTarget() !== "poki"`. The minifier folds positive `TARGET === "poki"` branches but not a negative early-return, so the literal leaked into the CrazyGames and generic bundles and tripped cross-portal isolation — the exact trap `src/sdk/net.ts` documents having already fallen into. | `pnpm verify:portals` | ✅ Fixed — compile-time `POKI_MULTIPLAYER`, same semantics |
+
+P2 and P3 are worth calling out as *mobile* defects specifically: the welcome
+screen is the first thing a phone player sees, its primary CTA did not work, and
+its name field was empty. Neither was reachable from the desktop-oriented test
+suite, because `SunbirdPage.ready()` always clicked 🎲 Random first — which
+filled the field and masked both bugs.
+
+Two test harnesses predated the welcome screen and passed only against a stale
+`poki-upload/` snapshot: `portal-policy`'s `boot()` and `poki-artifact`'s
+cross-origin iframe test both waited straight through it to the menu CTA. Both
+now dismiss it the way `SunbirdPage.ready()` does. That is the concrete cost of
+the stale-artifact problem noted in §8: a test looked green for a reason that had
+nothing to do with the code under test.
+
+**Gates after these fixes:** `verify:upload` → UPLOAD READY · `verify:portals` →
+PASSED, all three zips · `test:policy` 8/8 (was 3 failing per project) ·
+`test:artifact` 6/6 (was 2 failing per project) · `isolation:check` PASSED ·
+`verify:thumbnail` PASSED · 1191 unit tests · lint, typecheck, `audit:ui` clean.
+
+**Still open, deliberately not guessed at:** `audit:zips` fails because the
+repo's own packaging gates contradict each other. `package-portal.mjs`
+(`ENTRY_DIRS`) and `verify-upload.mjs` (`allowedTop`) both deliberately include
+`public/animated/` — 2.5 MB of Poki animated-thumbnail promo art written there by
+`scripts/capture-gameplay-loop.mjs` and referenced nowhere by the game — while
+`audit-zips.mjs` documents *"any OTHER entry is a packaging mistake"*. Either the
+promo art belongs in the upload or it does not; that is a submission-policy call,
+and picking one silently could break a portal upload workflow. Pre-existing on
+`main`.
