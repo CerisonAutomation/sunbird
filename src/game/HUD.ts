@@ -2505,12 +2505,50 @@ function renderMain(s: HudSnapshot): string {
     </header>
 
     <button class="primary-btn home-launch" data-ui data-action="pvp-practice" aria-label="Play free flight now"><span class="launch-art">${menuIcon("flight")}</span><span class="launch-copy"><small>${t("onboarding.skyIsYours", undefined, "THE SKY IS YOURS")}</small><b>Fly now</b><span>${t("onboarding.launchSub", undefined, "Hold to dive · release to glide")}</span></span><span class="launch-arrow" aria-hidden="true">${arrowRightSvg()}</span></button>
+
+    <div class="home-pulse-row">
+      <button class="home-pulse-cell home-pulse-challenge ${s.daily.done ? "done" : "active"}" data-ui data-action="open-challenges" aria-label="Open challenges">
+        <span class="hpc-icon">${s.daily.done ? "✅" : s.daily.modeIcon}</span>
+        <span class="hpc-body">
+          <b>${s.daily.done ? "Challenge done!" : s.daily.title}</b>
+          <span>${s.daily.done ? `+${s.daily.reward} coins earned` : `${s.daily.modeName} · ${s.daily.modifierLabel}`}</span>
+        </span>
+        <span class="hpc-arrow">›</span>
+      </button>
+      <button class="home-pulse-cell home-pulse-board" data-ui data-action="open-board" aria-label="Open leaderboard">
+        <span class="hpc-icon">🏆</span>
+        <span class="hpc-body">
+          ${s.board && s.board.yourRank > 0
+            ? `<b>#${s.board.yourRank} <span class="hpc-of">of ${s.board.total}</span></b><span>${s.board.entries[0] ? `Leader: ${escapeHtml(s.board.entries[0].name)}` : "Leaderboard"}</span>`
+            : `<b>Leaderboard</b><span>${s.bestDistance > 0 ? `Best: ${formatDistance(s.bestDistance)}` : "See top flights"}</span>`
+          }
+        </span>
+        <span class="hpc-arrow">›</span>
+      </button>
+    </div>
+
     <div class="home-section-title"><span>${t("hud.menu.chooseAdventure", undefined, "Choose your adventure")}</span><small>01 — PLAY</small></div>
     <nav class="destination-grid play-destinations" aria-label="Choose how to play">${menuLinks(PLAY_DESTINATIONS)}</nav>
     <div class="home-section-title"><span>${t("hud.menu.makeItYours", undefined, "Make it yours")}</span><small>02 — HANGAR</small></div>
     <nav class="destination-grid utility-destinations" aria-label="Your hangar">${menuLinks(COLLECTION_DESTINATIONS)}</nav>
     <div class="home-section-title"><span>${t("hud.menu.everyFlightCounts", undefined, "Every flight counts")}</span><small>03 — DISCOVER</small></div>
-    <nav class="destination-grid progress-destinations" aria-label="Challenges and progress">${menuLinks(PROGRESS_DESTINATIONS)}</nav>
+    <nav class="destination-grid progress-destinations" aria-label="Challenges and progress">${menuLinks(
+      PROGRESS_DESTINATIONS.map(item => {
+        if (item.action === "open-challenges") {
+          const liveDetail = s.daily.done
+            ? `✅ Today done · ${s.daily.dailiesDone} day streak`
+            : `${s.daily.modeIcon} ${s.daily.title} · ${s.daily.modeName}`;
+          return { ...item, detail: liveDetail };
+        }
+        if (item.action === "open-board") {
+          const liveDetail = s.board && s.board.yourRank > 0
+            ? `You're #${s.board.yourRank} of ${s.board.total} · #1 ${s.board.entries[0] ? escapeHtml(s.board.entries[0].name) : ""}`
+            : `${s.bestDistance > 0 ? `Your best: ${formatDistance(s.bestDistance)}` : "See top pilot scores"}`;
+          return { ...item, detail: liveDetail };
+        }
+        return item;
+      })
+    )}</nav>
     <div class="home-record"><span class="record-art">${menuIcon("medal")}</span><span>${t("hud.menu.personalBest", undefined, "Personal best")} <b>${formatDistance(s.bestDistance)}</b></span><span class="record-wallet">${s.wallet.toLocaleString()} <small>${t("hud.menu.coinBalance", undefined, "coin balance")}</small></span></div>
   `;
 }
