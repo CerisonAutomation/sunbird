@@ -801,10 +801,9 @@ export class HUD {
         return;
       }
       if (e.target === this.overEl) {
-        // The results backdrop is deliberately inert. A stray tap (or a drag
-        // that ends on the backdrop while scrolling the recap) must never
-        // launch another race — the recap is for reading, and restarting is
-        // an explicit choice on the card's own buttons.
+        // Tap-anywhere on the results screen flies again — same action, same
+        // conditions as the card's own primary button (see resultsPrimaryAction).
+        handler(this.currentSnapshot ? resultsPrimaryAction(this.currentSnapshot) : "retry", "");
         return;
       }
       if (e.target === this.menuEl && this.currentSnapshot && this.currentSnapshot.screen !== "main") {

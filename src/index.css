@@ -493,9 +493,6 @@ textarea {
   pointer-events: auto;
   overflow: auto;
   touch-action: pan-y;
-  /* Momentum scrolling on older iOS; a no-op elsewhere. Without it some iOS
-     versions only pan a div when the drag starts on a native control. */
-  -webkit-overflow-scrolling: touch;
 }
 
 .overlay.menu {
@@ -533,7 +530,6 @@ textarea {
   overflow-y: auto;
   overflow-x: clip; /* prevent -2px screen-head margin from creating a horizontal scrollbar */
   overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
   background:
     linear-gradient(165deg, rgba(255, 252, 245, 0.64) 0%, rgba(255, 244, 230, 0.52) 50%, rgba(255, 238, 222, 0.62) 100%);
   -webkit-backdrop-filter: blur(18px) saturate(1.25);
@@ -1326,36 +1322,18 @@ fieldset.squad-fields {
   display: flex;
   flex-direction: column;
   border-radius: 16px;
-  padding: 10px 12px;
-  margin: 8px 0;
+  padding: 12px 14px;
+  margin: 12px 0;
   background: linear-gradient(135deg, var(--pc-bg1), var(--pc-bg2));
   border: 1.5px solid var(--pc-border);
   box-shadow: 0 3px 0 var(--pc-shadow, transparent);
 }
 
-/* Row variant: emoji + text body + action side-by-side.
- * flex-direction:row is load-bearing — .pc above sets column, and without
- * this the "row" cards stack vertically and bloat the shop by ~240px. */
+/* Row variant: emoji + text body + action side-by-side */
 .pc-row {
   display: flex;
-  flex-direction: row;
   align-items: center;
   gap: 12px;
-}
-
-/* .primary-btn is width:100% (menu buttons) which crushes promo-card rows;
- * scope those to their content so the body column keeps its width. */
-.pc-row .primary-btn,
-.pc-action .primary-btn {
-  width: auto;
-  margin: 0;
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-
-/* Full-width CTAs inside promo cards don't inherit the menu margin. */
-.pc > .primary-btn {
-  margin-bottom: 0;
 }
 
 .pc-icon {

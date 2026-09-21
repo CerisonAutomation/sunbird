@@ -3048,7 +3048,6 @@ button {
   padding-bottom: 6px;
   margin-bottom: 8px;
   scrollbar-width: thin;
-  -webkit-overflow-scrolling: touch;
 }
 .pills-scroll::-webkit-scrollbar {
   height: 4px;

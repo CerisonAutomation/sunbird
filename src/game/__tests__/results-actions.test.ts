@@ -48,11 +48,11 @@ describe("results primary action", () => {
 });
 
 /**
- * The wiring half: the bare results backdrop is deliberately INERT. Players
- * tap and drag anywhere while reading the recap — a backdrop tap that
- * launches another race turned "look at my results" into an accidental
- * restart. Restarting is an explicit choice on the card's own buttons
- * (resultsPrimaryAction), so a backdrop click must dispatch nothing.
+ * The wiring half: a click on the bare results backdrop must actually reach
+ * `Game` as one of those actions. This is the assertion that fails on the old
+ * code, which dispatched `restart-flight` here — a no-op in `gameover`, so the
+ * backdrop tap did nothing and the affordance survived only through the
+ * unrelated dive gesture.
  */
 describe("results backdrop tap", () => {
   afterEach(() => { vi.unstubAllGlobals(); document.body.innerHTML = ""; });
@@ -71,27 +71,26 @@ describe("results backdrop tap", () => {
     return dispatched;
   }
 
-  it("stays on the recap after an ordinary run", () => {
-    expect(resultsHud({ massRace: false, racePlace: 0, duelWas: "" })).toEqual([]);
+  it("flies again after an ordinary run", () => {
+    expect(resultsHud({ massRace: false, racePlace: 0, duelWas: "" })).toEqual([["retry", ""]]);
   });
 
-  it("stays on the recap for a placed mass race", () => {
-    expect(resultsHud({ massRace: true, racePlace: 3, duelWas: "" })).toEqual([]);
+  it("rematches a placed mass race", () => {
+    expect(resultsHud({ massRace: true, racePlace: 3, duelWas: "" })).toEqual([["rematch", ""]]);
   });
 
-  it("stays on the recap for a DNF or a settled duel", () => {
-    expect(resultsHud({ massRace: true, racePlace: 0, duelWas: "" })).toEqual([]);
-    expect(resultsHud({ massRace: true, racePlace: 1, duelWas: "won" })).toEqual([]);
+  it("flies again rather than rematching a DNF or a settled duel", () => {
+    expect(resultsHud({ massRace: true, racePlace: 0, duelWas: "" })).toEqual([["retry", ""]]);
+    expect(resultsHud({ massRace: true, racePlace: 1, duelWas: "won" })).toEqual([["retry", ""]]);
   });
 
-  it("stays on the recap when no snapshot has been rendered yet", () => {
+  it("still flies again when no snapshot has been rendered yet", () => {
     vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
     const hud = new HUD(document.body);
     const dispatched: Array<[string, string]> = [];
     hud.onAction((id, value) => { dispatched.push([id, value]); });
     hud.root.querySelector<HTMLElement>('[data-ref="over"]')!
       .dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(dispatched).toEqual([]);
+    expect(dispatched).toEqual([["retry", ""]]);
   });
-
 });
