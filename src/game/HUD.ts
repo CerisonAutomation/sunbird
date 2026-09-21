@@ -1621,10 +1621,12 @@ function renderBoard(s: HudSnapshot): string {
 
   // Never imply a device-only ladder is worldwide.
   const status = !s.boardOnline
-    ? `<span class="board-badge local">On-device board</span>`
+    ? `<span class="board-badge local">Local scores</span>`
     : page?.stale
       ? `<span class="board-badge warn">Offline — showing cached</span>`
-      : `<span class="board-badge live">Live global</span>`;
+      : leaderboardBackend() === "auds"
+        ? `<span class="board-badge live">🌐 Global</span>`
+        : `<span class="board-badge live">🌐 Global</span>`;
 
   const medals = ["🥇", "🥈", "🥉"];
   const rows =
@@ -1664,6 +1666,7 @@ function renderBoard(s: HudSnapshot): string {
     ${s.portalLeaderboard
       ? `<button class="soft-btn wide" data-ui data-action="open-portal-leaderboard">🏆 ${PORTAL_DISPLAY_NAME} leaderboard</button>`
       : ""}
+    <div class="section-title" style="margin-top:16px">Your call sign</div>
     ${
       CUSTOM_PILOT_NAMES
         ? `<div class="redeem pilot-name-row">
@@ -1827,10 +1830,11 @@ function renderPractice(s: HudSnapshot): string {
       <button class="primary-btn gold wide" data-ui data-action="ai-pvp" data-id="${s.selectedPvpMode}">🤖 Race the AI flock · ${(s.pvpModes || []).find((m) => m.id === s.selectedPvpMode)?.name ?? "Sprint GP"}</button>
       <div class="practice-formats"><h3>Race formats</h3>
         <p class="fineprint">Dynamic AI pilots adapt locally with neural downslope timing, slipstream drafting, and slingshot attacks. No server connection required!</p>
-        ${PVP_MODES.map((m) => `<button class="soft-btn wide ${s.selectedPvpMode === m.id ? "on" : ""}" data-ui data-action="ai-pvp" data-id="${m.id}">${m.icon} ${m.name} · ${m.blurb}</button>`).join("")}
-        <button class="soft-btn wide" data-ui data-action="pvp-duel">⚔ 1v1 Seeded Rival Duel</button>
-        <button class="soft-btn wide" data-ui data-action="practice-storm">⛈ Stormfront Race · wild weather</button>
-        <button class="soft-btn wide" data-ui data-action="practice-ranked">🏆 40-Pilot Flock Grand Prix</button>
+        ${PVP_MODES.map((m) => `<button class="soft-btn wide format-btn ${s.selectedPvpMode === m.id ? "on" : ""}" data-ui data-action="ai-pvp" data-id="${m.id}">${m.icon} ${m.name} · ${m.blurb}</button>`).join("")}
+        <div class="format-divider">Special modes</div>
+        <button class="soft-btn wide format-btn" data-ui data-action="pvp-duel">⚔ 1v1 Seeded Rival Duel</button>
+        <button class="soft-btn wide format-btn" data-ui data-action="practice-storm">⛈ Stormfront Race · wild weather</button>
+        <button class="soft-btn wide format-btn" data-ui data-action="practice-ranked">🏆 40-Pilot Flock Grand Prix</button>
       </div>
     </section>
     <button class="soft-btn wide" data-ui data-action="open-live">🌐 Want human rivals? Open PvP</button>
@@ -1921,7 +1925,7 @@ function renderChallenges(s: HudSnapshot): string {
     </div>`;
 
   return `
-    ${head("Challenges", "back", `<span class="pill">☀ Daily · 🌩 Weekly</span>`)}
+    ${head("Challenges", "back")}
     <p class="tagline">Same hills as everyone else today. Modifiers change how you fly them.</p>
     ${event}
     ${daily}
@@ -1972,22 +1976,6 @@ export function renderSquad(s: HudSnapshot): string {
   const pages = (kind: string, view: { page: number; pages: number }): string => view.pages < 2 ? "" : `<nav class="collection-pager" aria-label="${kind} pages"><button class="mini-btn" data-ui data-action="squad-page" data-id="${kind}:${view.page - 1}" aria-label="Previous ${kind}" ${view.page === 0 ? "disabled" : ""}>‹</button><span>${view.page + 1} / ${view.pages}</span><button class="mini-btn" data-ui data-action="squad-page" data-id="${kind}:${view.page + 1}" aria-label="Next ${kind}" ${view.page === view.pages - 1 ? "disabled" : ""}>›</button></nav>`;
   const notice = s.squadNotice ? `<div class="reward-strip">${escapeHtml(s.squadNotice)}</div>` : "";
 
-  const quests = `
-    <div class="section-title">Squadron Team Quests <small>Co-Op Milestones</small></div>
-    <div class="squad-quests">
-      ${SQUAD_QUESTS.map((q) => {
-        const prog = q.id === "migration" ? Math.min(q.target, Math.round(s.bestDistance * 1.5)) : q.id === "drafting" ? Math.min(q.target, Math.round(s.runsPlayed * 5)) : Math.min(q.target, Math.round(s.todayBest / 100));
-        return `<div class="squad-quest-card">
-          <div class="sq-info"><b>${escapeHtml(q.title)}</b><span>${escapeHtml(q.desc)}</span></div>
-          <div class="sq-action">
-            ${prog >= q.target
-              ? `<button class="mini-btn gold" data-ui data-action="claim-squad-quest" data-id="${q.id}">Claim ● ${q.rewardCoins}</button>`
-              : `<span class="sq-prog-label">${prog}/${q.target}</span>`}
-          </div>
-        </div>`;
-      }).join("")}
-    </div>
-  `;
 
   // ---------------------------------------------------------- pilot lookup
   // The panel never invents a pilot. Every row below is either a code the
@@ -2081,42 +2069,78 @@ export function renderSquad(s: HudSnapshot): string {
       <div class="friend-list">${rows || `<div class="empty-note">Everyone you flew with is already in your wingmen.</div>`}</div>`;
   })();
 
-  const friends = `${lookupPanel}${wingmen}${flewWith}`;
   const myClub = sq.clubs.find((c) => c.id === sq.myClubId);
   const clubs = myClub
     ? `
-    <div class="section-title">Your club <small>${myClub.members}/30 members</small></div>
+    <div class="section-title">🏰 Your Club <small>${myClub.members}/30 members</small></div>
     <div class="club-card mine">
-      <div class="daily-head"><span class="daily-icon">🏰</span><div><b>${escapeHtml(myClub.name)}</b><em>${escapeHtml(myClub.motto)}</em></div><button class="mini-btn ghost" data-ui data-action="squad-leave-club">Leave</button></div>
+      <div class="daily-head">
+        <span class="daily-icon">🏰</span>
+        <div><b>${escapeHtml(myClub.name)}</b><em>${escapeHtml(myClub.motto)}</em></div>
+        <button class="mini-btn ghost" data-ui data-action="squad-leave-club">Leave</button>
+      </div>
+      <p class="fineprint">Club members appear on each other's leaderboards and share team quests. Up to 30 pilots per club.</p>
     </div>`
     : `
-    <div class="section-title">Flight Clubs <small>join or found one</small></div>
+    <div class="section-title">🏰 Flight Clubs <small>${sq.clubs.length ? `${sq.clubs.length} open` : "none yet"}</small></div>
+    <p class="fineprint">Clubs are groups of up to 30 pilots who fly together. Join an existing club or found your own — members share a leaderboard and unlock team quests together.</p>
     ${
       sq.clubs.length
         ? `<div class="club-list">${clubPage.items
             .map(
-              (c) => `<div class="club-row"><div><b>🏰 ${escapeHtml(c.name)}</b><em>${escapeHtml(c.motto)} · ${c.members}/30</em></div><button class="mini-btn" data-ui data-action="squad-join-club" data-id="${c.id}" ${c.members >= 30 ? "disabled" : ""}>Join</button></div>`,
+              (c) => `<div class="club-row"><div><b>🏰 ${escapeHtml(c.name)}</b><em>${escapeHtml(c.motto)} · ${c.members}/30 pilots</em></div><button class="mini-btn" data-ui data-action="squad-join-club" data-id="${c.id}" ${c.members >= 30 ? "disabled" : ""}>${c.members >= 30 ? "Full" : "Join"}</button></div>`,
             )
-            .join("")}</div>`
-        : `<div class="empty-note">No clubs yet — found the first one.</div>`
+            .join("")}</div>${pages("clubs", clubPage)}`
+        : `<div class="empty-note">No clubs yet — be the first to found one below.</div>`
     }
-    ${pages("clubs", clubPage)}
-    <div class="redeem"><input data-ui data-ref="clubName" data-enter-action="squad-create-club" aria-label="Club name" placeholder="Club name" maxlength="24" autocomplete="off" /><button class="mini-btn gold" data-ui data-action="squad-create-club">Found club</button></div>`;
+    <div class="redeem"><input data-ui data-ref="clubName" data-enter-action="squad-create-club" aria-label="Club name" placeholder="Name your club…" maxlength="24" autocomplete="off" /><button class="mini-btn gold" data-ui data-action="squad-create-club">Found club</button></div>`;
 
   const hubBanner = sq.isAutonomous
-    ? `<div class="reward-strip" style="background:linear-gradient(135deg,#fff8e1,#ffe082); color:#5d4037; border:1px solid #ffcc80; margin-bottom:12px;">📴 Offline build · wingman requests and pilot lookup need the online service. Pilots you actually raced with still work.</div>`
+    ? `<div class="reward-strip squad-offline-note">📴 Offline build — pilot lookup, wingman requests &amp; clubs need the online service. Pilots you've raced with still appear below.</div>`
     : "";
+
+  const raceCta = `<button class="primary-btn squad-race-cta" data-ui data-action="open-live">🐦 Race with wingmen</button>`;
 
   return `
     ${head("Squad", "back", sq.myCode ? `<span class="pill">${escapeHtml(sq.myCode)}</span>` : "")}
-    <p class="tagline">A little flock. A bigger adventure.</p>
     ${hubBanner}
-    ${sq.myCode ? `<div class="squad-invite"><span class="squad-invite-art">${menuIcon("squad")}</span><div><b>Your friend code</b><p>Share it with someone you want to fly with.</p></div><button class="mini-btn" data-ui data-action="squad-copy-code">Copy code</button></div>` : ""}
+    ${sq.myCode ? `
+    <div class="squad-invite">
+      <span class="squad-invite-art">${menuIcon("squad")}</span>
+      <div>
+        <b>Your pilot code</b>
+        <p>Share <b>${escapeHtml(sq.myCode)}</b> with friends to add each other as wingmen.</p>
+      </div>
+      <button class="mini-btn" data-ui data-action="squad-copy-code">Copy</button>
+    </div>` : ""}
     ${notice}
-    ${quests}
-    <fieldset class="squad-fields"><legend class="sr-only">Squad actions</legend>${friends + clubs}</fieldset>
-    <button class="soft-btn wide" data-ui data-action="squad-refresh" ${sq.loading || sq.busy ? "disabled" : ""}>${sq.loading ? "Connecting…" : "Refresh Squad"}</button>
-    <button class="soft-btn wide" data-ui data-action="open-live">Race with friends</button>
+    <div class="squad-sections">
+      <div class="squad-section">
+        <div class="section-title">🪽 Wingmen &amp; Pilots</div>
+        ${lookupPanel}
+        ${wingmen}
+        ${flewWith}
+      </div>
+      <div class="squad-section">
+        ${clubs}
+      </div>
+      <div class="squad-section">
+        <div class="section-title">✦ Team Quests <small>co-op milestones</small></div>
+        <div class="squad-quests">${SQUAD_QUESTS.map((q) => {
+          const prog = q.id === "migration" ? Math.min(q.target, Math.round(s.bestDistance * 1.5)) : q.id === "drafting" ? Math.min(q.target, Math.round(s.runsPlayed * 5)) : Math.min(q.target, Math.round(s.todayBest / 100));
+          return `<div class="squad-quest-card">
+            <div class="sq-info"><b>${escapeHtml(q.title)}</b><span>${escapeHtml(q.desc)}</span></div>
+            <div class="sq-action">
+              ${prog >= q.target
+                ? `<button class="mini-btn gold" data-ui data-action="claim-squad-quest" data-id="${q.id}">Claim ● ${q.rewardCoins}</button>`
+                : `<span class="sq-prog-label">${prog}/${q.target}</span>`}
+            </div>
+          </div>`;
+        }).join("")}</div>
+      </div>
+    </div>
+    ${raceCta}
+    <button class="soft-btn wide" data-ui data-action="squad-refresh" ${sq.loading || sq.busy ? "disabled" : ""}>${sq.loading ? "Connecting…" : "Refresh"}</button>
   `;
 }
 
@@ -2392,12 +2416,50 @@ function renderMain(s: HudSnapshot): string {
     </header>
 
     <button class="primary-btn home-launch" data-ui data-action="pvp-practice" aria-label="Play free flight now"><span class="launch-art">${menuIcon("flight")}</span><span class="launch-copy"><small>${t("onboarding.skyIsYours", undefined, "THE SKY IS YOURS")}</small><b>Fly now</b><span>${t("onboarding.launchSub", undefined, "Hold to dive · release to glide")}</span></span><span class="launch-arrow" aria-hidden="true">→</span></button>
+
+    <div class="home-pulse-row">
+      <button class="home-pulse-cell home-pulse-challenge ${s.daily.done ? "done" : "active"}" data-ui data-action="open-challenges" aria-label="Open challenges">
+        <span class="hpc-icon">${s.daily.done ? "✅" : s.daily.modeIcon}</span>
+        <span class="hpc-body">
+          <b>${s.daily.done ? "Challenge done!" : s.daily.title}</b>
+          <span>${s.daily.done ? `+${s.daily.reward} coins earned` : `${s.daily.modeName} · ${s.daily.modifierLabel}`}</span>
+        </span>
+        <span class="hpc-arrow">›</span>
+      </button>
+      <button class="home-pulse-cell home-pulse-board" data-ui data-action="open-board" aria-label="Open leaderboard">
+        <span class="hpc-icon">🏆</span>
+        <span class="hpc-body">
+          ${s.board && s.board.yourRank > 0
+            ? `<b>#${s.board.yourRank} <span class="hpc-of">of ${s.board.total}</span></b><span>${s.board.entries[0] ? `Leader: ${escapeHtml(s.board.entries[0].name)}` : "Leaderboard"}</span>`
+            : `<b>Leaderboard</b><span>${s.bestDistance > 0 ? `Best: ${formatDistance(s.bestDistance)}` : "See top flights"}</span>`
+          }
+        </span>
+        <span class="hpc-arrow">›</span>
+      </button>
+    </div>
+
     <div class="home-section-title"><span>${t("hud.menu.chooseAdventure", undefined, "Choose your adventure")}</span><small>01 — PLAY</small></div>
     <nav class="destination-grid play-destinations" aria-label="Choose how to play">${menuLinks(PLAY_DESTINATIONS)}</nav>
     <div class="home-section-title"><span>${t("hud.menu.makeItYours", undefined, "Make it yours")}</span><small>02 — HANGAR</small></div>
     <nav class="destination-grid utility-destinations" aria-label="Your hangar">${menuLinks(COLLECTION_DESTINATIONS)}</nav>
     <div class="home-section-title"><span>${t("hud.menu.everyFlightCounts", undefined, "Every flight counts")}</span><small>03 — DISCOVER</small></div>
-    <nav class="destination-grid progress-destinations" aria-label="Challenges and progress">${menuLinks(PROGRESS_DESTINATIONS)}</nav>
+    <nav class="destination-grid progress-destinations" aria-label="Challenges and progress">${menuLinks(
+      PROGRESS_DESTINATIONS.map(item => {
+        if (item.action === "open-challenges") {
+          const liveDetail = s.daily.done
+            ? `✅ Today done · ${s.daily.dailiesDone} day streak`
+            : `${s.daily.modeIcon} ${s.daily.title} · ${s.daily.modeName}`;
+          return { ...item, detail: liveDetail };
+        }
+        if (item.action === "open-board") {
+          const liveDetail = s.board && s.board.yourRank > 0
+            ? `You're #${s.board.yourRank} of ${s.board.total} · #1 ${s.board.entries[0] ? escapeHtml(s.board.entries[0].name) : ""}`
+            : `${s.bestDistance > 0 ? `Your best: ${formatDistance(s.bestDistance)}` : "See top pilot scores"}`;
+          return { ...item, detail: liveDetail };
+        }
+        return item;
+      })
+    )}</nav>
     <div class="home-record"><span class="record-art">${menuIcon("medal")}</span><span>${t("hud.menu.personalBest", undefined, "Personal best")} <b>${formatDistance(s.bestDistance)}</b></span><span class="record-wallet">${s.wallet.toLocaleString()} <small>${t("hud.menu.coinBalance", undefined, "coin balance")}</small></span></div>
   `;
 }
@@ -2916,15 +2978,26 @@ function renderTrophies(s: HudSnapshot): string {
   const groups: Record<string, AchievementView[]> = { bronze: [], silver: [], gold: [], platinum: [] };
   for (const v of s.trophies) groups[v.def.rarity]!.push(v);
   const order: (keyof typeof groups)[] = ["bronze", "silver", "gold", "platinum"];
+  const totalUnlocked = s.trophyCounts.unlocked;
+  const totalAll = s.trophyCounts.total;
+  const pctAll = Math.round((totalUnlocked / Math.max(1, totalAll)) * 100);
+  const rarityLabel: Record<string, string> = { bronze: "🥉 Bronze", silver: "🥈 Silver", gold: "🥇 Gold", platinum: "💎 Platinum" };
   return `
-    ${head("Trophy Case", "back", `<span class="pill">${s.trophyCounts.unlocked}/${s.trophyCounts.total}</span>`)}
+    ${head("Trophy Case", "back", `<span class="pill">${totalUnlocked}/${totalAll}</span>`)}
+    <div class="trophy-overview">
+      <div class="trophy-progress-bar"><i style="width:${pctAll}%"></i></div>
+      <p class="fineprint">${totalUnlocked} of ${totalAll} trophies unlocked · ${pctAll}% mastery</p>
+    </div>
     ${order
       .map(
-        (rarity) => `
-      <details class="shop-section trophy-collection" data-ref="trophies-${rarity}"><summary>${rarity}<span>${groups[rarity]!.filter(v => v.unlocked).length}/${groups[rarity]!.length} unlocked</span></summary>
-      <div class="trophy-grid">
-        ${groups[rarity]!
-          .map((v) => {
+        (rarity) => {
+          const done = groups[rarity]!.filter(v => v.unlocked).length;
+          const tot = groups[rarity]!.length;
+          return `
+      <details class="shop-section trophy-collection" data-ref="trophies-${rarity}" ${done > 0 ? "open" : ""}>
+        <summary>${rarityLabel[rarity] ?? rarity}<span>${done}/${tot} unlocked</span></summary>
+        <div class="trophy-grid">
+          ${groups[rarity]!.map((v) => {
             const pct = Math.min(100, (v.progress / v.def.target) * 100);
             return `<div class="trophy ${v.unlocked ? "unlocked" : ""} ${rarity}">
               <div class="trophy-icon">${v.unlocked ? "🏆" : "🔒"}</div>
@@ -2932,9 +3005,10 @@ function renderTrophies(s: HudSnapshot): string {
               <div class="trophy-desc">${v.def.desc}</div>
               ${v.unlocked ? "" : `<div class="qb"><i style="width:${pct}%"></i></div>`}
             </div>`;
-          })
-          .join("")}
-      </div></details>`,
+          }).join("")}
+        </div>
+      </details>`;
+        }
       )
       .join("")}
   `;

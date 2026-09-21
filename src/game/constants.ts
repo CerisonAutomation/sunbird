@@ -103,7 +103,7 @@ export const SAVE_KEY_CORRUPT = "sunbird.save.corrupt";
 export const DAYLIGHT_MAX_GOLD = 62;
 export const CONTINUE_COST = 80;
 export const CONTINUE_DAYLIGHT = 16;
-export const CONTINUE_TIMEOUT = 4;
+export const CONTINUE_TIMEOUT = 10;
 export const AD_DURATION = 4;
 export const INTERSTITIAL_EVERY = 3;
 
