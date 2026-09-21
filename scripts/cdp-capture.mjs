@@ -13,7 +13,7 @@ import { writeFileSync, mkdirSync, statSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { join } from "node:path";
 
-const OUT_DIR = join(process.cwd(), "public", "animated");
+const OUT_DIR = join(process.cwd(), "promo", "animated");
 const FRAME_DIR = "/tmp/sunbird-frames";
 mkdirSync(OUT_DIR, { recursive: true });
 mkdirSync(FRAME_DIR, { recursive: true });
