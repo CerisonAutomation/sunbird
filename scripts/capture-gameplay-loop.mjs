@@ -9,17 +9,17 @@
  *   - Playwright Chromium installed
  *
  * Output:
- *   public/animated/sunbird-animated.webp  (628x500, 15fps, looped)
- *   public/animated/sunbird-animated.gif   (512x512, 10fps)
- *   public/animated/sunbird-animated-256.gif (256x256, 12fps)
- *   public/animated/sunbird-animated-128.gif (128x128, 8fps)
+ *   promo/animated/sunbird-animated.webp  (628x500, 15fps, looped)
+ *   promo/animated/sunbird-animated.gif   (512x512, 10fps)
+ *   promo/animated/sunbird-animated-256.gif (256x256, 12fps)
+ *   promo/animated/sunbird-animated-128.gif (128x128, 8fps)
  */
 import { chromium } from "playwright";
 import { execSync } from "node:child_process";
 import { mkdirSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-const OUT_DIR = join(process.cwd(), "public", "animated");
+const OUT_DIR = join(process.cwd(), "promo", "animated");
 mkdirSync(OUT_DIR, { recursive: true });
 
 const GAME_URL = "http://127.0.0.1:5173/";
@@ -128,7 +128,7 @@ async function main() {
     stdio: "inherit",
   });
 
-  console.log("\nDone. Real gameplay footage is now in public/animated/.");
+  console.log("\nDone. Real gameplay footage is now in promo/animated/.");
 }
 
 main().catch(e => {

@@ -485,8 +485,10 @@ export class PokiNetlibClient implements NetTransport {
                 this.pendingEvents.push({ type: "ready", name: t.name });
               }
               // Host: when all peers (including us) are ready, broadcast a start.
+              // Six seconds — the same shared countdown the relay server gives —
+              // so a race never launches "instantly" the moment a pilot readies.
               if (this.amHost && this.localReady && this.allReady() && this.state === "lobby") {
-                const at = Date.now() + 1500;
+                const at = Date.now() + 6000;
                 const seed = this.seed;
                 this.broadcastReliable({ type: "start", at, seed });
                 this.startsAt = at;
@@ -639,6 +641,15 @@ export class PokiNetlibClient implements NetTransport {
     if (this.isAutonomous || !this.connected) {
       this.state = "racing";
       this.startsAt = Date.now() + 100;
+      this.pendingEvents.push({ type: "start" });
+    } else if (this.amHost && this.tracks.size > 0) {
+      // Host authority: launch the room with the SAME shared 6s countdown the
+      // guests get — never an instant local launch that leaves the field
+      // behind. Our own "start" event comes back through pendingEvents.
+      const at = Date.now() + 6000;
+      this.broadcastReliable({ type: "start", at, seed: this.seed });
+      this.startsAt = at;
+      this.state = "racing";
       this.pendingEvents.push({ type: "start" });
     } else {
       this.sendReady(true);

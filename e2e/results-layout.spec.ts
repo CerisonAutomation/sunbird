@@ -15,7 +15,7 @@ test("a real completed flight puts replay first and preserves results when brows
   if (await sleep.isVisible()) await sleep.click();
   const result = page.locator('[data-ref="over"]');
   await expect(result).toBeVisible();
-  await expect(result.getByRole("heading", { name: "Flight complete", exact: true })).toBeVisible();
+  await expect(result.getByRole("heading", { name: "Flight completed", exact: true })).toBeVisible();
   await expect(result.locator(".result-actions .play-again-btn")).toBeInViewport({ ratio: 1 });
   await expect(result.locator(".play-again-btn")).toHaveCount(1);
   const bounds = await result.locator(".paper-card").boundingBox();

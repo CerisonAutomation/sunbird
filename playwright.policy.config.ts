@@ -8,7 +8,8 @@ import { defineConfig, devices } from "@playwright/test";
  * No webServer: the spec serves both folders itself, so what runs is the
  * artifact, not a dev build.
  *
- * Run: pnpm test:policy   (needs `pnpm build:portals` and `pnpm build`)
+ * Run: pnpm test:policy — it builds `dist/` and `poki-upload/` itself first, so
+ * it can never report on a stale committed artifact.
  */
 export default defineConfig({
   testDir: "./e2e",

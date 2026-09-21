@@ -65,11 +65,18 @@ function stageHtml() {
   return html;
 }
 
-/** `index.html` + the directories that ship beside it (and nothing else). */
-// `public/animated/` holds the Poki tile-icon GIF: a submission asset for the
-// catalogue, not something the game loads. It stays out of the portal bundle
-// (it alone took each zip from ~860 KB to ~3.1 MB) and out of `audit:zips`'
-// allowlist, which is index.html + icons/ + fonts/ + i18n/.
+/**
+ * `index.html` + the directories that ship beside it (and nothing else).
+ *
+ * This list IS the zip anatomy contract, and `audit-zips.mjs` enforces the same
+ * entries from the other side — anything else in a zip is a packaging mistake.
+ * It used to also carry `animated/`, the Poki animated-thumbnail promo art:
+ * 2.5 MB of GIF/WebP that no code in the game ever requests, which ate a third
+ * of the 8 MB portal budget and failed that gate on every single build. The art
+ * now lives in `promo/animated/`, outside `public/`, so Vite no longer copies it
+ * into every build; `pnpm gen-icons` still generates it there for hand-submission
+ * to a portal, it just does not ship inside the game package any more.
+ */
 const ENTRY_DIRS = ["icons", "fonts", "i18n"];
 const ENTRIES = ["index.html", ...ENTRY_DIRS];
 

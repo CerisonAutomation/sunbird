@@ -457,7 +457,7 @@ button {
   background: linear-gradient(135deg, #fff1c8, #ffe0a0);
   border: none;
   border-radius: 14px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   cursor: pointer;
   font-family: inherit;
   color: var(--ink);
@@ -2697,7 +2697,7 @@ button {
   width: 100%;
   border: 1px solid rgba(200, 120, 30, 0.35);
   border-radius: 14px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   margin-bottom: 8px;
   background: linear-gradient(90deg, #fff3dc, #ffe9c2);
   cursor: pointer;
@@ -3198,7 +3198,7 @@ button {
   width: 100%;
   border: 1px solid rgba(120, 70, 190, 0.35);
   border-radius: 14px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   margin-bottom: 8px;
   background: linear-gradient(90deg, #f0e4ff, #e2d4ff);
   cursor: pointer;
@@ -3481,7 +3481,6 @@ button {
 .overlay.menu.pause-submenu > .paper-card {
   max-height: calc(100% - 8px);
   overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
 }
 /* Tighten the pause grid on small phones so two rows of four fit. */
 @media (max-width: 420px) {
@@ -4846,6 +4845,16 @@ h1, h2, h3, h4, h5, h6, .heading-art {
 }
 .mm-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
 .mm-actions button { min-height: 44px; }
+/* Explicit Ready toggle: the only way into a live race. The pressed state
+   turns the shared amber CTA into a settled green "locked in" chip. */
+.mm-actions .mm-ready { flex: 1 1 100%; }
+.mm-ready[aria-pressed="true"] {
+  background: linear-gradient(115deg, #8cc17e, #55985f);
+  border-color: #3f7d4c;
+  border-top-color: #cfe8c2;
+  color: #f6fff2;
+  box-shadow: inset 0 1px #e9f7dd, 0 4px 0 #35693f, 0 8px 20px #3f7d4c30;
+}
 .mm-cancel { width: auto; padding: 8px 22px; }
 @media (max-width: 420px) {
   .mm-actions { flex-direction: column; width: min(92vw, 320px); }
@@ -5030,3 +5039,22 @@ h1, h2, h3, h4, h5, h6, .heading-art {
   white-space: nowrap;
   border: 0;
 }
+
+/* Squad profile recovery: honest re-enrollment when the key is lost. */
+.squad-recovery { background: #fff7e6; border: 1px solid #ffd699; border-radius: 14px; padding: 14px; margin: 10px 0; }
+.squad-recovery .section-title { margin-top: 0; }
+.squad-recovery p { margin: 6px 0 10px; font-size: 14px; line-height: 1.45; color: #4e342e; }
+.squad-recovery .recovery-consent { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; margin-bottom: 10px; color: #3e2723; }
+.squad-recovery .recovery-consent input { margin-top: 2px; width: 17px; height: 17px; flex: none; }
+
+/* Club chat inside the Squad screen: real, scrollable, member-only. */
+.club-chat { margin: 10px 0; }
+.club-chat .chat-box { max-height: 200px; overflow-y: auto; -webkit-overflow-scrolling: touch; background: #fdfaf3; border: 1px solid #e8dcc8; border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.club-chat .chat-line { display: flex; flex-direction: column; font-size: 14px; line-height: 1.35; color: #3e2f23; }
+.club-chat .chat-line b { font-size: 12px; color: #8a6d3b; letter-spacing: .02em; }
+
+/* Read-only pilot name plate (portal builds: curated names, no typing). */
+.pilot-name-readonly.name-entry-plate { display: inline-block; padding: 6px 14px; border-radius: 12px; background: #fff6dd; border: 1px solid #e8d9ae; color: #5d4037; font-weight: 700; letter-spacing: .02em; }
+/* Segmented unit toggle in settings (km / mi). */
+.toggle-group { display: inline-flex; gap: 6px; }
+.toggle-group .mini-btn { min-width: 44px; }

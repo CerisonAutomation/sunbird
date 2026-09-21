@@ -10,7 +10,8 @@ import { defineConfig, devices } from "@playwright/test";
  * touches `dist/`. That is the point: what is under test is the artifact, not
  * a dev server.
  *
- * Run: pnpm test:artifact   (needs `pnpm build:poki` first)
+ * Run: pnpm test:artifact — it runs `pnpm build:poki` itself first, so a stale
+ * `poki-upload/` snapshot can never make these pass for the wrong reason.
  */
 export default defineConfig({
   testDir: "./e2e",

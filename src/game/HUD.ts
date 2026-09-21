@@ -1,6 +1,6 @@
 import { browseSkins, newShopBrowse, nextBird, type ShopBrowse } from "./ShopBrowse";
 import { flightTakeaway } from "./FlightGuidance";
-import { menuIcon, menuHorizon } from "./MenuIcons";
+import { menuIcon, menuHorizon, arrowUpRightSvg, arrowRightSvg } from "./MenuIcons";
 import { paginate } from "./Pagination";
 import { flockLoadingMark } from "./FlockLoading";
 import { PLAY_DESTINATIONS, COLLECTION_DESTINATIONS, PROGRESS_DESTINATIONS, type MenuDestination } from "./MenuCatalog";
@@ -247,6 +247,8 @@ export type HudSnapshot = {
   raceFinishTime: number;
   massRace: boolean;
   multiplayerLive: boolean;
+  /** True when this build has any live-race transport (URL or Poki Netlib). */
+  multiplayerConfigured: boolean;
   /* --- live room + roster --- */
   roster: RosterBird[];
   roomCode: string;
@@ -380,6 +382,31 @@ export function emoteWheelVisible(s: Pick<HudSnapshot, "massRace">): boolean {
   return Boolean(s.massRace);
 }
 
+/**
+ * The action behind the results card's primary button — and behind a tap on the
+ * bare backdrop beside that card, which is the same affordance with a larger hit
+ * area.
+ *
+ * A placed mass race rematches at the same stakes (an online field goes back
+ * through the honest search; a duel or an AI flock replays locally). Every other
+ * run just flies again.
+ *
+ * Both callers must agree, so the decision lives here instead of being
+ * re-derived inline at each site. It previously existed only inside the render
+ * string, and the backdrop tap dispatched `restart-flight` — an action `Game`
+ * honours only while paused or playing, so tapping the results backdrop was a
+ * silent no-op. It looked like it worked because a touch on the bare overlay
+ * also armed the dive gesture and `holdToStart()` restarted the run that way;
+ * once overlays stopped arming gameplay gestures (they own the finger, so the
+ * card can scroll and the tap can land) that accidental path disappeared and the
+ * dead action was exposed.
+ */
+export function resultsPrimaryAction(
+  s: Pick<HudSnapshot, "massRace" | "racePlace" | "duelWas">,
+): "rematch" | "retry" {
+  return s.massRace && s.racePlace > 0 && !s.duelWas ? "rematch" : "retry";
+}
+
 export class HUD {
   readonly root: HTMLDivElement;
   private readonly menuSky: MenuSky;
@@ -448,6 +475,7 @@ export class HUD {
   private matchmakingRooms!: HTMLElement;
   private matchmakingAi!: HTMLElement;
   private matchmakingKeep!: HTMLElement;
+  private matchmakingReady!: HTMLElement;
   private draftMeter!: HTMLElement;
   private finishCd!: HTMLElement;
   private lastFinishCd = "";
@@ -652,6 +680,7 @@ export class HUD {
         <div class="matchmaking-label" data-ref="matchmakingLabel">Reading the sky…</div>
         <div class="matchmaking-rooms hidden" data-ref="matchmakingRooms"></div>
         <div class="btn-row mm-actions">
+          <button class="primary-btn mm-ready hidden" data-ui data-ref="matchmakingReady" data-action="mm-ready">Ready up ✓</button>
           <button class="primary-btn gold mm-ai hidden" data-ui data-ref="matchmakingAi" data-action="mm-ai">🤖 Race the AI flock instead</button>
           <button class="soft-btn mm-keep hidden" data-ui data-ref="matchmakingKeep" data-action="mm-keep-search">Keep searching</button>
           <button class="soft-btn mm-cancel" data-ui data-action="mm-cancel">Cancel</button>
@@ -709,6 +738,7 @@ export class HUD {
     secsLeft: number,
     phase: "searching" | "waiting" = "searching",
     rooms = "",
+    ready: "none" | "unready" | "ready" = "none",
   ): void {
     this.matchmakingEl.classList.toggle("hidden", !on);
     if (!on) return;
@@ -718,15 +748,23 @@ export class HUD {
     this.matchmakingCount.textContent = live > 0
       ? `${live} live pilot${live === 1 ? "" : "s"} in this room`
       : "Waiting for the first live pilot";
-    this.matchmakingLabel.textContent = searching
-      ? secsLeft > 0.5
+    this.matchmakingLabel.textContent = ready === "ready"
+      ? "You're ready — the race launches when every pilot is ready, with a 6s countdown."
+      : ready === "unready"
         ? live > 0
-          ? `Race starts when the room is ready · ${Math.ceil(secsLeft)}s left on the clock`
-          : `Looking for pilots on this circuit · ${Math.ceil(secsLeft)}s`
-        : "Starting the room…"
-      : "The search stays open — anyone who arrives can still join this room";
+          ? "A pilot is in the room — ready up! The race launches when everyone is ready."
+          : "Ready up now and the race launches the moment a pilot joins you."
+        : searching
+          ? secsLeft > 0.5
+            ? `Looking for pilots on this circuit · ${Math.ceil(secsLeft)}s`
+            : "Reading the sky…"
+          : "The search stays open — anyone who arrives can still join this room";
     this.matchmakingRooms.textContent = rooms;
     this.matchmakingRooms.classList.toggle("hidden", !rooms);
+    // Nobody auto-readies: the Ready toggle is the only way into a live start.
+    this.matchmakingReady.classList.toggle("hidden", ready === "none");
+    this.matchmakingReady.textContent = ready === "ready" ? "Ready ✓ — tap to cancel" : "Ready up ✓";
+    this.matchmakingReady.setAttribute("aria-pressed", ready === "ready" ? "true" : "false");
     this.matchmakingAi.classList.toggle("hidden", searching);
     this.matchmakingKeep.classList.toggle("hidden", searching);
   }
@@ -735,7 +773,12 @@ export class HUD {
     this.root.addEventListener("keydown", e => {
       if (e.key === "Enter" && !e.isComposing && e.target instanceof HTMLInputElement && e.target.dataset.enterAction) {
         e.preventDefault(); e.stopPropagation();
-        this.menuCard.querySelector<HTMLButtonElement>(`button[data-action="${e.target.dataset.enterAction}"]`)?.click();
+        const action = e.target.dataset.enterAction;
+        const btn = this.menuCard.querySelector<HTMLButtonElement>(`button[data-action="${action}"]`);
+        // Prefer the visible button (keeps focus/press feedback); actions
+        // without a dedicated button (e.g. Friend code → direct add) still fire.
+        if (btn) btn.click();
+        else handler(action, "");
         return;
       }
       if (e.key === "Escape" && this.emoteWheel.contains(e.target as Node) && this.emoteWheel.querySelector('[aria-expanded="true"]')) {
@@ -758,7 +801,10 @@ export class HUD {
         return;
       }
       if (e.target === this.overEl) {
-        handler("restart-flight", "");
+        // The results backdrop is deliberately inert. A stray tap (or a drag
+        // that ends on the backdrop while scrolling the recap) must never
+        // launch another race — the recap is for reading, and restarting is
+        // an explicit choice on the card's own buttons.
         return;
       }
       if (e.target === this.menuEl && this.currentSnapshot && this.currentSnapshot.screen !== "main") {
@@ -823,6 +869,12 @@ export class HUD {
       if (field instanceof HTMLInputElement && field.dataset.ref === "shopSearch") {
         this.shopBrowse.query = field.value.slice(0, 80);
         if (this.shopSnapshot) this.renderStatic(this.shopSnapshot);
+      }
+      if (field instanceof HTMLInputElement && field.dataset.ref === "pilotNameInput") {
+        // The counter is decorative, but it must not lie: it rendered a hardcoded
+        // "0/14" and never moved while the player typed.
+        const count = field.closest(".name-input-wrapper")?.querySelector(".name-char-count span");
+        if (count) count.textContent = String(field.value.length);
       }
       if (field instanceof HTMLInputElement && field.type === "range") {
         const output = field.parentElement?.querySelector("output");
@@ -963,6 +1015,7 @@ export class HUD {
     const inPlay = s.state === "playing" || s.state === "paused" || s.state === "continue";
     this.playHud.classList.toggle("hidden", !inPlay);
     this.playHud.classList.toggle("versus", s.versus);
+    if (this.playHud.dataset.splitLayout !== s.splitLayout) this.playHud.dataset.splitLayout = s.splitLayout;
     if (this.root.dataset.uiState !== s.state) this.root.dataset.uiState = s.state;
     const flying = String(inPlay);
     if (this.root.dataset.flying !== flying) this.root.dataset.flying = flying;
@@ -1481,6 +1534,7 @@ export class HUD {
     this.matchmakingRooms = grab("matchmakingRooms");
     this.matchmakingAi = grab("matchmakingAi");
     this.matchmakingKeep = grab("matchmakingKeep");
+    this.matchmakingReady = grab("matchmakingReady");
     this.goalStrip = grab("goalStrip");
     this.goalPop = grab("goalPop");
     this.standingsEl = grab("standings");
@@ -1621,12 +1675,10 @@ function renderBoard(s: HudSnapshot): string {
 
   // Never imply a device-only ladder is worldwide.
   const status = !s.boardOnline
-    ? `<span class="board-badge local">Local scores</span>`
+    ? `<span class="board-badge local">On-device board</span>`
     : page?.stale
       ? `<span class="board-badge warn">Offline — showing cached</span>`
-      : leaderboardBackend() === "auds"
-        ? `<span class="board-badge live">🌐 Global</span>`
-        : `<span class="board-badge live">🌐 Global</span>`;
+      : `<span class="board-badge live">🌐 Global</span>`;
 
   const medals = ["🥇", "🥈", "🥉"];
   const rows =
@@ -1666,7 +1718,6 @@ function renderBoard(s: HudSnapshot): string {
     ${s.portalLeaderboard
       ? `<button class="soft-btn wide" data-ui data-action="open-portal-leaderboard">🏆 ${PORTAL_DISPLAY_NAME} leaderboard</button>`
       : ""}
-    <div class="section-title" style="margin-top:16px">Your call sign</div>
     ${
       CUSTOM_PILOT_NAMES
         ? `<div class="redeem pilot-name-row">
@@ -1752,7 +1803,7 @@ function renderLive(s: HudSnapshot): string {
 
         <div class="room-actions-bar">
           <button class="primary-btn gold large-btn" data-ui data-action="start-room-now">⚡ Start Race Now (${s.roomCount > 1 ? "Launch Room" : "Fill with AI flock"})</button>
-          <button class="soft-btn ${s.roomReady ? "on" : ""}" data-ui data-action="ready-room" aria-pressed="${s.roomReady}">${s.roomReady ? "Cancel ready" : "Ready up ✓"}</button>
+          <button class="soft-btn ${s.roomReady ? "on" : ""}" data-ui data-action="ready-room" aria-pressed="${s.roomReady}" ${connected ? "" : "disabled"} title="${connected ? "" : "Race connection lost — close the room to race again"}">${s.roomReady ? "Cancel ready" : "Ready up ✓"}</button>
         </div>
 
         <div class="room-flock" aria-label="Pilots in this room">
@@ -1801,13 +1852,21 @@ function renderLive(s: HudSnapshot): string {
       <section class="race-section room-entry" aria-label="Invite friends">
         <div class="room-entry-crest">${menuIcon("online")}</div>
         <h3>Fly with your flock</h3>
-        <p>Create a private room with a custom code and link. Race your squad on any course!</p>
+        ${s.multiplayerConfigured
+          ? `<p>Create a private room with a custom code and link. Race your squad on any course!</p>
         <button class="primary-btn" data-ui data-action="host-room">Create Private Room</button>
         <label class="field-label" for="race-room-code">Or enter a friend's room code</label>
         <div class="redeem">
           <input id="race-room-code" data-ui data-ref="roomCode" data-enter-action="join-room" aria-label="Room code" maxlength="2048" placeholder="Code or invite link" autocomplete="off" autocapitalize="characters" spellcheck="false" />
           <button class="mini-btn" data-ui data-action="join-room">Join</button>
-        </div>
+        </div>`
+          : `<p class="pilot-note island" role="note">Live rooms are not available in this edition. AI practice and same-screen 1v1 below still race.</p>
+        <button class="primary-btn" data-ui data-action="host-room" disabled>Create Private Room</button>
+        <label class="field-label" for="race-room-code">Or enter a friend's room code</label>
+        <div class="redeem">
+          <input id="race-room-code" data-ui data-ref="roomCode" data-enter-action="join-room" aria-label="Room code" maxlength="2048" placeholder="Code or invite link" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+          <button class="mini-btn" data-ui data-action="join-room" disabled>Join</button>
+        </div>`}
       </section>
       <nav class="destination-grid" aria-label="More ways to race">
         <button class="destination" data-ui data-action="open-practice"><span class="destination-art">${menuIcon("compass")}</span><span class="destination-copy"><b>AI Practice</b><span>Custom opponent count &amp; skill</span></span></button>
@@ -1830,11 +1889,10 @@ function renderPractice(s: HudSnapshot): string {
       <button class="primary-btn gold wide" data-ui data-action="ai-pvp" data-id="${s.selectedPvpMode}">🤖 Race the AI flock · ${(s.pvpModes || []).find((m) => m.id === s.selectedPvpMode)?.name ?? "Sprint GP"}</button>
       <div class="practice-formats"><h3>Race formats</h3>
         <p class="fineprint">Dynamic AI pilots adapt locally with neural downslope timing, slipstream drafting, and slingshot attacks. No server connection required!</p>
-        ${PVP_MODES.map((m) => `<button class="soft-btn wide format-btn ${s.selectedPvpMode === m.id ? "on" : ""}" data-ui data-action="ai-pvp" data-id="${m.id}">${m.icon} ${m.name} · ${m.blurb}</button>`).join("")}
-        <div class="format-divider">Special modes</div>
-        <button class="soft-btn wide format-btn" data-ui data-action="pvp-duel">⚔ 1v1 Seeded Rival Duel</button>
-        <button class="soft-btn wide format-btn" data-ui data-action="practice-storm">⛈ Stormfront Race · wild weather</button>
-        <button class="soft-btn wide format-btn" data-ui data-action="practice-ranked">🏆 40-Pilot Flock Grand Prix</button>
+        ${PVP_MODES.map((m) => `<button class="soft-btn wide ${s.selectedPvpMode === m.id ? "on" : ""}" data-ui data-action="ai-pvp" data-id="${m.id}">${m.icon} ${m.name} · ${m.blurb}</button>`).join("")}
+        <button class="soft-btn wide" data-ui data-action="pvp-duel">⚔ 1v1 Seeded Rival Duel</button>
+        <button class="soft-btn wide" data-ui data-action="practice-storm">⛈ Stormfront Race · wild weather</button>
+        <button class="soft-btn wide" data-ui data-action="practice-ranked">🏆 40-Pilot Flock Grand Prix</button>
       </div>
     </section>
     <button class="soft-btn wide" data-ui data-action="open-live">🌐 Want human rivals? Open PvP</button>
@@ -1925,7 +1983,7 @@ function renderChallenges(s: HudSnapshot): string {
     </div>`;
 
   return `
-    ${head("Challenges", "back")}
+    ${head("Challenges", "back", `<span class="pill">☀ Daily · 🌩 Weekly</span>`)}
     <p class="tagline">Same hills as everyone else today. Modifiers change how you fly them.</p>
     ${event}
     ${daily}
@@ -1976,6 +2034,22 @@ export function renderSquad(s: HudSnapshot): string {
   const pages = (kind: string, view: { page: number; pages: number }): string => view.pages < 2 ? "" : `<nav class="collection-pager" aria-label="${kind} pages"><button class="mini-btn" data-ui data-action="squad-page" data-id="${kind}:${view.page - 1}" aria-label="Previous ${kind}" ${view.page === 0 ? "disabled" : ""}>‹</button><span>${view.page + 1} / ${view.pages}</span><button class="mini-btn" data-ui data-action="squad-page" data-id="${kind}:${view.page + 1}" aria-label="Next ${kind}" ${view.page === view.pages - 1 ? "disabled" : ""}>›</button></nav>`;
   const notice = s.squadNotice ? `<div class="reward-strip">${escapeHtml(s.squadNotice)}</div>` : "";
 
+  const quests = `
+    <div class="section-title">Squadron Team Quests <small>Co-Op Milestones</small></div>
+    <div class="squad-quests">
+      ${SQUAD_QUESTS.map((q) => {
+        const prog = q.id === "migration" ? Math.min(q.target, Math.round(s.bestDistance * 1.5)) : q.id === "drafting" ? Math.min(q.target, Math.round(s.runsPlayed * 5)) : Math.min(q.target, Math.round(s.todayBest / 100));
+        return `<div class="squad-quest-card">
+          <div class="sq-info"><b>${escapeHtml(q.title)}</b><span>${escapeHtml(q.desc)}</span></div>
+          <div class="sq-action">
+            ${prog >= q.target
+              ? `<button class="mini-btn gold" data-ui data-action="claim-squad-quest" data-id="${q.id}">Claim ● ${q.rewardCoins}</button>`
+              : `<span class="sq-prog-label">${prog}/${q.target}</span>`}
+          </div>
+        </div>`;
+      }).join("")}
+    </div>
+  `;
 
   // ---------------------------------------------------------- pilot lookup
   // The panel never invents a pilot. Every row below is either a code the
@@ -2028,7 +2102,7 @@ export function renderSquad(s: HudSnapshot): string {
     <div class="section-title">🔍 Pilot Lookup <small>${sq.live && !sq.isAutonomous ? "online directory" : "offline build"}</small></div>
     <p class="fineprint">Look a pilot up by their exact code. Results come from the pilot directory — nothing here is invented, and an unknown or unreachable code says so.</p>
     <div class="redeem">
-      <input data-ui data-ref="pilotCode" data-enter-action="pilot-lookup" aria-label="Pilot code" placeholder="Pilot code (SUN-9F3K2A)" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${escapeHtml(sq.pilotQuery)}" />
+      <input data-ui data-ref="pilotCode" data-enter-action="pilot-add" aria-label="Friend code" placeholder="Friend code (SUN-9F3K2A)" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${escapeHtml(sq.pilotQuery)}" />
       <button class="mini-btn" data-ui data-action="pilot-lookup">${sq.lookupBusy ? "Looking…" : "Look up"}</button>
     </div>
     ${lookupCard}
@@ -2046,7 +2120,7 @@ export function renderSquad(s: HudSnapshot): string {
       .map((f) => {
         const presence = f.local ? "met in a race" : f.online ? "● online" : "○ offline";
         const best = f.bestDistance && f.bestDistance > 0 ? ` · best ${Math.round(f.bestDistance).toLocaleString()} m` : "";
-        return `<div class="friend-row"><span class="fr-name">🐦 ${escapeHtml(f.name)}</span><span class="fr-code">${escapeHtml(presence)}${f.code ? ` · ${escapeHtml(f.code)}` : ""}${best}</span><button class="mini-btn ghost" data-ui data-action="squad-remove" aria-label="Remove ${escapeHtml(f.name)}" data-id="${escapeHtml(f.code || f.name)}">✕</button></div>`;
+        return `<div class="friend-row"><span class="fr-name">🐦 ${escapeHtml(f.name)} <small>${escapeHtml(presence)}${best}</small></span><span class="fr-code">${escapeHtml(f.code || "")}</span><button class="mini-btn ghost" data-ui data-action="squad-remove" aria-label="Remove ${escapeHtml(f.name)}" data-id="${escapeHtml(f.code || f.name)}">✕</button></div>`;
       })
       .join("")}</div>${pages("friends", page)}`;
   })();
@@ -2069,78 +2143,73 @@ export function renderSquad(s: HudSnapshot): string {
       <div class="friend-list">${rows || `<div class="empty-note">Everyone you flew with is already in your wingmen.</div>`}</div>`;
   })();
 
+  const friends = `${lookupPanel}${wingmen}${flewWith}`;
   const myClub = sq.clubs.find((c) => c.id === sq.myClubId);
+  const clubChat = SQUAD_CHAT && myClub
+    ? `
+    <div class="club-chat">
+      <div class="chat-box" data-ref="chatBox" data-scroll-memory="squad-chat" data-stick-bottom role="log" aria-label="Club chat history">
+        ${sq.chat.length
+          ? sq.chat.map((m) => `<div class="chat-line"><b>${escapeHtml(m.name)}</b><span>${escapeHtml(m.text)}</span></div>`).join("")
+          : `<div class="empty-note">Say hello to your club — messages stay between members.</div>`}
+      </div>
+      <div class="redeem">
+        <input data-ui data-ref="chatText" data-enter-action="squad-chat" aria-label="Club message" placeholder="Message your club" maxlength="140" autocomplete="off" />
+        <button class="mini-btn" data-ui data-action="squad-chat">Send</button>
+      </div>
+    </div>`
+    : "";
   const clubs = myClub
     ? `
-    <div class="section-title">🏰 Your Club <small>${myClub.members}/30 members</small></div>
+    <div class="section-title">Your club <small>${myClub.members}/30 members</small></div>
     <div class="club-card mine">
-      <div class="daily-head">
-        <span class="daily-icon">🏰</span>
-        <div><b>${escapeHtml(myClub.name)}</b><em>${escapeHtml(myClub.motto)}</em></div>
-        <button class="mini-btn ghost" data-ui data-action="squad-leave-club">Leave</button>
-      </div>
-      <p class="fineprint">Club members appear on each other's leaderboards and share team quests. Up to 30 pilots per club.</p>
-    </div>`
+      <div class="daily-head"><span class="daily-icon">🏰</span><div><b>${escapeHtml(myClub.name)}</b><em>${escapeHtml(myClub.motto)}</em></div><button class="mini-btn ghost" data-ui data-action="squad-leave-club">Leave</button></div>
+    </div>
+    ${clubChat}`
     : `
-    <div class="section-title">🏰 Flight Clubs <small>${sq.clubs.length ? `${sq.clubs.length} open` : "none yet"}</small></div>
-    <p class="fineprint">Clubs are groups of up to 30 pilots who fly together. Join an existing club or found your own — members share a leaderboard and unlock team quests together.</p>
+    <div class="section-title">Flight Clubs <small>join or found one</small></div>
     ${
       sq.clubs.length
         ? `<div class="club-list">${clubPage.items
             .map(
-              (c) => `<div class="club-row"><div><b>🏰 ${escapeHtml(c.name)}</b><em>${escapeHtml(c.motto)} · ${c.members}/30 pilots</em></div><button class="mini-btn" data-ui data-action="squad-join-club" data-id="${c.id}" ${c.members >= 30 ? "disabled" : ""}>${c.members >= 30 ? "Full" : "Join"}</button></div>`,
+              (c) => `<div class="club-row"><div><b>🏰 ${escapeHtml(c.name)}</b><em>${escapeHtml(c.motto)} · ${c.members}/30</em></div><button class="mini-btn" data-ui data-action="squad-join-club" data-id="${c.id}" ${c.members >= 30 ? "disabled" : ""}>Join</button></div>`,
             )
-            .join("")}</div>${pages("clubs", clubPage)}`
-        : `<div class="empty-note">No clubs yet — be the first to found one below.</div>`
+            .join("")}</div>`
+        : `<div class="empty-note">No clubs yet — found the first one.</div>`
     }
-    <div class="redeem"><input data-ui data-ref="clubName" data-enter-action="squad-create-club" aria-label="Club name" placeholder="Name your club…" maxlength="24" autocomplete="off" /><button class="mini-btn gold" data-ui data-action="squad-create-club">Found club</button></div>`;
+    ${pages("clubs", clubPage)}
+    <div class="redeem"><input data-ui data-ref="clubName" data-enter-action="squad-create-club" aria-label="Club name" placeholder="Club name" maxlength="24" autocomplete="off" /><button class="mini-btn gold" data-ui data-action="squad-create-club">Found club</button></div>`;
 
   const hubBanner = sq.isAutonomous
-    ? `<div class="reward-strip squad-offline-note">📴 Offline build — pilot lookup, wingman requests &amp; clubs need the online service. Pilots you've raced with still appear below.</div>`
+    ? `<div class="reward-strip" style="background:linear-gradient(135deg,#fff8e1,#ffe082); color:#5d4037; border:1px solid #ffcc80; margin-bottom:12px;">📴 Offline build · wingman requests and pilot lookup need the online service. Pilots you actually raced with still work.</div>`
     : "";
 
-  const raceCta = `<button class="primary-btn squad-race-cta" data-ui data-action="open-live">🐦 Race with wingmen</button>`;
+  // A lost Squad key never blocks the pilot: flight progress, coins and
+  // birds live in the save file, not in the Squad service. The honest path
+  // is an explicit, confirmed re-enrollment into a fresh profile.
+  const recovery = sq.credentialError && !sq.isAutonomous
+    ? `<section class="squad-recovery" role="region" aria-label="Squad profile recovery">
+        <div class="section-title">Squad profile recovery <small>key missing</small></div>
+        <p>${escapeHtml(sq.error || "This browser cannot unlock the saved Squad profile.")} Your flight progress, coins and birds are untouched — only the Squad identity is locked.</p>
+        <label class="recovery-consent"><input type="checkbox" data-ui data-ref="squadRecoveryConsent" /> I understand this creates a separate Squad profile.</label>
+        <div class="room-actions-bar">
+          <button class="primary-btn" data-ui data-action="squad-new-profile" ${sq.busy || sq.loading ? "disabled" : ""}>Create a new Squad profile</button>
+          <button class="soft-btn" data-ui data-action="squad-refresh" ${sq.loading ? "disabled" : ""}>Try reconnecting</button>
+        </div>
+      </section>`
+    : "";
 
   return `
     ${head("Squad", "back", sq.myCode ? `<span class="pill">${escapeHtml(sq.myCode)}</span>` : "")}
+    <p class="tagline">A little flock. A bigger adventure.</p>
     ${hubBanner}
-    ${sq.myCode ? `
-    <div class="squad-invite">
-      <span class="squad-invite-art">${menuIcon("squad")}</span>
-      <div>
-        <b>Your pilot code</b>
-        <p>Share <b>${escapeHtml(sq.myCode)}</b> with friends to add each other as wingmen.</p>
-      </div>
-      <button class="mini-btn" data-ui data-action="squad-copy-code">Copy</button>
-    </div>` : ""}
+    ${recovery}
+    ${sq.myCode ? `<div class="squad-invite"><span class="squad-invite-art">${menuIcon("squad")}</span><div><b>Your friend code</b><p>Share it with someone you want to fly with.</p></div><button class="mini-btn" data-ui data-action="squad-copy-code">Copy code</button></div>` : ""}
     ${notice}
-    <div class="squad-sections">
-      <div class="squad-section">
-        <div class="section-title">🪽 Wingmen &amp; Pilots</div>
-        ${lookupPanel}
-        ${wingmen}
-        ${flewWith}
-      </div>
-      <div class="squad-section">
-        ${clubs}
-      </div>
-      <div class="squad-section">
-        <div class="section-title">✦ Team Quests <small>co-op milestones</small></div>
-        <div class="squad-quests">${SQUAD_QUESTS.map((q) => {
-          const prog = q.id === "migration" ? Math.min(q.target, Math.round(s.bestDistance * 1.5)) : q.id === "drafting" ? Math.min(q.target, Math.round(s.runsPlayed * 5)) : Math.min(q.target, Math.round(s.todayBest / 100));
-          return `<div class="squad-quest-card">
-            <div class="sq-info"><b>${escapeHtml(q.title)}</b><span>${escapeHtml(q.desc)}</span></div>
-            <div class="sq-action">
-              ${prog >= q.target
-                ? `<button class="mini-btn gold" data-ui data-action="claim-squad-quest" data-id="${q.id}">Claim ● ${q.rewardCoins}</button>`
-                : `<span class="sq-prog-label">${prog}/${q.target}</span>`}
-            </div>
-          </div>`;
-        }).join("")}</div>
-      </div>
-    </div>
-    ${raceCta}
-    <button class="soft-btn wide" data-ui data-action="squad-refresh" ${sq.loading || sq.busy ? "disabled" : ""}>${sq.loading ? "Connecting…" : "Refresh"}</button>
+    ${quests}
+    <fieldset class="squad-fields"><legend class="sr-only">Squad actions</legend>${friends + clubs}</fieldset>
+    <button class="soft-btn wide" data-ui data-action="squad-refresh" ${sq.loading || sq.busy ? "disabled" : ""}>${sq.loading ? "Connecting…" : "Refresh Squad"}</button>
+    <button class="soft-btn wide" data-ui data-action="open-live">Race with friends</button>
   `;
 }
 
@@ -2337,15 +2406,30 @@ function renderAtlas(s: HudSnapshot): string {
 }
 
 function menuLinks(items: MenuDestination[]): string {
-  return items.map(item => `<button class="destination" data-ui data-action="${item.action}" data-icon="${item.icon}"><span class="destination-art">${menuIcon(item.icon)}</span><span class="destination-copy"><b>${item.title}</b><span>${item.detail}</span></span><span class="destination-arrow" aria-hidden="true">↗</span></button>`).join("");
+  return items.map(item => `<button class="destination" data-ui data-action="${item.action}" data-icon="${item.icon}"><span class="destination-art">${menuIcon(item.icon)}</span><span class="destination-copy"><b>${item.title}</b><span>${item.detail}</span></span><span class="destination-arrow" aria-hidden="true">${arrowUpRightSvg()}</span></button>`).join("");
 }
 
 function renderNameEntry(s: HudSnapshot): string {
-  // Portal builds (CUSTOM_PILOT_NAMES=false) use auto-generated call signs;
-  // free-text entry is replaced with a read-only display + dice button so no
-  // player-authored text enters the multiplayer name broadcasts.
-  const nameField = CUSTOM_PILOT_NAMES
-    ? `<div class="name-input-row">
+  // The first-run welcome screen is a name surface like any other, so it obeys
+  // the same edition split as the board's pilot-name row: portal editions
+  // broadcast this name to real players and allow no unmoderated player-authored
+  // text, so they get a curated generated name and a dice — no typing surface at
+  // all, and the field is not in those bundles. The direct/web/itch build owns
+  // its own surfaces and keeps free rename.
+  //
+  // The portal variant deliberately uses a <span>, not a <label for=…>: there is
+  // no input for it to point at, and a dangling label is an accessibility defect.
+  //
+  // The direct build's field is pre-filled from the snapshot, the same way the
+  // board's rename field is. Boot used to do it with `setValue("pilotNameInput")`
+  // immediately after `setScreen("nameEntry")`, but the screen renders on the
+  // next HUD push, so the ref did not exist yet and the call was a silent no-op:
+  // the field came up empty and "Let's Fly" — the primary CTA, under copy that
+  // says "We picked a name for you" — only toasted "Please enter a pilot name".
+  // A first-run player who did not notice the dice had no way past the screen.
+  const field = CUSTOM_PILOT_NAMES
+    ? `<label class="name-entry-label" for="pilot-name-input">Your call sign</label>
+      <div class="name-input-row">
         <div class="name-input-wrapper">
           <input
             type="text"
@@ -2356,14 +2440,16 @@ function renderNameEntry(s: HudSnapshot): string {
             maxlength="14"
             aria-label="Pilot name"
             autocomplete="off"
+            value="${escapeHtml(s.pilotName)}"
           />
-          <div class="name-char-count"><span>0</span>/14</div>
+          <div class="name-char-count"><span>${s.pilotName.length}</span>/14</div>
         </div>
         <button class="name-random-btn" data-ui data-action="randomize-pilot-name" title="Suggest a name" aria-label="Random name">🎲</button>
       </div>`
-    : `<div class="name-input-row">
-        <span class="pilot-name-readonly" aria-label="Pilot name">${escapeHtml(s.pilotName)}</span>
-        <button class="name-random-btn" data-ui data-action="randomize-pilot-name" title="Roll a new call sign" aria-label="Random name">🎲</button>
+    : `<span class="name-entry-label">Your call sign</span>
+      <div class="name-input-row">
+        <span class="pilot-name-readonly name-entry-plate" aria-label="Pilot name">${escapeHtml(s.pilotName)}</span>
+        <button class="name-random-btn" data-ui data-action="randomize-pilot-name" title="Roll a new name" aria-label="Random name">🎲</button>
       </div>`;
 
   return `
@@ -2374,19 +2460,22 @@ function renderNameEntry(s: HudSnapshot): string {
 
     <div class="name-entry-headline">
       <h2 class="name-entry-title">Welcome, Pilot</h2>
-      <p class="name-entry-sub">We picked a name for you — ${CUSTOM_PILOT_NAMES ? "change it or " : ""}fly right now.</p>
+      <p class="name-entry-sub">We picked a name for you — ${CUSTOM_PILOT_NAMES ? "change it" : "roll it"} or fly right now.</p>
     </div>
 
     <div class="name-entry-form">
-      <label class="name-entry-label" for="pilot-name-input">Your call sign</label>
-      ${nameField}
+      ${field}
 
       <button class="primary-btn name-entry-cta" data-ui data-action="confirm-pilot-name">
         Let's Fly ›
       </button>
     </div>
 
-    <p class="name-entry-footer">You can ${CUSTOM_PILOT_NAMES ? "rename yourself anytime in Settings" : "roll a new name anytime"}.</p>
+    <p class="name-entry-footer">${
+      CUSTOM_PILOT_NAMES
+        ? "You can rename yourself anytime in Settings."
+        : "Roll the dice for a different call sign — you can roll again anytime."
+    }</p>
   `;
 }
 
@@ -2415,51 +2504,13 @@ function renderMain(s: HudSnapshot): string {
       </div>
     </header>
 
-    <button class="primary-btn home-launch" data-ui data-action="pvp-practice" aria-label="Play free flight now"><span class="launch-art">${menuIcon("flight")}</span><span class="launch-copy"><small>${t("onboarding.skyIsYours", undefined, "THE SKY IS YOURS")}</small><b>Fly now</b><span>${t("onboarding.launchSub", undefined, "Hold to dive · release to glide")}</span></span><span class="launch-arrow" aria-hidden="true">→</span></button>
-
-    <div class="home-pulse-row">
-      <button class="home-pulse-cell home-pulse-challenge ${s.daily.done ? "done" : "active"}" data-ui data-action="open-challenges" aria-label="Open challenges">
-        <span class="hpc-icon">${s.daily.done ? "✅" : s.daily.modeIcon}</span>
-        <span class="hpc-body">
-          <b>${s.daily.done ? "Challenge done!" : s.daily.title}</b>
-          <span>${s.daily.done ? `+${s.daily.reward} coins earned` : `${s.daily.modeName} · ${s.daily.modifierLabel}`}</span>
-        </span>
-        <span class="hpc-arrow">›</span>
-      </button>
-      <button class="home-pulse-cell home-pulse-board" data-ui data-action="open-board" aria-label="Open leaderboard">
-        <span class="hpc-icon">🏆</span>
-        <span class="hpc-body">
-          ${s.board && s.board.yourRank > 0
-            ? `<b>#${s.board.yourRank} <span class="hpc-of">of ${s.board.total}</span></b><span>${s.board.entries[0] ? `Leader: ${escapeHtml(s.board.entries[0].name)}` : "Leaderboard"}</span>`
-            : `<b>Leaderboard</b><span>${s.bestDistance > 0 ? `Best: ${formatDistance(s.bestDistance)}` : "See top flights"}</span>`
-          }
-        </span>
-        <span class="hpc-arrow">›</span>
-      </button>
-    </div>
-
+    <button class="primary-btn home-launch" data-ui data-action="pvp-practice" aria-label="Play free flight now"><span class="launch-art">${menuIcon("flight")}</span><span class="launch-copy"><small>${t("onboarding.skyIsYours", undefined, "THE SKY IS YOURS")}</small><b>Fly now</b><span>${t("onboarding.launchSub", undefined, "Hold to dive · release to glide")}</span></span><span class="launch-arrow" aria-hidden="true">${arrowRightSvg()}</span></button>
     <div class="home-section-title"><span>${t("hud.menu.chooseAdventure", undefined, "Choose your adventure")}</span><small>01 — PLAY</small></div>
     <nav class="destination-grid play-destinations" aria-label="Choose how to play">${menuLinks(PLAY_DESTINATIONS)}</nav>
     <div class="home-section-title"><span>${t("hud.menu.makeItYours", undefined, "Make it yours")}</span><small>02 — HANGAR</small></div>
     <nav class="destination-grid utility-destinations" aria-label="Your hangar">${menuLinks(COLLECTION_DESTINATIONS)}</nav>
     <div class="home-section-title"><span>${t("hud.menu.everyFlightCounts", undefined, "Every flight counts")}</span><small>03 — DISCOVER</small></div>
-    <nav class="destination-grid progress-destinations" aria-label="Challenges and progress">${menuLinks(
-      PROGRESS_DESTINATIONS.map(item => {
-        if (item.action === "open-challenges") {
-          const liveDetail = s.daily.done
-            ? `✅ Today done · ${s.daily.dailiesDone} day streak`
-            : `${s.daily.modeIcon} ${s.daily.title} · ${s.daily.modeName}`;
-          return { ...item, detail: liveDetail };
-        }
-        if (item.action === "open-board") {
-          const liveDetail = s.board && s.board.yourRank > 0
-            ? `You're #${s.board.yourRank} of ${s.board.total} · #1 ${s.board.entries[0] ? escapeHtml(s.board.entries[0].name) : ""}`
-            : `${s.bestDistance > 0 ? `Your best: ${formatDistance(s.bestDistance)}` : "See top pilot scores"}`;
-          return { ...item, detail: liveDetail };
-        }
-        return item;
-      })
-    )}</nav>
+    <nav class="destination-grid progress-destinations" aria-label="Challenges and progress">${menuLinks(PROGRESS_DESTINATIONS)}</nav>
     <div class="home-record"><span class="record-art">${menuIcon("medal")}</span><span>${t("hud.menu.personalBest", undefined, "Personal best")} <b>${formatDistance(s.bestDistance)}</b></span><span class="record-wallet">${s.wallet.toLocaleString()} <small>${t("hud.menu.coinBalance", undefined, "coin balance")}</small></span></div>
   `;
 }
@@ -2978,26 +3029,15 @@ function renderTrophies(s: HudSnapshot): string {
   const groups: Record<string, AchievementView[]> = { bronze: [], silver: [], gold: [], platinum: [] };
   for (const v of s.trophies) groups[v.def.rarity]!.push(v);
   const order: (keyof typeof groups)[] = ["bronze", "silver", "gold", "platinum"];
-  const totalUnlocked = s.trophyCounts.unlocked;
-  const totalAll = s.trophyCounts.total;
-  const pctAll = Math.round((totalUnlocked / Math.max(1, totalAll)) * 100);
-  const rarityLabel: Record<string, string> = { bronze: "🥉 Bronze", silver: "🥈 Silver", gold: "🥇 Gold", platinum: "💎 Platinum" };
   return `
-    ${head("Trophy Case", "back", `<span class="pill">${totalUnlocked}/${totalAll}</span>`)}
-    <div class="trophy-overview">
-      <div class="trophy-progress-bar"><i style="width:${pctAll}%"></i></div>
-      <p class="fineprint">${totalUnlocked} of ${totalAll} trophies unlocked · ${pctAll}% mastery</p>
-    </div>
+    ${head("Trophy Case", "back", `<span class="pill">${s.trophyCounts.unlocked}/${s.trophyCounts.total}</span>`)}
     ${order
       .map(
-        (rarity) => {
-          const done = groups[rarity]!.filter(v => v.unlocked).length;
-          const tot = groups[rarity]!.length;
-          return `
-      <details class="shop-section trophy-collection" data-ref="trophies-${rarity}" ${done > 0 ? "open" : ""}>
-        <summary>${rarityLabel[rarity] ?? rarity}<span>${done}/${tot} unlocked</span></summary>
-        <div class="trophy-grid">
-          ${groups[rarity]!.map((v) => {
+        (rarity) => `
+      <details class="shop-section trophy-collection" data-ref="trophies-${rarity}"><summary>${rarity}<span>${groups[rarity]!.filter(v => v.unlocked).length}/${groups[rarity]!.length} unlocked</span></summary>
+      <div class="trophy-grid">
+        ${groups[rarity]!
+          .map((v) => {
             const pct = Math.min(100, (v.progress / v.def.target) * 100);
             return `<div class="trophy ${v.unlocked ? "unlocked" : ""} ${rarity}">
               <div class="trophy-icon">${v.unlocked ? "🏆" : "🔒"}</div>
@@ -3005,10 +3045,9 @@ function renderTrophies(s: HudSnapshot): string {
               <div class="trophy-desc">${v.def.desc}</div>
               ${v.unlocked ? "" : `<div class="qb"><i style="width:${pct}%"></i></div>`}
             </div>`;
-          }).join("")}
-        </div>
-      </details>`;
-        }
+          })
+          .join("")}
+      </div></details>`,
       )
       .join("")}
   `;
@@ -3203,7 +3242,7 @@ function renderGameOver(s: HudSnapshot): string {
     <div class="results-kicker">${escapeHtml(s.modeName)} · flight recap</div>
     <h2>${t("hud.gameover.title", undefined, "Flight completed")}</h2>
     <p class="tagline">${s.massRace ? "Your place, your progress, your next race." : "A little farther. A little smoother. One more flight?"}</p>
-    <div class="result-actions"><button class="play-again-btn" data-ui data-action="${s.massRace && s.racePlace > 0 && !s.duelWas ? "rematch" : "retry"}">${s.massRace && s.roomCode ? "Back to race lobby" : s.massRace && s.racePlace > 0 ? "Race again · same stakes" : t("hud.gameover.flyAgain", undefined, "Fly Again")}</button><button class="soft-btn" data-ui data-action="menu">${t("hud.gameover.mainMenu", undefined, "Main Menu")}</button></div>
+    <div class="result-actions"><button class="play-again-btn" data-ui data-action="${resultsPrimaryAction(s)}">${s.massRace && s.roomCode ? "Back to race lobby" : s.massRace && s.racePlace > 0 ? "Race again · same stakes" : t("hud.gameover.flyAgain", undefined, "Fly Again")}</button><button class="soft-btn" data-ui data-action="menu">${t("hud.gameover.mainMenu", undefined, "Main Menu")}</button></div>
     ${!s.massRace ? `<p class="fineprint replay-note">Fly again replays this exact course so you can race the ghost of the run you just flew 👻</p>` : ""}
     ${s.newBest ? `<div class="new-best">👑 NEW BEST · ${formatDistance(s.distance)}<small>your farthest flight yet</small></div>` : ""}
     ${s.boardScope === "global" && s.boardMetric === "distance" && s.board && s.board.yourRank > 0 ? `<div class="reward-strip rank-strip">Leaderboard rank · <b>#${s.board.yourRank}</b> of ${s.board.total}</div>` : ""}

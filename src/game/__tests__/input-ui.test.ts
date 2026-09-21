@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Input } from "../Input";
 let input: Input | undefined;
-afterEach(() => { input?.dispose(); document.body.innerHTML = ""; });
+afterEach(() => { input?.dispose(); vi.restoreAllMocks(); document.body.innerHTML = ""; });
 function fixture(mark = vi.fn()) {
   const host = document.createElement("div");
   document.body.append(host);
@@ -267,5 +267,199 @@ describe("standardised movement keys (Poki EN-02)", () => {
     for (const code of ["Space", "Enter", "KeyW", "ArrowDown"]) {
       expect(key(button, code).defaultPrevented).toBe(false);
     }
+  });
+});
+
+describe("orientation and cancelled touch recovery", () => {
+  function point(host: HTMLElement, id: number, type: string, x: number, y: number) {
+    const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y });
+    Object.defineProperty(event, "pointerId", { value: id });
+    host.dispatchEvent(event);
+  }
+
+  it("releases old split touches on rotation and routes fresh ones to the new halves", () => {
+    const { host, input } = fixture();
+    vi.spyOn(host, "getBoundingClientRect").mockReturnValue({ left: 20, top: 30, width: 800, height: 400 } as DOMRect);
+    input.splitMode = "vertical";
+    point(host, 1, "pointerdown", 100, 100);
+    point(host, 2, "pointerdown", 700, 100);
+    input.splitMode = "vertical"; // Duplicate resize must not release active input.
+    expect(input.diving).toBe(true);
+    expect(input.diving2).toBe(true);
+    input.splitMode = "horizontal";
+    expect(input.diving).toBe(false);
+    expect(input.diving2).toBe(false);
+    vi.spyOn(host, "getBoundingClientRect").mockReturnValue({ left: 20, top: 30, width: 400, height: 800 } as DOMRect);
+    point(host, 1, "pointerup", 100, 40); // Old-orientation release is not a flick.
+    expect(input.consumeBoost()).toBe(false);
+    point(host, 3, "pointerdown", 100, 700);
+    expect(input.diving).toBe(false);
+    expect(input.diving2).toBe(true);
+    point(host, 4, "pointerdown", 100, 100);
+    expect(input.diving).toBe(true);
+    point(host, 3, "pointercancel", 100, 100);
+    expect(input.diving).toBe(true);
+    expect(input.diving2).toBe(false);
+  });
+
+  it("does not interpret a cancelled pointer or a menu release as a boost", () => {
+    const { host, input } = fixture();
+    let now = 1000;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    point(host, 1, "pointerdown", 150, 300);
+    now += 100;
+    point(host, 1, "pointercancel", 150, 200);
+    expect(input.diving).toBe(false);
+    expect(input.consumeBoost()).toBe(false);
+    now += 100;
+    point(host, 2, "pointerdown", 150, 300);
+    expect(input.consumeBoost()).toBe(false); // Not the second tap of a double-tap.
+    point(host, 99, "pointerup", 150, 100); // Never tracked (e.g. a UI button).
+    expect(input.consumeBoost()).toBe(false);
+    expect(input.diving).toBe(true);
+  });
+
+  it("preserves keyboard holds when the touch layout changes", () => {
+    const { host, input } = fixture();
+    key(host, "Space");
+    key(host, "KeyL");
+    input.splitMode = "horizontal";
+    input.splitMode = "vertical";
+    expect(input.diving).toBe(true);
+    expect(input.diving2).toBe(true);
+    key(host, "Space", "keyup");
+    key(host, "KeyL", "keyup");
+    expect(input.diving).toBe(false);
+    expect(input.diving2).toBe(false);
+  });
+});
+
+/**
+ * A menu overlay owns its own gestures.
+ *
+ * Regression cover for the two mobile breakages this caused: cancelling
+ * `touchstart`/`touchmove` anywhere outside a `<button>` stopped Chromium from
+ * ever handing the pan to its compositor thread (the shop card measured 0px of
+ * a 1340px scroll range), and cancelling `touchstart` also suppressed the
+ * compatibility `click` that dismisses a backdrop tap or resumes from pause —
+ * neither of which is a `<button>`.
+ */
+describe("menu overlays keep native scrolling and tapping", () => {
+  /** host > .overlay > .paper-card > child, mirroring the real HUD tree. */
+  function overlayFixture(childTag = "div", mark = vi.fn()) {
+    const { host, input } = fixture(mark);
+    const overlay = document.createElement("div");
+    overlay.className = "overlay menu";
+    const card = document.createElement("div");
+    card.className = "paper-card";
+    const child = document.createElement(childTag);
+    card.append(child);
+    overlay.append(card);
+    host.append(overlay);
+    return { host, input, overlay, card, child, mark };
+  }
+  const touch = (el: Element, type: string) => {
+    const event = new Event(type, { bubbles: true, cancelable: true });
+    el.dispatchEvent(event);
+    return event;
+  };
+  const pointer = (el: Element, type: string, x = 100, y = 200, id = 1) => {
+    const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y });
+    Object.defineProperty(event, "pointerId", { value: id });
+    (type === "pointerdown" ? el : window).dispatchEvent(event);
+    return event;
+  };
+
+  it.each(["touchstart", "touchmove"])("never cancels %s inside an overlay, so the card can pan", type => {
+    const { child, card, overlay } = overlayFixture();
+    for (const el of [child, card, overlay]) expect(touch(el, type).defaultPrevented).toBe(false);
+  });
+
+  it("still cancels touch on the bare gameplay surface", () => {
+    const { host } = fixture();
+    expect(touch(host, "touchstart").defaultPrevented).toBe(true);
+    expect(touch(host, "touchmove").defaultPrevented).toBe(true);
+  });
+
+  it("honours data-scroll-surface as the escape hatch for a scroller outside an overlay", () => {
+    const { host } = fixture();
+    const rail = document.createElement("div");
+    rail.dataset.scrollSurface = "true";
+    const inner = document.createElement("div");
+    rail.append(inner);
+    host.append(rail);
+    expect(touch(inner, "touchstart").defaultPrevented).toBe(false);
+    expect(touch(inner, "touchmove").defaultPrevented).toBe(false);
+  });
+
+  it.each([".emote-wheel"])("leaves the in-flight %s rail scrollable", sel => {
+    const { host } = fixture();
+    const rail = document.createElement("div");
+    rail.className = sel.slice(1);
+    const gap = document.createElement("span");
+    rail.append(gap);
+    host.append(rail);
+    expect(touch(gap, "touchstart").defaultPrevented).toBe(false);
+    expect(pointer(gap, "pointerdown").defaultPrevented).toBe(false);
+  });
+
+  it("does not arm a dive, a boost or a gameplay ripple from a touch on a menu", () => {
+    const { child, input } = overlayFixture();
+    pointer(child, "pointerdown");
+    expect(input.diving).toBe(false);
+    expect(document.querySelector(".touch-ripple")).toBeNull();
+    pointer(child, "pointerup");
+    expect(input.consumeBoost()).toBe(false);
+  });
+
+  it("does not read a double-tap on a menu as the boost gesture", () => {
+    const { child, input } = overlayFixture();
+    let now = 1000;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    pointer(child, "pointerdown", 100, 200, 1);
+    now = 1080;
+    pointer(child, "pointerup", 100, 200, 1);
+    now = 1200;
+    pointer(child, "pointerdown", 104, 204, 2);
+    expect(input.consumeBoost()).toBe(false);
+  });
+
+  it("does not read an upward flick on a menu as the boost gesture", () => {
+    const { child, input } = overlayFixture();
+    let now = 1000;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    pointer(child, "pointerdown", 150, 300, 3);
+    now = 1150;
+    pointer(child, "pointerup", 155, 240, 3);
+    expect(input.consumeBoost()).toBe(false);
+  });
+
+  it("still counts a menu touch as the first gesture, so audio unlocks on touch-only devices", () => {
+    const { child, mark } = overlayFixture("div", vi.fn());
+    pointer(child, "pointerdown");
+    expect(mark).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the dive alive on the gameplay surface either side of an overlay", () => {
+    const { host, child, input } = overlayFixture();
+    pointer(host, "pointerdown", 10, 10, 5);
+    expect(input.diving).toBe(true);
+    pointer(child, "pointerdown", 100, 200, 6); // menu touch is ignored entirely
+    expect(input.diving).toBe(true);
+    pointer(child, "pointerup", 100, 200, 6);
+    expect(input.diving).toBe(true); // and must not release the real hold
+    pointer(host, "pointerup", 10, 10, 5);
+    expect(input.diving).toBe(false);
+  });
+
+  it("positive control: the gameplay surface still dives and still shows the ripple", () => {
+    // Guards the overlay tests above from passing for the wrong reason (e.g. a
+    // guard so broad that no touch anywhere arms the dive any more).
+    const { host, input } = overlayFixture();
+    pointer(host, "pointerdown", 40, 60, 8);
+    expect(input.diving).toBe(true);
+    const ripple = document.querySelector(".touch-ripple");
+    expect(ripple).not.toBeNull();
+    expect((ripple as HTMLElement).style.left).toBe("40px");
   });
 });

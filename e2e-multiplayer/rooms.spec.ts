@@ -73,13 +73,23 @@ test("private invite: two pilots stay seated, ready together, share start/seed a
   } finally { await a.close(); await b.close(); }
 });
 
-test("public matching starts both browsers from the same server signal", async ({ browser, baseURL }) => {
+test("public matching starts only after both pilots ready up, from the same server signal", async ({ browser, baseURL }) => {
   const a = await browser.newContext({ baseURL }), b = await browser.newContext({ baseURL });
   try {
     const host = await a.newPage(), guest = await b.newPage();
     const hw = wire(host), gw = wire(guest);
     await lobby(host); await lobby(guest);
     await Promise.all([host.locator('[data-action="pvp-casual"]').click(), guest.locator('[data-action="pvp-casual"]').click()]);
+    // Nobody auto-readies: seated pilots must explicitly tap Ready up. While
+    // both are unready the room must NOT broadcast a start, however long they
+    // sit together.
+    for (const page of [host, guest]) {
+      await expect(page.locator('[data-action="mm-ready"]')).toBeVisible();
+    }
+    await host.waitForTimeout(1500);
+    expect(hw.frames.some(f => f.type === "start")).toBe(false);
+    expect(gw.frames.some(f => f.type === "start")).toBe(false);
+    await Promise.all([host.locator('[data-action="mm-ready"]').click(), guest.locator('[data-action="mm-ready"]').click()]);
     await expect.poll(() => hw.frames.some(f => f.type === "start")).toBe(true);
     await expect.poll(() => gw.frames.some(f => f.type === "start")).toBe(true);
     expect(hw.frames.find(f => f.type === "start")).toEqual(gw.frames.find(f => f.type === "start"));

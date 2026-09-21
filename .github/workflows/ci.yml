@@ -54,6 +54,66 @@ jobs:
           path: dist/
           retention-days: 14
 
+  orientation:
+    name: Portrait · Landscape · Rotation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Test the production build in both orientations
+        run: pnpm test:orientation
+      - name: Preserve browser failure traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orientation-test-results
+          path: test-results/
+          retention-days: 7
+
+  mobile:
+    name: Mobile · touch, scroll & tap-anywhere
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      # The regressions this suite exists to catch, all of them reported by real
+      # players on phones: menus that would not scroll (a blanket
+      # `preventDefault` on touchstart/touchmove was overriding a correct
+      # `touch-action`), taps that did nothing (touchstart swallowed the
+      # synthetic click), controls that gave no feedback at ≤640px, and a results
+      # screen whose tap-anywhere-to-fly-again dead zone sat underneath the card
+      # rather than inside it. Driven over real CDP touch on a Pixel 7 profile;
+      # the desktop project self-skips because it has no touch.
+      - name: Touch, scroll and tap-anywhere on a phone profile
+        run: pnpm test:mobile
+      - name: Preserve browser failure traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-test-results
+          path: test-results/
+          retention-days: 7
+
   verify-prod:
     name: Production gate (audit + budget + determinism)
     runs-on: ubuntu-latest
@@ -156,6 +216,41 @@ jobs:
           tail -c 6000 poki-artifact-test.log | grep -a -E "✘|Error:|Expected|Received" | head -8 | while IFS= read -r line; do
             echo "::error title=Poki artifact test::$(printf '%s' "$line" | sed 's/%/%25/g; s/\r//g')"
           done || true
+
+  policy:
+    name: Portal policy (shipping artifacts, real browser)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      # Source-level gates prove what the bundle *contains*; this proves what a
+      # player actually *sees*. It drives the two shipping folders — `poki-upload/`
+      # (handed to the Poki Inspector) and `dist/` (the direct build) — through
+      # the portal policy contract: a read-only curated pilot name and no
+      # ad-removal offers on Poki, and the free-text name field still present on
+      # the direct build. The script builds both folders itself, so a stale
+      # committed `poki-upload/` snapshot can never make this green for the wrong
+      # reason — which is exactly how the first-run welcome screen shipped a
+      # free-text input into the Poki bundle unnoticed.
+      - name: Policy contract on both builds
+        run: pnpm test:policy
+      - name: Preserve browser failure traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: policy-test-results
+          path: test-results/
+          retention-days: 7
 
   pvp-live:
     name: PvP · live clients · pilot directory

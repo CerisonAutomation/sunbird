@@ -12,9 +12,9 @@
  * geometry as the static icon generator.
  *
  * Output:
- *   public/animated/sunbird-animated.gif   (512×512, 24 frames, ~12 FPS, looping)
- *   public/animated/sunbird-animated.webp  (if ffmpeg is available)
- *   public/animated/sunbird-animated-256.gif, -128.gif  (smaller variants)
+ *   promo/animated/sunbird-animated.gif   (512×512, 24 frames, ~12 FPS, looping)
+ *   promo/animated/sunbird-animated.webp  (if ffmpeg is available)
+ *   promo/animated/sunbird-animated-256.gif, -128.gif  (smaller variants)
  *
  * Usage: node scripts/gen-animated-icon.mjs
  */
@@ -25,7 +25,7 @@ import { execSync } from "node:child_process";
 import { encodePng } from "./png.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const outDir = join(__dirname, "..", "public", "animated");
+const outDir = join(__dirname, "..", "promo", "animated");
 const framesDir = join(outDir, "_frames");
 mkdirSync(framesDir, { recursive: true });
 
@@ -401,4 +401,4 @@ for (const f of readdirSync(framesDir)) {
 }
 rmdirSync(framesDir);
 
-console.log("Done. Animated icons in public/animated/");
+console.log("Done. Animated icons in promo/animated/");

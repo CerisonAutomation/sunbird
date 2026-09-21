@@ -66,8 +66,17 @@ export async function boot(page: Page, baseUrl: string, locale?: string): Promis
   }
   await page.goto(baseUrl, { waitUntil: "commit" });
   await expect(page.locator("#boot-shell")).toHaveCount(0, { timeout: 45_000 });
+  // First run shows the welcome/name screen before the root menu. Accept the
+  // pre-filled (or curated) name exactly the way SunbirdPage.ready does, so
+  // the visual suite measures the shipping onboarding path, not around it.
+  const home = page.locator('[data-ref="menuCard"] [data-action="open-settings"]');
+  const welcome = page.locator('[data-action="confirm-pilot-name"]');
+  await Promise.race([home.waitFor({ state: "visible", timeout: 45_000 }), welcome.waitFor({ state: "visible", timeout: 45_000 })]);
+  if (await welcome.isVisible().catch(() => false) && !(await home.isVisible().catch(() => false))) {
+    await welcome.click();
+  }
   // Locale-independent home marker: a root-menu destination.
-  await expect(page.locator('[data-ref="menuCard"] [data-action="open-settings"]')).toBeVisible({ timeout: 45_000 });
+  await expect(home).toBeVisible({ timeout: 45_000 });
 }
 
 export async function openScreen(page: Page, action: string): Promise<void> {

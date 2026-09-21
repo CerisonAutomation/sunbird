@@ -59,13 +59,22 @@ export class MenuSky {
   // Cached per-resize scenery (rebuilt only when the canvas really changes).
   private skyGrad: CanvasGradient | null = null;
   private hazeGrad: CanvasGradient | null = null;
-  private hillFar: Path2D | null = null;
-  private hillMid: Path2D | null = null;
-  private hillNear: Path2D | null = null;
   private sunGrad: CanvasGradient | null = null;
   private sunX = 0;
   private sunY = 0;
   private sunR = 0;
+  private hillFar: Path2D | null = null;
+  private hillMid: Path2D | null = null;
+  private hillNear: Path2D | null = null;
+  // The 12 god-ray gradients used to be rebuilt and filled EVERY frame (30 Hz),
+  // which is the single most expensive thing in the menu on a phone GPU. They
+  // never change shape — only the whole layer rotates — so they are baked into
+  // one offscreen canvas per resize and composited with a rotated drawImage.
+  private raysCanvas: HTMLCanvasElement | null = null;
+  private rayLen = 0;
+  // Per-spark `shadowBlur` is brutally slow in 2D canvas; the glow is baked
+  // into a tiny radial sprite once and stamped with drawImage instead.
+  private sparkSprite: HTMLCanvasElement | null = null;
 
   // Golden particle trail behind the hero bird.
   private readonly sparks: Spark[] = [];
@@ -212,16 +221,75 @@ export class MenuSky {
     sunGrad.addColorStop(0.5, "rgba(255, 210, 100, 0.45)");
     sunGrad.addColorStop(0.8, "rgba(255, 185, 80,  0.18)");
     sunGrad.addColorStop(1,   "rgba(255, 160, 60,  0)");
-    // Store for draw() — gradient can't be cached as a field; rebuild is free.
+    // Cache the glow with the rest of the per-resize scenery.
     this.sunGrad = sunGrad;
     this.sunX = sx;
     this.sunY = sy;
     this.sunR = sunR;
 
+    // Bake the rotating god-rays once per resize (see field note).
+    this.bakeRays();
+    this.bakeSparkSprite();
+
     // Rolling hills: three layers with Poki video palette
     this.hillFar  = this.buildHill(0.60, 1.4, 1.9);   // back: purple moors
     this.hillMid  = this.buildHill(0.68, 1.2, 2.6);   // mid: teal meadow
     this.hillNear = this.buildHill(0.78, 1.0, 3.8);   // front: dark green
+  }
+
+  /** The god-ray layer, baked once per resize into an offscreen canvas. */
+  private bakeRays(): void {
+    const { width: w, height: h, sunR } = this;
+    const rayLen = Math.min(w, h) * 0.85;
+    this.rayLen = rayLen;
+    if (typeof document === "undefined") { this.raysCanvas = null; return; }
+    const size = Math.max(4, Math.ceil(rayLen * 2 * this.dpr));
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) { this.raysCanvas = null; return; }
+    const c = size / 2;
+    ctx.translate(c, c);
+    ctx.scale(this.dpr, this.dpr);
+    const rayCount = 12;
+    for (let i = 0; i < rayCount; i++) {
+      const angle = (i / rayCount) * Math.PI * 2;
+      const halfW = (0.04 + (i % 3) * 0.018) * Math.PI;
+      ctx.save();
+      ctx.rotate(angle);
+      const ray = ctx.createLinearGradient(sunR, 0, rayLen, 0);
+      ray.addColorStop(0,   "rgba(255, 240, 180, 0.22)");
+      ray.addColorStop(0.5, "rgba(255, 220, 120, 0.10)");
+      ray.addColorStop(1,   "rgba(255, 200,  80, 0)");
+      ctx.beginPath();
+      ctx.moveTo(sunR, 0);
+      ctx.arc(0, 0, rayLen, -halfW, halfW);
+      ctx.closePath();
+      ctx.fillStyle = ray;
+      ctx.fill();
+      ctx.restore();
+    }
+    this.raysCanvas = canvas;
+  }
+
+  /** A tiny radial glow sprite stamped per spark (replaces shadowBlur). */
+  private bakeSparkSprite(): void {
+    if (typeof document === "undefined") { this.sparkSprite = null; return; }
+    const s = 32;
+    const canvas = document.createElement("canvas");
+    canvas.width = s;
+    canvas.height = s;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) { this.sparkSprite = null; return; }
+    const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+    g.addColorStop(0, "rgba(255, 250, 220, 1)");
+    g.addColorStop(0.35, "rgba(255, 210, 110, 0.85)");
+    g.addColorStop(0.7, "rgba(255, 180, 60, 0.35)");
+    g.addColorStop(1, "rgba(255, 160, 40, 0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, s, s);
+    this.sparkSprite = canvas;
   }
 
   private buildHill(baseY: number, amp: number, freq: number): Path2D | null {
@@ -257,10 +325,7 @@ export class MenuSky {
     }
 
     // Sun glow (behind everything else)
-    const sx: number = this.sunX || w * 0.62;
-    const sy: number = this.sunY || h * 0.42;
-    const sunR: number = this.sunR || Math.min(w, h) * 0.18;
-    const sunGrad = this.sunGrad;
+    const { sunX: sx, sunY: sy, sunR, sunGrad } = this;
     if (sunGrad) {
       ctx.fillStyle = sunGrad;
       ctx.fillRect(0, 0, w, h);
@@ -274,30 +339,16 @@ export class MenuSky {
     ctx.fill();
     ctx.restore();
 
-    // God-rays: 12 rotating beams radiating from the sun
-    ctx.save();
-    ctx.translate(sx, sy);
-    ctx.rotate(this.time * 0.018);
-    const rayCount = 12;
-    const rayLen = Math.min(w, h) * 0.85;
-    for (let i = 0; i < rayCount; i++) {
-      const angle = (i / rayCount) * Math.PI * 2;
-      const halfW = (0.04 + (i % 3) * 0.018) * Math.PI;
+    // God-rays: the baked layer rotates as a single composited drawImage —
+    // per-frame gradient creation + 12 arc fills used to dominate menu cost.
+    if (this.raysCanvas) {
+      const half = this.rayLen;
       ctx.save();
-      ctx.rotate(angle);
-      const ray = ctx.createLinearGradient(sunR, 0, rayLen, 0);
-      ray.addColorStop(0,   "rgba(255, 240, 180, 0.22)");
-      ray.addColorStop(0.5, "rgba(255, 220, 120, 0.10)");
-      ray.addColorStop(1,   "rgba(255, 200,  80, 0)");
-      ctx.beginPath();
-      ctx.moveTo(sunR, 0);
-      ctx.arc(0, 0, rayLen, -halfW, halfW);
-      ctx.closePath();
-      ctx.fillStyle = ray;
-      ctx.fill();
+      ctx.translate(sx, sy);
+      ctx.rotate(this.time * 0.018);
+      ctx.drawImage(this.raysCanvas, -half, -half, half * 2, half * 2);
       ctx.restore();
     }
-    ctx.restore();
 
     // Warm cloud bands (drift slowly)
     this.band(ctx, w, h, 0.33, 0.14, "rgba(255, 220, 170, 0.22)", 0.09);
@@ -395,20 +446,23 @@ export class MenuSky {
       sp.life -= dt / sp.maxLife;
       if (sp.life <= 0) { this.sparks.splice(i, 1); continue; }
       const alpha = sp.life * 0.9;
-      const frac = 1 - sp.life;
-      // Colour: white-hot → golden → amber → fades out
-      const r = 255;
-      const g = Math.round(230 - frac * 90);
-      const b = Math.round(120 - frac * 100);
-      ctx.save();
-      ctx.globalAlpha = alpha;
-      ctx.beginPath();
-      ctx.arc(sp.x, sp.y, sp.r * (0.7 + sp.life * 0.5), 0, Math.PI * 2);
-      ctx.fillStyle = `rgb(${r},${g},${b})`;
-      ctx.shadowColor = `rgba(255,180,40,${alpha * 0.8})`;
-      ctx.shadowBlur = sp.r * 3;
-      ctx.fill();
-      ctx.restore();
+      const radius = sp.r * (0.7 + sp.life * 0.5) * 3; // sprite carries the glow falloff
+      if (this.sparkSprite) {
+        // One stamped gradient sprite per spark; shadowBlur here cost a full
+        // blur pass per particle per frame on phones.
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.drawImage(this.sparkSprite, sp.x - radius, sp.y - radius, radius * 2, radius * 2);
+        ctx.restore();
+      } else {
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        ctx.arc(sp.x, sp.y, sp.r * (0.7 + sp.life * 0.5), 0, Math.PI * 2);
+        ctx.fillStyle = "rgb(255, 210, 100)";
+        ctx.fill();
+        ctx.restore();
+      }
     }
 
     // Draw the bird on top of the sparks

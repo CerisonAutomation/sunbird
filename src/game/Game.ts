@@ -1,3 +1,4 @@
+import { splitLayout, splitViews } from "./Viewport";
 import { equalizedRace } from "./RaceRules";
 import { terrainCue, landingLookAhead } from "./FlightGuidance";
 import { ScreenHistory } from "./ScreenHistory";
@@ -270,6 +271,10 @@ export class Game {
   private continueOfferView: ContinueOffer | null = null;
 
   private daylight = DAYLIGHT_MAX;
+  /** Seconds the bird has sat settled (grounded/water, slow, no input). */
+  private settleAcc = 0;
+  /** runTime of the last dive input; passive braking keys off it. */
+  private lastInputAt = 0;
   private startX = 64;
   private island = 0;
   private lastIsland = 0;
@@ -518,6 +523,7 @@ export class Game {
   private resetTimer = 0;
 
   private readonly resizeObs: ResizeObserver;
+  private orientationTimers: number[] = [];
   private readonly onVis: () => void;
   private readonly onResize: () => void;
   private readonly loop: (t: number) => void;
@@ -757,8 +763,10 @@ export class Game {
     this.onOrientationChange = () => {
       try { window.scrollTo(0, 0); } catch { /* ignore */ }
       this.resize();
-      window.setTimeout(() => this.resize(), 100);
-      window.setTimeout(() => this.resize(), 300);
+      // Mobile browsers may report the old dimensions during orientationchange.
+      // Coalesce recovery passes, and never let them outlive this game instance.
+      this.orientationTimers.forEach(id => window.clearTimeout(id));
+      this.orientationTimers = [100, 300].map(delay => window.setTimeout(() => this.resize(), delay));
     };
     this.onFullscreenChange = () => {
       this.resize();
@@ -959,6 +967,8 @@ export class Game {
     this.disposed = true;
     cancelAnimationFrame(this.raf);
     this.resizeObs.disconnect();
+    this.orientationTimers.forEach(id => window.clearTimeout(id));
+    this.orientationTimers = [];
     window.removeEventListener("resize", this.onResize);
     window.visualViewport?.removeEventListener("resize", this.onResize);
     window.visualViewport?.removeEventListener("scroll", this.onResize);
@@ -1007,7 +1017,12 @@ export class Game {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.loop);
     try {
-    const raw = Math.min(0.1, (now - this.last) / 1000);
+    // Cap the frame delta so a backgrounded tab or a hiccup never teleports
+    // physics. 0.25s (not 0.1): on low-end devices the renderer can dip below
+    // 10 fps, and with a tighter cap the GAME CLOCK runs slower than real
+    // time — runs take forever and timed gates drift. Physics is fixed-step
+    // (PHYS_DT accumulator), so a larger delta just means more cheap substeps.
+    const raw = Math.min(0.25, (now - this.last) / 1000);
     this.last = now;
     if (this.hidden || this.contextLost) return;
 
@@ -1887,6 +1902,31 @@ export class Game {
       }
     }
 
+    // Settle rule: a bird that is down (grounded, in water, or skimming the
+    // deck) with crawl speed and no held input has nothing left to do — let
+    // it fall asleep now instead of waiting out the whole sun. Passive runs
+    // end in seconds, matching the recap's "let it sleep" framing; active
+    // flight cruises far above the speed threshold, so play never trips it.
+    // An untouched bird tucks its wings: while grounded and passive, bleed
+    // the taxi surges terrain bumps keep pumping in, so a run nobody plays
+    // settles to a stop instead of surfing valleys until sundown.
+    if (diving) this.lastInputAt = this.runTime;
+    if (!diving && this.bird.grounded && this.runTime - this.lastInputAt > 3) {
+      this.bird.vx *= Math.max(0, 1 - 2.5 * dt);
+    }
+    const surfaceY = this.terrain.isOcean(this.bird.x) ? WATER_Y : this.terrain.heightAt(this.bird.x);
+    const settleAlt = this.bird.y - surfaceY;
+    const settled = (this.bird.grounded || this.bird.inWater || settleAlt < 6) && this.bird.speed() < 6;
+    if (!this.bird.asleep && !this.input.diving && settled) {
+      this.settleAcc += dt;
+    } else {
+      this.settleAcc = 0;
+    }
+    if (this.settleAcc >= 4 && !this.bird.asleep) {
+      this.onDaylightOut();
+      return;
+    }
+
     // Session goals update live so the player sees a bar fill mid-flight.
     const done = this.goals.update({
       distance: this.bird.x - this.startX,
@@ -2491,20 +2531,10 @@ export class Game {
     this.audio.setMusicIntensity(playing ? Math.min(1, lead.bird.speed() / 90 * 0.5 + Math.min(1, lead.bird.altitude / ALT_HIGH) * 0.3) : 0);
 
     const size = this.renderer.getSize(this.tmpSize);
-    const vertical = size.x / Math.max(1, size.y) >= 1.25;
-    const w = vertical ? Math.floor(size.x / 2) : size.x;
-    const h = vertical ? size.y : Math.floor(size.y / 2);
+    const views = splitViews(size.x, size.y, this.renderer.getPixelRatio());
     this.renderer.setScissorTest(true);
-    const views: [Racer, number, number][] = vertical
-      ? [
-          [p1, 0, 0],
-          [p2, w, 0],
-        ]
-      : [
-          [p1, 0, h],
-          [p2, 0, 0],
-        ];
-    for (const [racer, ox, oy] of views) {
+    for (const [index, racer] of [p1, p2].entries()) {
+      const { x: ox, y: oy, width: w, height: h } = views[index]!;
       // Each split viewport gets one authoritative bird. Rendering both
       // meshes into both cameras made nearby racers visually stack or appear
       // to teleport across the divider. Terrain and particles remain shared,
@@ -2596,6 +2626,8 @@ export class Game {
       (this.mode.clock > 0 ? this.mode.clock : this.daylightMax()) *
       this.challengeMods.daylightMult *
       (this.eventRun ? this.weeklyMods.daylightMult : 1);
+    this.settleAcc = 0;
+    this.lastInputAt = 0;
     this.weather.windMult = (this.eventRun ? this.weeklyMods.windMult : 1) * (this.stormfront ? 1.7 : 1);
     this.weather.stormfront = this.stormfront;
     if (this.stormfront) this.hud.toast("⛈ STORMFRONT — same storm for every pilot. Survive and outfly.", "warn");
@@ -3504,7 +3536,24 @@ export class Game {
         break;
       }
       case "confirm-pilot-name": {
-        const nameInput = this.hud.readValue("pilotNameInput") || this.pilotName;
+        if (!CUSTOM_PILOT_NAMES) {
+          // Portal editions render no typing surface, so the curated generated
+          // name on the plate *is* the name. Falling through to the free-text
+          // guard below would toast "Please enter a pilot name" forever and trap
+          // a first-run player on the welcome screen with no way out. The
+          // typed-name easter eggs are skipped with it — there is nothing typed,
+          // and "sunbird" awarding coins would otherwise be free to farm.
+          const curated = savePilotName(this.pilotName);
+          this.pilotName = curated;
+          this.save.state.pilotName = curated;
+          this.save.state.pilotNameCustomized = true;
+          this.save.persist();
+          this.audio.fanfare();
+          this.hud.toast(`Welcome, ${curated}!`, "info");
+          this.setScreen("main");
+          break;
+        }
+        const nameInput = this.hud.readValue("pilotNameInput");
         if (!nameInput || !nameInput.trim()) {
           this.hud.toast("Please enter a pilot name", "warn");
           break;
@@ -3535,7 +3584,22 @@ export class Game {
         break;
       }
       case "randomize-pilot-name": {
-        this.hud.setValue("pilotNameInput", generatePilotName());
+        const gen = generatePilotName();
+        if (CUSTOM_PILOT_NAMES) {
+          // Free-text build: fill the field and let "Let's Fly" commit it, so a
+          // player can keep rolling without each roll silently saving.
+          this.hud.setValue("pilotNameInput", gen);
+          break;
+        }
+        // Portal build: there is no field to fill, so `setValue` would be a
+        // no-op and the dice would be dead. Commit the roll and re-render the
+        // plate instead. `pilotNameCustomized` stays false until the player
+        // confirms, so a reload still lands on the welcome screen.
+        const next = savePilotName(gen);
+        this.pilotName = next;
+        this.save.state.pilotName = next;
+        this.save.persist();
+        this.bump();
         break;
       }
       case "claim-rank-prize": {
@@ -3576,6 +3640,10 @@ export class Game {
         this.sendEmote(id || "👋");
         break;
       case "host-room": {
+        if (!isMultiplayerConfigured()) {
+          this.hud.toast("Live rooms are not available in this edition", "warn");
+          break;
+        }
         this.disconnectRace();
         this.localRace = false;
         this.roomCode = makeRoomCode();
@@ -3590,6 +3658,10 @@ export class Game {
         break;
       }
       case "join-room": {
+        if (!isMultiplayerConfigured()) {
+          this.hud.toast("Live rooms are not available in this edition", "warn");
+          break;
+        }
         const code = normalizeRoomCode(this.hud.readValue("roomCode"));
         if (!code) {
           this.hud.toast("Enter a 5-letter room code", "warn");
@@ -3678,12 +3750,21 @@ export class Game {
         this.beginMatchmaking({ ranked: true, storm: mode.id === "pvp_typhoon" });
         break;
       }
-      case "start-room-now":
-        if (this.net) this.net.startNow();
+      case "start-room-now": {
         this.modeId = this.selectedPvpMode;
         this.mode = modeById(this.selectedPvpMode);
-        this.launchMatch({ ranked: false, storm: this.modeId === "pvp_typhoon" }, false);
+        // With real pilots seated, the room launches together: the transport
+        // issues ONE shared start (a 6s countdown for everyone) instead of the
+        // host racing off alone while guests watch an empty sky.
+        const seatedWithPilots = Boolean(this.net) && this.net!.connected && this.liveCount() > 0;
+        if (this.net) this.net.startNow();
+        if (seatedWithPilots) {
+          this.hud.toast("Launching together — every pilot gets the countdown", "gold");
+        } else {
+          this.launchMatch({ ranked: false, storm: this.modeId === "pvp_typhoon" }, false);
+        }
         break;
+      }
       case "copy-invite": {
         if (this.roomCode) this.copyRoomInvite(this.roomCode);
         else this.hud.toast("Host a room first to get an invite link", "warn");
@@ -3719,6 +3800,17 @@ export class Game {
       case "mm-cancel":
         this.cancelMatchmaking();
         break;
+      case "mm-ready": {
+        // Explicit opt-in to a live start. The race launches only once every
+        // seated pilot is ready, then counts down 6s for everyone.
+        if (this.net?.state === "lobby") {
+          const nowReady = !this.net.info().ready;
+          this.net.sendReady(nowReady);
+          this.hud.toast(nowReady ? "You are ready! ✓" : "Ready cancelled", "gold");
+          this.bump();
+        }
+        break;
+      }
       case "mm-ai":
         // Explicit opt-in only: the search never drops a pilot into a bot race.
         this.takeAiFlock();
@@ -3880,13 +3972,18 @@ export class Game {
             this.squad.enableAutonomous();
           } else {
             void this.squad.refresh().then(() => {
-              if (!this.squad?.state.registered) {
+              // A lost key is not "no service": keep the honest recovery
+              // surface (explicit re-enrollment) instead of silently
+              // dropping into the autonomous offline hub.
+              if (!this.squad?.state.registered && !this.squad?.state.credentialError) {
                 this.squad?.enableAutonomous();
                 this.bump();
               }
             }).catch(() => {
-              this.squad?.enableAutonomous();
-              this.bump();
+              if (!this.squad?.state.credentialError) {
+                this.squad?.enableAutonomous();
+                this.bump();
+              }
             });
           }
         }
@@ -4901,7 +4998,12 @@ export class Game {
   }
 
   private get fairRace(): boolean {
-    return equalizedRace(this.modeId, this.rankedRace, this.localRace, this.duelActive);
+    if (equalizedRace(this.modeId, this.rankedRace, this.localRace, this.duelActive)) return true;
+    // Private-room rooms are live shared-field races too: the lobby promises
+    // "Equal flight equipment — Store boosts are saved for solo play", so any
+    // race mode flown inside a live room strips paid advantages (boosts,
+    // daylight, mastery perks) the same way ranked rooms do.
+    return isRaceMode(this.modeId) && !this.localRace && !this.duelActive && this.roomCode !== "";
   }
 
   /** Keep the chosen artwork, but not paid flight advantages in a live race. */
@@ -5133,8 +5235,6 @@ export class Game {
    * server's shared start. A timed-out search explicitly disconnects before
    * starting local AI practice. Browsing or cancelling cannot block a room. */
   private static readonly MM_WINDOW = 15;
-  /** After the window: how long we keep the seat and keep listening. */
-  private static readonly MM_KEEPALIVE = 600;
 
   private beginMatchmaking(opts: { ranked: boolean; storm: boolean }): void {
     this.disconnectRace();
@@ -5160,7 +5260,8 @@ export class Game {
     this.mmDeadline = performance.now() + Game.MM_WINDOW * 1000;
     this.preseatLobby();
     this.startRoomWatch();
-    this.hud.setMatchmaking(true, this.liveCount(), this.roomSize, Game.MM_WINDOW, "searching", "");
+    const ready = this.net?.state === "lobby" ? (this.net.info().ready ? "ready" : "unready") : "none";
+    this.hud.setMatchmaking(true, this.liveCount(), this.roomSize, Game.MM_WINDOW, "searching", "", ready);
     this.bump();
   }
 
@@ -5240,26 +5341,35 @@ export class Game {
       return;
     }
     const live = this.liveCount();
-    // Public entrants opt in by pressing Find race. The server, not each
-    // player's timer, decides when the room may launch.
-    if (this.net?.state === "lobby" && !this.net.info().ready) this.net.sendReady(true);
+    // Nobody is auto-readied. A live pilot joining the room never launches a
+    // race by itself — the overlay offers an explicit Ready toggle, and the
+    // room starts (with a shared 6s countdown) only once every seated pilot
+    // has readied up.
+    const ready = this.net?.state === "lobby" ? (this.net.info().ready ? "ready" : "unready") : "none";
     // Someone real is in the room — keep the search open until the room starts.
     if (live > 0 && this.mmPhase === "waiting") this.mmPhase = "searching";
     if (this.mmPhase === "waiting") {
-      this.hud.setMatchmaking(true, live, this.roomSize, 0, "waiting", this.mmRooms);
+      this.hud.setMatchmaking(true, live, this.roomSize, 0, "waiting", this.mmRooms, ready);
       return;
     }
     const secsLeft = (this.mmDeadline - performance.now()) / 1000;
-    this.hud.setMatchmaking(true, live, this.roomSize, Math.max(0, secsLeft), "searching", this.mmRooms);
+    this.hud.setMatchmaking(true, live, this.roomSize, Math.max(0, secsLeft), "searching", this.mmRooms, ready);
     if (secsLeft <= 0) {
-      // The window elapsed with nobody to race. Do NOT launch a bot race — the
-      // pilot asked for live pilots. Keep the room, keep listening, and let
-      // them choose: wait longer, or take the AI flock deliberately.
+      // The window elapsed with nobody to race. Fall back to a clearly
+      // labeled AI flock so the pilot is never left staring at a dead
+      // search — real pilots still require an explicit Ready; only an
+      // empty room may launch on its own.
       this.mmPhase = "waiting";
-      this.mmDeadline = performance.now() + Game.MM_KEEPALIVE * 1000;
-      this.hud.setMatchmaking(true, live, this.roomSize, 0, "waiting", this.mmRooms);
-      this.hud.toast(this.mmRooms ? `Still searching — ${this.mmRooms}` : "Still searching for live pilots…", "info");
+      const opts = this.mmOpts;
+      this.mmOpts = null;
+      this.mmDeadline = 0;
+      this.roomWatcher?.stop();
+      this.closeRoomBrowser();
+      this.hud.setMatchmaking(false, live, this.roomSize, 0);
+      this.hud.toast("No live pilots found — racing the AI flock (practice)", "info");
+      this.telemetry.track("matchmaking_ai_fallback", { window: Game.MM_WINDOW });
       this.bump();
+      if (opts) this.launchMatch(opts, true);
     }
   }
 
@@ -5368,7 +5478,15 @@ export class Game {
 
   /** Opens (or reuses) a realtime seat for the current race seed. */
   private connectRace(): void {
-    if (!isMultiplayerConfigured() && getPortalTarget() !== "poki") return;
+    // Compile-time edition constant, not a runtime `getPortalTarget() !== "poki"`
+    // comparison. The minifier folds positive `TARGET === "poki"` branches but
+    // not a negative early-return, so the literal survived into the CrazyGames
+    // and generic bundles and tripped their cross-portal isolation gate — the
+    // same trap `src/sdk/net.ts` documents having already fallen into.
+    // Identical semantics: POKI_MULTIPLAYER is true only in the Poki build, so
+    // Poki still never bails here and every other edition still bails unless a
+    // multiplayer backend is configured.
+    if (!isMultiplayerConfigured() && !POKI_MULTIPLAYER) return;
     if (this.net?.connected) { this.massRace.attachTransport(this.net); return; }
     if (!this.net) {
       this.net = this.createNetTransport(this.save.state.deviceId, this.pilotName, this.skin.id);
@@ -6244,6 +6362,7 @@ export class Game {
       raceFinishTime: this.raceFinishTime,
       massRace: isRaceMode(this.modeId),
       multiplayerLive: isMultiplayerConfigured() && !(this.state === "playing" && this.localRace),
+      multiplayerConfigured: isMultiplayerConfigured(),
       roster:
         this.massRace.active && this.state === "playing"
           ? this.massRace.roster(this.bird.x, this.startX, this.mode.finish, this.pilotName)
@@ -6508,9 +6627,13 @@ export class Game {
   }
 
   private resize(): void {
-    const vv = typeof window !== "undefined" ? window.visualViewport : null;
-    const w = Math.round(vv?.width ?? (this.host.clientWidth || window.innerWidth));
-    const h = Math.round(vv?.height ?? (this.host.clientHeight || window.innerHeight));
+    if (this.disposed) return;
+    // CSS sizes the canvas/HUD to the host. A keyboard or pinch zoom can shrink
+    // visualViewport without resizing that host; using it would stretch WebGL
+    // and make its split layout disagree with pointer coordinates and the HUD.
+    const w = this.host.clientWidth;
+    const h = this.host.clientHeight;
+    if (w <= 0 || h <= 0) return; // Ignore transient hidden/rotation dimensions.
     // A ResizeObserver and window resize can report the same size. Avoid
     // resetting canvas storage / bloom targets twice (or on unchanged DPR).
     if (w !== this.renderWidth || h !== this.renderHeight || this.dpr !== this.renderDpr) {
@@ -6524,8 +6647,7 @@ export class Game {
       this.renderDpr = this.dpr;
     }
     if (this.p1 && this.p2) {
-      const vertical = w / Math.max(1, h) >= 1.25;
-      this.input.splitMode = this.versus ? (vertical ? "vertical" : "horizontal") : "off";
+      this.input.splitMode = this.versus ? splitLayout(w, h) : "off";
     }
   }
 }

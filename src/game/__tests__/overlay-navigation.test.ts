@@ -49,7 +49,11 @@ describe("primary menu action via Space / Return (Poki EN-02)", () => {
     return { root, overlay, nav };
   }
 
-  it.each(["Enter", " "])("activates the primary action when focus is on the heading (%s)", (keyName) => {
+  // Focus-first contract (mirrors e2e input-standards:42): the first bare key
+  // moves focus onto the primary without activating it — a stray Space must
+  // never launch a race or spend coins in one press — and the press that
+  // lands on the now-focused control activates it natively, unhijacked.
+  it.each(["Enter", " "])("routes a bare key on the heading onto the primary action (%s)", (keyName) => {
     const { nav } = overlayFixture();
     const primary = document.getElementById("primary")!;
     const clicked = vi.fn();
@@ -58,8 +62,15 @@ describe("primary menu action via Space / Return (Poki EN-02)", () => {
     title.focus();
     const event = new KeyboardEvent("keydown", { key: keyName, bubbles: true, cancelable: true });
     title.dispatchEvent(event);
-    expect(clicked).toHaveBeenCalledOnce();
+    // Focus lands on the primary, the key is consumed, nothing fired yet.
+    expect(document.activeElement).toBe(primary);
     expect(event.defaultPrevented).toBe(true);
+    expect(clicked).not.toHaveBeenCalled();
+    // The press that lands on the focused control is left to native
+    // activation: OverlayNavigation must not hijack or prevent it.
+    const second = new KeyboardEvent("keydown", { key: keyName, bubbles: true, cancelable: true });
+    primary.dispatchEvent(second);
+    expect(second.defaultPrevented).toBe(false);
     nav.dispose();
   });
 

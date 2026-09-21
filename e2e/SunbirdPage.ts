@@ -12,7 +12,15 @@ export class SunbirdPage {
   async open(): Promise<void> { await this.page.goto("/", { waitUntil: "commit" }); }
   async ready(): Promise<void> {
     await expect(this.page.locator("#boot-shell")).toHaveCount(0);
-    await expect(this.page.getByRole("button", { name: "Play free flight now", exact: true })).toBeVisible();
+    const play = this.page.getByRole("button", { name: "Play free flight now", exact: true });
+    const confirmName = this.page.locator('[data-action="confirm-pilot-name"]');
+    await expect(play.or(confirmName)).toBeVisible();
+    // Fresh browser contexts now start at the pilot welcome screen.
+    if (await confirmName.isVisible()) {
+      await this.page.getByRole("button", { name: "Random name", exact: true }).click();
+      await confirmName.click();
+    }
+    await expect(play).toBeVisible();
   }
   async fly(): Promise<void> {
     await this.page.getByRole("button", { name: "Play free flight now", exact: true }).click();
@@ -90,12 +98,17 @@ export class SunbirdPage {
         el("standings").classList.remove("hidden");
         el("standings").innerHTML = '<div class="st-row you"><b>12</b><span>You</span><span>1,240m</span></div>';
       }
+      // Finish layout-affecting transitions before measuring the frozen lanes.
+      await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
       // Same observed height contract as HUD's ResizeObserver, on the frozen
       // clone (the live observer still belongs to the original game instance).
       for (const name of ["header", "footer"]) {
         const lane = root.querySelector(name === "header" ? ".hud-header" : ".flight-footer")!;
         root.style.setProperty(`--hud-${name}-height`, `${lane.getBoundingClientRect().height}px`);
       }
+      // Let the measured CSS variables settle before reading overlap boxes.
+      // Reduced-motion CSS still gives transitions a tiny nonzero duration.
+      await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
     }, race);
   }
 

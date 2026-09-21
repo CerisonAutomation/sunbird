@@ -37,7 +37,14 @@ export class OverlayNavigation {
    * A focused native button already does this, but these overlays deliberately
    * move focus to the dialog heading for screen readers — so a bare Space or
    * Return lands on nothing. Route it to the overlay's primary action (the
-   * `.primary-btn` when one exists, else the first visible control) instead.
+   * `.primary-btn` when one exists, else the first visible control).
+   *
+   * Two-step on purpose: the first press MOVES FOCUS onto the primary (the
+   * keyboard player sees exactly what will happen, and screen readers announce
+   * it); the press that lands on the already-focused control then activates
+   * it natively. Activating-and-navigating on the very first bare Space made
+   * the focus target vanish and let a stray key launch races or spend coins —
+   * the same hazard that made the results backdrop inert.
    *
    * Skipped when: there is no open overlay, the event was already handled, the
    * key is auto-repeating, an IME composition is in flight, or focus sits on a
@@ -56,10 +63,9 @@ export class OverlayNavigation {
     if (!primary) return;
     event.preventDefault();
     // Move focus onto the control being activated, not just fire its click:
-    // a keyboard player gets the focus ring on the thing that happened, and
-    // the next Tab continues from there instead of from the heading.
-    if (document.activeElement !== primary) primary.focus({ preventScroll: true });
-    primary.click();
+    // a keyboard player gets the focus ring on the thing that will happen,
+    // and the next Tab continues from there instead of from the heading.
+    primary.focus({ preventScroll: true });
   }
 
   constructor(private readonly root: HTMLElement) { root.addEventListener("keydown", this.onKey); }

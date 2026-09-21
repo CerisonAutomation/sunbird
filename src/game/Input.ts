@@ -11,6 +11,9 @@ const DIVE_CODE_SET = new Set(DIVE_CODES);
 const P2_CODES = ["Enter", "NumpadEnter", "ShiftRight", "KeyL"];
 const P2_CODE_SET = new Set(P2_CODES);
 
+/** Surfaces whose panning belongs to the browser, never to the dive gesture. */
+const SCROLL_SURFACES = ".overlay, .emote-wheel, [data-scroll-surface]";
+
 export class Input {
   enabled = true;
   held = false;
@@ -28,7 +31,15 @@ export class Input {
   private padP1 = false;
   private padP2 = false;
   /** In versus mode a tap is routed to a player by which half of the screen it lands on. */
-  splitMode: "off" | "vertical" | "horizontal" = "off";
+  private split: "off" | "vertical" | "horizontal" = "off";
+  get splitMode(): "off" | "vertical" | "horizontal" { return this.split; }
+  set splitMode(mode: "off" | "vertical" | "horizontal") {
+    if (mode === this.split) return;
+    this.split = mode;
+    // Fingers belonged to the old screen halves. Require a fresh touch after
+    // rotation, but keep independent keyboard/gamepad holds intact.
+    this.onPointerEnd();
+  }
   private readonly touches = new Map<number, 1 | 2>();
   private first = false;
   private lastTapDownAt = 0;
@@ -53,26 +64,18 @@ export class Input {
     this.onFirstGesture = onFirstGesture;
     this.boundPointerDown = (e) => this.onPointerDown(e);
     this.boundPointerUp = (e) => this.onPointerUp(e);
-    this.boundPointerCancel = (e: PointerEvent) => this.onPointerUp(e);
+    this.boundPointerCancel = (e: PointerEvent) => this.onPointerUp(e, true);
     this.boundKeyDown = (e) => this.onKeyDown(e);
     this.boundKeyUp = (e) => this.onKeyUp(e);
     this.boundContext = (e) => e.preventDefault();
     this.boundTouchStart = (e: TouchEvent) => {
       this.markFirst();
-      if (!this.isTyping(e.target) && !this.isInteractive(e.target)) {
-        if (e.cancelable) e.preventDefault();
-      }
+      if (this.ownsTouch(e.target) && e.cancelable) e.preventDefault();
     };
     this.boundTouchMove = (e: TouchEvent) => {
-      if (!this.isTyping(e.target) && !this.isInteractive(e.target)) {
-        if (e.cancelable) e.preventDefault();
-      }
+      if (this.ownsTouch(e.target) && e.cancelable) e.preventDefault();
     };
-    this.boundWindowTouchMove = (e: TouchEvent) => {
-      if (!this.isTyping(e.target) && !this.isInteractive(e.target)) {
-        if (e.cancelable) e.preventDefault();
-      }
-    };
+    this.boundWindowTouchMove = this.boundTouchMove;
 
     el.addEventListener("pointerdown", this.boundPointerDown);
     window.addEventListener("pointerdown", this.boundPointerDown);
@@ -187,11 +190,71 @@ export class Input {
     return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || (target instanceof Element && !!target.closest("[contenteditable=true]"));
   }
 
+  /**
+   * Surfaces the browser must pan for us.
+   *
+   * `.overlay` is every menu/pause/result screen; `.emote-wheel` is the one
+   * scrollable rail that lives in the flight HUD rather than in an overlay.
+   * `[data-scroll-surface]` is the escape hatch for the next one, so this stays
+   * a selector match instead of a `getComputedStyle` walk on a 60Hz event.
+   */
+  private isScrollSurface(target: EventTarget | null): boolean {
+    return target instanceof Element && !!target.closest(SCROLL_SURFACES);
+  }
+
+  /**
+   * A menu overlay owns its gestures outright — the flight surface does not.
+   *
+   * Two separate breakages came from treating overlay touches as gameplay:
+   *
+   * 1. Scrolling died. Chromium only hands a pan to the compositor thread
+   *    while the first touch events stay uncancelled, so a `preventDefault()`
+   *    on any `touchstart`/`touchmove` stops the scroll before it begins. The
+   *    menu card is mostly plain `<div>`s, so almost every finger position
+   *    landed on a non-interactive target and the card never moved — measured
+   *    at 0px of a 1340px scroll range on the shop, while the identical drag
+   *    that happened to start on a `<button>` scrolled 337px. This is the
+   *    exact anti-pattern Chrome's scrolling-intervention guidance names:
+   *    express "don't scroll here" with `touch-action`, not `preventDefault()`.
+   * 2. Taps died with it. Cancelling `touchstart` also suppresses the
+   *    compatibility `click`, which is the only thing that dismisses a
+   *    backdrop tap (`.overlay` → back) or resumes from the pause / game-over
+   *    screens — neither of which is a `<button>`.
+   *
+   * The host page is still protected, which is what Poki's "prevent game
+   * viewport scrolling from affecting the parent page" asks for: `body` is
+   * `position: fixed; overflow: hidden; overscroll-behavior: none` and the
+   * menu card is `overscroll-behavior: contain`, so no gesture can chain out
+   * of the game.
+   */
+  private isOverlaySurface(target: EventTarget | null): boolean {
+    return target instanceof Element && !!target.closest(".overlay, [data-scroll-surface]");
+  }
+
+  /**
+   * Whether the gameplay surface owns this touch, and may therefore block the
+   * browser's default handling of it. Everything else — a focused field, a
+   * control with its own click, a surface the browser should pan — is left
+   * alone. `touch-action: none` on the canvas/HUD is what actually stops the
+   * gameplay surface from scrolling; this is the belt-and-braces path for
+   * engines old enough to ignore `touch-action`.
+   */
+  private ownsTouch(target: EventTarget | null): boolean {
+    return !this.isTyping(target) && !this.isInteractive(target) && !this.isScrollSurface(target);
+  }
+
   private onPointerDown(e: PointerEvent): void {
     if (!this.enabled) return;
     if (this.isInteractive(e.target)) return;
+    // A menu covering the flight surface owns the finger: no dive, no armed
+    // double-tap boost, no gameplay ripple splashed over the menu — and no
+    // preventDefault, which would also swallow the tap that dismisses it.
+    // Still count as the first gesture so audio unlocks on a touch-only device.
+    if (this.isOverlaySurface(e.target)) { this.markFirst(); return; }
     if (this.touches.has(e.pointerId)) return;
-    if (!this.isTyping(e.target)) e.preventDefault();
+    // The emote rail pans horizontally inside the flight HUD; only the
+    // gameplay surface itself is taken over.
+    if (this.ownsTouch(e.target)) e.preventDefault();
     this.markFirst();
 
     const now = performance.now();
@@ -230,7 +293,8 @@ export class Input {
     return e.clientY - r.top > r.height / 2 ? 2 : 1;
   }
 
-  private onPointerUp(e: PointerEvent): void {
+  private onPointerUp(e: PointerEvent, cancelled = false): void {
+    if (!this.touches.has(e.pointerId)) return; // UI/old-orientation releases aren't gestures.
     const now = performance.now();
     const duration = now - this.lastTapDownAt;
     const dy = e.clientY - this.lastTapY;
@@ -238,12 +302,12 @@ export class Input {
 
     // Upward flick / swipe-up gesture for mobile rocket boost:
     // dy <= -35px, duration < 320ms, vertical bias (|dy| > |dx| * 0.7)
-    if (dy <= -35 && duration < 320 && Math.abs(dy) > Math.abs(dx) * 0.7) {
+    if (!cancelled && dy <= -35 && duration < 320 && Math.abs(dy) > Math.abs(dx) * 0.7) {
       this.boostPressed = true;
     }
 
-    this.lastTapDuration = duration;
-    this.lastTapUpAt = now;
+    this.lastTapDuration = cancelled ? 0 : duration;
+    this.lastTapUpAt = cancelled ? 0 : now;
 
     const who = this.touches.get(e.pointerId);
     this.touches.delete(e.pointerId);
@@ -273,6 +337,8 @@ export class Input {
     this.touches.clear();
     this.held = false;
     this.p2Touch = false;
+    this.lastTapDownAt = this.lastTapUpAt = this.lastTapDuration = 0;
+    this.boostPressed = false;
   }
 
   private resetHeld(): void {
