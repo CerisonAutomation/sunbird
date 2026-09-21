@@ -351,7 +351,11 @@ export class SaveData {
       if (!owned.includes("sunbird")) owned.unshift("sunbird");
       const quality = p.settings?.quality;
       const deviceId = typeof p.deviceId === "string" && p.deviceId ? p.deviceId : d.deviceId;
-      return {
+      // Build on top of defaults() so the loaded object keeps EXACTLY the same
+      // key order as a fresh save — exportCode() stringifies this object, and
+      // the code must be byte-identical across a reload (persistence gate).
+      const parsedState: SaveState = {
+        ...d,
         bestScore: num(p.bestScore),
         bestDistance: num(p.bestDistance),
         totalCoins: num(p.totalCoins),
@@ -530,6 +534,7 @@ export class SaveData {
         rankPrizeSeason: String(p.rankPrizeSeason ?? ""),
         wingmanBundle: Boolean(p.wingmanBundle),
       };
+      return parsedState;
     } catch {
       // Corruption recovery: never destroy a player's data. If we actually read
       // a blob but couldn't parse it, park it under a dedicated key before

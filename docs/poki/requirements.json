@@ -76,7 +76,7 @@
         "type": "file",
         "path": "docs/poki/01-web-game-engines.md"
       },
-      "evidence": "Engine decision + device baseline documented; the game uses Three.js with hand-rolled systems (see docs/poki/01-web-game-engines.md §Part 4)."
+      "evidence": "Engine decision + device baseline documented; the game uses Three.js with hand-rolled systems (see docs/poki/01-web-game-engines.md \u00a7Part 4)."
     },
     {
       "id": "GK-02",
@@ -137,20 +137,20 @@
         "type": "file",
         "path": "docs/poki/01-web-game-engines.md"
       },
-      "evidence": "§Part 4 records the filter outcome for Sunbird."
+      "evidence": "\u00a7Part 4 records the filter outcome for Sunbird."
     },
     {
       "id": "ENG-02",
       "group": "ENG",
       "kind": "requirement",
-      "rule": "Mobile web fit: prefer engines with touch support and small files — initial download < 5 MB, total < 8 MB.",
+      "rule": "Mobile web fit: prefer engines with touch support and small files \u2014 initial download < 5 MB, total < 8 MB.",
       "status": "satisfied",
       "verify": {
         "type": "grep",
         "path": "scripts/verify-portal.mjs",
         "pattern": "MAX_ZIP_BYTES = 8_000_000"
       },
-      "evidence": "Portal zips gated at 8 MB; shipped size ≈0.7 MB."
+      "evidence": "Portal zips gated at 8 MB; shipped size \u22480.7 MB."
     },
     {
       "id": "ENG-03",
@@ -187,7 +187,7 @@
         "type": "manual",
         "note": "Reference material."
       },
-      "evidence": "See docs/poki/01-web-game-engines.md §Part 3."
+      "evidence": "See docs/poki/01-web-game-engines.md \u00a7Part 3."
     },
     {
       "id": "EA-01",
@@ -206,7 +206,7 @@
       "id": "EA-02",
       "group": "EA",
       "kind": "requirement",
-      "rule": "Keep it small: target an 8–10 MB game file for older hardware and slow connections.",
+      "rule": "Keep it small: target an 8\u201310 MB game file for older hardware and slow connections.",
       "status": "satisfied",
       "verify": {
         "type": "command",
@@ -277,7 +277,7 @@
         "type": "test",
         "path": "src/game/__tests__/firstflight.test.ts"
       },
-      "evidence": "One cue at a time (dive → soar → land), gated on real input."
+      "evidence": "One cue at a time (dive \u2192 soar \u2192 land), gated on real input."
     },
     {
       "id": "EA-08",
@@ -500,9 +500,9 @@
       "verify": {
         "type": "grep",
         "path": "src/game/HUD.ts",
-        "pattern": "🎬"
+        "pattern": "\ud83c\udfac"
       },
-      "evidence": "🎬 present on the rewarded continue button and verified in the shipped bundle."
+      "evidence": "\ud83c\udfac present on the rewarded continue button and verified in the shipped bundle."
     },
     {
       "id": "MON-10",
@@ -843,7 +843,7 @@
       "verify": {
         "type": "manual",
         "owner": "submission",
-        "note": "Record the 3-5 s capture from a real play session (the build is capture-ready: embed-safe, no fullscreen requirement)."
+        "note": "Record the 3-5 s capture from a real play session on a GPU machine: node scripts/capture-animated-thumbnail.mjs (serves poki-upload/, plays a scripted dive-glide loop, writes assets/submission/sunbird-thumbnail-animated.gif). Sandboxed/CI renderers read back WebGL too slowly for a smooth capture."
       },
       "evidence": "POKI_COMPLIANCE_AUDIT.md submission actions 1-2"
     },
@@ -1028,7 +1028,7 @@
           "dist-poki/index.html"
         ]
       },
-      "evidence": "`pnpm build:poki` GENERATES `poki-upload/` (index.html at the root); `pnpm verify:upload` (ROOT-01…ROOT-06) asserts the folder and the zip both carry a root index.html, that the folder is current with `dist-poki/`, and that it holds only uploadable files — the failure mode behind the reported \"missing index.html\" upload. Runbook: docs/poki/UPLOAD.md."
+      "evidence": "`pnpm build:poki` GENERATES `poki-upload/` (index.html at the root); `pnpm verify:upload` (ROOT-01\u2026ROOT-06) asserts the folder and the zip both carry a root index.html, that the folder is current with `dist-poki/`, and that it holds only uploadable files \u2014 the failure mode behind the reported \"missing index.html\" upload. Runbook: docs/poki/UPLOAD.md."
     },
     {
       "id": "TOOL-04",
@@ -1077,7 +1077,7 @@
         "type": "file",
         "path": "src/sdk/auds.ts"
       },
-      "evidence": "Implemented: score boards, ghost shares, per-user sync, a public pilot directory (src/game/PilotDirectory.ts — code-only lookup, one record per pilot, no presence claims) and — for non-real-time multiplayer — run share codes (src/sdk/auds.ts, src/game/SharedRun.ts: publish a run, race a friend's code, count plays through the public _increment endpoint)."
+      "evidence": "Implemented: score boards, ghost shares, per-user sync, a public pilot directory (src/game/PilotDirectory.ts \u2014 code-only lookup, one record per pilot, no presence claims) and \u2014 for non-real-time multiplayer \u2014 run share codes (src/sdk/auds.ts, src/game/SharedRun.ts: publish a run, race a friend's code, count plays through the public _increment endpoint)."
     },
     {
       "id": "TOOL-08",
@@ -1087,7 +1087,7 @@
       "status": "action",
       "verify": {
         "type": "manual",
-        "note": "Submission step: ship with the Poki-issued game id (VITE_POKI_GAME_ID); without it every AUDS call is skipped, so the integration is dormant rather than broken. Portable builds cannot depend on it — `pnpm isolation:check` fails if auds.poki.io reaches a non-Poki edition."
+        "note": "Submission step: ship with the Poki-issued game id (VITE_POKI_GAME_ID); without it every AUDS call is skipped, so the integration is dormant rather than broken. Portable builds cannot depend on it \u2014 `pnpm isolation:check` fails if auds.poki.io reaches a non-Poki edition."
       },
       "evidence": "src/sdk/auds.ts (dormant without VITE_POKI_GAME_ID), scripts/verify-isolation.mjs, scripts/portal-markers.mjs"
     },
@@ -1142,7 +1142,7 @@
           "sunbird-poki.zip"
         ]
       },
-      "evidence": "Zip gate at 8 MB; measured ≈0.7 MB."
+      "evidence": "Zip gate at 8 MB; measured \u22480.7 MB."
     },
     {
       "id": "REQ-05",
@@ -1182,7 +1182,7 @@
         "type": "test",
         "path": "src/sdk/__tests__/platform-failsafe.test.ts"
       },
-      "evidence": "PokiAdapter.loadingFinished() is one-shot; gameLoadingStart fires once right after init; and the entry-point loading-screen failsafe routes through the live adapter instead of the raw SDK global, so it cannot add a second gameLoadingFinished on a healthy boot (it used to, 1.5 s after window load — found by e2e/poki-artifact.spec.ts, pinned by platform-failsafe.test.ts)."
+      "evidence": "PokiAdapter.loadingFinished() is one-shot; gameLoadingStart fires once right after init; and the entry-point loading-screen failsafe routes through the live adapter instead of the raw SDK global, so it cannot add a second gameLoadingFinished on a healthy boot (it used to, 1.5 s after window load \u2014 found by e2e/poki-artifact.spec.ts, pinned by platform-failsafe.test.ts)."
     },
     {
       "id": "REQ-11",
@@ -1524,7 +1524,7 @@
         "path": "src/game/__tests__/pilot-name-surface.test.ts",
         "pattern": "CUSTOM_PILOT_NAMES"
       },
-      "evidence": "edition CUSTOM_PILOT_NAMES=false in edition.poki/crazy/generic.ts: the leaderboard renders the generated pilot name read-only with a 🎲 roll instead of an input (pilot-name-surface.test.ts drives the real renderer both ways), rename-pilot refuses typed text, and scripts/portal-markers.mjs fails any portal bundle containing data-ref=\"pilotName\" (dist-poki/index.html has 0 matches)."
+      "evidence": "edition CUSTOM_PILOT_NAMES=false in edition.poki/crazy/generic.ts: the leaderboard renders the generated pilot name read-only with a \ud83c\udfb2 roll instead of an input (pilot-name-surface.test.ts drives the real renderer both ways), rename-pilot refuses typed text, and scripts/portal-markers.mjs fails any portal bundle containing data-ref=\"pilotName\" (dist-poki/index.html has 0 matches)."
     },
     {
       "id": "REQ-62",
@@ -1558,7 +1558,7 @@
       "id": "REQ-64",
       "group": "REQ",
       "kind": "requirement",
-      "rule": "A portal build must not describe or count ad breaks it does not schedule — the platform owns ad frequency.",
+      "rule": "A portal build must not describe or count ad breaks it does not schedule \u2014 the platform owns ad frequency.",
       "status": "satisfied",
       "verify": {
         "type": "test",
@@ -1578,7 +1578,7 @@
         "path": "e2e/portal-policy.spec.ts",
         "pattern": "HTTP \\$\\{r.status"
       },
-      "evidence": "Squad.load() returned early only on abort/live/loading, so with VITE_SOCIAL_URL blanked it fetched a relative /register against the host origin — a 404 plus a console error the moment a player opened Squad on Poki. It now also bails when API is empty; the policy spec fails on any response >= 400 while walking every menu screen."
+      "evidence": "Squad.load() returned early only on abort/live/loading, so with VITE_SOCIAL_URL blanked it fetched a relative /register against the host origin \u2014 a 404 plus a console error the moment a player opened Squad on Poki. It now also bails when API is empty; the policy spec fails on any response >= 400 while walking every menu screen."
     }
   ]
 }

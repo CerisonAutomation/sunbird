@@ -262,6 +262,10 @@ export class Game {
   private continueOfferView: ContinueOffer | null = null;
 
   private daylight = DAYLIGHT_MAX;
+  /** Seconds the bird has sat settled (grounded/water, slow, no input). */
+  private settleAcc = 0;
+  /** runTime of the last dive input; passive braking keys off it. */
+  private lastInputAt = 0;
   private startX = 64;
   private island = 0;
   private lastIsland = 0;
@@ -1002,7 +1006,12 @@ export class Game {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.loop);
     try {
-    const raw = Math.min(0.1, (now - this.last) / 1000);
+    // Cap the frame delta so a backgrounded tab or a hiccup never teleports
+    // physics. 0.25s (not 0.1): on low-end devices the renderer can dip below
+    // 10 fps, and with a tighter cap the GAME CLOCK runs slower than real
+    // time — runs take forever and timed gates drift. Physics is fixed-step
+    // (PHYS_DT accumulator), so a larger delta just means more cheap substeps.
+    const raw = Math.min(0.25, (now - this.last) / 1000);
     this.last = now;
     if (this.hidden || this.contextLost) return;
 
@@ -1882,6 +1891,31 @@ export class Game {
       }
     }
 
+    // Settle rule: a bird that is down (grounded, in water, or skimming the
+    // deck) with crawl speed and no held input has nothing left to do — let
+    // it fall asleep now instead of waiting out the whole sun. Passive runs
+    // end in seconds, matching the recap's "let it sleep" framing; active
+    // flight cruises far above the speed threshold, so play never trips it.
+    // An untouched bird tucks its wings: while grounded and passive, bleed
+    // the taxi surges terrain bumps keep pumping in, so a run nobody plays
+    // settles to a stop instead of surfing valleys until sundown.
+    if (diving) this.lastInputAt = this.runTime;
+    if (!diving && this.bird.grounded && this.runTime - this.lastInputAt > 3) {
+      this.bird.vx *= Math.max(0, 1 - 2.5 * dt);
+    }
+    const surfaceY = this.terrain.isOcean(this.bird.x) ? WATER_Y : this.terrain.heightAt(this.bird.x);
+    const settleAlt = this.bird.y - surfaceY;
+    const settled = (this.bird.grounded || this.bird.inWater || settleAlt < 6) && this.bird.speed() < 6;
+    if (!this.bird.asleep && !this.input.diving && settled) {
+      this.settleAcc += dt;
+    } else {
+      this.settleAcc = 0;
+    }
+    if (this.settleAcc >= 4 && !this.bird.asleep) {
+      this.onDaylightOut();
+      return;
+    }
+
     // Session goals update live so the player sees a bar fill mid-flight.
     const done = this.goals.update({
       distance: this.bird.x - this.startX,
@@ -2581,6 +2615,8 @@ export class Game {
       (this.mode.clock > 0 ? this.mode.clock : this.daylightMax()) *
       this.challengeMods.daylightMult *
       (this.eventRun ? this.weeklyMods.daylightMult : 1);
+    this.settleAcc = 0;
+    this.lastInputAt = 0;
     this.weather.windMult = (this.eventRun ? this.weeklyMods.windMult : 1) * (this.stormfront ? 1.7 : 1);
     this.weather.stormfront = this.stormfront;
     if (this.stormfront) this.hud.toast("⛈ STORMFRONT — same storm for every pilot. Survive and outfly.", "warn");
@@ -3584,6 +3620,10 @@ export class Game {
         this.sendEmote(id || "👋");
         break;
       case "host-room": {
+        if (!isMultiplayerConfigured()) {
+          this.hud.toast("Live rooms are not available in this edition", "warn");
+          break;
+        }
         this.disconnectRace();
         this.localRace = false;
         this.roomCode = makeRoomCode();
@@ -3598,6 +3638,10 @@ export class Game {
         break;
       }
       case "join-room": {
+        if (!isMultiplayerConfigured()) {
+          this.hud.toast("Live rooms are not available in this edition", "warn");
+          break;
+        }
         const code = normalizeRoomCode(this.hud.readValue("roomCode"));
         if (!code) {
           this.hud.toast("Enter a 5-letter room code", "warn");
@@ -3686,12 +3730,21 @@ export class Game {
         this.beginMatchmaking({ ranked: true, storm: mode.id === "pvp_typhoon" });
         break;
       }
-      case "start-room-now":
-        if (this.net) this.net.startNow();
+      case "start-room-now": {
         this.modeId = this.selectedPvpMode;
         this.mode = modeById(this.selectedPvpMode);
-        this.launchMatch({ ranked: false, storm: this.modeId === "pvp_typhoon" }, false);
+        // With real pilots seated, the room launches together: the transport
+        // issues ONE shared start (a 6s countdown for everyone) instead of the
+        // host racing off alone while guests watch an empty sky.
+        const seatedWithPilots = Boolean(this.net) && this.net!.connected && this.liveCount() > 0;
+        if (this.net) this.net.startNow();
+        if (seatedWithPilots) {
+          this.hud.toast("Launching together — every pilot gets the countdown", "gold");
+        } else {
+          this.launchMatch({ ranked: false, storm: this.modeId === "pvp_typhoon" }, false);
+        }
         break;
+      }
       case "copy-invite": {
         if (this.roomCode) this.copyRoomInvite(this.roomCode);
         else this.hud.toast("Host a room first to get an invite link", "warn");
@@ -3727,6 +3780,17 @@ export class Game {
       case "mm-cancel":
         this.cancelMatchmaking();
         break;
+      case "mm-ready": {
+        // Explicit opt-in to a live start. The race launches only once every
+        // seated pilot is ready, then counts down 6s for everyone.
+        if (this.net?.state === "lobby") {
+          const nowReady = !this.net.info().ready;
+          this.net.sendReady(nowReady);
+          this.hud.toast(nowReady ? "You are ready! ✓" : "Ready cancelled", "gold");
+          this.bump();
+        }
+        break;
+      }
       case "mm-ai":
         // Explicit opt-in only: the search never drops a pilot into a bot race.
         this.takeAiFlock();
@@ -3888,13 +3952,18 @@ export class Game {
             this.squad.enableAutonomous();
           } else {
             void this.squad.refresh().then(() => {
-              if (!this.squad?.state.registered) {
+              // A lost key is not "no service": keep the honest recovery
+              // surface (explicit re-enrollment) instead of silently
+              // dropping into the autonomous offline hub.
+              if (!this.squad?.state.registered && !this.squad?.state.credentialError) {
                 this.squad?.enableAutonomous();
                 this.bump();
               }
             }).catch(() => {
-              this.squad?.enableAutonomous();
-              this.bump();
+              if (!this.squad?.state.credentialError) {
+                this.squad?.enableAutonomous();
+                this.bump();
+              }
             });
           }
         }
@@ -4908,7 +4977,12 @@ export class Game {
   }
 
   private get fairRace(): boolean {
-    return equalizedRace(this.modeId, this.rankedRace, this.localRace, this.duelActive);
+    if (equalizedRace(this.modeId, this.rankedRace, this.localRace, this.duelActive)) return true;
+    // Private-room rooms are live shared-field races too: the lobby promises
+    // "Equal flight equipment — Store boosts are saved for solo play", so any
+    // race mode flown inside a live room strips paid advantages (boosts,
+    // daylight, mastery perks) the same way ranked rooms do.
+    return isRaceMode(this.modeId) && !this.localRace && !this.duelActive && this.roomCode !== "";
   }
 
   /** Keep the chosen artwork, but not paid flight advantages in a live race. */
@@ -5140,8 +5214,6 @@ export class Game {
    * server's shared start. A timed-out search explicitly disconnects before
    * starting local AI practice. Browsing or cancelling cannot block a room. */
   private static readonly MM_WINDOW = 15;
-  /** After the window: how long we keep the seat and keep listening. */
-  private static readonly MM_KEEPALIVE = 600;
 
   private beginMatchmaking(opts: { ranked: boolean; storm: boolean }): void {
     this.disconnectRace();
@@ -5167,7 +5239,8 @@ export class Game {
     this.mmDeadline = performance.now() + Game.MM_WINDOW * 1000;
     this.preseatLobby();
     this.startRoomWatch();
-    this.hud.setMatchmaking(true, this.liveCount(), this.roomSize, Game.MM_WINDOW, "searching", "");
+    const ready = this.net?.state === "lobby" ? (this.net.info().ready ? "ready" : "unready") : "none";
+    this.hud.setMatchmaking(true, this.liveCount(), this.roomSize, Game.MM_WINDOW, "searching", "", ready);
     this.bump();
   }
 
@@ -5247,26 +5320,35 @@ export class Game {
       return;
     }
     const live = this.liveCount();
-    // Public entrants opt in by pressing Find race. The server, not each
-    // player's timer, decides when the room may launch.
-    if (this.net?.state === "lobby" && !this.net.info().ready) this.net.sendReady(true);
+    // Nobody is auto-readied. A live pilot joining the room never launches a
+    // race by itself — the overlay offers an explicit Ready toggle, and the
+    // room starts (with a shared 6s countdown) only once every seated pilot
+    // has readied up.
+    const ready = this.net?.state === "lobby" ? (this.net.info().ready ? "ready" : "unready") : "none";
     // Someone real is in the room — keep the search open until the room starts.
     if (live > 0 && this.mmPhase === "waiting") this.mmPhase = "searching";
     if (this.mmPhase === "waiting") {
-      this.hud.setMatchmaking(true, live, this.roomSize, 0, "waiting", this.mmRooms);
+      this.hud.setMatchmaking(true, live, this.roomSize, 0, "waiting", this.mmRooms, ready);
       return;
     }
     const secsLeft = (this.mmDeadline - performance.now()) / 1000;
-    this.hud.setMatchmaking(true, live, this.roomSize, Math.max(0, secsLeft), "searching", this.mmRooms);
+    this.hud.setMatchmaking(true, live, this.roomSize, Math.max(0, secsLeft), "searching", this.mmRooms, ready);
     if (secsLeft <= 0) {
-      // The window elapsed with nobody to race. Do NOT launch a bot race — the
-      // pilot asked for live pilots. Keep the room, keep listening, and let
-      // them choose: wait longer, or take the AI flock deliberately.
+      // The window elapsed with nobody to race. Fall back to a clearly
+      // labeled AI flock so the pilot is never left staring at a dead
+      // search — real pilots still require an explicit Ready; only an
+      // empty room may launch on its own.
       this.mmPhase = "waiting";
-      this.mmDeadline = performance.now() + Game.MM_KEEPALIVE * 1000;
-      this.hud.setMatchmaking(true, live, this.roomSize, 0, "waiting", this.mmRooms);
-      this.hud.toast(this.mmRooms ? `Still searching — ${this.mmRooms}` : "Still searching for live pilots…", "info");
+      const opts = this.mmOpts;
+      this.mmOpts = null;
+      this.mmDeadline = 0;
+      this.roomWatcher?.stop();
+      this.closeRoomBrowser();
+      this.hud.setMatchmaking(false, live, this.roomSize, 0);
+      this.hud.toast("No live pilots found — racing the AI flock (practice)", "info");
+      this.telemetry.track("matchmaking_ai_fallback", { window: Game.MM_WINDOW });
       this.bump();
+      if (opts) this.launchMatch(opts, true);
     }
   }
 
@@ -6259,6 +6341,7 @@ export class Game {
       raceFinishTime: this.raceFinishTime,
       massRace: isRaceMode(this.modeId),
       multiplayerLive: isMultiplayerConfigured() && !(this.state === "playing" && this.localRace),
+      multiplayerConfigured: isMultiplayerConfigured(),
       roster:
         this.massRace.active && this.state === "playing"
           ? this.massRace.roster(this.bird.x, this.startX, this.mode.finish, this.pilotName)

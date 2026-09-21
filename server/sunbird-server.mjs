@@ -243,6 +243,14 @@ const server = createServer((req, res) => {
     );
   }
 
+  // POST /telemetry — anonymous aggregate beacons from the client. The
+  // reference server keeps no analytics store: drain and acknowledge so
+  // browsers never log a failed request.
+  if (url.pathname === "/telemetry" && req.method === "POST") {
+    req.resume();
+    return res.writeHead(204).end();
+  }
+
   // GET /board?scope=&metric=&device=
   if (url.pathname === "/board" && req.method === "GET") {
     const metric = ["distance", "altitude", "perfects", "coins"].includes(url.searchParams.get("metric"))

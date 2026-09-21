@@ -46,8 +46,19 @@ describe("matchmaking search overlay", () => {
     const hud = fixture();
     hud.setMatchmaking(true, 3, 40, 5, "searching", "");
     expect(el(".matchmaking-count").textContent).toBe("3 live pilots in this room");
-    expect(el(".matchmaking-label").textContent).toContain("Race starts when the room is ready");
     expect(el(".matchmaking-rooms").classList.contains("hidden")).toBe(true);
+    hud.dispose();
+  });
+
+  it("never auto-readies: a live room shows an explicit Ready toggle", () => {
+    const hud = fixture();
+    hud.setMatchmaking(true, 1, 40, 5, "searching", "", "unready");
+    expect(el('[data-action="mm-ready"]').classList.contains("hidden")).toBe(false);
+    expect(el('[data-action="mm-ready"]').textContent).toContain("Ready up");
+    expect(el(".matchmaking-label").textContent).toContain("ready up");
+    hud.setMatchmaking(true, 1, 40, 5, "searching", "", "ready");
+    expect(el('[data-action="mm-ready"]').textContent).toContain("cancel");
+    expect(el(".matchmaking-label").textContent).toContain("6s countdown");
     hud.dispose();
   });
 

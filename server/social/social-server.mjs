@@ -124,7 +124,7 @@ const routes = {
     if (Number(n) >= MAX_FRIENDS) return [400, { error: "Friend list full" }];
     // Private, one-way saved-pilot list. Adding someone must not edit their list.
     await db.query("INSERT INTO friends VALUES ($1,$2) ON CONFLICT DO NOTHING", [deviceId, target.device_id]);
-    return [200, { ok: true, friend: { name: target.name, code: target.code } }];
+    return [200, { ok: true, status: "friends", friend: { name: target.name, code: target.code } }];
   },
 
   "POST /friends/remove": async (body) => {
@@ -139,6 +139,12 @@ const routes = {
     }
     return [200, { ok: true }];
   },
+
+  // Wingman adds are immediate and one-way in this service, so there is no
+  // pending-request queue. The endpoint exists so the client's unified
+  // profile load never hits a 404; the UI renders empty lists faithfully.
+  "GET /friends/requests": async () => [200, { incoming: [], outgoing: [] }],
+
 
   "GET /clubs": async (_b, q) => {
     const device = clean(q.get("device"), 64);
@@ -262,11 +268,14 @@ const server = createServer(async (req, res) => {
     return res.end();
   }
   const capability = String(req.headers.authorization || "");
-  if (url.pathname !== "/health" && (!allow(`ip:${req.socket.remoteAddress}`, 1200) || !allow(`key:${tokenHash(capability)}`, 180))) {
+  // Browsers address this service under the /social prefix on the game
+  // origin (proxied by vite); the route table mounts handlers at the root.
+  const path = url.pathname.replace(/^\/social(?=\/|$)/, "") || "/";
+  if (path !== "/health" && (!allow(`ip:${req.socket.remoteAddress}`, 1200) || !allow(`key:${tokenHash(capability)}`, 180))) {
     res.writeHead(429, { ...headers, "retry-after": "60" });
     return res.end(JSON.stringify({ error: "Too many Squad requests. Wait a minute and retry." }));
   }
-  const handler = routes[`${req.method} ${url.pathname}`];
+  const handler = routes[`${req.method} ${path}`];
   if (!handler) {
     res.writeHead(404, headers);
     return res.end(JSON.stringify({ error: "not found" }));
@@ -292,7 +301,7 @@ const server = createServer(async (req, res) => {
   }
   try {
     let hash = "";
-    if (url.pathname !== "/health") {
+    if (path !== "/health") {
       const token = /^Bearer ([a-f0-9]{64})$/.exec(String(req.headers.authorization || ""))?.[1];
       const device = clean(req.method === "POST" ? body.deviceId : url.searchParams.get("device"), 64);
       if (!token || !device) {
@@ -304,7 +313,7 @@ const server = createServer(async (req, res) => {
         res.writeHead(403, headers);
         return res.end(JSON.stringify({ error: existing.auth_hash ? "Squad identity could not be verified on this browser." : "This legacy Squad profile needs administrator migration. Your game progress is unchanged." }));
       }
-      if (!existing && url.pathname !== "/register") {
+      if (!existing && path !== "/register") {
         res.writeHead(401, headers); return res.end(JSON.stringify({ error: "Refresh Squad before continuing." }));
       }
     }

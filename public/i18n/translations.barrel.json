@@ -1236,14 +1236,14 @@
       }
     },
     "hud.gameover.title": {
-      "sourceText": "Flight Completed",
+      "sourceText": "Flight completed",
       "meta": {
         "file": "src/game/HUD.ts",
         "context": "Game over screen title"
       },
       "placeholders": [],
       "translations": {
-        "en": "Flight Completed",
+        "en": "Flight completed",
         "es": "Vuelo completado",
         "de": "Flug beendet",
         "fr": "Vol terminé",
@@ -1427,7 +1427,7 @@
     "hud.settings.music": "Music Volume",
     "hud.settings.reduceMotion": "Reduce Motion",
     "hud.account.title": "Pilot Account",
-    "hud.gameover.title": "Flight Completed",
+    "hud.gameover.title": "Flight completed",
     "hud.gameover.flyAgain": "Fly Again",
     "hud.gameover.mainMenu": "Main Menu"
   },

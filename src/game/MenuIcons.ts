@@ -31,6 +31,19 @@ export function menuIcon(name: MenuIconName): string {
   return `<svg class="menu-illustration" viewBox="0 0 64 64" fill="none" stroke="#695541" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${artwork[name]}</svg>`;
 }
 
+/** Crisp vector arrows for menu chrome.
+ *
+ * Text arrows (→, ↗) render from the device font, which on phones means
+ * emoji-styled glyphs or missing-glyph boxes depending on the installed
+ * font set — the menu's "arrows" read as emoji. An inline SVG stroke draws
+ * identically everywhere and inherits `currentColor` from the CSS. */
+export function arrowUpRightSvg(): string {
+  return '<svg class="arrow-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 17 17 7"/><path d="M9 7h8v8"/></svg>';
+}
+export function arrowRightSvg(): string {
+  return '<svg class="arrow-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 12h15"/><path d="m13 6 6 6-6 6"/></svg>';
+}
+
 /** A quiet illustrated horizon, not another animated particle layer. */
 export function menuHorizon(): string {
   return '<svg class="menu-horizon" viewBox="0 0 600 200" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="M0 141Q65 83 145 125T300 117T456 115T600 85V200H0Z" fill="#ced8ba"/><path d="M0 163Q85 108 180 153T366 143T600 138V200H0Z" fill="#a2be9f"/><path d="M0 184Q90 160 190 181T400 171T600 180V200H0Z" fill="#749d87"/><path d="M0 179Q96 155 195 177T400 167T600 176" fill="none" stroke="#eaf0d2" stroke-width="2" opacity=".65"/></svg>';
