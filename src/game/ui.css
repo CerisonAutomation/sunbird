@@ -3048,7 +3048,6 @@ button {
   padding-bottom: 6px;
   margin-bottom: 8px;
   scrollbar-width: thin;
-  -webkit-overflow-scrolling: touch;
 }
 .pills-scroll::-webkit-scrollbar {
   height: 4px;
@@ -3481,7 +3480,6 @@ button {
 .overlay.menu.pause-submenu > .paper-card {
   max-height: calc(100% - 8px);
   overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
 }
 /* Tighten the pause grid on small phones so two rows of four fit. */
 @media (max-width: 420px) {

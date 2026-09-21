@@ -2,7 +2,7 @@
  * Procedurally renders the app icons (no external assets, no AI images):
  *   public/icons/icon-192.png, icon-512.png, apple-touch-icon.png,
  *   favicon-32.png, favicon-64.png
- *   public/animated/sunbird-animated.gif — Poki-style animated tile icon
+ *   promo/animated/sunbird-animated.gif — Poki-style animated tile icon
  * Run: node scripts/gen-icons.mjs
  *
  * Design: golden-hour sky, huge low sun half-set behind layered hills,
@@ -298,7 +298,7 @@ console.log("---");
 // placeholder (gen-animated-icon.mjs) otherwise.
 import { execSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
-const animatedDir = join(__dirname, "..", "public", "animated");
+const animatedDir = join(__dirname, "..", "promo", "animated");
 const webpPath = join(animatedDir, "sunbird-animated.webp");
 const hasGameCapture = existsSync(webpPath) && statSync(webpPath).size > 100000;
 

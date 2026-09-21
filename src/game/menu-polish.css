@@ -848,7 +848,6 @@
 .board-table,
 .mode-list,
 .cup-list {
-  -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   touch-action: pan-y;
 }

@@ -119,8 +119,22 @@ async function boot(page: Page, origin: string): Promise<string[]> {
   });
   await page.goto(origin + "/", { waitUntil: "commit" });
   await expect(page.locator("#boot-shell")).toHaveCount(0, { timeout: 45_000 });
+  await dismissNameEntry(page);
   await expect(page.getByRole("button", { name: "Play free flight now", exact: true })).toBeVisible({ timeout: 45_000 });
   return errors;
+}
+
+/** A fresh profile lands on the first-run welcome screen before the menu CTA,
+ *  so every test that boots a build has to get past it. Both editions leave it
+ *  with "Let's Fly": the portal build commits the curated name on the plate, the
+ *  direct build commits the field (pre-filled with the same generated name).
+ *  Without this the CTA wait below simply times out and the failure looks like a
+ *  broken menu rather than an undismissed onboarding screen. */
+async function dismissNameEntry(page: Page): Promise<void> {
+  const fly = page.locator('[data-action="confirm-pilot-name"]');
+  if (!(await fly.isVisible().catch(() => false))) return;
+  await fly.click();
+  await expect(fly).toHaveCount(0, { timeout: 20_000 });
 }
 
 async function openMenu(page: Page, action: string, title: string): Promise<void> {
@@ -150,6 +164,45 @@ test.describe("portal artifact (poki-upload/)", () => {
     await page.route(POKI_CDN, (route) =>
       route.fulfill({ status: 200, contentType: "application/javascript", body: SDK_STUB }),
     );
+  });
+
+  test("the first-run welcome screen offers no typing surface either", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await page.goto(`http://127.0.0.1:${PORTAL_PORT}/`, { waitUntil: "commit" });
+    await expect(page.locator("#boot-shell")).toHaveCount(0, { timeout: 45_000 });
+
+    // A fresh profile lands here before the menu, so this is the first name
+    // surface a portal player ever sees — it has to obey the same edition split
+    // as the board's pilot-name row, not just that one.
+    const fly = page.locator('[data-action="confirm-pilot-name"]');
+    await expect(fly).toBeVisible({ timeout: 45_000 });
+    await expect(page.locator(".name-entry-form input")).toHaveCount(0);
+    await expect(page.locator('[data-ref="pilotNameInput"]')).toHaveCount(0);
+
+    const plate = page.locator(".name-entry-plate");
+    await expect(plate).toBeVisible();
+    const before = (await plate.textContent())?.trim() ?? "";
+    expect(before.length, "a curated name is already on the plate").toBeGreaterThan(0);
+    expect(await plate.getAttribute("aria-label")).toBe("Pilot name");
+
+    // The sanctioned alternative has to work: a dice that only wrote to an input
+    // which is no longer in the bundle would leave the plate stuck.
+    await page.locator('[data-action="randomize-pilot-name"]').click();
+    await expect
+      .poll(async () => (await plate.textContent())?.trim() ?? "", {
+        timeout: 15_000,
+        message: "🎲 must roll a new curated name on the welcome plate",
+      })
+      .not.toBe(before);
+    await expect(page.locator(".name-entry-form input")).toHaveCount(0);
+
+    // And "Let's Fly" must be a real exit. It reads the name field, so on a
+    // build with no field it would toast "Please enter a pilot name" forever and
+    // trap the player on this screen with no way out.
+    await fly.click();
+    await expect(page.getByRole("button", { name: "Play free flight now", exact: true })).toBeVisible({ timeout: 30_000 });
+    expect(errors).toEqual([]);
   });
 
   test("shows the pilot name read-only and rolls a new one without a keyboard", async ({ page }) => {

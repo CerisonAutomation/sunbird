@@ -65,8 +65,19 @@ function stageHtml() {
   return html;
 }
 
-/** `index.html` + the directories that ship beside it (and nothing else). */
-const ENTRY_DIRS = ["icons", "fonts", "i18n", "animated"];
+/**
+ * `index.html` + the directories that ship beside it (and nothing else).
+ *
+ * This list IS the zip anatomy contract, and `audit-zips.mjs` enforces the same
+ * entries from the other side — anything else in a zip is a packaging mistake.
+ * It used to also carry `animated/`, the Poki animated-thumbnail promo art:
+ * 2.5 MB of GIF/WebP that no code in the game ever requests, which ate a third
+ * of the 8 MB portal budget and failed that gate on every single build. The art
+ * now lives in `promo/animated/`, outside `public/`, so Vite no longer copies it
+ * into every build; `pnpm gen-icons` still generates it there for hand-submission
+ * to a portal, it just does not ship inside the game package any more.
+ */
+const ENTRY_DIRS = ["icons", "fonts", "i18n"];
 const ENTRIES = ["index.html", ...ENTRY_DIRS];
 
 /** Write a staged bundle into `target` (fresh every run). */

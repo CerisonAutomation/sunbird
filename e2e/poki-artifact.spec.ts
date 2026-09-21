@@ -238,6 +238,15 @@ test("boots and plays inside the cross-origin iframe the Inspector uses", async 
 
   // The boot overlay removing itself is the app's own "first playable frame".
   await expect(game.locator("#boot-shell")).toHaveCount(0, { timeout: 60_000 });
+  // A fresh profile lands on the first-run welcome screen before the menu CTA,
+  // so dismiss it the way SunbirdPage.ready() does. This test used to pass only
+  // because it ran against a poki-upload/ snapshot that predated that screen;
+  // once the artifact is built from current source the CTA is not there yet.
+  const welcome = game.locator('[data-action="confirm-pilot-name"]');
+  if (await welcome.isVisible().catch(() => false)) {
+    await welcome.click();
+    await expect(welcome).toHaveCount(0, { timeout: 20_000 });
+  }
   await expect(game.getByRole("button", { name: "Play free flight now", exact: true })).toBeVisible();
 
   await game.getByRole("button", { name: "Play free flight now", exact: true }).click();
