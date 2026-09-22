@@ -22,6 +22,8 @@ import { isRaceMode, MASS_RACE_FIELD, MODES, modeById, PVP_MODES, PVP_WORLDS, RA
 import { MassRace } from "./MassRace";
 import { FinishGate } from "./FinishGate";
 import { fetchPublicRooms, isMultiplayerConfigured, makeRoomCode, RealtimeClient, type AnyRealtimeClient } from "./Realtime";
+import { photoFinishMessage } from "./RacePolish";
+import { SlopeChain } from "./SlopeChain";
 import { RoomWatcher, ROOM_POLL_MS, roomSummaryLine, summarizeRooms, type LiveRoom } from "./RoomBrowser";
 import { Leaderboard, loadPilotName, savePilotName, isLeaderboardOnline, type BoardMetric, type BoardPage, type BoardScope } from "./Leaderboard";
 import { generatePilotName } from "./pilotNameGenerator";
@@ -131,6 +133,9 @@ function hsl(h: number, s: number, l: number): [number, number, number] {
   const c = new THREE.Color().setHSL(h, s, l);
   return [c.r, c.g, c.b];
 }
+
+/** Seconds a ring chain stays open — one number for the rule and the meter. */
+const RING_CHAIN_WINDOW = 2.8;
 
 const ASLEEP: BirdStepOpts = { diving: false, fever: false, speedMult: 1, boost: false };
 
@@ -460,6 +465,7 @@ export class Game {
   private runRings = 0;
   private ringChain = 0;
   private ringChainTimer = 0;
+  private readonly slopeChain = new SlopeChain();
   private runBalloons = 0;
   private runSunflowers = 0;
   private readonly powers = new PowerUps();
@@ -1843,7 +1849,7 @@ export class Game {
           .sort((a, b) => Math.abs(a.distance - (you?.distance ?? 0)) - Math.abs(b.distance - (you?.distance ?? 0)))[0];
         if (rival && you && Math.abs(rival.distance - you.distance) < 25) {
           const won = you.distance > rival.distance;
-          this.photoFinish = won ? `Photo finish — you edged ${rival.name}` : `Photo finish — ${rival.name} pipped you`;
+          this.photoFinish = photoFinishMessage(won, rival.name, Math.abs(rival.distance - you.distance));
           if (!won) this.nemesis = rival.name;
           this.hud.toast(this.photoFinish, won ? "gold" : "warn");
           this.flash("perfect");
@@ -1986,6 +1992,12 @@ export class Game {
   private onLaunch(): void {
     const res = this.launch.evaluate(this.bird, this.terrain, this.runTime);
     this.lastLaunch = res;
+    const linked = this.slopeChain.launch(res.rating);
+    if (linked) {
+      this.bonus += linked.points;
+      this.audio.ringPass(linked.chain);
+      this.hud.toast(`SLOPE FLOW ×${linked.chain} +${linked.points}`, linked.chain >= 3 ? "gold" : "cloud");
+    }
     if (res.rating === "none") {
       if (this.bird.launchSpeed > 18) this.audio.chirp();
       return;
@@ -2048,6 +2060,7 @@ export class Game {
 
   /** Sunflower pad: a springy launch off a bloom — pure, reviewable bounce. */
   private onSunflower(): void {
+    this.slopeChain.break();
     this.runSunflowers += 1;
     this.bonus += 80;
     this.awardXp(XP_RULES.coin);
@@ -2066,6 +2079,7 @@ export class Game {
   /** Landings feed straight back into momentum, so they get feedback too. */
   private onLanding(): void {
     const q = this.bird.landingQuality;
+    this.slopeChain.land(q, this.terrain.slopeAt(this.bird.x), this.bird.impact);
     if (q >= LAND_PERFECT && this.bird.speed() > 30) {
       this.bonus += 12;
       this.audio.butter();
@@ -2155,14 +2169,16 @@ export class Game {
   /** Threading a sky ring: a speed surge + score that scales with the chain. */
   private onRing(x: number, y: number): void {
     this.runRings += 1;
-    this.ringChainTimer = 2.8;
+    this.ringChainTimer = RING_CHAIN_WINDOW;
     this.ringChain += 1;
-    const chainBonus = Math.min(4, this.ringChain) * 8;
+    // Deeper chains pay more: the courses make long ones reachable, so the
+    // ceiling sits at 8 instead of 4 and the speed reward keeps climbing.
+    const chainBonus = Math.min(8, this.ringChain) * 8;
     const pts = 30 + chainBonus;
     this.bonus += pts;
     this.awardXp(XP_RULES.cloud);
     this.audio.ringPass(this.ringChain);
-    this.bird.vx += 8 + Math.min(14, this.ringChain * 2);
+    this.bird.vx += 8 + Math.min(22, this.ringChain * 2.4);
     this.particles.burstRing(x, y, 0xffd76a);
     this.particles.emitSonicBoom(x, y);
     if (this.ringChain >= 3) {
@@ -3213,6 +3229,7 @@ export class Game {
     this.runRings = 0;
     this.ringChain = 0;
     this.ringChainTimer = 0;
+    this.slopeChain.reset();
     this.dustCooldown = 0;
     this.runBalloons = 0;
     this.runSunflowers = 0;
@@ -5270,6 +5287,21 @@ export class Game {
     return isPortalBuild();
   }
 
+  /**
+   * True only when the portal SDK is present AND exposes a real ad surface.
+   *
+   * A portal *build* is not the same thing as a portal *session*: off the
+   * portal CDN (a local preview, a blocked script, a rejected handshake) the
+   * build still runs, but every break would resolve instantly and every
+   * rewarded button would be a lie. Callers use this to skip the ad state
+   * entirely and offer the coin / gold paths instead.
+   */
+  private adsLive(): boolean {
+    const platform = this.platform;
+    if (!this.portalEnabled() || !platform || platform.name === "none") return false;
+    return platform.capabilities().includes("ads");
+  }
+
   /* ------------------------------------------------------- live multiplayer */
 
   /* ------------------------------------------------------- matchmaking */
@@ -5778,13 +5810,13 @@ export class Game {
         event: this.eventRun, storm: this.stormfront }),
       replay: true,
     };
-    if (allowPortalBreak && this.portalEnabled()) void this.restartWithPortalBreak(options);
+    if (allowPortalBreak && this.adsLive()) void this.restartWithPortalBreak(options);
     else this.startRun(options);
   }
 
   private async restartWithPortalBreak(options: RunOptions = {}): Promise<void> {
     const platform = this.platform;
-    if (!platform || platform.name === "none") {
+    if (!this.adsLive() || !platform || platform.name === "none") {
       this.startRun(options);
       return;
     }
@@ -5809,7 +5841,7 @@ export class Game {
     // Collapse any pause sub-screen (shop/settings/...) before returning to flight.
     this.closePauseScreen();
     const platform = this.platform;
-    if (this.portalEnabled() && platform && platform.name !== "none") {
+    if (this.adsLive() && platform && platform.name !== "none") {
       this.setState("ad");
       this.telemetry.track("portal_break_request", { portal: platform.name, placement: "resume" });
       await platform.commercialBreak();
@@ -5826,7 +5858,7 @@ export class Game {
    */
   private async menuAfterPortalBreak(): Promise<void> {
     const platform = this.platform;
-    if (!platform || platform.name === "none") return;
+    if (!this.adsLive() || !platform || platform.name === "none") return;
     this.setState("ad");
     await platform.commercialBreak();
     if (this.disposed) return;
@@ -5844,7 +5876,7 @@ export class Game {
    */
   private async multiplierWithPortalReward(): Promise<void> {
     const platform = this.platform;
-    if (!platform || platform.name === "none") return;
+    if (!this.adsLive() || !platform || platform.name === "none") return;
     const earned = await platform.rewardedBreak();
     if (this.disposed) return;
     this.endPortalAd();
@@ -5865,7 +5897,7 @@ export class Game {
   /** Rewarded continue never succeeds unless the platform explicitly grants it. */
   private async continueWithPortalReward(): Promise<void> {
     const platform = this.platform;
-    if (!platform || platform.name === "none") return;
+    if (!this.adsLive() || !platform || platform.name === "none") return;
     this.setState("ad");
     this.telemetry.track("portal_break_request", { portal: platform.name, placement: "continue" });
     const earned = await platform.rewardedBreak();
@@ -6323,7 +6355,8 @@ export class Game {
       continueHighlight: this.continueOfferView?.highlight ?? false,
       continueCost: CONTINUE_COST,
       canAffordContinue: st.wallet >= CONTINUE_COST,
-      adAvailable: this.portalEnabled() ? Boolean(this.platform && this.platform.name !== "none") : this.ads.isAvailable(),
+      // Portal: only advertise a rewarded option the SDK can actually pay out.
+      adAvailable: this.portalEnabled() ? this.adsLive() : this.ads.isAvailable(),
       adTimer: this.adTimer,
       adTotal: this.ads.duration,
       adReason: this.adReason,
@@ -6392,6 +6425,10 @@ export class Game {
               this.telemetry.track("experiment_exposure", { experiment: "results_cta_order", variant: v });
             })) === "treatment",
       combo: Math.max(this.perfectChain, this.versus && this.p1 ? this.p1.launch.combo : this.launch.combo),
+      ringChain: this.ringChain,
+      ringChainFrac: RING_CHAIN_WINDOW > 0 ? this.ringChainTimer / RING_CHAIN_WINDOW : 0,
+      slopeChain: this.slopeChain.chain,
+      slopeScore: this.slopeChain.score,
       speedNorm: Math.min(1, this.bird.speed() / 100),
       gust: this.weather.gust,
       inThermal: this.weather.inThermal,
@@ -6431,6 +6468,14 @@ export class Game {
       boardScope: this.boardScope,
       boardMetric: this.boardMetric,
       boardOnline: isLeaderboardOnline(),
+      // Pulled from the page the menu already warms (scope global / distance):
+      // no extra request, and nothing to render on a cold cache.
+      homeBoard: (this.board.peek("global", "distance")?.entries ?? []).slice(0, 3).map((e) => ({
+        name: e.name,
+        value: `${Math.round(e.value).toLocaleString()} m`,
+        you: e.you,
+      })),
+
       cups: this.cups.view(),
       trails: this.cups.ownedTrails().map((id) => ({
         id,
@@ -6467,6 +6512,7 @@ export class Game {
           ? this.massRace.rivals.slice(0, 12).map((r) => ({ id: r.id, name: r.name, skill: Math.round(r.skill * 100), hue: Math.round(r.hue * 360) }))
           : [],
       netState: this.net?.info().state ?? "offline",
+      linkQuality: this.net instanceof RealtimeClient ? this.net.connectionQuality : "unknown",
       netError: this.net?.info().error ?? "",
       draft: this.massRace.draft,
       finishRemaining: this.finishRemaining,

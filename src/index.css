@@ -377,6 +377,63 @@ textarea {
   opacity: 1;
 }
 
+/* Ring chain meter — the airborne objective, top-centre under the daylight
+   bar. Count is the headline (it is the thing being built); the bar is the
+   window left to extend it, so a fading bar is a visible "dive now". */
+.ring-chain {
+  position: absolute;
+  top: 54px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 8px;
+  border-radius: 999px;
+  background: rgba(20, 16, 32, 0.42);
+  border: 1px solid rgba(255, 214, 106, 0.5);
+  backdrop-filter: blur(3px);
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.ring-chain.hidden {
+  display: none;
+}
+
+.ring-chain b {
+  font-size: 17px;
+  font-weight: 800;
+  color: #ffd76a;
+  text-shadow: 0 1px 0 #7a4200;
+  font-variant-numeric: tabular-nums;
+}
+
+.ring-chain i {
+  display: block;
+  width: 46px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  overflow: hidden;
+}
+
+.ring-chain s {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #ffd76a, #ff9a3a);
+  text-decoration: none;
+}
+
+.ring-chain.hot {
+  border-color: #ff8a3a;
+  box-shadow: 0 0 14px rgba(255, 138, 58, 0.55);
+}
+
+.ring-chain.hot b {
+  color: #fff0c0;
+}
+
 .fever-label {
   text-align: center;
   color: #fff4c8;
@@ -2297,3 +2354,13 @@ label { font-size: 12px; font-weight: 600; color: #666; margin-bottom: 6px; }
 ::-webkit-scrollbar-track { background: #f1f1f1; }
 ::-webkit-scrollbar-thumb { background: #bbb; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #888; }
+
+/* Downslope-to-launch rhythm sits below the ring objective, never on top of it. */
+.slope-chain {
+  position: absolute; top: 88px; left: 50%; transform: translateX(-50%);
+  padding: 4px 10px; border-radius: 999px; pointer-events: none;
+  background: rgba(16, 39, 32, .7); border: 1px solid rgba(127, 255, 180, .55);
+  color: #c8ffda; font-size: 12px; font-weight: 900; letter-spacing: .08em;
+  font-variant-numeric: tabular-nums;
+}
+.slope-chain.hidden { display: none; }

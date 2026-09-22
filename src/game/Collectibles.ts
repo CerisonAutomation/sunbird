@@ -47,7 +47,10 @@ export const PICKUP_STYLE: Record<PickupKind, { color: number; emissive: number;
 const SPAWN_CELL = 26;
 const MAX_COINS = 512;
 const MAX_GEMS = 96;
-const MAX_RINGS = 72;
+// Courses (4–6 hoops each, ~1/3 of spawn windows) raise the number of
+// live rings at once; the pool must cover the widest window rather than
+// silently dropping hoops out of a course.
+const MAX_RINGS = 120;
 const MAX_BALLOONS = 24;
 const BALLOON_COLORS = [0xff6b6b, 0xffc14a, 0x6ad8ff, 0xb18cff, 0x7fe8a0];
 const coinDummy = new THREE.Object3D();
@@ -390,11 +393,35 @@ export class Collectibles {
         this.placeCoin(x + rng.range(-6, 6), hh + alt + rng.range(0, 30), true);
       }
 
-      // Sky rings: golden hoops threaded along the high line. They sit between
-      // the cloud bands so a good launch (or a brave dive-climb) reaches them.
-      if (rng.next() < 0.16) {
-        const alt = 26 + rng.range(0, 52);
-        this.placeRing(x + rng.range(-8, 8), hh + alt, 4.4);
+      // Sky rings — laid out as COURSES, not as scattered singles.
+      //
+      // Single rings 16% of the time meant the ring chain (three inside 2.8 s,
+      // which is what pays the speed boost and the combo) was close to
+      // unreachable in normal play: the sky had nothing to aim at and long
+      // airtime had no objective. A course threads 4–6 hoops 26–34 units apart
+      // along a shallow arc, so a pilot who holds their line threads several in
+      // a row — and one who doesn't can see exactly how to fix it. A third of
+      // the courses rise, a third descend, the rest stay level, so the sky
+      // asks for a decision instead of a straight line.
+      if (rng.next() < 0.34) {
+        const count = 4 + Math.floor(rng.next() * 3); // 4–6 hoops
+        const shape = rng.next();
+        // Slope is per hoop along a line in WORLD space, not a height above the
+        // terrain: terrain-relative hoops zig-zag by tens of metres as hills
+        // rise and fall, which is a course nobody can thread. Anchored to the
+        // air the bird is actually in, the hoops form one continuous line.
+        const climb = shape < 0.34 ? 2.0 : shape < 0.68 ? -2.4 : 0;
+        const phase = rng.next() * Math.PI * 2;
+        // Entry height is set so an ordinary launch off the hill below reaches
+        // the first hoop; later hoops are clamped above the ground so a course
+        // never buries a ring inside a hill.
+        const startY = terrain.heightAt(x) + 16 + rng.range(0, 10);
+        for (let i = 0; i < count; i++) {
+          const rx = x + i * 30 + rng.range(-3, 3);
+          const roll = Math.sin(phase + i * 0.9) * 2.2;
+          const ry = Math.max(terrain.heightAt(rx) + 7, startY + climb * i + roll);
+          this.placeRing(rx, ry, 4.4);
+        }
       }
 
       // Balloons: rare, up in the cloud layer — pop one for a huge bounce.
