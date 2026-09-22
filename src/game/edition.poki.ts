@@ -26,7 +26,8 @@ export const POKI_MULTIPLAYER = true;
 export const SQUAD_CHAT = false;
 
 /** Player text is allowed with profanity filtering (isPilotNameClean). */
-export const CUSTOM_PILOT_NAMES = true;
+/** No unmoderated player text or personal data (content & player safety, REQ-61). */
+export const CUSTOM_PILOT_NAMES = false;
 
 /** Poki owns ad scheduling and forbids in-app purchases (REQ-20).
  * Unconditionally false: this is the edition's policy, not a build toggle.

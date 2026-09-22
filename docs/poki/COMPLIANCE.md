@@ -264,7 +264,7 @@
 | `NL-05` | requirement | WebRTC is feature-detected and a non-WebRTC path exists. | ✅ | src/game/PokiMpUtils.ts matches /RTCPeerConnection/ |
 | `NL-06` | requirement | The UI says whether the player is in a live room or a local/AI fallback. | ✅ | src/game/Game.ts matches /multiplayerLive/ |
 | `NL-07` | requirement | A dropped connection must not end the session; degrade to the local flock. | ✅ | src/game/PokiNetlib.ts matches /closedByUs/ |
-| `NL-08` | requirement | Netlib is loaded lazily so it never lands in the boot path. | ✅ | src/game/net-transport.poki.ts matches /await import\("\./PokiNetlib"\)/ |
+| `NL-08` | requirement | Netlib is loaded lazily so it never lands in the boot path. | ✅ | src/game/net-transport.poki.ts matches /import\("\./PokiNetlib"\)/ |
 | `NL-09` | requirement | A Netlib build must not contain another platform's transport names or endpoints. | ✅ | gate wired: pnpm isolation:check |
 | `NL-10` | requirement | Lobby codes are short and unambiguous to read aloud. | ✅ | src/game/PokiMpUtils.ts matches /ABCDEFGHJKLMNPQRSTUVWXYZ/ |
 
@@ -498,7 +498,7 @@
 | `NL-05` | isPokiMultiplayerAvailable() gates the Netlib client; net-transport.poki.ts falls back to the WebSocket client. |
 | `NL-06` | HUD status + race screen state the live/local truth; local rivals are labelled AI. |
 | `NL-07` | Reconnect + seat preservation in PokiNetlibClient; MassRace keeps flying the local squadron otherwise. |
-| `NL-08` | Dynamic import at race time; the library is not in the initial download. |
+| `NL-08` | One shared dynamic import (loadNetlib) is awaited by createNetTransport and warmed by prewarmNetTransport: the library is never in the boot path, and never in a non-Poki bundle. |
 | `NL-09` | Per-target transport module swap + isolation check. |
 | `NL-10` | No 0/O/1/I alphabet, five characters, shared with the WebSocket transport. |
 | `AU-01` | Create payloads keep values scalar. |

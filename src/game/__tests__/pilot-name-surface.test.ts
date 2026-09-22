@@ -16,6 +16,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { HudSnapshot } from "../HUD";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 /**
  * A snapshot stand-in: the HUD reads far more fields than the board page
@@ -92,6 +94,22 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   document.body.innerHTML = "";
+});
+
+describe("edition policy — who may type a name", () => {
+  // The renderer tests above mock the edition module, so they stay green even if
+  // an edition file flips the flag. These read the real files: every portal
+  // edition must ship the curated call sign, and only the direct/web build may
+  // offer free text (REQ-61: multiplayer-visible names are curated, not typed).
+  const read = (file: string): string =>
+    readFileSync(join(process.cwd(), "src", "game", file), "utf8");
+
+  it("portal editions keep free-text names off, the direct build keeps them on", () => {
+    for (const file of ["edition.poki.ts", "edition.crazy.ts", "edition.generic.ts"]) {
+      expect(read(file), file).toMatch(/export const CUSTOM_PILOT_NAMES = false;/);
+    }
+    expect(read("edition.ts")).toMatch(/export const CUSTOM_PILOT_NAMES = true;/);
+  });
 });
 
 describe("leaderboard pilot-name row", () => {

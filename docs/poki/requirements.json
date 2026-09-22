@@ -2119,9 +2119,9 @@
    "verify": {
     "type": "grep",
     "path": "src/game/net-transport.poki.ts",
-    "pattern": "await import\\(\"\\./PokiNetlib\"\\)"
+    "pattern": "import\\(\"\\./PokiNetlib\"\\)"
    },
-   "evidence": "Dynamic import at race time; the library is not in the initial download."
+   "evidence": "One shared dynamic import (loadNetlib) is awaited by createNetTransport and warmed by prewarmNetTransport: the library is never in the boot path, and never in a non-Poki bundle."
   },
   {
    "id": "NL-09",
