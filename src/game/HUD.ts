@@ -726,7 +726,7 @@ export class HUD {
     this.root.querySelector(".mid-meta")!.appendChild(this.root.querySelector(".combo")!);
     const header = lane("hud-header", [".top-bar", ".mid-meta", ".power-chips", ".power-strip", ".roster-bar", ".versus-bar"]);
     lane("flight-messages", [".launch-banner", ".hint", ".goal-pop", ".finish-countdown", ".countdown"]);
-    const footer = lane("flight-footer", [".goal-strip", ".draft-meter", ".fever-wrap", ".emote-wheel"]);
+    const footer = lane("flight-footer", [".goal-strip", ".draft-meter", ".emote-wheel"]);
     // The menu backdrop is the LIVE 3D gameplay world (Game.menuTick attract
     // flight): the painted 2D sky canvas stays OUT of the DOM so it never
     // covers the world, and its loop never starts. The hero-bird overlay
@@ -738,11 +738,14 @@ export class HUD {
     this.overlayNavigation = new OverlayNavigation(this.root);
     // Observe only these small flow containers, not the full scene or per-frame
     // positions. Header/footer wrapping automatically reserves feedback space.
-    this.resizeObs = new ResizeObserver(entries => {
-      for (const entry of entries) {
-        const name = entry.target === header ? "header" : "footer";
-        this.root.style.setProperty(`--hud-${name}-height`, `${entry.contentRect.height}px`);
-      }
+    this.resizeObs = new ResizeObserver(() => {
+      // Measure the FULL offset from the play-hud edge so that absolutely-
+      // positioned elements cleared by this variable actually sit below the
+      // header (or above the footer). contentRect.height omits the play-hud
+      // padding, causing the elements to land inside the header/footer.
+      const hudRect = header.offsetParent?.getBoundingClientRect() ?? { top: 0, bottom: window.innerHeight };
+      this.root.style.setProperty(`--hud-header-height`, `${header.getBoundingClientRect().bottom - hudRect.top}px`);
+      this.root.style.setProperty(`--hud-footer-height`, `${hudRect.bottom - footer.getBoundingClientRect().top}px`);
     });
     this.resizeObs.observe(header);
     this.resizeObs.observe(footer);
@@ -2601,15 +2604,23 @@ function renderMain(s: HudSnapshot): string {
 
     ${homeBoardStrip(s)}
     <button class="primary-btn home-launch" data-ui data-action="pvp-practice" aria-label="Play free flight now"><span class="launch-art">${menuIcon("flight")}</span><span class="launch-copy"><small>${t("onboarding.skyIsYours", undefined, "THE SKY IS YOURS")}</small><b>Fly now</b><span>${t("onboarding.launchSub", undefined, "Hold to dive · release to glide")}</span></span><span class="launch-arrow" aria-hidden="true">${arrowRightSvg()}</span></button>
-    <!-- 01 — PLAY. PvP and AI PvP are the first two entries *inside* Play —
+    <!-- 01 — PLAY. PvP, AI PvP and Leaderboards are the first three entries *inside* Play —
          they are ways of playing, not separate apps, so they sit underneath
-         the Play heading rather than beside it. Solo play follows in the same
-         group so the whole block reads as one hierarchy. -->
+         the Play heading rather than beside it. Leaderboards sits here next to
+          PvP/PvAI so score-chasing has the same visual anchor. Solo modes
+          follow in the same grid so the whole block reads as one play section. -->
     <div class="home-section-title"><span>${t("hud.menu.chooseAdventure", undefined, "Choose your adventure")}</span><small>01 — PLAY</small></div>
     <div class="home-subsection" role="presentation"><span>Play with rivals</span><small>PvP &amp; PvAI</small></div>
-    <nav class="destination-grid play-destinations" aria-label="Play against other pilots">${menuLinks(PLAY_DESTINATIONS.filter((d) => d.action !== "mode-select" && d.action !== "start-endless"))}</nav>
-    <div class="home-subsection" role="presentation"><span>Play solo</span><small>Solo skies</small></div>
-    <nav class="destination-grid play-destinations solo-destinations" aria-label="Play solo">${menuLinks(PLAY_DESTINATIONS.filter((d) => d.action === "mode-select" || d.action === "start-endless"))}</nav>
+    <nav class="destination-grid play-destinations" aria-label="Choose your adventure">${menuLinks(
+      PLAY_DESTINATIONS.map(item => {
+        if (item.action === "open-board") {
+          const liveDetail = s.board && s.board.yourRank > 0
+            ? `🏆 You · #${s.board.yourRank} of ${s.board.total} · Leader: ${s.board.entries[0] ? escapeHtml(s.board.entries[0].name) : "—"}`
+            : `${s.bestDistance > 0 ? `Your best: ${formatDistance(s.bestDistance)} · Global standings` : "All-time · weekly · today · you"}`;
+          return { ...item, detail: liveDetail, featured: true };
+        }
+        return item;
+      }) as (typeof PLAY_DESTINATIONS[number] & { featured?: boolean })[])}</nav>
     <div class="home-section-title"><span>${t("hud.menu.makeItYours", undefined, "Make it yours")}</span><small>02 — HANGAR</small></div>
     <nav class="destination-grid utility-destinations" aria-label="Your hangar">${menuLinks(COLLECTION_DESTINATIONS)}</nav>
     <div class="home-section-title"><span>${t("hud.menu.everyFlightCounts", undefined, "Every flight counts")}</span><small>03 — PROGRESS</small></div>
@@ -2621,14 +2632,8 @@ function renderMain(s: HudSnapshot): string {
             : `${s.daily.modeIcon} ${s.daily.title} · ${s.daily.modeName}`;
           return { ...item, detail: liveDetail };
         }
-        if (item.action === "open-board") {
-          const liveDetail = s.board && s.board.yourRank > 0
-            ? `🏆 You · #${s.board.yourRank} of ${s.board.total} · Leader: ${s.board.entries[0] ? escapeHtml(s.board.entries[0].name) : "—"}`
-            : `${s.bestDistance > 0 ? `Your best: ${formatDistance(s.bestDistance)} · Global standings` : "All-time · weekly · today · you"}`;
-          return { ...item, detail: liveDetail, featured: true };
-        }
         return item;
-      }) as (typeof PROGRESS_DESTINATIONS[number] & { featured?: boolean })[]
+      }) as typeof PROGRESS_DESTINATIONS[number][]
     )}</nav>
     <div class="home-record"><span class="record-art">${menuIcon("medal")}</span><span>${t("hud.menu.personalBest", undefined, "Personal best")} <b>${formatDistance(s.bestDistance)}</b></span><span class="record-pass" data-ui data-action="open-pass">Nest Pass Lv.${s.season.tier}/${s.season.maxTier}</span><span class="record-wallet">● ${s.wallet.toLocaleString()} <small>${t("hud.menu.coinBalance", undefined, "coins")}</small></span></div>
   `;
@@ -3499,19 +3504,24 @@ function renderContinue(s: HudSnapshot): string {
 }
 
 function renderAd(s: HudSnapshot): string {
-  if (s.portalName !== "none") {
-    return `
-      <div class="ad-label">${PORTAL_DISPLAY_NAME} break</div>
-      <div class="portal-ad-wait"><div class="spinner"></div><h3>Preparing the next flight</h3><p>Your run is paused while the portal handles this break.</p></div>
-    `;
-  }
+  const portal = s.portalName !== "none";
+  const canRemoveBreaks = SELL_AD_REMOVAL && !s.gold;
+  const label = portal
+    ? `${PORTAL_DISPLAY_NAME} · sponsored break`
+    : `Sponsored break · ${s.adReason === "continue" ? "your second wind is loading…" : "back to flying in a moment"}`;
+  const header = portal
+    ? `Advertisement`
+    : `Your ad is loading`;
+  const subtext = portal
+    ? `Your run is paused while the portal serves this break.`
+    : `Back to flying in a moment.`;
   return `
-    <div class="ad-label">Sponsored break · ${s.adReason === "continue" ? "your second wind is loading…" : "back to flying in a moment"}</div>
-    <div class="portal-ad-wait"><div class="spinner"></div><h3>Your ad is loading</h3><p>Back to flying in a moment.</p></div>
+    <div class="ad-label">${label}</div>
+    <div class="portal-ad-wait"><div class="spinner"></div><h3>${header}</h3><p>${subtext}</p></div>
     <div class="ad-bar"><i data-live="adBar"></i></div>
     <div class="ad-actions">
       <button class="mini-btn" data-ui data-action="ad-skip" data-live="adSkip" disabled>Skip in ${Math.ceil(s.adTimer)}</button>
-      ${!(import.meta.env.VITE_SELL_AD_REMOVAL as any /* eslint-disable-line @typescript-eslint/no-explicit-any */) || s.gold ? "" : `<button class="mini-btn gold" data-ui data-action="ad-gold">✦ Remove breaks</button>`}
+      ${canRemoveBreaks ? `<button class="mini-btn gold" data-ui data-action="ad-gold">✦ Remove breaks</button>` : ""}
     </div>
   `;
 }

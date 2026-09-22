@@ -28,6 +28,7 @@ export const FOREIGN_MARKERS = {
     [/auds\.poki\.io/, "Poki AUDS endpoint"],
     [/\bPokiSDK\b/, "Poki SDK global"],
     [/Poki edition/, "Poki edition string"],
+    [/data-ref=["']pilotName/, "free-text pilot name input (read-only with 🎲 roll)"],
   ],
   generic: [
     [/poki/i, "Poki marker"],
@@ -37,6 +38,7 @@ export const FOREIGN_MARKERS = {
     [/\bPokiSDK\b/, "Poki SDK global"],
     [/crazygames/i, "CrazyGames marker"],
     [/sdk\.crazygames\.com/, "CrazyGames SDK URL"],
+    [/data-ref=["']pilotName/, "free-text pilot name input (read-only with 🎲 roll)"],
   ],
 };
 
@@ -52,6 +54,12 @@ export const FOREIGN_MARKERS = {
  * so a future renderer cannot quietly reintroduce a message box into a portal
  * build. (Inert remnants are expected and allowed: the `.chat-box` CSS rule and
  * a minified `case"squad-chat":break;` with nothing to trigger it.)
+ *
+ * Note on pilot names: Poki now permits profanity-filtered free-text pilot
+ * names (content & player safety policy updated 2026-09), so the
+ * `data-ref="pilotName"` input is a LEGITIMATE Poki surface and must NOT be
+ * flagged here. It is instead a foreign marker for crazy/generic (see
+ * FOREIGN_MARKERS above) — those editions render the name read-only.
  */
 export const PORTAL_FORBIDDEN_MARKERS = [
   [/Message your club/, "club chat input (REQ-31 forbids chat surfaces)"],
@@ -66,15 +74,11 @@ export const PORTAL_FORBIDDEN_MARKERS = [
   //     purchase"). Gold's pitch claimed "No sponsored breaks, ever"; the
   //     bullet now only exists when edition SELL_AD_REMOVAL is true, so a
   //     portal bundle containing this string means the gate regressed.
-  //   • Content & player safety — portals broadcast the pilot name to real
-  //     players (netlib rooms, rosters, name tags) and must not collect
-  //     personal data, so portal editions render the name read-only
-  //     (edition CUSTOM_PILOT_NAMES) with a 🎲 roll instead of a text field.
+  //   • Ad-removal claims must not survive into ANY portal bundle.
   [/No sponsored breaks/i, "ad-removal purchase claim in the paywall (REQ-20)"],
   [/[Rr]emove ads|No ads,? ever|Ad-?free forever/i, "ad-removal purchase claim (REQ-20)"],
   [/no breaks/i, "\"no breaks\" ad-removal claim in the Gold upsell strip (REQ-20)"],
   [/[Rr]emove breaks/, "\"Remove breaks\" ad-removal purchase button (REQ-20)"],
-  [/data-ref=["']pilotName/, "free-text pilot name input (no player-authored text or personal data on portals)"],
   // The self-hosted stack (Rust/TS room server, social service, leaderboard
   // backend) is the DIRECT-BUILD path. Portal editions blank
   // VITE_MULTIPLAYER_URL / VITE_SOCIAL_URL / VITE_LEADERBOARD_URL at build

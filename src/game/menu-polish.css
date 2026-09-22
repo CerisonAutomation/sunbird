@@ -3682,10 +3682,16 @@ button.upsell:active,
 /* ── Stat value / coin display ───────────────────────────────────────────────── */
 .stat-value {
   font: 700 22px/1.1 var(--display) !important;
-  color: #2c1f14 !important;
+  color: #fff !important;
+  text-shadow: 0 2px 0 rgba(42, 28, 40, 0.25), 0 8px 18px rgba(20, 20, 40, 0.4) !important;
 }
 .stat-value.coin {
-  color: #7a4800 !important;
+  background: linear-gradient(135deg, #ffd54a 0%, #ffb84d 40%, #fff8dd 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  color: transparent !important;
+  text-shadow: 0 0 6px rgba(255, 195, 75, 0.6), 0 0 12px rgba(255, 165, 0, 0.4) !important;
+  filter: drop-shadow(0 0 4px rgba(255, 195, 75, 0.5)) !important;
 }
 .stat-label {
   font: 700 8px/1.4 var(--body) !important;

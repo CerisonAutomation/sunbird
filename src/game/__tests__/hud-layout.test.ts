@@ -44,7 +44,7 @@ describe("readable HUD feedback", () => {
     for (const c of root.querySelectorAll("canvas")) expect(c.width).toBe(300);
     expect(root.querySelectorAll(".top-bar .hud-controls button")).toHaveLength(2);
     expect(root.querySelector(".hud-header .roster-bar")).not.toBeNull();
-    expect(root.querySelector(".flight-footer .fever-wrap")).not.toBeNull();
+    expect(root.querySelector(".play-hud > .fever-wrap")).not.toBeNull();
     expect(root.querySelectorAll(".flight-messages > *")).toHaveLength(5);
     hud.dispose();
     expect(disconnect).toHaveBeenCalledOnce();

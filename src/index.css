@@ -364,15 +364,22 @@ textarea {
 
 .fever-wrap {
   position: absolute;
-  left: 50%;
-  bottom: calc(28px + env(safe-area-inset-bottom));
-  transform: translateX(-50%);
-  width: min(280px, 70vw);
+  right: calc(12px + env(safe-area-inset-right, 0px));
+  top: calc(100% + 6px);
+  left: auto;
+  bottom: auto;
+  transform: none;
+  width: min(160px, 40vw);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease;
 }
 
+.hud-header .fever-wrap {
+  top: calc(100% + 4px);
+}
+
+.hud-header .fever-wrap.on,
 .fever-wrap.on {
   opacity: 1;
 }
@@ -1774,7 +1781,7 @@ fieldset.squad-fields {
 /* Flight HUD lanes: one header, one priority message, one footer. Keep these
    after legacy responsive rules so touch controls never return over the fever
    meter. Heights are observed only when their flow content changes. */
-.hud-header { display: flex; flex-direction: column; gap: 6px; }
+.hud-header { position: relative; display: flex; flex-direction: column; gap: 6px; }
 .hud-header .top-bar {
   grid-template-columns: minmax(0, 1fr) minmax(80px, 280px) minmax(0, 1fr) auto;
   align-items: center;
@@ -1877,8 +1884,13 @@ fieldset.squad-fields {
 }
 .hud-root:not([data-feedback="countdown"]) .countdown { display: none; }
 .hud-header .combo {
-  position: static; transform: none; animation: none;
-  font-size: 14px; line-height: 1.2; padding: 3px 6px;
+  position: absolute;
+  right: calc(12px + env(safe-area-inset-right, 0px));
+  top: 100%;
+  transform: translateX(0);
+  margin-top: 6px;
+  font-size: 16px; line-height: 1.1; padding: 2px 8px;
+  pointer-events: none;
 }
 .hud-header .combo:not(.show) { display: none; }
 .play-hud .alt-gauge {
