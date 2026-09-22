@@ -3402,17 +3402,7 @@ function renderAd(s: HudSnapshot): string {
   }
   return `
     <div class="ad-label">Sponsored break · ${s.adReason === "continue" ? "your second wind is loading…" : "back to flying in a moment"}</div>
-    <div class="ad-slot">
-      <div class="ad-slot-inner">
-        <div class="ad-slot-badge">AD</div>
-        <div class="ad-slot-content">
-          <div class="ad-slot-placeholder">
-            <span class="ad-slot-icon">📢</span>
-            <span class="ad-slot-text">Advertisement</span>
-          </div>
-        </div>
-      </div>
-    </div>
+    <div class="portal-ad-wait"><div class="spinner"></div><h3>Your ad is loading</h3><p>Back to flying in a moment.</p></div>
     <div class="ad-bar"><i data-live="adBar"></i></div>
     <div class="ad-actions">
       <button class="mini-btn" data-ui data-action="ad-skip" data-live="adSkip" disabled>Skip in ${Math.ceil(s.adTimer)}</button>
