@@ -106,7 +106,7 @@ unlock, storm-wall hook + 3 CTR thumbnails. **Voice:** 7 quip engines ×
 50+ lines, seeded rotation, transcreated per locale. **Honesty law:**
 simulated = local badge; refereed = ✓ stamp. Never mix.
 
-### 3D WORLD-CLASS BARS (Sunbird's look is the thumbnail — protect it)
+### 3D QUALITY BARS (Sunbird's look is the thumbnail — protect it)
 
 Three.js ACES, locked 60fps on iPhone 12 / Pixel 7 / M1 / Chromebook-4GB
 (throttled profile), 120fps-capable on desktop GPU. Concrete bars:

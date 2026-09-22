@@ -25,7 +25,7 @@ import { fetchPublicRooms, isMultiplayerConfigured, makeRoomCode, RealtimeClient
 import { RoomWatcher, ROOM_POLL_MS, roomSummaryLine, summarizeRooms, type LiveRoom } from "./RoomBrowser";
 import { Leaderboard, loadPilotName, savePilotName, isLeaderboardOnline, type BoardMetric, type BoardPage, type BoardScope } from "./Leaderboard";
 import { generatePilotName } from "./pilotNameGenerator";
-import { setLocale, type SupportedLocale } from "../i18n";
+import { setLocale, whenLocaleReady, type SupportedLocale } from "../i18n";
 import { Tournaments, TRAILS, weekKey, type PrizeGrant } from "./Tournaments";
 import {
   dailyChallenge,
@@ -119,6 +119,8 @@ import { GameplayEventSink } from "./GameplayEvents";
 import { LivingBackground } from "./LivingBackground";
 import { Sky } from "./Sky";
 import { Telemetry } from "./Telemetry";
+import { crashReporter } from "./resilience/CrashReporter";
+import { Watchdog } from "./resilience/Watchdog";
 import { TerrainSystem } from "./TerrainSystem";
 import { Weather } from "./Weather";
 
@@ -178,6 +180,16 @@ export class Game {
     else this.platform?.gameplayStop();
   });
   private readonly telemetry = new Telemetry();
+  /** Detects multi-second main-thread stalls while the tab is visible and
+   * reports them through telemetry. Suspended during context loss and ad
+   * breaks (rAF legitimately stops there — naively checking would report
+   * every tab switch as a stall). */
+  private readonly watchdog = new Watchdog({
+    onStall: (stallMs, bucket, worstTaskMs) => {
+      this.telemetry.track("main_thread_stall", { ms: stallMs, bucket, worstTaskMs });
+      crashReporter.breadcrumb(`stall ${bucket} (${Math.round(stallMs)}ms, worst task ${worstTaskMs}ms)`);
+    },
+  });
   private readonly ghostRecorder = new GhostRecorder();
   private readonly ghostPlayer = new GhostPlayer();
   /** Network rival ghost (async PvP on the daily seed) — amber silhouette. */
@@ -532,7 +544,18 @@ export class Game {
     this.achievements = new Achievements(this.save);
     this.seasonPass = new SeasonPass(this.save);
     this.board = new Leaderboard(this.save.state.deviceId);
+    // Warm the startup locale pack (English is resident; everyone else
+    // fetches one small file). Runs while the HUD/menu build — the module
+    // already lives in this chunk, so this costs nothing on the entry path.
+    void whenLocaleReady();
     this.telemetry.bindDevice(this.save.state.deviceId);
+    // The crash reporter's network copy goes through the same privacy
+    // pipeline as every other event; the journal from the previous session
+    // (if any) is reported exactly once, here.
+    crashReporter.attach(this.telemetry);
+    const priorCrashes = crashReporter.previousSessionCrashes.length;
+    if (priorCrashes > 0) this.telemetry.track("boot_after_crash", { count: priorCrashes });
+    this.watchdog.start();
     // Persistence failures (quota / blocked storage) lose progress silently
     // unless we say so — route them through the same observability bus.
     this.save.onPersistError = () => this.telemetry.track("save_persist_failed", {});
@@ -642,6 +665,7 @@ export class Game {
       this.contextLost = true;
       if (this.state === "playing") this.setState("paused");
       this.audio.setHiddenMuted(true);
+      this.watchdog.suspend(); // rAF stops with the context — not a stall
       this.hud.toast("Graphics context lost — restoring…");
       this.telemetry.track("webgl_context_lost", {});
       // If the GPU never comes back, say so instead of leaving a dead canvas.
@@ -654,6 +678,7 @@ export class Game {
     };
     this.onContextRestored = () => {
       this.contextLost = false;
+      this.watchdog.resume();
       this.renderWidth = 0; // force a fresh buffer after GPU/context restoration
       this.audio.setHiddenMuted(false);
       // Rebuild the drawing buffer at the current size and drop the stale clock.
@@ -954,6 +979,7 @@ export class Game {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.watchdog.stop();
     cancelAnimationFrame(this.raf);
     this.resizeObs.disconnect();
     this.orientationTimers.forEach(id => window.clearTimeout(id));
@@ -1632,6 +1658,18 @@ export class Game {
           this.audio.fanfare();
           this.enterFever();
           this.feverTimer = Math.max(this.feverTimer, surprise.feverSeconds);
+          break;
+        case "moonbow":
+          // A shimmering arc overhead: glissando + a burst of colour above
+          // the bird. Pure delight — no coins, no strings attached.
+          this.audio.triggerViralGlissando();
+          this.particles.emitConfetti(this.bird.x, this.bird.y - 14);
+          break;
+        case "flock-chorus":
+          // A V-formation honks past downwind: a gust, honks, and a tip.
+          this.audio.honk();
+          this.audio.slideWhistle();
+          this.particles.emitWind(this.bird.x - 8, this.bird.y, 0.6);
           break;
       }
       if (surprise.coins > 0) {
@@ -3029,6 +3067,11 @@ export class Game {
     const newTrophies = this.achievements.checkNew();
     this.checkPrizeSkins();
 
+    // Poki game-events: the rewarded bonus card is on the recap — measure its
+    // exposure once so the dashboard can pair it with the tap's `interact`.
+    if (this.portalEnabled() && this.runCoins > 0 && !this.multiplierClaimed) {
+      this.platform?.measure("button", "results-coin-multiplier", "visible");
+    }
     this.telemetry.track("run_end", {
       distance: Math.round(stats.distance),
       score: Math.round(score),
@@ -3297,13 +3340,23 @@ export class Game {
         // One claim per run. The old handler tripled runCoins on every click
         // and the card re-armed from the live snapshot — an infinite 3× coin
         // loop. Now it pays the bonus once and the card flips to a claimed
-        // chip (renderCoinMultiplierCard). No ad is shown, so no ad wording.
+        // chip (renderCoinMultiplierCard). On portals the bonus is the
+        // results-screen REWARDED placement (optional value, reward stated on
+        // the card); a declined ad leaves the card armed, never punishes.
         if (this.state === "gameover" && !this.multiplierClaimed && this.runCoins > 0) {
-          const bonus = this.runCoins * 2;
-          this.multiplierClaimed = true;
-          this.save.addCoins(bonus);
-          this.audio.chapterFanfare();
-          this.hud.toast(`3× flight bonus — +● ${bonus} coins`, "gold");
+          const platform = this.platform;
+          if (this.portalEnabled() && platform && platform.name !== "none") {
+            platform.measure("button", "results-coin-multiplier", "interact");
+            this.setState("ad");
+            this.telemetry.track("portal_break_request", { portal: platform.name, placement: "results-multiplier" });
+            void this.multiplierWithPortalReward();
+          } else {
+            const bonus = this.runCoins * 2;
+            this.multiplierClaimed = true;
+            this.save.addCoins(bonus);
+            this.audio.chapterFanfare();
+            this.hud.toast(`3× flight bonus — +● ${bonus} coins`, "gold");
+          }
         }
         this.bump();
         break;
@@ -3388,6 +3441,14 @@ export class Game {
         // the confirmation flow (goToMenu returns to menu state) starts clean.
         if (this.state === "paused") this.closePauseScreen();
         this.exitVersus();
+        if (this.state === "gameover" && this.portalEnabled() && this.platform && this.platform.name !== "none") {
+          // Leaving the recap for the menu is one of Poki's documented
+          // commercial-break points ("back to the main menu"); the SDK
+          // frequency-caps how often a real ad actually serves.
+          this.telemetry.track("portal_break_request", { portal: this.platform.name, placement: "to-menu" });
+          void this.menuAfterPortalBreak();
+          break;
+        }
         this.goToMenu();
         break;
       case "pause-to": {
@@ -3504,9 +3565,12 @@ export class Game {
       }
       case "set-language": {
         if (id) {
-          setLocale(id as SupportedLocale);
-          this.hud.toast(`Language updated`, "info");
-          this.bump();
+          // Pack loads before the re-render: UI never paints half-switched
+          // text, and the confirmation toast lands once strings are live.
+          void setLocale(id as SupportedLocale).then(() => {
+            this.hud.toast(`Language updated`, "info");
+            this.bump();
+          });
         }
         break;
       }
@@ -5753,6 +5817,49 @@ export class Game {
       this.endPortalAd();
     }
     if (this.state === "paused" || this.state === "ad") this.setState("playing");
+  }
+
+  /**
+   * The "back to the main menu" commercial break (results → menu on portal
+   * builds). A rejected or absent break resolves straight into the menu —
+   * leaving a results screen can never wedge in the ad state.
+   */
+  private async menuAfterPortalBreak(): Promise<void> {
+    const platform = this.platform;
+    if (!platform || platform.name === "none") return;
+    this.setState("ad");
+    await platform.commercialBreak();
+    if (this.disposed) return;
+    this.endPortalAd();
+    this.goToMenu();
+    this.bump();
+  }
+
+  /**
+   * Results-screen 3× coin bonus via the platform's rewarded ad. The card
+   * states the reward before the tap; the payout happens only on a true
+   * grant, and a declined/failed ad just returns the player to the recap
+   * with the card still armed (Poki rewarded rules: optional, honest, no
+   * penalty on decline).
+   */
+  private async multiplierWithPortalReward(): Promise<void> {
+    const platform = this.platform;
+    if (!platform || platform.name === "none") return;
+    const earned = await platform.rewardedBreak();
+    if (this.disposed) return;
+    this.endPortalAd();
+    if (earned) {
+      const bonus = this.runCoins * 2;
+      this.multiplierClaimed = true;
+      this.save.addCoins(bonus);
+      this.audio.chapterFanfare();
+      this.hud.toast(`3× flight bonus — +● ${bonus} coins`, "gold");
+      platform.measure("reward", "results-coin-multiplier", "granted");
+    } else {
+      this.hud.toast("No reward this time — the 3× bonus is still on the card", "warn");
+    }
+    if (this.state === "ad") this.setState("gameover");
+    this.bump();
   }
 
   /** Rewarded continue never succeeds unless the platform explicitly grants it. */

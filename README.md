@@ -1,4 +1,4 @@
-# 🐦 Sunbird — Tiny Glide
+# 🐦 Sunbird
 
 > A one-button, side-scrolling arcade glider. Hold to dive, release to soar, chase the daylight across procedurally generated islands.
 
@@ -12,6 +12,8 @@ Sunbird is a complete HTML5 arcade game: 8 flight modes, 40-pilot races, daily/w
 - **PvP** — 40-pilot mass race (live pilots + time-shifted leaderboard ghosts), ranked duels, Stormfront Royale, `#rival=` zero-server challenge links
 - **PvE** — seeded daily challenge, weekly gauntlet, storm weather, login calendar
 - **Honesty rule** — anything simulated on-device is badged as local/practice in the UI; server-owned results only where a backend actually referees (see [ROADMAP.md](./ROADMAP.md))
+- **Review** — 360° comparative review vs multiplayer/mobile category standards: [docs/COMPARATIVE_REVIEW_360.md](./docs/COMPARATIVE_REVIEW_360.md)
+- **Poki** — developer-guide implementation matrix, verified against Poki's public sources: [docs/POKI_IMPLEMENTATION_MATRIX.md](./docs/POKI_IMPLEMENTATION_MATRIX.md)
 
 ## Tech stack
 
@@ -27,6 +29,7 @@ Sunbird is a complete HTML5 arcade game: 8 flight modes, 40-pilot races, daily/w
 | Leaderboard | Vercel Functions ([api/](./api/)) + Upstash Redis, on-device fallback ([LEADERBOARD_API.md](./LEADERBOARD_API.md)) |
 | Ghosts | Async PvP via ghost publish/chase ([src/game/GhostNet.ts](./src/game/GhostNet.ts)) |
 | Caching | Content-hashed Vite assets + immutable HTTP caching; legacy service worker safely retired |
+| Resilience | Client kernel ([src/game/resilience/](./src/game/resilience/)): crash capture + persisted journal, per-host circuit breakers, timeout/retry with full-jitter backoff, durable offline outbox for score uploads, main-thread stall watchdog, quota self-healing storage writes |
 
 ## Quick start
 

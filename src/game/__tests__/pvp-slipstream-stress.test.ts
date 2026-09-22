@@ -349,6 +349,18 @@ describe("3× coin bonus card (one claim per run)", () => {
     expect(claimed).not.toContain("📺");
   });
 
+  it("portal (rewarded) variant states the reward and marks the ad before the tap", () => {
+    const html = renderCoinMultiplierCard(250, false, true);
+    expect(html).toContain("data-action=\"multiply-run-coins\"");
+    expect(html).toContain("🎬"); // the tap is visibly an ad placement
+    expect(html).toContain("Watch a short ad"); // reward stated BEFORE the tap
+    expect(html).toContain("+● 500");
+    // The free (non-portal) variant must stay ad-free.
+    const free = renderCoinMultiplierCard(250, false);
+    expect(free).not.toContain("🎬");
+    expect(free).not.toContain("📺");
+  });
+
   it("is absent entirely when the run earned no coins", () => {
     expect(renderCoinMultiplierCard(0, false)).toBe("");
     expect(renderCoinMultiplierCard(0, true)).toBe("");

@@ -10,6 +10,8 @@ import {
   VIP_DAYS,
 } from "./constants";
 import { dateSeed } from "./math";
+import { durableSetItem } from "./resilience/durableSet";
+import { openPayload, sealPayload } from "./resilience/crc";
 import { TRACK_NAMES } from "./Music";
 import { defaultRival, rankSeasonId, ratingDelta, RIVAL_BASE_RATING, seasonReward, softResetRating, streakBonus, type RivalMatch, type RivalState } from "./pvp";
 import { seasonId } from "./season";
@@ -329,6 +331,8 @@ export class SaveData {
   /** Invoked (throttled) when a persist fails — lets the game observe data-
    *  loss risk instead of swallowing it silently. */
   onPersistError: (() => void) | null = null;
+  /** Invoked when quota pressure forced cache eviction to complete a write. */
+  onEviction: ((evicted: readonly string[]) => void) | null = null;
   /** Optional platform SDK adapter for cloud save syncing (e.g. CrazyGames data.setItem). */
   platformAdapter: { saveData?: (key: string, data: string) => Promise<void> } | null = null;
   private lastPersistErrorAt = 0;
@@ -346,7 +350,13 @@ export class SaveData {
         this.persistNow(d);
         return d;
       }
-      const p = JSON.parse(raw) as Partial<SaveState> & { settings?: Partial<Settings> };
+      // Integrity seal (CRC32 envelope). Legacy bare-JSON saves pass through
+      // untouched; a sealed save whose bytes no longer match its checksum is
+      // treated exactly like unparseable JSON — the catch below quarantines
+      // the raw blob and boots clean instead of trusting corrupt numbers.
+      const opened = openPayload(raw);
+      if (!opened.ok) throw new Error("save integrity check failed");
+      const p = JSON.parse(opened.data) as Partial<SaveState> & { settings?: Partial<Settings> };
       const owned = strArr(p.ownedSkins);
       if (!owned.includes("sunbird")) owned.unshift("sunbird");
       const quality = p.settings?.quality;
@@ -553,21 +563,29 @@ export class SaveData {
   }
 
   private persistNow(state: SaveState): void {
-    const raw = JSON.stringify(state);
-    try {
-      storage.setItem(SAVE_KEY, raw);
+    // CRC32-sealed envelope: a silently truncated or bit-flipped write is
+    // detectable on load (the load path quarantines it) instead of quietly
+    // restoring wrong numbers. Portal cloud-save adapters receive the same
+    // sealed string, so every copy of the save carries its own integrity seal.
+    const raw = sealPayload(JSON.stringify(state));
+    // Quota self-healing: regenerable caches (ghosts, journal, board cache)
+    // are evicted to make room before this write is allowed to fail. Only a
+    // truly unusable store (private-mode quota-zero sandbox) reaches the
+    // degraded path — which is still reported, throttled, never thrown.
+    const result = durableSetItem(SAVE_KEY, raw, { protectedKeys: [SAVE_KEY, SAVE_KEY_V1, SAVE_KEY_CORRUPT] });
+    if (result.ok) {
       if (this.platformAdapter?.saveData) {
         void this.platformAdapter.saveData(SAVE_KEY, raw);
       }
-    } catch {
-      // A write that silently no-ops loses player progress with no signal. Call
-      // the observer (if any) — throttled here so a full/blocked store can't
-      // flood it — and otherwise keep playing rather than crashing the game.
-      const now = Date.now();
-      if (now - this.lastPersistErrorAt > 10_000) {
-        this.lastPersistErrorAt = now;
-        this.onPersistError?.();
-      }
+      return;
+    }
+    if (result.evicted.length > 0) {
+      this.onEviction?.(result.evicted);
+    }
+    const now = Date.now();
+    if (now - this.lastPersistErrorAt > 10_000) {
+      this.lastPersistErrorAt = now;
+      this.onPersistError?.();
     }
   }
 

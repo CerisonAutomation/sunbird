@@ -4,6 +4,7 @@ import { Component, type ErrorInfo, type ReactNode, useEffect, useRef, useState 
 // dynamic import inside the mount effect, behind the inline boot loader.
 import type { Game } from "./game/Game";
 import { bootStage } from "./game/BootProgress";
+import { crashReporter } from "./game/resilience/CrashReporter";
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
   state = { error: null as string | null };
@@ -13,6 +14,10 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: string |
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
+    // Same evidence pipeline as every other failure: deduped, redacted,
+    // journaled for the next boot's boot_after_crash count.
+    crashReporter.breadcrumb(`react boundary: ${String(info.componentStack ?? "").slice(0, 160)}`);
+    crashReporter.capture("react", error);
     console.error("Sunbird error boundary:", error, info.componentStack);
   }
 
@@ -53,6 +58,34 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: string |
             >
               Try again
             </button>
+            {crashReporter.previousSessionCrashes.length >= 2 && (
+              <button
+                onClick={() => {
+                  // Repeated boot crashes are usually one poisoned save.
+                  // Offer the escape hatch rather than a crash loop.
+                  try {
+                    localStorage.removeItem("sunbird.save.v2");
+                    localStorage.removeItem("sunbird.save.v1");
+                  } catch {
+                    /* storage unavailable — nothing to reset */
+                  }
+                  window.location.reload();
+                }}
+                style={{
+                  font: "inherit",
+                  border: "none",
+                  borderRadius: 12,
+                  padding: "10px 18px",
+                  background: "transparent",
+                  color: "#ff9d73",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                }}
+              >
+                Crashes repeat? Reset saved progress
+              </button>
+            )}
           </div>
         </div>
       );

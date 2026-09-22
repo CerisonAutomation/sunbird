@@ -1,9 +1,11 @@
 import { installRejectionGuard } from "./rejection-guard";
 import { bootStage } from "./game/BootProgress";
+import { crashReporter } from "./game/resilience/CrashReporter";
 
-// A floating promise rejection must never surface as a red console ERROR —
-// portal QA treats console errors as defects, and the game's network paths
-// are best-effort by design. Install before anything else can reject.
+// Order matters: the black box goes in before anything can throw. The
+// rejection guard is installed immediately after so a rejection during
+// module evaluation is captured, not just silenced.
+crashReporter.install();
 installRejectionGuard();
 
 // Mirrors the TARGET check in sdk/platform.ts, but written here so the

@@ -458,6 +458,60 @@ const MEL_CHIP_6 = [
   0, 77, 0, 79, 81, -1, -1, 0,
 ];
 
+// Sugar Rush: paired-call motif (E5–E5–G5) that climbs and answers —
+// candy-coated and relentless, the double-tap track.
+const MEL_CHIP_7 = [
+  76, 76, 0, 76, 0, 79, 0, 0,
+  76, 76, 0, 76, 0, 79, 0, 81,
+  81, 81, 0, 81, 0, 84, 0, 83,
+  81, 79, 76, 0, 79, -1, 0, 0,
+  74, 74, 0, 74, 0, 77, 0, 0,
+  76, 76, 0, 76, 0, 79, 0, 81,
+  84, 84, 0, 83, 0, 81, 0, 79,
+  76, 0, 74, 0, 72, -1, 0, 0,
+];
+
+// Neon Tail: offbeat 16th drive over ii–V–I–IV with a high sparkle answer —
+// the late-night highway track.
+const MEL_CHIP_8 = [
+  0, 74, 76, 0, 79, 0, 76, 74,
+  0, 72, 74, 0, 76, 0, 74, 72,
+  0, 74, 76, 0, 79, 0, 81, 79,
+  0, 84, 0, 83, 81, -1, 0, 0,
+  0, 74, 76, 0, 79, 0, 81, 84,
+  0, 86, 84, 0, 81, 0, 79, 76,
+  0, 74, 76, 0, 79, 0, 76, 74,
+  0, 72, 0, 74, 72, -1, 0, 0,
+];
+
+// Turbo Finch: two-note gallop pairs leaping octaves — pure forward motion,
+// the "one more run" track.
+const MEL_CHIP_9 = [
+  72, 72, 79, 0, 76, 76, 84, 0,
+  81, 81, 88, 0, 84, 84, 83, 0,
+  79, 79, 86, 0, 83, 83, 79, 0,
+  76, 0, 74, 0, 72, -1, 0, 0,
+  72, 72, 79, 0, 76, 76, 84, 0,
+  81, 0, 84, 0, 81, 0, 79, 0,
+  76, 76, 83, 0, 79, 79, 84, 0,
+  81, 79, 76, 74, 72, -1, 0, 0,
+];
+
+// Moon Arcade: syncopated minor groove (A-minor color over the IV loop) —
+// the after-hours cabinet track.
+const MEL_CHIP_10 = [
+  0, 81, 0, 79, 76, 0, 79, 0,
+  0, 81, 0, 84, 83, 0, 81, 0,
+  0, 79, 0, 76, 74, 0, 76, 0,
+  0, 74, 0, 76, 74, -1, 0, 0,
+  0, 81, 0, 79, 81, 0, 84, 0,
+  0, 86, 0, 84, 83, 0, 81, 0,
+  0, 79, 0, 81, 79, 0, 76, 0,
+  0, 74, 76, 0, 72, -1, 0, 0,
+];
+
+const PROG_CHIP_7 = ["Am", "F", "C", "G", "Am", "F", "C", "G"]; // vi–IV–I–V
+
 /**
  * Track list. The arcade chiptune family comes FIRST so it sits at the top
  * of the settings picker and early in every shuffle pass; the island-folk /
@@ -470,6 +524,10 @@ export const TRACKS: Track[] = [
   { name: "Bouncy Bird",     prog: PROG_K,      mel: MEL_CHIP_4, mood: "warm",   chip: true },
   { name: "Sunset Sprint",   prog: PROG_CHIP_5, mel: MEL_CHIP_5, mood: "wide",   chip: true },
   { name: "Pixel Coast",     prog: PROG_CHIP_6, mel: MEL_CHIP_6, mood: "night",  chip: true },
+  { name: "Sugar Rush",      prog: PROG_CHIP_1, mel: MEL_CHIP_7,  mood: "bright", chip: true },
+  { name: "Neon Tail",       prog: PROG_CHIP_6, mel: MEL_CHIP_8,  mood: "night",  chip: true },
+  { name: "Turbo Finch",     prog: PROG_CHIP_5, mel: MEL_CHIP_9,  mood: "warm",   chip: true },
+  { name: "Moon Arcade",     prog: PROG_CHIP_7, mel: MEL_CHIP_10, mood: "ember",  chip: true },
   { name: "Ascent",            prog: PROG_A, mel: MEL_A, mood: "bright"  },
   { name: "Voyage",            prog: PROG_B, mel: MEL_B, mood: "airy"    },
   { name: "Cathedral",         prog: PROG_C, mel: MEL_C, mood: "bright"  },

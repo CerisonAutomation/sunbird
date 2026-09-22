@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { SUPPORTED_LOCALES, matchLocale } from "../index";
 import barrel from "../translations.barrel.json";
@@ -94,5 +94,42 @@ describe("browser-language detection (LOC-05)", () => {
     expect(matchLocale("")).toBeNull();
     expect(matchLocale(null)).toBeNull();
     expect(matchLocale(undefined)).toBeNull();
+  });
+});
+
+
+describe("runtime packs (generated from the barrel)", () => {
+  it("regenerates byte-identical packs from the barrel (no drift)", () => {
+    const root = resolve(__dirname, "../../..");
+    const barrel = JSON.parse(readFileSync(resolve(root, "src/i18n/translations.barrel.json"), "utf8")) as {
+      barrel: Record<string, { translations: Record<string, string>; sourceText?: string }>;
+    };
+    const codes = [...new Set(Object.values(barrel.barrel).flatMap((e) => Object.keys(e.translations ?? {})))].sort();
+    const drift: string[] = [];
+    for (const code of codes) {
+      const pack: Record<string, string> = {};
+      for (const [key, entry] of Object.entries(barrel.barrel)) {
+        const text = entry.translations[code] ?? entry.translations.en ?? entry.sourceText;
+        if (typeof text === "string" && text.length > 0) pack[key] = text;
+      }
+      const ordered = Object.fromEntries(Object.entries(pack).sort(([a], [b]) => (a < b ? -1 : 1)));
+      const expected = JSON.stringify(ordered, null, 1) + "\n";
+      const actual = readFileSync(resolve(root, `src/i18n/packs/${code}.json`), "utf8");
+      if (actual !== expected) drift.push(code);
+    }
+    expect(drift).toEqual([]);
+  });
+
+  it("every pack covers every key (fallback chain stays total)", () => {
+    const root = resolve(__dirname, "../../..");
+    const barrel = JSON.parse(readFileSync(resolve(root, "src/i18n/translations.barrel.json"), "utf8")) as {
+      barrel: Record<string, unknown>;
+    };
+    const keys = Object.keys(barrel.barrel);
+    for (const file of readdirSync(resolve(root, "src/i18n/packs"))) {
+      const pack = JSON.parse(readFileSync(resolve(root, "src/i18n/packs", file), "utf8")) as Record<string, string>;
+      const missing = keys.filter((k) => typeof pack[k] !== "string" || pack[k].length === 0);
+      expect(missing, file).toEqual([]);
+    }
   });
 });

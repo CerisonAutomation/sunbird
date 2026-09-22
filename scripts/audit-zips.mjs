@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * BRUTAL portal-zip audit — the deep pass beyond scripts/verify-portal.mjs.
+ * Deep portal-zip audit — the pass beyond scripts/verify-portal.mjs.
  *
  * verify-portal.mjs is the shippability GATE (fast, per-zip). This script is
  * the forensic inspection: zip anatomy, cross-zip separation, banned-string
@@ -232,7 +232,7 @@ for (const portal of PORTALS) {
 }
 
 /* --------------------------------------------------------------- report */
-console.log("\n=== BRUTAL PORTAL-ZIP AUDIT ===\n");
+console.log("\n=== PORTAL-ZIP AUDIT (deep) ===\n");
 if (notes.length) {
   console.log("Inventory / notes:");
   for (const n of notes) console.log(`  · ${n}`);
@@ -243,4 +243,4 @@ if (failures.length) {
   for (const f of failures) console.error(`  ✗ ${f}`);
   process.exit(1);
 }
-console.log("✅ BRUTAL AUDIT PASSED — all zips separate, clean, and portal-ready.\n");
+console.log("✅ ZIP AUDIT PASSED — all zips separate, clean, and portal-ready.\n");

@@ -6,7 +6,7 @@
  * All routes are rate-limited per IP (reads/writes/guest buckets).
  */
 import type { Ctx } from "../core/ctx.js";
-import type { Route } from "./router.js";
+import type { Params, Route } from "./router.js";
 import { HttpError, cleanText } from "../util/http.js";
 import { seasonId } from "../util/id.js";
 import type { BoardMetric, BoardScope, PrivacySettings } from "../types.js";
@@ -32,7 +32,82 @@ function hostSeatCheck(ctx: Ctx, code: string, actor: string): string {
   return host.seatId;
 }
 
+/** Shared handler for the aggregate telemetry beacon (three path aliases:
+ * root for prod bases, /mp/v1 for the versioned namespace, /social for the
+ * dev proxy base). */
+function telemetryIngest(ctx: Ctx, _p: Params, _q: URLSearchParams, body: Record<string, unknown>): unknown {
+  return ctx.telemetry.ingest(body);
+}
+
 export const V1_ROUTES: Route[] = [
+  /* ------------------------------------------------- device board (root) */
+
+  {
+    // The LEADERBOARD_API.md surface the shipped client speaks: GET /board.
+    // Device-keyed best rows (kept by distance), daily or global scope,
+    // server-computed rank/total. Persisted with the Db (file backend).
+    method: "GET",
+    re: /^\/board$/,
+    rl: "read",
+    auth: "optional",
+    handler: (ctx, _p, q) => {
+      const wanted = ["distance", "altitude", "perfects", "coins", "score"];
+      const metricRaw = q.get("metric") ?? "distance";
+      const metric = (wanted.includes(metricRaw) ? metricRaw : "distance") as
+        | "distance"
+        | "altitude"
+        | "perfects"
+        | "coins"
+        | "score";
+      const scope = q.get("scope") === "daily" ? "daily" : "global";
+      const device = cleanText(q.get("device"), 64);
+      const today = new Date(ctx.now()).toISOString().slice(0, 10);
+      let rows = Object.values(ctx.db.state.deviceBoard);
+      if (scope === "daily") rows = rows.filter((r) => r.date === today);
+      rows.sort((a, b) => b[metric] - a[metric]);
+      const rank = rows.findIndex((r) => r.deviceId === device) + 1;
+      return { entries: rows.slice(0, 50), rank, total: rows.length };
+    },
+  },
+  {
+    // POST /score — the run-record ingestion from LEADERBOARD_API.md.
+    // Best-row-per-device semantics by distance; every field cleaned and
+    // clamped server-side. The optional `sig` (HMAC) is accepted and stored
+    // only when present — verification stays with the edge deployment.
+    method: "POST",
+    re: /^\/score$/,
+    rl: "write",
+    auth: "optional",
+    bodyMaxBytes: 4096,
+    handler: (ctx, _p, _q, body) => {
+      const deviceId = cleanText(body.deviceId, 64);
+      if (!deviceId) throw new HttpError(400, "deviceId required", "invalidDevice");
+      const num = (v: unknown, max: number): number =>
+        typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.min(Math.floor(v), max)) : 0;
+      const row = {
+        deviceId,
+        name: cleanText(body.name, 14) || "Pilot",
+        skin: cleanText(body.skin, 24) || "sunbird",
+        distance: num(body.distance, 500_000),
+        altitude: num(body.altitude, 10_000),
+        perfects: num(body.perfects, 5_000),
+        coins: num(body.coins, 100_000),
+        score: num(body.score, 5_000_000),
+        date: new Date(ctx.now()).toISOString().slice(0, 10),
+      };
+      const prev = ctx.db.state.deviceBoard[row.deviceId];
+      // Keep the best row per pilot rather than an ever-growing log.
+      if (!prev || row.distance > prev.distance) {
+        ctx.db.state.deviceBoard[row.deviceId] = row;
+        // touch() marks the state dirty; flush() writes it through
+        // immediately so a score that just landed survives a crash.
+        ctx.db.touch();
+        ctx.db.flush();
+      }
+      return { ok: true };
+    },
+  },
+
   /* ---------------------------------------------------------------- health */
 
   {
@@ -56,6 +131,46 @@ export const V1_ROUTES: Route[] = [
         players: Object.keys(ctx.db.state.profiles).length,
       };
     },
+  },
+
+  /* ------------------------------------------------------------- telemetry */
+
+  {
+    // Aggregate client telemetry beacon (sendBeacon on tab-hide). Privacy by
+    // construction: whitelisted counter names + coarse numbers, validated and
+    // capped server-side. Counters are per-process by design — this endpoint
+    // is a trend signal, never a tracking record.
+    method: "POST",
+    re: /^\/telemetry$/,
+    rl: "write",
+    auth: "optional",
+    bodyMaxBytes: 4096,
+    handler: telemetryIngest,
+  },
+  {
+    method: "POST",
+    re: /^\/mp\/v1\/telemetry$/,
+    rl: "write",
+    auth: "optional",
+    bodyMaxBytes: 4096,
+    handler: telemetryIngest,
+  },
+  {
+    // Dev base alias: the vite /social proxy forwards the full path.
+    method: "POST",
+    re: /^\/social\/telemetry$/,
+    rl: "write",
+    auth: "optional",
+    bodyMaxBytes: 4096,
+    handler: telemetryIngest,
+  },
+  {
+    // Ops view: top aggregate counters. Contains only counts — no identities.
+    method: "GET",
+    re: /^\/mp\/v1\/telemetry\/summary$/,
+    rl: "read",
+    auth: "optional",
+    handler: (ctx) => ctx.telemetry.snapshot(),
   },
 
   /* -------------------------------------------------------------- identity */

@@ -136,7 +136,7 @@ Server tests: ✅ 7 PASS
 Lint:         ✅ PASS (0 warnings)
 Build:        ✅ PASS — 1.76 MB bundle, 557 KB gzipped
 Portals:      ✅ PASS — poki 829 KB · crazy 820 KB · generic 819 KB
-Zip audit:    ✅ BRUTAL AUDIT PASSED
+Zip audit:    ✅ ZIP AUDIT PASSED
 Upload shape: ✅ UPLOAD READY (ROOT-01…ROOT-06; negative-tested)
 Thumbnail:    ✅ THB GATE PASSED
 Poki audit:   ✅ 99/113 verified, 0 failures (3 submission actions, 1 deferral, 10 informational)
