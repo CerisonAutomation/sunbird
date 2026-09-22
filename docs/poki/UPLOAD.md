@@ -17,6 +17,43 @@ pnpm upload:poki        # builds the game, packages it, and verifies the upload 
 
 Then drag **`poki-upload/`** (the folder itself) into <https://inspector.poki.dev/>.
 
+## Authenticating the CLI (once per machine)
+
+@poki/cli has no `login` subcommand — it authenticates as part of `poki upload`,
+and it looks for a token in this order:
+
+| Source | Notes |
+|---|---|
+| `POKI_UPLOAD_TOKEN` | The supported non-interactive path. Generate an upload token in Poki for Developers. |
+| `POKI_ACCESS_TOKEN` | Deprecated; the CLI warns and uses it anyway. |
+| `~/.config/poki/auth.json` | Written by the browser flow. `$XDG_CONFIG_HOME/poki/auth.json` if set; `%LOCALAPPDATA%\Poki` on Windows. Mode `600`. |
+
+With no token it prints `authentication required, opening browser...`, opens
+`https://app.poki.dev/signin/?cli=http://localhost:<port>`, waits for the
+local callback, then exchanges the refresh token and writes `auth.json`
+(`access_token` + `refresh_token` + `ttl`). Later runs re-read that file and
+refresh silently on a 401, so the browser step happens once.
+
+Because auth is triggered by `upload`, and `createZip` runs before the auth
+call while the version POST runs after it, you can complete the login **without
+publishing a version** by pointing at a throwaway build dir and a game id that
+is not yours — auth lands in `auth.json`, then the POST is rejected:
+
+```bash
+mkdir -p /tmp/poki-auth-probe && echo '<!doctype html>' > /tmp/poki-auth-probe/index.html
+pnpm exec poki upload --game 00000000-0000-0000-0000-000000000000 \
+  --build-dir /tmp/poki-auth-probe --name cli-auth-probe
+# → "authentication required, opening browser..."  (approve in the browser)
+# → 403 permission-denied on the bogus game id; nothing published.
+```
+
+Verify without printing the secret:
+
+```bash
+ls -l ~/.config/poki/auth.json          # -rw------- 600
+node -e 'console.log(Object.keys(require(process.env.HOME+"/.config/poki/auth.json")))'
+```
+
 ## What each artifact is for
 
 | Artifact | Produced by | Use it for |

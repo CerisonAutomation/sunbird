@@ -33,7 +33,11 @@ function unzip(portal, mode) {
   const args =
     mode === "html"
       ? ["-p", zipPath, "index.html"] // archive FIRST, then member
-      : ["-l", zipPath];
+      // `-Z1` lists entry names only, one per line — no length/date columns, so
+      // the anatomy parse below cannot be broken by the `unzip -l` date format.
+      // GNU unzip prints YYYY-MM-DD; BSD unzip (macOS) prints MM-DD-YYYY, which
+      // silently emptied the listing and failed every anatomy check locally.
+      : ["-Z1", zipPath];
   return execFileSync("unzip", args, { maxBuffer: 64 * 1024 * 1024 }).toString("utf8");
 }
 
@@ -87,14 +91,8 @@ for (const portal of PORTALS) {
   const { html, listing, bytes } = z;
 
   /* ------------------------------------------------------------- anatomy */
-  // `unzip -l` rows: "<len>  YYYY-MM-DD HH:MM  name". Match only rows shaped
-  // like real entries — the header row ("Length Date Time Name") and the
-  // dash separators never match, so no separator parsing is needed.
-  const files = [];
-  for (const line of listing.split("\n")) {
-    const m = line.match(/^\s*\d+\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+(\S.*)$/);
-    if (m) files.push(m[1].trim());
-  }
+  // `unzip -Z1` prints bare entry names, one per line (see `unzip` above).
+  const files = listing.split("\n").map((line) => line.trim()).filter(Boolean);
   // Allowed anatomy: the single-file game, its icons and fonts, plus the
   // bundled locale barrel (`i18n/`, ~12 KB). The barrel is the artifact the
   // poki-upload folder and the host-side tooling consume, it is loaded from a
