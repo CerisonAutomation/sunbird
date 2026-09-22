@@ -728,7 +728,12 @@ export class HUD {
     this.root.querySelector(".mid-meta")!.appendChild(this.root.querySelector(".combo")!);
     const header = lane("hud-header", [".top-bar", ".mid-meta", ".power-chips", ".power-strip", ".roster-bar", ".versus-bar"]);
     lane("flight-messages", [".launch-banner", ".hint", ".goal-pop", ".finish-countdown", ".countdown"]);
-    const footer = lane("flight-footer", [".goal-strip", ".draft-meter", ".emote-wheel"]);
+    // `.fever-wrap` stays in the footer lane: it is `position: static` there
+    // (see `.flight-footer .fever-wrap`), so it is a flow child of the footer.
+    // Moving it out made the absolutely-positioned base rule resolve against
+    // `.play-hud` (`inset: 0`), which parked the meter at `top: 100%` — one
+    // screen below the viewport, invisible while fever was active.
+    const footer = lane("flight-footer", [".goal-strip", ".draft-meter", ".fever-wrap", ".emote-wheel"]);
     // The menu backdrop is the LIVE 3D gameplay world (Game.menuTick attract
     // flight): the painted 2D sky canvas stays OUT of the DOM so it never
     // covers the world, and its loop never starts. The hero-bird overlay
