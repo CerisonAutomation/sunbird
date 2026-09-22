@@ -3113,6 +3113,12 @@ button.upsell:active,
   padding-right: 4px !important;
   overflow: visible !important;
 }
+/* Pill in screen-head must compress before truncating the title */
+.overlay .screen-head > span:last-child .pill {
+  max-width: 130px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
 
 /* ── Board-badge: tighten font so badge never wraps or overflows ─────────────── */
 .board-badge {

@@ -19,5 +19,7 @@ export const SQUAD_CHAT = false;
 /** No unmoderated player text or personal data (content & player safety). */
 export const CUSTOM_PILOT_NAMES = false;
 
-/** Poki owns ad scheduling and forbids in-app purchases (REQ-20). */
-export const SELL_AD_REMOVAL = false;
+/** Poki owns ad scheduling and forbids in-app purchases (REQ-20).
+ * Read from Vite define so Rollup/Terser can DCE IAP UI from this bundle. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const SELL_AD_REMOVAL: boolean = !!(import.meta.env.VITE_SELL_AD_REMOVAL as any);

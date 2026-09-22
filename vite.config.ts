@@ -166,6 +166,15 @@ export default defineConfig({
     // and strip non-target SDK URLs / branches (e.g. Poki Netlib dynamic
     // import) from the output entirely.
     "import.meta.env.VITE_PORTAL_TARGET": JSON.stringify(PORTAL),
+    // Inline SELL_AD_REMOVAL so Rollup/Terser DCEs IAP purchase UI from portal
+    // builds (Poki REQ-20). Must stay in sync with edition.*.ts values.
+    // NOTE: We define the bare identifier too (not just import.meta.env.*) so
+    // Rollup replaces every reference in expressions before bundling. The
+    // cross-module import form is not constant-folded by Rollup, leaving dead
+    // strings ("Remove breaks", "No sponsored breaks") in the bundle.
+    // preventAssignment:true (Vite default) means import/export bindings are
+    // NOT replaced, only expression usages — so edition exports still compile.
+    "import.meta.env.VITE_SELL_AD_REMOVAL": JSON.stringify(PORTAL === "none"),
   },
   build: {
     // Keep production bundles lean and avoid publishing source maps that

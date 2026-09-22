@@ -19,5 +19,7 @@ export const SQUAD_CHAT = false;
 /** No unmoderated player text or personal data (same policy as Poki). */
 export const CUSTOM_PILOT_NAMES = false;
 
-/** Portal ad scheduling belongs to the platform; no ad-removal purchase. */
-export const SELL_AD_REMOVAL = false;
+/** Portal ad scheduling belongs to the platform; no ad-removal purchase.
+ * Read from Vite define so Rollup/Terser can DCE IAP UI from this bundle. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const SELL_AD_REMOVAL: boolean = !!(import.meta.env.VITE_SELL_AD_REMOVAL as any);

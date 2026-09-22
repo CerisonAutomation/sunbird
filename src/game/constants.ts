@@ -109,6 +109,11 @@ export const AD_DURATION = 4;
 export const INTERSTITIAL_EVERY = 3;
 
 export const DAILY_STIPEND = 250;
+/** Portal shop: coins granted per watched rewarded ad (kept modest so the
+ *  2500+ mythic tier stays a long-term chase, not an ad-weekend grind). */
+export const SHOP_AD_COINS = 60;
+/** Portal shop: rewarded-coin claims allowed per session (anti-farm cap). */
+export const SHOP_AD_SESSION_CAP = 5;
 
 export const PIGGY_BANK_MIN_SMASH = 50;
 export const PIGGY_BANK_CAP = 1000;

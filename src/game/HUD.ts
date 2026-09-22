@@ -20,7 +20,7 @@ import type { TournamentView } from "./Tournaments";
 import type { RosterBird, Standing, RivalNameTag } from "./MassRace";
 import { SUPPORTED_LOCALES, getLocale, t } from "../i18n";
 import * as THREE from "three";
-import { DAILY_STIPEND, PIGGY_BANK_CAP, PIGGY_BANK_MIN_SMASH, VIP_DAILY_GIFT } from "./constants";
+import { DAILY_STIPEND, PIGGY_BANK_CAP, PIGGY_BANK_MIN_SMASH, SHOP_AD_COINS, SHOP_AD_SESSION_CAP, VIP_DAILY_GIFT } from "./constants";
 import { COLLECTIONS, dailyFlashBird, GOLD, skinById, STARTER_PACK, VIP, type BoostView, type ShopTrailView, type SkinView } from "./Economy";
 import { rivalPalette, skinPalette, sunSVG, sunbirdSVG } from "./Sunbird";
 import { formatDistance } from "./math";
@@ -1586,6 +1586,7 @@ function head(title: string, backAction = "back", right = ""): string {
 }
 
 function upsellStrip(): string {
+  if (!SELL_AD_REMOVAL) return "";
   return `<button class="upsell" data-ui data-action="open-paywall"><div><b>✦ Sunbird Gold &amp; VIP</b><span>2× coins · ad-free · Phoenix &amp; Aurora skins · Nest Pass</span></div><span class="mini-btn gold">Unlock · ● 500</span></button>`;
 }
 
@@ -1982,7 +1983,7 @@ function renderChallenges(s: HudSnapshot): string {
     </div>`;
 
   return `
-    ${head("Challenges", "back", `<span class="pill">☀ Daily · 🌩 Weekly</span>`)}
+    ${head("Challenges", "back", `<span class="pill">Daily · Weekly</span>`)}
     <p class="tagline">Same hills as everyone else today. Modifiers change how you fly them.</p>
     ${event}
     ${daily}
@@ -2565,7 +2566,7 @@ function renderProgress(s: HudSnapshot): string {
         .join("")}</div>`
     : portal
       ? `<p class="portal-note">${PORTAL_EDITION_NOTE}</p>`
-      : `<button class="lock-chip" data-ui data-action="open-paywall">✦ Pick your hills with Gold</button>`;
+      : SELL_AD_REMOVAL ? `<button class="lock-chip" data-ui data-action="open-paywall">✦ Pick your hills with Gold</button>` : "";
   return `${head(t("hud.progress.title", undefined, "Your progress"))}
     <p class="tagline">${t("hud.progress.tagline", undefined, "Missions and rewards from all your flights, in one place.")}</p>
     <div class="hero-meta">
@@ -2709,8 +2710,10 @@ function skinAction(v: SkinView, portal: boolean, wallet: number): string {
   else if (d.prizeOnly) action = `<span class="tag prize" title="${d.prizeOnly}">🏆 ${d.prizeOnly}</span>`;
   else if (v.locked && portal)
     action = `<span class="tag portal-lock">Portal event</span>`;
-  else if (v.locked)
+  else if (v.locked && SELL_AD_REMOVAL)
     action = `<button class="mini-btn ${v.lockReason === "vip" ? "vip" : "gold"}" data-ui data-action="open-paywall">${v.lockReason === "vip" ? "♛ VIP" : "✦ Gold"}</button>`;
+  else if (v.locked)
+    action = `<span class="tag portal-lock">Gold perk</span>`;
   else
     action = `<button class="mini-btn ${v.affordable ? (v.dealPrice !== undefined ? "gold" : "") : "off"}" data-ui data-action="buy-skin" data-id="${d.id}" ${v.affordable ? "" : "disabled"} aria-label="${v.affordable ? `Buy ${d.name} for ${price} coins` : `${d.name} costs ${price} coins; earn more coins to unlock`}">${priceLabel}</button>`;
   return action + (!v.owned && !v.locked && !d.prizeOnly && !v.affordable ? `<small class="purchase-shortfall">${Math.max(0, price - wallet)} more coins</small>` : "");
@@ -2802,6 +2805,15 @@ function renderShop(s: HudSnapshot, browse: ShopBrowse): string {
         : `<button class="primary-btn gold" data-ui data-action="claim-daily-stipend">Claim +● ${DAILY_STIPEND}</button>`
       }
     </div>
+    ${s.portalName !== "none" ? `
+    <div class="pc pc--gold pc-row">
+      <span class="pc-icon">📺</span>
+      <div class="pc-body">
+        <b>Free Coins</b>
+        <span>Watch a short ad · +● ${SHOP_AD_COINS} (max ${SHOP_AD_SESSION_CAP}/visit)</span>
+      </div>
+      <button class="primary-btn gold" data-ui data-action="shop-free-coins">Watch Ad</button>
+    </div>` : ""}
 
     <div class="pc pc--red">
       <div class="pc-header">
@@ -2998,6 +3010,18 @@ function renderSettings(s: HudSnapshot): string {
   return `
     ${head(t("hud.settings.title", undefined, "Settings"))}
     <p class="settings-intro">Make the flight feel right for you. Changes save automatically.</p>
+    <div class="section-title">Pilot</div>
+    ${CUSTOM_PILOT_NAMES
+      ? `<div class="redeem pilot-name-row">
+      <input data-ui data-ref="pilotName" aria-label="Pilot name" maxlength="14" placeholder="Pilot name" value="${escapeHtml(s.pilotName)}" />
+      <button class="mini-btn autogen-btn" data-ui data-action="autogen-pilot" title="Autogenerate random pilot name">🎲 Random</button>
+      <button class="mini-btn primary" data-ui data-action="rename-pilot">Save</button>
+    </div>`
+      : `<div class="redeem pilot-name-row">
+      <span class="pilot-name-readonly" aria-label="Pilot name">${escapeHtml(s.pilotName)}</span>
+      <button class="mini-btn autogen-btn" data-ui data-action="autogen-pilot" title="Roll a new pilot name">🎲 Random</button>
+    </div>`
+    }
     <div class="section-title">Sound</div>
     ${toggle("Mute all sound", "mute", s.settings.mute)}
     ${volumeControl("Effects volume", "sfx-vol", sPct)}
@@ -3043,8 +3067,8 @@ function renderPass(s: HudSnapshot): string {
   return `
     ${head("Nest Pass", "back", `<span class="pill">Lv.${s.season.tier}/${s.season.maxTier}</span>`)}
     <div class="pass-progress"><i style="width:${pct}%"></i></div>
-    <p class="tagline">${s.season.label} — fly to earn XP. Gold unlocks the premium track.</p>
-    ${!s.gold ? `<button class="upsell" data-ui data-action="open-paywall"><div><b>✦ Unlock premium rewards</b><span>Double the tier rewards with Gold</span></div><span class="mini-btn gold">Unlock</span></button>` : ""}
+    <p class="tagline">${s.season.label} — fly to earn XP.${SELL_AD_REMOVAL ? " Gold unlocks the premium track." : " Fly to unlock rewards."}</p>
+    ${!s.gold && SELL_AD_REMOVAL ? `<button class="upsell" data-ui data-action="open-paywall"><div><b>✦ Unlock premium rewards</b><span>Double the tier rewards with Gold</span></div><span class="mini-btn gold">Unlock</span></button>` : ""}
     <div class="tier-track">
       ${s.season.tiers
         .map((t) => {
@@ -3094,15 +3118,16 @@ function renderAccount(s: HudSnapshot): string {
   return `
     ${head("Account")}
     <div class="section-title">Membership</div>
+    ${!SELL_AD_REMOVAL ? "" : `
     <div class="sheet">
       <div class="code-row"><span>${s.gold ? "✦ Gold · owned for life" : "✦ Gold · not owned"}</span>${
-        s.gold ? `<span class="tag on">Active</span>` : `<button class="mini-btn gold" data-ui data-action="open-paywall">Get Gold</button>`
+        s.gold ? `<span class="tag on">Active</span>` : SELL_AD_REMOVAL ? `<button class="mini-btn gold" data-ui data-action="open-paywall">Get Gold</button>` : `<span class="tag">Portal member</span>`
       }</div>
-      <div class="code-row"><span>♛ VIP · ${s.vip ? `${s.vipDaysLeft} day${s.vipDaysLeft === 1 ? "" : "s"} left` : "inactive"}</span>${
+      ${SELL_AD_REMOVAL ? `<div class="code-row"><span>♛ VIP · ${s.vip ? `${s.vipDaysLeft} day${s.vipDaysLeft === 1 ? "" : "s"} left` : "inactive"}</span>${
         s.vip
           ? `<button class="mini-btn vip" data-ui data-action="vip-buy">Extend</button>`
           : `<button class="mini-btn vip" data-ui data-action="vip-buy">Subscribe</button>`
-      }</div>
+      }</div>` : ""}
       <p class="fineprint">VIP gifts ${VIP_DAILY_GIFT} coins every day you play and adds a fourth daily quest. ${
         s.vip ? "" : "Cancel anytime — no auto-renewal in this build; your 30 days simply run out."
       }${
@@ -3112,6 +3137,8 @@ function renderAccount(s: HudSnapshot): string {
         s.portalName === "none" ? ` Sponsored breaks respect a hard cap: <b>${s.adsLeftToday}</b> left today.` : ""
       }</p>
     </div>
+    `}
+
     <div class="section-title">Invite friends</div>
     <div class="sheet">
       <p class="tagline">Share your code — friends who redeem it get a welcome bonus on their device.</p>
@@ -3384,7 +3411,7 @@ function renderAd(s: HudSnapshot): string {
     <div class="ad-bar"><i data-live="adBar"></i></div>
     <div class="ad-actions">
       <button class="mini-btn" data-ui data-action="ad-skip" data-live="adSkip" disabled>Skip in ${Math.ceil(s.adTimer)}</button>
-      ${s.gold || !SELL_AD_REMOVAL ? "" : `<button class="mini-btn gold" data-ui data-action="ad-gold">✦ Remove breaks</button>`}
+      ${!(import.meta.env.VITE_SELL_AD_REMOVAL as any) || s.gold ? "" : `<button class="mini-btn gold" data-ui data-action="ad-gold">✦ Remove breaks</button>`}
     </div>
   `;
 }

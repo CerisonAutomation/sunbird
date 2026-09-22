@@ -16,11 +16,10 @@
       "runtimeArgs": [
         "--yes",
         "serve",
-        "-p",
-        "5174",
         "poki-upload"
       ],
-      "port": 5174
+      "port": 5174,
+      "autoPort": true
     }
   ]
 }

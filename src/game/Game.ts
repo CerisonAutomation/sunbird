@@ -81,9 +81,11 @@ import {
   REFERRAL_BONUS,
   STALL_SPEED,
   WATER_Y,
-  ZENITH_ALT,
-  ZENITH_DURATION,
-  ZENITH_SLOWMO,
+ZENITH_ALT,
+ZENITH_DURATION,
+ZENITH_SLOWMO,
+SHOP_AD_COINS,
+SHOP_AD_SESSION_CAP,
 } from "./constants";
 import { BOOSTS, COLLECTIONS, GOLD, PROMO_CODES, SHOP_TRAILS, SKINS, STARTER_PACK, VIP, WHEEL_SECTORS, dailyDealBoost, dailyFlashBird, skinById, type BoostView, type ShopTrailDef, type ShopTrailView, type SkinDef, type SkinView } from "./Economy";
 import { nextWings, wingsFor, wingsProgress, wingsPromotion } from "./Career";
@@ -115,7 +117,7 @@ import { flag } from "./Flags";
 import { variant } from "./Experiments";
 import { buildRoomInviteUrl, normalizeRoomCode, readRoomInviteFromUrl } from "./RoomInvite";
 import { PORTAL_BANNER_ID, attachPortalErrorReporters, initPlatform, isCoarsePointer, isPortalBuild, portalTarget as getPortalTarget, type PlatformAdapter } from "../sdk/platform";
-import { CUSTOM_PILOT_NAMES, POKI_MULTIPLAYER, SQUAD_CHAT } from "./edition";
+import { CUSTOM_PILOT_NAMES, POKI_MULTIPLAYER, SELL_AD_REMOVAL, SQUAD_CHAT } from "./edition";
 import type { PokiNetlibClient } from "./PokiNetlib";
 import { GameplayEventSink } from "./GameplayEvents";
 import { LivingBackground } from "./LivingBackground";
@@ -300,6 +302,10 @@ export class Game {
    * re-renders every frame, so without this flag the bonus was re-claimable
    * forever (each claim tripled runCoins and re-armed the card). */
   private multiplierClaimed = false;
+  /** Rewarded-ad coin claims earned via the shop this hour (see adHourKey). */
+  private shopAdClaimed = 0;
+  /** Hour-buckets the shopAdClaimed counter; resets when the wall-clock hour rolls. */
+  private adHourKey = Math.floor(Date.now() / 3_600_000);
   private runClouds = 0;
   private zeniths = 0;
   private pickups = 0;
@@ -1240,6 +1246,9 @@ export class Game {
     this.boostTimer = Math.max(0, this.boostTimer - dt);
     this.manualBoostCooldown = Math.max(0, this.manualBoostCooldown - dt);
     this.runTime += dt;
+    // Hour roll resets the shop ad reward counter (cap per wall-clock hour).
+    const nowHour = Math.floor(Date.now() / 3_600_000);
+    if (nowHour !== this.adHourKey) { this.adHourKey = nowHour; this.shopAdClaimed = 0; }
     this.xpFlush -= dt;
     if (this.xpFlush <= 0) {
       this.xpFlush = 2;
@@ -3437,6 +3446,7 @@ export class Game {
         this.setScreen("shop");
         break;
       case "open-paywall":
+        if (!SELL_AD_REMOVAL) break;
         this.restoreMessage = "";
         this.setScreen("paywall");
         this.telemetry.track("paywall_open", { from: this.state });
@@ -3919,6 +3929,16 @@ export class Game {
         this.bump();
         break;
       }
+      case "shop-free-coins": {
+        // Rewarded ad from the shop: capped per session to prevent ad farming.
+        if (!this.platform || this.platform.name === "none") break;
+        if (this.shopAdClaimed >= SHOP_AD_SESSION_CAP) {
+          this.hud.toast("Ad rewards capped for this visit", "info");
+          break;
+        };
+        void this.multiplyCoinsFromShopAd();
+        break;
+      }
       case "buy-bundle": {
         // One crate per save. It pays 250 coins for 240 — re-claimable it is
         // an infinite +10/click coin faucet.
@@ -4314,7 +4334,7 @@ export class Game {
         this.buyCoinGold();
         break;
       case "vip-buy":
-        this.buyPortalVip();
+        if (SELL_AD_REMOVAL) this.buyPortalVip();
         break;
       case "buy-vault":
         this.buyMysteryVault();
@@ -5823,6 +5843,36 @@ export class Game {
       this.bump();
     } else {
       this.hud.toast("No reward this time — bonus not applied", "warn");
+    }
+  }
+
+  /** Shop free-coins rewarded break: capped per hour, modest payout so the
+   *  high-price mythic tier (2500-10000) stays aspirational. */
+  private async multiplyCoinsFromShopAd(): Promise<void> {
+    const platform = this.platform;
+    if (!platform || platform.name === "none") return;
+    if (this.shopAdClaimed >= SHOP_AD_SESSION_CAP) {
+      this.hud.toast("Free coin rewards capped for this hour", "info");
+      return;
+    }
+    // Shop free-coin break does not bookend gameplay (no gameplayStop/start),
+    // so mute + disable input directly around the break instead of begin/endPortalAd
+    // (which would risk a duplicate gameplayStop from the sink).
+    this.audio.setAdMuted(true);
+    this.input.setEnabled(false);
+    const earned = await platform.rewardedBreak();
+    if (this.disposed) return;
+    this.audio.setAdMuted(false);
+    this.input.setEnabled(true);
+    if (earned) {
+      this.shopAdClaimed++;
+      const payout = Math.min(SHOP_AD_COINS, 60);
+      this.save.addCoins(payout);
+      this.audio.chapterFanfare();
+      this.hud.toast(`🍪 Here's a little flying fuel — +● ${payout} coins`, "gold");
+      this.bump();
+    } else {
+      this.hud.toast("No reward this time — try again next hour", "info");
     }
   }
 
