@@ -90,3 +90,42 @@ Every one of these degrades honestly when absent: the Poki build ships fully pla
 ## 9. Verdict
 
 Every guide requirement that can be satisfied in code **is satisfied and verified** — most with dedicated automated gates that run in CI, which is stronger than a one-time manual pass. The five remaining items are dashboard-owned configuration steps listed in §8 with their exact insertion points. The netlib integration is verified against the library's actual source, and the delivery pipeline matches the official CLI's contract exactly.
+
+## 10. Dev-server browser verification (2026-09-22)
+
+The Poki edition was **driven in a real headless Chromium** (153.0.8010.0, SwiftShader WebGL,
+Playwright 1.58) against the Vite dev server started with `VITE_PORTAL_TARGET=poki` — i.e. the
+same code path `pnpm dev` would serve, with the portal target baked in at transform time.
+
+What was observed, in order:
+
+1. **Dev serving of the portal edition.** The dev server serves the Poki edition correctly:
+   the compile-time constant resolves to `poki` (`src/sdk/platform.ts`), and the only portal
+   SDK URL requested is the canonical `https://game-cdn.poki.com/scripts/v2/poki-sdk.js`.
+2. **Degraded SDK boot (sandbox has no Poki CDN egress).** The SDK request fails
+   (`net::ERR_CONNECTION_CLOSED`); the adapter's 6 s load timeout elapses and the game boots
+   **without** the SDK — `portal_ready {portal: poki, caps: lifecycle, ads, cloudSaveLocal,
+   identity, iap, urlParams, share, measure}` is still reported and nothing blocks or crashes.
+   This is the documented degrade path, confirmed live.
+3. **Full player path.** Call-sign onboarding (random sign rendered + reroll offered) → main
+   menu → `run_start {mode: daytrip, seed: fly-…, skin: sunbird}` → live HUD (distance,
+   coins, island chip, daylight meter, minimap) rendered via WebGL → idle doze → **Second
+   Wind modal with the rewarded-ad entry point** ("Watch for Second Wind"), the coin-revive
+   button showing a live wallet check ("you have 20"), and `continue_offer {kind: standard,
+   distance: 98}` telemetry → "Let it sleep" → `run_end {distance, score, coins, islands}` →
+   results recap ("Flight completed", Fly Again with ghost explanation, local leaderboard
+   rank #21 of 21) and `experiment_exposure {experiment: results_cta_order}`.
+4. **SDK-present behaviour is pinned by tests, not hope.** With the SDK installed, the exact
+   event behaviour (loadingFinished, gameplayStart/Stop pairing, commercialBreak/rewarded
+   bookkeeping, happytime, leaderboard handshake, dashboard event order) is covered by
+   `src/game/__tests__/poki-analytics.test.ts` (8 tests) against a recording `window.PokiSDK`
+   double installed through the same global the real loader script populates.
+
+Evidence screenshots (unversioned per repo convention — `*.png` is gitignored):
+`docs/dev-poki-browser/menu.png` (mid-run HUD + Second Wind modal with rewarded-ad button),
+`docs/dev-poki-browser/results.png` (flight recap with local leaderboard rank).
+
+Sandbox artifacts, not product defects: emoji glyphs render as tofu (no emoji fonts installed
+in the headless image), `perf_frame` longFrames are high (software rendering), and the Poki
+script tag is absent after the failed load (the loader cleans it up; the request itself is
+logged above).
