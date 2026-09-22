@@ -58,6 +58,8 @@ type MusicInternals = {
   ukeGain: { gain: { value: number } };
   glockGain: { gain: { value: number } };
   chipGain: { gain: { value: number } };
+  sparkGain: { gain: { value: number } };
+  percGain: { gain: { value: number } };
 };
 const internals = (m: Music): MusicInternals => m as unknown as MusicInternals;
 
@@ -96,11 +98,15 @@ describe("arcade chiptune family", () => {
     const s = internals(music);
     expect(s.isChipTrack).toBe(true);
     expect(s.isTronTrack).toBe(false);
-    // Arcade tempo, present lead, island layers silent.
-    expect(s.bpm).toBe(150);
+    // Arcade tempo, island colours silent — but the glockenspiel is the lead
+    // voice here too, with the square wave demoted to a supporting halo.
+    // (This assertion used to read `glockGain === 0`, which is what made the
+    // arcade tracks sound like a bare 8-bit buzz instead of a melody.)
+    expect(s.bpm).toBe(164);
     expect(s.chipGain.gain.value).toBeGreaterThan(0);
     expect(s.ukeGain.gain.value).toBe(0);
-    expect(s.glockGain.gain.value).toBe(0);
+    expect(s.glockGain.gain.value).toBeGreaterThan(s.chipGain.gain.value);
+    expect(s.sparkGain.gain.value).toBeGreaterThan(0);
 
     // Let the sequencer actually run — it must not throw on chip steps.
     const ctx = (music as unknown as { ctx: { currentTime: number } }).ctx;
@@ -118,9 +124,12 @@ describe("arcade chiptune family", () => {
 
     const s = internals(music);
     expect(s.isChipTrack).toBe(false);
-    expect(s.bpm).toBe(112); // bright biome default
+    expect(s.bpm).toBe(132); // bright biome default (upbeat floor)
     expect(s.chipGain.gain.value).toBe(0);
     expect(s.ukeGain.gain.value).toBeGreaterThan(0);
+    // The glock is the lead voice now, and the menu still has a pulse.
+    expect(s.glockGain.gain.value).toBeGreaterThan(s.ukeGain.gain.value);
+    expect(s.percGain.gain.value).toBeGreaterThan(0);
     music.dispose();
   });
 

@@ -207,7 +207,14 @@ export class PokiAdapter implements PlatformAdapter {
   }
 
   capabilities(): string[] {
-    const caps = ["lifecycle", "ads", "cloudSaveLocal", "identity", "iap", "urlParams", "share", "measure"];
+    const caps = ["lifecycle", "cloudSaveLocal", "identity", "iap", "urlParams", "share", "measure"];
+    // "ads" is reported from the live SDK, not from the build target. Off the
+    // Poki CDN (local preview, CDN blocked, SDK rejected) there is no ad
+    // surface at all, and the game must not offer breaks or rewarded buttons
+    // that can only fail — it offers the coin/gold paths instead.
+    if (typeof this.sdk?.commercialBreak === "function" || typeof this.sdk?.rewardedBreak === "function") {
+      caps.push("ads");
+    }
     // Reported from what the deployed SDK actually exposes, so the UI never
     // offers a portal surface that isn't there.
     if (typeof this.sdk?.showLeaderboard === "function" || pokiLeaderboardReady()) caps.push("leaderboard");

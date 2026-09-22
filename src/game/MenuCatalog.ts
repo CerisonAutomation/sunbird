@@ -22,6 +22,9 @@ export const COLLECTION_DESTINATIONS: MenuDestination[] = [
   { action: "open-settings", icon: "settings", title: "Settings", detail: "Sound, controls & display" },
 ];
 export const PROGRESS_DESTINATIONS: MenuDestination[] = [
+  // Leaderboard leads the section: it is the page competitive players open
+  // between runs, and it used to sit tenth — below the Atlas.
+  { action: "open-board", icon: "board", title: "Leaderboards", detail: "All-time · weekly · today · you" },
   { action: "open-challenges", icon: "challenge", title: "Challenges", detail: "Daily & weekly goals" },
   { action: "open-progress", icon: "progress", title: "Your progress", detail: "Missions, gifts & events" },
   { action: "open-cups", icon: "trophy", title: "Tournaments", detail: "Weekly score challenges" },
@@ -31,6 +34,5 @@ export const PROGRESS_DESTINATIONS: MenuDestination[] = [
   { action: "open-trophies", icon: "medal", title: "Trophies", detail: "Achievements & mastery" },
   { action: "open-atlas", icon: "atlas", title: "Island Atlas", detail: "Islands & hazards" },
   { action: "open-scores", icon: "scores", title: "Your scores", detail: "Saved flight records" },
-  { action: "open-board", icon: "board", title: "Leaderboard", detail: "Compare flight scores" },
   { action: "open-account", icon: "account", title: "Account", detail: "Name & save transfer" },
 ];
