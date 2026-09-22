@@ -25,7 +25,7 @@ import { fetchPublicRooms, isMultiplayerConfigured, makeRoomCode, RealtimeClient
 import { RoomWatcher, ROOM_POLL_MS, roomSummaryLine, summarizeRooms, type LiveRoom } from "./RoomBrowser";
 import { Leaderboard, loadPilotName, savePilotName, isLeaderboardOnline, type BoardMetric, type BoardPage, type BoardScope } from "./Leaderboard";
 import { generatePilotName } from "./pilotNameGenerator";
-import { setLocale, type SupportedLocale } from "../i18n";
+import { setLocale, whenLocaleReady, type SupportedLocale } from "../i18n";
 import { Tournaments, TRAILS, weekKey, type PrizeGrant } from "./Tournaments";
 import {
   dailyChallenge,
@@ -544,6 +544,10 @@ export class Game {
     this.achievements = new Achievements(this.save);
     this.seasonPass = new SeasonPass(this.save);
     this.board = new Leaderboard(this.save.state.deviceId);
+    // Warm the startup locale pack (English is resident; everyone else
+    // fetches one small file). Runs while the HUD/menu build — the module
+    // already lives in this chunk, so this costs nothing on the entry path.
+    void whenLocaleReady();
     this.telemetry.bindDevice(this.save.state.deviceId);
     // The crash reporter's network copy goes through the same privacy
     // pipeline as every other event; the journal from the previous session
@@ -3526,9 +3530,12 @@ export class Game {
       }
       case "set-language": {
         if (id) {
-          setLocale(id as SupportedLocale);
-          this.hud.toast(`Language updated`, "info");
-          this.bump();
+          // Pack loads before the re-render: UI never paints half-switched
+          // text, and the confirmation toast lands once strings are live.
+          void setLocale(id as SupportedLocale).then(() => {
+            this.hud.toast(`Language updated`, "info");
+            this.bump();
+          });
         }
         break;
       }

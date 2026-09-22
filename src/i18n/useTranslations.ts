@@ -1,23 +1,25 @@
-import { useMemo } from "react";
-import type { BarrelRoot } from "./barrel.types";
-import { getBarrel, getLocale } from "./index";
+import { useMemo, useSyncExternalStore } from "react";
+import { getPackVersion, subscribePacks, t as translate } from "./index";
 
-export function useTranslations(locale?: string, barrel?: BarrelRoot["barrel"]) {
-  const currentLocale = locale ?? getLocale();
-  const b = barrel ?? getBarrel().barrel;
+/**
+ * React binding for the pack-based translation registry.
+ *
+ * Packs arrive asynchronously (every locale except English lazy-loads), so
+ * the hook subscribes to the pack registry version and re-derives its `t`
+ * when a pack lands — a switch renders correctly on the tick after the pack
+ * is resident, never with half-updated text.
+ */
+export function useTranslations(locale?: string) {
+  // Registry version covers both reactivity paths: a fresh pack arriving and
+  // a switch to an already-resident pack (setLocale notifies on both).
+  const version = useSyncExternalStore(subscribePacks, getPackVersion, getPackVersion);
 
   return useMemo(() => {
-    const t = (key: string, params?: Record<string, string | number>, defaultText?: string) => {
-      const entry = b[key];
-      if (!entry) return defaultText ?? key;
-      const text = entry.translations[currentLocale] ?? entry.translations["en"] ?? entry.sourceText;
-      if (!params) return text;
-      return Object.entries(params).reduce((acc, [k, v]) => {
-        const token = `{{${k}}}`;
-        const altToken = `{${k}}`;
-        return acc.split(token).join(String(v)).split(altToken).join(String(v));
-      }, text);
+    void version;
+    void locale;
+    return {
+      t: (key: string, params?: Record<string, string | number>, defaultText?: string): string =>
+        translate(key, params, defaultText),
     };
-    return { t };
-  }, [currentLocale, b]);
+  }, [version, locale]);
 }
