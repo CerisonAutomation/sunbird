@@ -12,13 +12,17 @@ import { expect, test, type Page } from "@playwright/test";
  *   • `poki-upload/` (the folder handed to the Poki Inspector)
  *   • `dist/`        (the direct/web build)
  *
- * and asserts the two policies that were violated until the compliance pass:
+ * and asserts the two policies that matter in the shipped bundle:
  *
- *   1. PLAYER-AUTHORED TEXT / PERSONAL DATA — the pilot name is broadcast to
- *      real players (netlib rooms, rosters, floating name tags). Poki allows no
- *      unmoderated player text and no collection of personal data, so the
- *      portal build must offer a read-only generated name plus a 🎲 roll — no
- *      text field, no "Save". The direct build keeps free rename.
+ *   1. PLAYER-AUTHORED TEXT — Poki's external-resources policy forbids *chat
+ *      systems* and personal-data collection, not display names, so the Poki
+ *      build DOES offer a typing surface for the pilot name (it is broadcast to
+ *      real players over netlib and persisted on a public leaderboard, so the
+ *      duty is moderation, not prohibition). What this proves is therefore the
+ *      stronger property: the moderation pipeline actually ships — a blocked
+ *      spelling is rejected in the artifact, and a clean name is accepted. The
+ *      crazy/generic editions set CUSTOM_PILOT_NAMES=false and render the
+ *      generated name read-only; the direct build keeps free rename.
  *   2. AD-REMOVAL PURCHASES (REQ-20) — nothing may offer to remove or disable
  *      ads. The portal paywall must not carry Gold's "No sponsored breaks"
  *      bullet, and no screen may say "no breaks" / "Remove breaks". The direct
@@ -126,10 +130,11 @@ async function boot(page: Page, origin: string): Promise<string[]> {
 
 /** A fresh profile lands on the first-run welcome screen before the menu CTA,
  *  so every test that boots a build has to get past it. Both editions leave it
- *  with "Let's Fly": the portal build commits the curated name on the plate, the
- *  direct build commits the field (pre-filled with the same generated name).
- *  Without this the CTA wait below simply times out and the failure looks like a
- *  broken menu rather than an undismissed onboarding screen. */
+ *  with "Let's Fly": the Poki build commits the field, which is pre-filled with
+ *  a generated name so accepting it is one tap; crazy/generic commit the
+ *  curated name on the plate. Without this the CTA wait below simply times out
+ *  and the failure looks like a broken menu rather than an undismissed
+ *  onboarding screen. */
 async function dismissNameEntry(page: Page): Promise<void> {
   const fly = page.locator('[data-action="confirm-pilot-name"]');
   if (!(await fly.isVisible().catch(() => false))) return;
@@ -166,70 +171,77 @@ test.describe("portal artifact (poki-upload/)", () => {
     );
   });
 
-  test("the first-run welcome screen offers no typing surface either", async ({ page }) => {
+  test("the first-run welcome screen offers typing, pre-filled so it stays optional", async ({ page }) => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await page.goto(`http://127.0.0.1:${PORTAL_PORT}/`, { waitUntil: "commit" });
     await expect(page.locator("#boot-shell")).toHaveCount(0, { timeout: 45_000 });
 
     // A fresh profile lands here before the menu, so this is the first name
-    // surface a portal player ever sees — it has to obey the same edition split
-    // as the board's pilot-name row, not just that one.
+    // surface a Poki player meets. Poki forbids chat systems and personal-data
+    // collection, not display names — so the field is here, and it is already
+    // filled with a generated call sign, which keeps "Let's Fly" a single tap.
     const fly = page.locator('[data-action="confirm-pilot-name"]');
     await expect(fly).toBeVisible({ timeout: 45_000 });
-    await expect(page.locator(".name-entry-form input")).toHaveCount(0);
-    await expect(page.locator('[data-ref="pilotNameInput"]')).toHaveCount(0);
+    const input = page.locator('[data-ref="pilotNameInput"]');
+    await expect(input).toHaveCount(1);
+    await expect(input).toHaveAttribute("maxlength", "14");
+    const seeded = await input.inputValue();
+    expect(seeded.length, "the field is pre-filled with a generated name").toBeGreaterThan(0);
+    await expect(page.locator(".name-char-count span")).toHaveText(String(seeded.length));
 
-    const plate = page.locator(".name-entry-plate");
-    await expect(plate).toBeVisible();
-    const before = (await plate.textContent())?.trim() ?? "";
-    expect(before.length, "a curated name is already on the plate").toBeGreaterThan(0);
-    expect(await plate.getAttribute("aria-label")).toBe("Pilot name");
-
-    // The sanctioned alternative has to work: a dice that only wrote to an input
-    // which is no longer in the bundle would leave the plate stuck.
+    // The dice must write into the field, not to a plate that is no longer in
+    // the bundle — a dead dice would leave the player with a name they cannot
+    // change and no idea why.
     await page.locator('[data-action="randomize-pilot-name"]').click();
-    await expect
-      .poll(async () => (await plate.textContent())?.trim() ?? "", {
-        timeout: 15_000,
-        message: "🎲 must roll a new curated name on the welcome plate",
-      })
-      .not.toBe(before);
-    await expect(page.locator(".name-entry-form input")).toHaveCount(0);
+    await expect.poll(async () => input.inputValue(), { timeout: 15_000 }).not.toBe(seeded);
 
-    // And "Let's Fly" must be a real exit. It reads the name field, so on a
-    // build with no field it would toast "Please enter a pilot name" forever and
-    // trap the player on this screen with no way out.
+    // THE MODERATION PROOF. "fuuuck" is not a literal blocklist entry — it is a
+    // stretched spelling that only the shipped normaliser collapses to a
+    // blocked key, so this fails if the moderation pipeline is tree-shaken out
+    // of the portal bundle or silently stops running.
+    await input.fill("fuuuck");
+    await fly.click();
+    await expect(fly, "a blocked call sign must not get past the welcome screen").toBeVisible();
+    // Match by text, not by position: toasts from boot (the streak/welcome
+    // ones) are still in the DOM, so `.first()` would read an older toast.
+    await expect(page.locator(".toast").filter({ hasText: /call sign/i }).first()).toBeVisible();
+
+    // A clean name is accepted, all the way to the menu.
+    await input.fill("SkyFox42");
     await fly.click();
     await expect(page.getByRole("button", { name: "Play free flight now", exact: true })).toBeVisible({ timeout: 30_000 });
     expect(errors).toEqual([]);
   });
 
-  test("shows the pilot name read-only and rolls a new one without a keyboard", async ({ page }) => {
+  test("lets a Poki player type a call sign, and refuses one that is not allowed", async ({ page }) => {
     const errors = await boot(page, `http://127.0.0.1:${PORTAL_PORT}`);
     await openMenu(page, "open-board", "Leaderboard");
 
-    // No typing surface and no free-text save path.
-    await expect(page.locator('[data-ref="pilotName"]')).toHaveCount(0);
-    await expect(page.locator('[data-action="rename-pilot"]')).toHaveCount(0);
-    await expect(page.locator(".pilot-name-row input")).toHaveCount(0);
+    // Free text on Poki: the field and its Save path are in the bundle, and the
+    // read-only plate that crazy/generic use is not.
+    const input = page.locator('[data-ref="pilotName"]');
+    await expect(input).toHaveCount(1);
+    await expect(page.locator('[data-action="rename-pilot"]')).toHaveCount(1);
+    await expect(page.locator(".pilot-name-readonly")).toHaveCount(0);
 
-    const plate = page.locator(".pilot-name-readonly");
-    await expect(plate).toBeVisible();
-    const before = (await plate.textContent())?.trim() ?? "";
-    expect(before.length, "the generated name is on screen").toBeGreaterThan(0);
-    expect(await plate.getAttribute("aria-label")).toBe("Pilot name");
-
-    // The sanctioned alternative: roll a curated name. It must actually change
-    // the displayed name — a dead button here would leave players stuck.
+    // The dice still works and must change what is on screen.
+    const before = await input.inputValue();
     await page.locator('[data-action="autogen-pilot"]').click();
+    await expect.poll(async () => input.inputValue(), { timeout: 15_000 }).not.toBe(before);
+
+    // A blocked name is refused: the row says why, and the refusal is the
+    // evasive spelling again — proof the normaliser ships, not just the words.
+    await input.fill("fuuuck");
+    await page.locator('[data-action="rename-pilot"]').click();
+    await expect(page.locator(".toast").filter({ hasText: /call sign/i }).first()).toBeVisible();
+
+    // A clean name is committed and read back from the field.
+    await input.fill("SkyFox42");
+    await page.locator('[data-action="rename-pilot"]').click();
     await expect
-      .poll(async () => (await page.locator(".pilot-name-readonly").textContent())?.trim() ?? "", {
-        timeout: 15_000,
-        message: "🎲 Random must roll a new curated name",
-      })
-      .not.toBe(before);
-    await expect(page.locator(".pilot-name-row input")).toHaveCount(0);
+      .poll(async () => (await page.locator('[data-ref="pilotName"]').inputValue()) ?? "", { timeout: 15_000 })
+      .toBe("SkyFox42");
     expect(errors).toEqual([]);
   });
 

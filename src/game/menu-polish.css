@@ -255,7 +255,7 @@
 .destination-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:7px; margin:0 0 12px; }
 .destination { min-width:0; min-height:68px; padding:12px; text-align:left; border:1px solid #decebb; border-radius:14px; background:#fffaf1; color:#352c27; font-family:inherit; cursor:pointer; box-shadow:none; }
 .destination b { display:block; font-size:14px; line-height:1.3; }
-.destination span { display:block; margin-top:5px; color:#726254; font-size:11px; line-height:1.45; }
+.destination span { display:block; margin-top:5px; color:#5c4f42; font-size:12px; line-height:1.45; }
 .destination:hover { border-color:#b68a63; background:#fff1db; }
 .play-destinations .destination:first-child { background:#e2f1ed; border-color:#a5cabe; }
 .play-destinations .destination:nth-child(2) { background:#e6edfa; border-color:#b5c6e3; }
@@ -331,8 +331,13 @@
    the bird always sits level with the sun (portrait == landscape). We centre
    with top:50% + negative margin-top (not translateY) because .hero-bird's
    float animation owns `transform`. */
+/* The mute button owns the card's top-right 56x56 (44px control at 12px inset).
+   The sun is decorative and sits behind everything, so wherever its band
+   overlapped that corner it poked out from under the control — measured at
+   568x320 as a 3px sliver. Keeping its right inset >= 50 - (card padding)
+   clears the whole control at every breakpoint. */
 .menu-hero .hero-sun-wrap {
-  display:block !important; position:absolute; right:16px; top:50%; margin-top:-54px;
+  display:block !important; position:absolute; right:40px; top:50%; margin-top:-54px;
   width:108px; height:108px; z-index:1;
   animation: heroSunPulse 4.2s ease-in-out infinite;
 }
@@ -368,35 +373,32 @@
 .destination-grid .destination-arrow .arrow-glyph { width:12px; height:12px; display:block; }
 .home-section-title { display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin:10px 0 6px; letter-spacing:0; }
 .home-section-title > span { font:600 15px/1.3 var(--display); color:#514737; }
-.home-section-title > small { font:700 8px/1.4 var(--body); letter-spacing:.12em; color:#786d59; white-space:nowrap; }
-/* Sub-group inside a home section: the explicit hierarchy under "01 — PLAY"
-   (Play with rivals → PvP / PvAI, then Play solo). Same type ramp as the
-   section title, one step down, so the nesting reads at a glance. */
-.home-subsection { display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin:7px 0 5px; padding:0 2px; }
-.home-subsection > span { font:700 11px/1.3 var(--body); letter-spacing:.08em; text-transform:uppercase; color:#6d5c48; }
-.home-subsection > small { font:700 8px/1.4 var(--body); letter-spacing:.12em; color:#9a8971; white-space:nowrap; }
-/* Home leaderboard panel: the live top of the ladder, three compact rows in
-   one card. It sits directly under the hero deliberately — the first thing a
-   returning player looks for is where they stand — and it is ONE panel rather
-   than three tiles so the Play grid stays above the fold. */
+.home-section-title > small { font:700 10px/1.5 var(--body); letter-spacing:.1em; color:#5b4f3f; white-space:nowrap; }
+/* Home leaderboard bar: the live top of the ladder, as ONE full-width bar that
+   closes the Play section. It replaced two surfaces saying the same thing — a
+   sixth "Leaderboards" row in the Play grid, and a dark panel that sat above
+   the Fly-now CTA and pushed the primary action down the screen. Full width and
+   in the menu's own light card language, so it reads as the section's closing
+   bar rather than one more choice. */
 .home-board { display:flex; flex-direction:column; gap:2px; width:100%; text-align:left;
-  margin:0 0 10px; padding:8px 12px 9px;
-  background:linear-gradient(145deg,#2f2a4a,#1d1b33); color:#fff;
-  border:1px solid #4b4570; border-radius:17px; cursor:pointer;
-  box-shadow:0 3px 0 #14122a66, 0 6px 16px #14122a33; font-family:var(--body); font-size:13px; }
-.home-board:hover { border-color:#6f66a3; }
+  margin:0 0 12px; padding:10px 14px 11px;
+  background:linear-gradient(135deg,#fffbef 0%,#fff5d8 100%); color:#3b3025;
+  border:1.5px solid rgba(201,148,60,.55); border-radius:16px; cursor:pointer;
+  box-shadow:0 2px 0 rgba(201,148,60,.25), 0 6px 20px rgba(139,112,66,.12);
+  font-family:var(--body); font-size:13px; }
+.home-board:hover { border-color:rgba(185,135,50,.8); box-shadow:0 2px 0 rgba(185,135,50,.4), 0 8px 24px rgba(139,112,66,.2); transform:translateY(-1px); }
 .home-board .hb-head { display:flex; align-items:baseline; justify-content:space-between; gap:8px; width:100%; }
-.home-board .hb-title { font:700 9px/1.6 var(--body); letter-spacing:.12em; text-transform:uppercase; color:#cdc6f2; }
+.home-board .hb-title { font:700 10px/1.6 var(--body); letter-spacing:.11em; text-transform:uppercase; color:#7a5313; }
 .home-board .hb-row { display:flex; align-items:center; gap:8px; width:100%; min-height:19px; line-height:1.45; }
-.home-board .hb-row.you { color:#ffd9a3; }
+.home-board .hb-row.you { color:#a8551a; font-weight:700; }
 .home-board .hb-medal { flex:0 0 16px; display:inline-flex; align-items:center; justify-content:center;
-  width:16px; height:16px; border-radius:5px; background:#ffffff1f; color:#e8e2ff;
+  width:16px; height:16px; border-radius:5px; background:#c9943c26; color:#8a5f1c;
   font:700 10px/1 var(--body); font-variant-numeric:tabular-nums; }
-.home-board .hb-row.you .hb-medal { background:#ffd9a32e; color:#ffd9a3; }
+.home-board .hb-row.you .hb-medal { background:#e8a02033; color:#8a4d10; }
 .home-board .hb-name { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
 .home-board .hb-val { flex:0 0 auto; font-weight:700; font-variant-numeric:tabular-nums; }
-.home-board .hb-go { flex:0 0 auto; text-align:right; font:700 9px/1.2 var(--body); letter-spacing:.1em; text-transform:uppercase; color:#bdb6e4; white-space:nowrap; }
-@media(max-width:420px) { .home-board { font-size:12px; padding:7px 10px 8px; } }
+.home-board .hb-go { flex:0 0 auto; text-align:right; font:700 10px/1.2 var(--body); letter-spacing:.09em; text-transform:uppercase; color:#8a6414; white-space:nowrap; }
+@media(max-width:420px) { .home-board { font-size:12px; padding:8px 11px 9px; } }
 /* Solo half of the Play grid: solo modes are single-card rows (one entry
    each), so they get the wide layout rather than the two-up rival grid. */
 /* Every group is single-column (see .destination-grid); kept explicit so a
@@ -422,7 +424,7 @@
 .destination-grid .destination-art { display:block; flex:0 0 54px; align-self:stretch; width:54px; height:auto; min-height:52px; margin:0; padding:4px; }
 .destination-grid .destination-copy { display:block; min-width:0; margin:0; }
 .destination-grid .destination-copy b { font:600 15px/1.25 var(--display); color:#3b4236; }
-.destination-grid .destination-copy > span { font:400 11px/1.45 var(--body); margin-top:5px; color:#645d4d; }
+.destination-grid .destination-copy > span { font:400 12px/1.45 var(--body); margin-top:5px; color:#554d3e; }
 .destination-grid .destination-arrow { position:absolute; top:50%; right:10px; transform:translateY(-50%); margin:0; color:#8b8068; font-size:12px; }
 .play-destinations .destination[data-icon="online"] { background:#fffaf5; border-color:#dcc9ac; }
 .play-destinations .destination[data-icon="versus"] { background:#f5f8fc; border-color:#c5d0e0; }
@@ -433,11 +435,11 @@
 .utility-destinations .destination-art { flex-basis:44px; width:44px; }
 .utility-destinations .destination-arrow { display:none; }
 .utility-destinations .destination-copy b { font-size:14px; }
-.utility-destinations .destination-copy > span { font-size:10px; }
+.utility-destinations .destination-copy > span { font-size:11px; }
 .progress-destinations .destination { min-height:62px; padding:9px 11px; gap:9px; border-radius:14px; }
 .progress-destinations .destination-art { flex-basis:44px; width:44px; padding:3px; }
 .progress-destinations .destination-copy b { font-size:13px; }
-.progress-destinations .destination-copy > span { font-size:10px; }
+.progress-destinations .destination-copy > span { font-size:11px; }
 .progress-destinations .destination-arrow { display:none; }
 .home-record { display:flex; align-items:center; justify-content:flex-start; flex-wrap:nowrap; gap:10px; padding:14px 0 0; text-align:left; }
 .home-record .record-art { flex:0 0 34px; width:34px; height:34px; }
@@ -468,9 +470,7 @@
   .home-launch .launch-copy b { font-size:23px; }
   .home-launch .launch-arrow { display:none; }
   .home-section-title > span { font-size:13px; }
-  .home-section-title > small { font-size:7px; }
-  .home-subsection > span { font-size:10px; }
-  .home-subsection > small { font-size:7px; }
+  .home-section-title > small { font-size:9px; }
   /* Rows stay rows on a phone: an icon + two lines of copy is one scan line,
      and stacked tiles were 120px of mostly empty card each. */
   .play-destinations .destination,
@@ -478,14 +478,14 @@
   .progress-destinations .destination { flex-direction:row; align-items:center; gap:9px; padding:8px 10px; min-height:54px; }
   .destination-grid .destination-art { flex-basis:40px; width:40px; }
   .destination-grid .destination-copy b { font-size:13px; }
-  .destination-grid .destination-copy > span { font-size:10.5px; }
+  .destination-grid .destination-copy > span { font-size:11px; }
 }
 @media(max-height:400px) and (min-width:550px) {
   .menu-hero .hero { min-height:76px; padding:12px 18px; margin-bottom:12px; }
   .menu-hero .hero-title { max-width:75%; }
   .paper-card.menu-hero h1 { font-size:32px; margin:0; }
   .menu-hero .hero-kicker, .menu-hero .hero-sub { display:none; }
-  .menu-hero .hero-sun-wrap { top:50%; margin-top:-35px; width:70px; height:70px; right:38px; }
+  .menu-hero .hero-sun-wrap { top:50%; margin-top:-35px; width:70px; height:70px; right:52px; }
   .menu-hero .hero-sun { width:70px; height:70px; }
   .menu-hero .hero-bird { top:50%; margin-top:-22px; width:60px; height:44px; right:54px; }
   .menu-hero .home-launch { min-height:68px; padding:10px 14px; margin-bottom:16px; }
@@ -1283,9 +1283,12 @@ button,
   letter-spacing: .02em !important;
 }
 .home-section-title > small {
-  font: 700 9px/1.4 var(--body) !important;
-  letter-spacing: .14em !important;
-  color: #9a7b4e !important;
+  /* Was 9px #9a7b4e on this tan tint — about 3.5:1, under the 4.5:1 AA floor
+     for normal text, and the eyebrow is the only label the Play/Hangar/
+     Progress sections get. Same chip, readable type. */
+  font: 700 10px/1.4 var(--body) !important;
+  letter-spacing: .12em !important;
+  color: #6b5116 !important;
   background: rgba(180,140,60,0.1);
   border-radius: 4px;
   padding: 2px 5px;
@@ -2358,17 +2361,25 @@ button,
   text-transform: uppercase !important;
   margin: 18px 0 4px !important;
 }
+/* The pill stays 44x26, but the CONTROL is 44x44: Poki's (and WCAG's) minimum
+   touch target is 44px, and this block's `!important` height of 26px was
+   overriding the 52x44 rule above it, so every Settings toggle shipped as a
+   44x26 hit area. The track is inset by 9px top and bottom, which keeps the
+   pill's 26px height and the knob's 3px inset arithmetic unchanged. */
 .toggle {
   position: relative !important;
   display: inline-block !important;
   width: 44px !important;
-  height: 26px !important;
+  height: 44px !important;
   flex: 0 0 44px !important;
 }
 .toggle input { opacity: 0; width: 0; height: 0; }
 .toggle .track {
   position: absolute !important;
-  inset: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: 9px !important;
+  bottom: 9px !important;
   border-radius: 13px !important;
   background: #d4c4a4 !important;
   transition: background .2s ease !important;
@@ -3914,33 +3925,6 @@ hr.divider {
   padding: 11px !important;
 }
 
-/* ── Featured / full-width leaderboard card ─────────────────────────── */
-.destination--featured {
-  grid-column: 1 / -1;
-  min-height: 78px;
-  padding: 14px 18px;
-  background: linear-gradient(135deg, #fffbef 0%, #fff5d8 100%);
-  border: 1.5px solid rgba(201,148,60,.55);
-  box-shadow: 0 2px 0 rgba(201,148,60,.25), 0 6px 20px rgba(139,112,66,.12);
-  border-radius: 16px;
-}
-.destination--featured .destination-copy b {
-  font-size: 17px;
-}
-.destination--featured .destination-copy > span {
-  font-size: 12px;
-  margin-top: 4px;
-}
-.destination--featured .destination-art {
-  flex: 0 0 54px;
-  width: 54px;
-  height: 54px;
-}
-.destination--featured:hover {
-  border-color: rgba(185,135,50,.8);
-  box-shadow: 0 2px 0 rgba(185,135,50,.4), 0 8px 24px rgba(139,112,66,.2);
-  transform: translateY(-1px);
-}
 /* Short windows (laptops at 768, phones at 640): the hero blurb and the big
    title both cost Play-block height without adding meaning — the game is one
    button, and the button says what to do. */

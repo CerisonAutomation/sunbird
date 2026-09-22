@@ -2488,11 +2488,10 @@ function renderAtlas(s: HudSnapshot): string {
   `;
 }
 
-function menuLinks(items: (MenuDestination & { featured?: boolean })[]): string {
-  return items.map(item => {
-    const cls = item.featured ? "destination destination--featured" : "destination";
-    return `<button class="${cls}" data-ui data-action="${item.action}" data-icon="${item.icon}"><span class="destination-art">${menuIcon(item.icon)}</span><span class="destination-copy"><b>${item.title}</b><span>${item.detail}</span></span><span class="destination-arrow" aria-hidden="true">${arrowUpRightSvg()}</span></button>`;
-  }).join("");
+function menuLinks(items: MenuDestination[]): string {
+  return items.map(item =>
+    `<button class="destination" data-ui data-action="${item.action}" data-icon="${item.icon}"><span class="destination-art">${menuIcon(item.icon)}</span><span class="destination-copy"><b>${item.title}</b><span>${item.detail}</span></span><span class="destination-arrow" aria-hidden="true">${arrowUpRightSvg()}</span></button>`,
+  ).join("");
 }
 
 function renderNameEntry(s: HudSnapshot): string {
@@ -2628,25 +2627,15 @@ function renderMain(s: HudSnapshot): string {
       </div>
     </header>
 
-    ${homeBoardStrip(s)}
     <button class="primary-btn home-launch" data-ui data-action="pvp-practice" aria-label="Play free flight now"><span class="launch-art">${menuIcon("flight")}</span><span class="launch-copy"><small>${t("onboarding.skyIsYours", undefined, "THE SKY IS YOURS")}</small><b>Fly now</b><span>${t("onboarding.launchSub", undefined, "Hold to dive · release to glide")}</span></span><span class="launch-arrow" aria-hidden="true">${arrowRightSvg()}</span></button>
-    <!-- 01 — PLAY. PvP, AI PvP and Leaderboards are the first three entries *inside* Play —
-         they are ways of playing, not separate apps, so they sit underneath
-         the Play heading rather than beside it. Leaderboards sits here next to
-          PvP/PvAI so score-chasing has the same visual anchor. Solo modes
-          follow in the same grid so the whole block reads as one play section. -->
+    <!-- 01 — PLAY. PvP, AI PvP and the solo modes are all ways of playing, so
+         they sit under the Play heading as one grid. Standings then close the
+         section as a single full-width bar instead of a sixth row of choices:
+         "how am I doing" is a different question from "what shall I play", and
+         one bar at the end reads as the section's full stop. -->
     <div class="home-section-title"><span>${t("hud.menu.chooseAdventure", undefined, "Choose your adventure")}</span><small>01 — PLAY</small></div>
-    <div class="home-subsection" role="presentation"><span>Play with rivals</span><small>PvP &amp; PvAI</small></div>
-    <nav class="destination-grid play-destinations" aria-label="Choose your adventure">${menuLinks(
-      PLAY_DESTINATIONS.map(item => {
-        if (item.action === "open-board") {
-          const liveDetail = s.board && s.board.yourRank > 0
-            ? `🏆 You · #${s.board.yourRank} of ${s.board.total} · Leader: ${s.board.entries[0] ? escapeHtml(s.board.entries[0].name) : "—"}`
-            : `${s.bestDistance > 0 ? `Your best: ${formatDistance(s.bestDistance)} · Global standings` : "All-time · weekly · today · you"}`;
-          return { ...item, detail: liveDetail, featured: true };
-        }
-        return item;
-      }) as (typeof PLAY_DESTINATIONS[number] & { featured?: boolean })[])}</nav>
+    <nav class="destination-grid play-destinations" aria-label="Choose your adventure">${menuLinks(PLAY_DESTINATIONS)}</nav>
+    ${homeBoardStrip(s)}
     <div class="home-section-title"><span>${t("hud.menu.makeItYours", undefined, "Make it yours")}</span><small>02 — HANGAR</small></div>
     <nav class="destination-grid utility-destinations" aria-label="Your hangar">${menuLinks(COLLECTION_DESTINATIONS)}</nav>
     <div class="home-section-title"><span>${t("hud.menu.everyFlightCounts", undefined, "Every flight counts")}</span><small>03 — PROGRESS</small></div>

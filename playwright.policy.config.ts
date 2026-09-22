@@ -2,8 +2,9 @@ import { defineConfig, devices } from "@playwright/test";
 
 /**
  * Config for the platform-policy contract test: it drives the SHIPPING
- * artifacts (`poki-upload/` and `dist/`) through the two Poki policy fixes —
- * read-only pilot name, and no ad-removal offers — in a real browser.
+ * artifacts (`poki-upload/` and `dist/`) through both policies in a real
+ * browser — that a Poki player may type a call sign and that the shipped
+ * moderation refuses a blocked one, and that nothing offers to remove ads.
  *
  * No webServer: the spec serves both folders itself, so what runs is the
  * artifact, not a dev build.
@@ -14,7 +15,12 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./e2e",
   testMatch: /portal-policy\.spec\.ts/,
-  timeout: 120_000,
+  // Booting the shipped single-file build under headless SwiftShader is slow
+  // (WebGL warm-up alone stalls the main thread for seconds) and the ad-removal
+  // case walks 17 menu screens. At 120s the desktop project timed out mid-walk
+  // while the phone project passed the same assertions in ~9s — the budget was
+  // the constraint, not the behaviour.
+  timeout: 240_000,
   expect: { timeout: 20_000 },
   workers: 1,
   fullyParallel: false,

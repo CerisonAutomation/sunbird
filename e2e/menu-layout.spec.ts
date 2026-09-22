@@ -4,6 +4,13 @@ import { SunbirdPage } from "./SunbirdPage";
 for (const viewport of [{ width: 1280, height: 800 }, { width: 320, height: 568 }, { width: 568, height: 320 }]) {
   test(`menu launch and settings fit at ${viewport.width}×${viewport.height}`, async ({ page }, info) => {
     await page.setViewportSize(viewport);
+    // Measure a settled layout, not an entrance animation. The overlay animates
+    // in, and a `getBoundingClientRect` taken mid-flight reads a control smaller
+    // than its CSS box (a 44x44 toggle measured 42.68). The shipping CSS honours
+    // prefers-reduced-motion by zeroing overlay animation/transition, so asking
+    // for it makes the geometry deterministic and the 44px target assertion
+    // about the control's real size rather than the frame we happened to sample.
+    await page.emulateMedia({ reducedMotion: "reduce" });
     const app = new SunbirdPage(page);
     await app.open(); await app.ready();
     await app.expectMenuFits();
