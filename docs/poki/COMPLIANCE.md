@@ -1,6 +1,6 @@
 # Poki compliance report
 
-**Generated:** 2026-09-21 by `pnpm poki:audit` — do not edit by hand.
+**Generated:** 2026-09-22 by `pnpm poki:audit` — do not edit by hand.
 **Result:** ✅ every satisfied rule verified · 104/118 rules verified · 77 of them hard requirements.
 
 **Scope:** the extracted guide corpus in this folder (`requirements.json`, version 2026-09-17). Rules marked *action* are human/submission steps, *deferred* are accepted gaps with a recorded reason — both are listed so nothing is silently skipped.
