@@ -52,7 +52,7 @@ const uploadDir = portal === "poki" ? "poki-upload" : null;
  * the zip and the upload folder are byte-identical by construction.
  */
 function stageHtml() {
-  const html = readFileSync(path.join(src, "index.html"), "utf8")
+  let html = readFileSync(path.join(src, "index.html"), "utf8")
     .replace(/^\s*<link rel="manifest"[^>]*>\n?/m, "")
     .replace(/^\s*<meta property="og:url"[^>]*>\s*\n?/m, "")
     // Portal editions are coin/VIP-only and must not carry a payment-provider
@@ -62,6 +62,25 @@ function stageHtml() {
     // scrub is total (a leftover would mean a runtime-built string escaped it).
     .replace(/stripe/gi, "portal");
   if (/stripe/i.test(html)) throw new Error("payment-marker scrub incomplete");
+  // Poki's HTML5 SDK page: "Add the following HTML within the <head> tags of
+  // your game HTML". Loading it from the document head means it is already
+  // there when the bundle boots, instead of the game waiting ~2 s to discover
+  // it and then fetching it — which is the difference between ads being ready
+  // at the first natural break and not. The adapter still degrades cleanly if
+  // the request fails (offline preview, blocked script).
+  if (portal === "poki") {
+    // Match the TAG, not the hostname: the bundled adapter also contains the
+    // CDN URL as a string (it is the fallback loader).
+    const SDK_TAG = '<script src="https://game-cdn.poki.com/scripts/v2/poki-sdk.js"></script>';
+    if (html.includes(SDK_TAG)) throw new Error("Poki SDK tag already staged");
+    html = html.replace(
+      /<head>/i,
+      '<head>\n    <script src="https://game-cdn.poki.com/scripts/v2/poki-sdk.js"></script>',
+    );
+    if (!html.includes(SDK_TAG)) {
+      throw new Error("Poki SDK tag injection failed — the head tag shape changed");
+    }
+  }
   return html;
 }
 

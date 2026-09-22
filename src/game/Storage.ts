@@ -26,6 +26,51 @@
  * `key` / …), so migrating a call site is a one-word change.
  */
 
+const PROBE_KEY = "sunbird.storage.probe";
+
+/**
+ * Keys that are deliberately NOT part of the player's cloud save.
+ *
+ * Poki syncs `localStorage` to the player's account automatically once they
+ * are signed in ("cloud gamesaves"), and the documented way to keep something
+ * out of that sync is to prefix the key with `poki_ignore`. Two reasons to
+ * exclude a key:
+ *
+ *   • it is a CACHE that belongs to one device (the leaderboard page cache,
+ *     recorded ghost flights, squad caches) — syncing it wastes the 1 MB
+ *     gamesave budget and can resurrect stale rows on another device; and
+ *   • it is per-device state that must never silently follow the player to a
+ *     shared computer (AUDS entry secrets, the analytics journal).
+ *
+ * Growth is the reason this matters at all: the leaderboard cache alone holds
+ * up to 400 rows, and the gamesave limit is 1 MB gzipped — exceeding it makes
+ * Poki switch cloud saves off for that player entirely, which loses their real
+ * progress. Real progress (settings, coins, unlocks, mission state) keeps its
+ * plain key and syncs.
+ */
+const LOCAL_ONLY_PREFIXES = [
+  "sunbird.board.", // leaderboard page cache (large, re-fetchable)
+  "sunbird.ghost.", // recorded ghost flights (large, device-specific)
+  "sunbird.journal.", // analytics journal (local-only by definition)
+  "sunbird.squad.local_", // offline squad/club caches, incl. per-club chat logs
+  "auds-singleton:", // AUDS entry secrets: must not roam between devices
+  "auds-secret:", // AUDS update secrets: same
+  PROBE_KEY, // the write canary is never worth syncing
+];
+
+/** True on the Poki build, where cloud gamesaves are active. */
+const CLOUD_SYNC_BUILD = (import.meta.env.VITE_PORTAL_TARGET ?? "") === "poki";
+
+/**
+ * Logical key → the key actually written. On Poki, local-only data is stored
+ * under a `poki_ignore`-prefixed name so the SDK's cloud sync skips it; on
+ * every other build the key is used verbatim, so existing saves are untouched.
+ */
+export function physicalKey(key: string): string {
+  if (!CLOUD_SYNC_BUILD) return key;
+  return LOCAL_ONLY_PREFIXES.some((prefix) => key.startsWith(prefix)) ? `poki_ignore.${key}` : key;
+}
+
 export interface StorageLike {
   readonly length: number;
   key(index: number): string | null;
@@ -35,7 +80,7 @@ export interface StorageLike {
   clear(): void;
 }
 
-const PROBE_KEY = "sunbird.storage.probe";
+
 
 class MemoryStore implements StorageLike {
   private readonly entries = new Map<string, string>();
@@ -157,13 +202,25 @@ export const storage: StorageLike = {
     return backend().key(index);
   },
   getItem(key: string): string | null {
-    return backend().getItem(key);
+    const b = backend();
+    const direct = b.getItem(physicalKey(key));
+    if (direct !== null || !CLOUD_SYNC_BUILD) return direct;
+    // Read-through migration: data written before this rule existed sits under
+    // its plain key. Move it once rather than losing it.
+    const legacy = b.getItem(key);
+    if (legacy !== null) {
+      b.setItem(physicalKey(key), legacy);
+      b.removeItem(key);
+    }
+    return legacy;
   },
   setItem(key: string, value: string): void {
-    backend().setItem(key, value);
+    backend().setItem(physicalKey(key), value);
   },
   removeItem(key: string): void {
-    backend().removeItem(key);
+    const b = backend();
+    b.removeItem(physicalKey(key));
+    b.removeItem(key); // clear both spellings, never leave an orphan
   },
   clear(): void {
     backend().clear();

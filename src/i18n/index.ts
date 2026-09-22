@@ -123,6 +123,29 @@ export function getLocale(): SupportedLocale {
 }
 
 /**
+ * Adopt the language the portal reports for this player.
+ *
+ * The localization guide asks for the player's language to be served
+ * automatically, and on Poki that is `PokiSDK.getLanguage()` rather than
+ * `navigator.language` — it reflects the player's Poki account and region, not
+ * just the browser. An explicit in-game choice always wins, so this only runs
+ * when nothing has been saved yet, and it returns whether it changed anything
+ * so the caller can re-render.
+ */
+export async function adoptPortalLocale(language: string | null): Promise<boolean> {
+  if (!language) return false;
+  try {
+    if (storage.getItem(LOCALE_STORAGE_KEY)) return false;
+  } catch {
+    /* private mode: fall through and adopt */
+  }
+  const match = matchLocale(language);
+  if (!match || match === currentLocale) return false;
+  await setLocale(match);
+  return true;
+}
+
+/**
  * Switch locale. Loads the target pack FIRST, then flips the active locale —
  * callers re-render after the returned promise resolves, so UI never paints
  * half-switched text. On pack failure the switch still proceeds (English

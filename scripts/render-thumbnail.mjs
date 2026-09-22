@@ -21,8 +21,8 @@
  *
  * Usage: node scripts/render-thumbnail.mjs
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { decodePng, downscale, encodePng } from "./png.mjs";
 
@@ -32,6 +32,24 @@ const DELIVERABLES = [
   { file: "assets/submission/sunbird-thumbnail-1024.png", size: 1024 },
   { file: "assets/submission/sunbird-thumbnail-628.png", size: 628 },
 ];
+
+/**
+ * The copies that travel inside the game build (`public/` is copied verbatim
+ * into every dist). They are written from the *same* graded master as the
+ * submission files on purpose: the build used to ship a second, softer
+ * art direction (an off-centre sunset piece) while the submission folder held
+ * the crisp in-game-palette dive, so the picture a player saw on the game page
+ * and the picture on the tile could disagree. One master, every size.
+ *
+ * The 1400 copy is gone: it was a box-filter upscale of this same 1024 master,
+ * so it held no pixels the 1024 file does not, and the platform never asks for
+ * more than 628.
+ */
+const SHIPPED = [
+  { file: "public/poki/thumbnail-1024.png", size: 1024 },
+  { file: "public/poki/thumbnail-628.png", size: 628 },
+];
+const RETIRED = ["public/poki/thumbnail-1400.png"];
 
 function rgbToHsl(r, g, b) {
   const rn = r / 255;
@@ -144,9 +162,16 @@ const raw = decodePng(readFileSync(RAW));
 const graded = grade(raw);
 mkdirSync(join(root, "assets/submission"), { recursive: true });
 
-for (const { file, size } of DELIVERABLES) {
+for (const { file, size } of [...DELIVERABLES, ...SHIPPED]) {
   const image = size === graded.width ? graded : downscale(graded, size, size);
+  mkdirSync(dirname(join(root, file)), { recursive: true });
   writeFileSync(join(root, file), encodePng(image));
   console.log(`✓ ${file} — ${size}×${size} (graded from art/sunbird-raw-1024.png)`);
+}
+for (const file of RETIRED) {
+  if (existsSync(join(root, file))) {
+    rmSync(join(root, file));
+    console.log(`– ${file} removed (superseded by the 1024 master copy)`);
+  }
 }
 console.log("\nRun `pnpm verify:thumbnail` to check the deliverables against the Poki thumbnail rules.\n");

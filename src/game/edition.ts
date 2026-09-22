@@ -17,6 +17,17 @@ export const PORTAL_EDITION_NOTE = "Portal edition";
 /** Label for the leaderboard-backend chip. */
 export const LEADERBOARD_CLOUD_LABEL = "☁️ cloud";
 
+/**
+ * True only in the Poki build.
+ *
+ * Runtime `portalName === "poki"` comparisons embed the literal "poki" in EVERY
+ * bundle — the minifier folds positive compile-time branches but not a string
+ * comparison against a runtime field — and the cross-portal marker gate fails
+ * any non-Poki bundle containing it. Swapping an edition constant instead keeps
+ * the branch (and the literal) inside the one build that owns it.
+ */
+export const POKI_EDITION = false;
+
 /** True only in the Poki build (Poki's netlib multiplayer transport). */
 export const POKI_MULTIPLAYER = false;
 

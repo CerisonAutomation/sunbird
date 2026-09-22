@@ -35,15 +35,24 @@ carries an obligation was dropped.
 | `developers.poki.com/guide/player-device-report` | [`07-player-device-report.md`](./07-player-device-report.md) |
 | `developers.poki.com/guide/game-dev-tools` | [`08-game-dev-tools.md`](./08-game-dev-tools.md) |
 | `developers.poki.com/guide` (requirements, policies, events, release) | [`09-platform-requirements.md`](./09-platform-requirements.md) |
+| `developers.poki.com/guide/sdk-html5` | [`10-sdk-html5.md`](./10-sdk-html5.md) |
+| `developers.poki.com/guide/sdk-overview` | [`11-sdk-events.md`](./11-sdk-events.md) |
+| `developers.poki.com/guide/game-events` | [`12-game-events.md`](./12-game-events.md) |
+| `developers.poki.com/guide/netlib` | [`13-netlib.md`](./13-netlib.md) |
+| `developers.poki.com/guide/auds` | [`14-auds.md`](./14-auds.md) |
+| `developers.poki.com/guide/accounts` | [`15-user-accounts.md`](./15-user-accounts.md) |
+| `developers.poki.com/guide/adding-your-game`, `/external-resources-policy`, `/content-player-safety`, `/player-fit-test`, `/web-fit-test`, `/final-review`, `/inspector` | [`16-submission.md`](./16-submission.md) |
+| `developers.poki.com/guide/working-with-poki`, `/what-we-look-for`, `/revenue-deal-types`, `/release-process` | [`17-partnering.md`](./17-partnering.md) |
 
 ## Files
 
 | File | What it is |
 |---|---|
-| `00-guide-overview.md` … `09-platform-requirements.md` | The extracted guide, one page per topic, every rule numbered |
+| `00-guide-overview.md` … `17-partnering.md` | The extracted guide, one page per topic, every rule numbered |
 | [`requirements.json`](./requirements.json) | Machine-readable rule list: `id`, `section`, `kind`, `rule`, `verify`, `evidence`, `status` |
 | [`COMPLIANCE.md`](./COMPLIANCE.md) | **Generated** — the audit result per rule (`pnpm poki:audit`) |
 | [`REBUILD_REPORT.md`](./REBUILD_REPORT.md) | What this extraction changed in the game, why, and the evidence |
+| [`SUBMISSION.md`](./SUBMISSION.md) | The Poki for Developers dashboard sheet: title, thumbnail, categories, engine, description, privacy URL, integrations, CSP requests |
 
 ## Using the spec
 

@@ -328,6 +328,26 @@ export class CrazyGamesAdapter implements PlatformAdapter {
     });
   }
 
+  /**
+   * CrazyGames ships its own locale in the SDK's user/system info; when it is
+   * present the game starts in that language instead of sniffing the browser.
+   */
+  getLanguage(): string | null {
+    try {
+      const info = this.user?.systemInfo as { locale?: string } | undefined;
+      const locale = info?.locale;
+      return typeof locale === "string" && locale.length > 0 ? locale : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** No Poki pill on this portal. */
+  movePill(_topPercent: number, _topPx: number): void {}
+
+  /** No playtest recorder on this portal. */
+  playtestCapture(_on: boolean): void {}
+
   mountBanner(container: HTMLElement): void {
     const ad = this.sdk?.ad;
     if (!this.bannerId || !ad?.requestBanner || container.childElementCount > 0) return;

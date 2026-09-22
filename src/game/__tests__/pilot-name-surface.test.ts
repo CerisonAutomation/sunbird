@@ -3,10 +3,11 @@
  * platform-policy question, not a styling one.
  *
  *  • Direct/web build: free-text field + Save (its own surfaces, its own risk).
- *  • Portal builds (edition CUSTOM_PILOT_NAMES = false): the generated name is
- *    shown read-only with a 🎲 roll, because Poki's content & player-safety
- *    policy allows no unmoderated player-authored text and its external
- *    resources policy forbids collecting personal data.
+ *  • Poki: free text is allowed, but every write is gated on isPilotNameClean
+ *    (profanity filter) — Poki permits profiler-filtered player names; it only
+ *    forbids unmoderated text.
+ *  • CrazyGames/generic (edition CUSTOM_PILOT_NAMES = false): the generated name
+ *    is shown read-only with a 🎲 roll, because no filter ships on those builds.
  *
  * This drives the real renderer (`HUD.update` → `renderStatic` → `renderBoard`)
  * in jsdom rather than asserting on source text, so a rewrite that reintroduces
@@ -16,6 +17,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { HudSnapshot } from "../HUD";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 /**
  * A snapshot stand-in: the HUD reads far more fields than the board page
@@ -92,6 +95,23 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   document.body.innerHTML = "";
+});
+
+describe("edition policy — who may type a name", () => {
+  // The renderer tests above mock the edition module, so they stay green even if
+  // an edition file flips the flag. These read the real files. Poki allows
+  // profanity-filtered free text (isPilotNameClean gates every write); the
+  // unfiltered portal editions must ship the curated call sign instead.
+  const read = (file: string): string =>
+    readFileSync(join(process.cwd(), "src", "game", file), "utf8");
+
+  it("poki and the direct build allow free text, unfiltered editions do not", () => {
+    expect(read("edition.poki.ts")).toMatch(/export const CUSTOM_PILOT_NAMES = true;/);
+    for (const file of ["edition.crazy.ts", "edition.generic.ts"]) {
+      expect(read(file), file).toMatch(/export const CUSTOM_PILOT_NAMES = false;/);
+    }
+    expect(read("edition.ts")).toMatch(/export const CUSTOM_PILOT_NAMES = true;/);
+  });
 });
 
 describe("leaderboard pilot-name row", () => {

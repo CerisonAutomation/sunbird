@@ -123,6 +123,16 @@ export class LocalAdapter implements PlatformAdapter {
   }
   mountBanner(_container: HTMLElement): void {}
 
+  /** No portal language: the game's own browser detection is authoritative. */
+  getLanguage(): string | null {
+    return null;
+  }
+
+  movePill(_topPercent: number, _topPx: number): void {}
+
+  /** No portal recorder in a standalone build. */
+  playtestCapture(_on: boolean): void {}
+
   /* cloud save — real, localStorage-backed */
   saveCloud<T>(key: string, value: T): Promise<void> {
     return localCloudFallback.save(key, value);

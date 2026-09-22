@@ -8,7 +8,16 @@ export const PORTAL_DISPLAY_NAME = "Poki";
 
 export const PORTAL_EDITION_NOTE = "Poki edition · portal rewards enabled";
 
-export const LEADERBOARD_CLOUD_LABEL = "☁️ Poki cloud";
+/**
+ * Board-source chip. Poki's own leaderboards are the worldwide ladder on this
+ * edition (SDK `init({ submitScore })` + `showLeaderboard`), so the chip says
+ * the portal's name and nothing else: "Poki cloud" made players ask which
+ * cloud, and a globe emoji next to "Poki" reads as decoration at chip size.
+ */
+export const LEADERBOARD_CLOUD_LABEL = "Poki";
+
+/** True only in the Poki build (see edition.ts). */
+export const POKI_EDITION = true;
 
 /** Poki's netlib transport handles multiplayer; other builds have no room API. */
 export const POKI_MULTIPLAYER = true;
@@ -16,7 +25,8 @@ export const POKI_MULTIPLAYER = true;
 /** Poki forbids chat in multiplayer surfaces (REQ-31) — emotes only. */
 export const SQUAD_CHAT = false;
 
-/** Player text is allowed with profanity filtering (isPilotNameClean). */
+/** Player-typed names are allowed on Poki, but every write is gated on
+ * isPilotNameClean (profanity filter) before it is stored or broadcast. */
 export const CUSTOM_PILOT_NAMES = true;
 
 /** Poki owns ad scheduling and forbids in-app purchases (REQ-20).

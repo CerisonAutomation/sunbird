@@ -163,5 +163,12 @@ describe("Poki ad-placement canon (guideline: breaks only at natural break point
     for (const placement of ['"restart"', '"resume"', '"to-menu"', '"continue"', '"results-multiplier"', '"shop-free-coins"']) {
       expect(src).toContain(`placement: ${placement}`);
     }
+    // A break that does not interrupt gameplay (a recap→menu tap) must not
+    // fabricate a phase change, and the breaks that do interrupt flight must
+    // route through the sink-gated lifecycle: no gameplayStart/Stop may fire
+    // while the ad state is up.
+    expect(src).toContain("this.gameplaySink.send");
+    const toMenu = src.slice(src.indexOf("private async menuAfterPortalBreak"));
+    expect(toMenu.slice(0, 900)).not.toContain("gameplayStart");
   });
 });

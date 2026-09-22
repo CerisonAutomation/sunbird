@@ -18,9 +18,19 @@
  *   • `measure(category, label, action)` follows the start → complete|fail
  *     contract (one outcome per attempt).
  *
- * What Poki does NOT expose: banners, in-SDK score submission, room state,
- * pause hooks, and a data module. Those are honest no-ops; cloud save falls
- * back to localStorage so the save pipeline still works on the Poki build.
+ * Surfaces the SDK genuinely does not have are honest no-ops: there is no room
+ * state, no portal pause hook, and no invite API, so those return null/false
+ * rather than pretending. Two claims that used to sit in this comment were
+ * wrong and are worth naming, because both cost compliance:
+ *
+ *   • "no in-SDK score submission" — `init({ submitScore })` IS Poki's
+ *     leaderboard handshake, and `showLeaderboard()` is its overlay. Both are
+ *     implemented below and wired to the end of a run.
+ *   • "no banner API" — `displayAd()`/`destroyAd()` exist (see mountBanner).
+ *
+ * Cloud saves are handled by the SDK itself once a player is signed in, with a
+ * 1 MB gamesave budget; `src/game/Storage.ts` keeps caches out of that sync
+ * with the documented `poki_ignore` key prefix.
  */
 import type {
   InviteParams,
@@ -34,6 +44,13 @@ import { setLoadingNet } from "./net";
 import { createAudsIfConfigured, AUDSPREFIX, PokiAuds } from "./auds";
 
 type PokiUser = { username: string; avatarUrl?: string | null } | null;
+
+/**
+ * Display-ad format for this game, or "" to leave the slot empty. Poki's
+ * `displayAd(container, size)` needs a size the game cannot infer (the format
+ * is chosen per game on the Poki side), so it is configuration, not code.
+ */
+const POKI_DISPLAY_AD_SIZE = (import.meta.env.VITE_POKI_DISPLAY_AD_SIZE as string | undefined)?.trim() ?? "";
 type PokiShareableData = Record<string, string | number | boolean>;
 
 /**
@@ -60,6 +77,7 @@ type PokiSdk = {
   signalGameReady?: () => void;
   commercialBreak?: (onStart?: () => void) => Promise<void>;
   rewardedBreak?: (onStart?: (() => void) | { onStart?: () => void; size?: "small" | "medium" | "large" }) => Promise<boolean>;
+
   /** Gamebar display ad rendered into a container the game owns. */
   displayAd?: (
     container: HTMLElement,
@@ -122,8 +140,13 @@ type PokiInitOptions = {
   submitScore?: (submit: (leaderboard: string, score: number) => void) => void;
 };
 
-/** Leaderboard the run score is submitted to (Poki dashboard leaderboard name). */
-const POKI_LEADERBOARD = "distance";
+/**
+ * Leaderboard the run score is submitted to. The name must match the board as
+ * it is configured in Poki for Developers; `VITE_POKI_LEADERBOARD` lets a
+ * build be re-pointed at a renamed board without a code change, and the
+ * default stays the one the game has always submitted to.
+ */
+const POKI_LEADERBOARD = (import.meta.env.VITE_POKI_LEADERBOARD as string | undefined)?.trim() || "distance";
 
 /**
  * The submit function Poki hands us during `init({ submitScore })`. Held at
@@ -196,6 +219,8 @@ setLoadingNet(() => {
 export class PokiAdapter implements PlatformAdapter {
   readonly name = "poki" as const;
   readonly ready = true;
+  /** Container currently holding a display ad, so it can be torn down. */
+  private banner: HTMLElement | null = null;
 
   /** AUDS client — non-null only when VITE_POKI_GAME_ID is configured. */
   private readonly auds: PokiAuds | null = createAudsIfConfigured();
@@ -222,6 +247,48 @@ export class PokiAdapter implements PlatformAdapter {
     if (typeof this.sdk?.openExternalLink === "function") caps.push("externalLink");
     if (typeof this.sdk?.getDeviceInfo === "function") caps.push("deviceInfo");
     return caps;
+  }
+
+  /**
+   * Poki's own view of the player's language. The guide is explicit that the
+   * best experience is to serve the player's language automatically, and Poki
+   * knows the account/region language better than `navigator.language` does.
+   * Returns null when the SDK is absent, so the caller keeps its browser
+   * detection.
+   */
+  getLanguage(): string | null {
+    try {
+      const lang = this.sdk?.getLanguage?.();
+      return typeof lang === "string" && lang.length > 0 ? lang : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Keep the mobile Poki pill clear of the HUD. The default is (0, 24); our
+   * daylight meter and mute/pause buttons live in that band, so the pill is
+   * pushed below the top-left cluster on small screens.
+   */
+  movePill(topPercent: number, topPx: number): void {
+    try {
+      this.sdk?.movePill?.(topPercent, topPx);
+    } catch {
+      /* pill positioning is cosmetic — never fatal */
+    }
+  }
+
+  /**
+   * Level-2 Playtest recordings need the canvas registered and HTML capture
+   * switched on (Poki game-dev-tools). Both are no-ops off the portal.
+   */
+  playtestCapture(on: boolean): void {
+    try {
+      if (on) this.sdk?.playtestCaptureHtmlOn?.();
+      else this.sdk?.playtestCaptureHtmlOff?.();
+    } catch {
+      /* capture is best-effort */
+    }
   }
 
   environment(): string | null {
@@ -318,8 +385,46 @@ export class PokiAdapter implements PlatformAdapter {
     return this.rewardedBreak();
   }
 
-  mountBanner(_container: HTMLElement): void {
-    // Poki intentionally does not expose a banner placement API.
+  /**
+   * In-game display ads (`PokiSDK.displayAd`).
+   *
+   * The comment here used to claim Poki exposes no banner API at all — the
+   * documented SDK has `displayAd(container, size)` / `destroyAd(container)`,
+   * and the guide notes that portrait games additionally earn from Gamebar
+   * Display ads with no code. A size is therefore a per-game decision rather
+   * than something the game can guess, so the slot is filled only when a size
+   * is configured (`VITE_POKI_DISPLAY_AD_SIZE`); otherwise the container stays
+   * empty and nothing is requested.
+   */
+  mountBanner(container: HTMLElement): void {
+    const size = POKI_DISPLAY_AD_SIZE;
+    if (!this.sdk?.displayAd || !size) return;
+    this.banner = container;
+    try {
+      this.sdk.displayAd(
+        container,
+        size,
+        undefined,
+        (isEmpty) => {
+          // An empty creative (no fill, or an ad blocker) must leave no hole in
+          // the layout; the container is collapsed rather than showing a box.
+          container.classList.toggle("ad-empty", isEmpty);
+        },
+      );
+    } catch {
+      /* a failed display ad is not a game error */
+    }
+  }
+
+  destroyBanner(): void {
+    const container = this.banner;
+    if (!container || !this.sdk?.destroyAd) return;
+    this.banner = null;
+    try {
+      this.sdk.destroyAd(container);
+    } catch {
+      /* best effort */
+    }
   }
 
   /** Cache the Poki user id after first resolution so we don't await on every save. */
@@ -472,8 +577,24 @@ export class PokiAdapter implements PlatformAdapter {
     } catch { /* no external links are shipped today; stay inert */ }
   }
 
+  /**
+   * Poki's account upgrade prompt (`PokiSDK.login()` — "Poki User Accounts").
+   * It used to return false unconditionally on the assumption that Poki had no
+   * such prompt; the documented SDK surface has one, so this now actually asks
+   * and reports whether a player ended up signed in.
+   */
   async requestAccountLink(): Promise<boolean> {
-    return false; // Poki has no account-link prompt
+    const sdk = this.sdk;
+    if (!sdk?.login) return false;
+    try {
+      await sdk.login();
+      const user = await sdk.getUser?.();
+      return Boolean(user && user.username);
+    } catch {
+      // Declining the prompt rejects in some SDK versions; that is a choice,
+      // not an error.
+      return false;
+    }
   }
 
   async getIapToken(): Promise<string | null> {

@@ -249,7 +249,10 @@
 /* Visible home navigation replaces the catch-all Explore dropdown. */
 .home-launch { width:100%; margin:8px 0 16px; min-height:64px; }
 .home-launch span { display:block; font-size:12px; font-weight:500; letter-spacing:0; text-transform:none; margin-top:4px; }
-.destination-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:0 0 16px; }
+/* Full-width rows. The 2-up grid left a dead cell next to every odd tile and
+   made half-width tiles on a phone, which read as gaps rather than a menu;
+   one column means every destination spans the card edge to edge. */
+.destination-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:7px; margin:0 0 12px; }
 .destination { min-width:0; min-height:68px; padding:12px; text-align:left; border:1px solid #decebb; border-radius:14px; background:#fffaf1; color:#352c27; font-family:inherit; cursor:pointer; box-shadow:none; }
 .destination b { display:block; font-size:14px; line-height:1.3; }
 .destination span { display:block; margin-top:5px; color:#726254; font-size:11px; line-height:1.45; }
@@ -306,9 +309,9 @@
   .hud-root .overlay.menu > .menu-hero { animation: none; }
 }
 .menu-hero .hero {
-  position:relative; isolation:isolate; overflow:hidden; min-height:164px;
+  position:relative; isolation:isolate; overflow:hidden; min-height:118px;
   display:flex; align-items:flex-start; justify-content:center; flex-direction:column;
-  padding:24px; margin:0 0 16px; border-radius:19px;
+  padding:18px; margin:0 0 10px; border-radius:19px;
   border:1px solid #eed398; background:linear-gradient(135deg,#fff9de,#fff3bc 65%,#ffe8a1);
 }
 .menu-horizon { position:absolute; inset:0; width:100%; height:100%; z-index:-1; pointer-events:none; }
@@ -363,68 +366,76 @@
    as emoji/tofu on phones; these always draw identically. */
 .home-launch .launch-arrow .arrow-glyph { width:26px; height:26px; display:block; margin:0 auto; }
 .destination-grid .destination-arrow .arrow-glyph { width:12px; height:12px; display:block; }
-.home-section-title { display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin:20px 0 10px; letter-spacing:0; }
+.home-section-title { display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin:10px 0 6px; letter-spacing:0; }
 .home-section-title > span { font:600 15px/1.3 var(--display); color:#514737; }
 .home-section-title > small { font:700 8px/1.4 var(--body); letter-spacing:.12em; color:#786d59; white-space:nowrap; }
 /* Sub-group inside a home section: the explicit hierarchy under "01 — PLAY"
    (Play with rivals → PvP / PvAI, then Play solo). Same type ramp as the
    section title, one step down, so the nesting reads at a glance. */
-.home-subsection { display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin:14px 0 8px; padding:0 2px; }
+.home-subsection { display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin:7px 0 5px; padding:0 2px; }
 .home-subsection > span { font:700 11px/1.3 var(--body); letter-spacing:.08em; text-transform:uppercase; color:#6d5c48; }
 .home-subsection > small { font:700 8px/1.4 var(--body); letter-spacing:.12em; color:#9a8971; white-space:nowrap; }
-/* Home board strip: three rows of live standings under the hero. Reads as a
-   card, not a button, but the whole thing opens the leaderboards — a player
-   who sees their name here taps it. */
-.home-board { display:block; width:100%; text-align:left; margin:0 0 12px; padding:12px 14px;
+/* Home leaderboard panel: the live top of the ladder, three compact rows in
+   one card. It sits directly under the hero deliberately — the first thing a
+   returning player looks for is where they stand — and it is ONE panel rather
+   than three tiles so the Play grid stays above the fold. */
+.home-board { display:flex; flex-direction:column; gap:2px; width:100%; text-align:left;
+  margin:0 0 10px; padding:8px 12px 9px;
   background:linear-gradient(145deg,#2f2a4a,#1d1b33); color:#fff;
   border:1px solid #4b4570; border-radius:17px; cursor:pointer;
-  box-shadow:0 3px 0 #14122a66, 0 6px 16px #14122a33; font-family:var(--body); }
+  box-shadow:0 3px 0 #14122a66, 0 6px 16px #14122a33; font-family:var(--body); font-size:13px; }
 .home-board:hover { border-color:#6f66a3; }
-.home-board .hb-head { display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:8px; }
-.home-board .hb-head b { font:700 13px/1.2 var(--display); letter-spacing:.04em; text-transform:uppercase; color:#ffd9a0; }
-.home-board .hb-head small { font:700 8px/1.3 var(--body); letter-spacing:.1em; color:#a9a2d0; }
-.home-board .hb-row { display:flex; align-items:center; gap:9px; padding:3px 0; font-size:13px; }
-.home-board .hb-row.you { color:#ffd9a0; }
-.home-board .hb-medal { flex:0 0 18px; text-align:center; font-size:12px; opacity:.95; }
-.home-board .hb-name { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.home-board .hb-head { display:flex; align-items:baseline; justify-content:space-between; gap:8px; width:100%; }
+.home-board .hb-title { font:700 9px/1.6 var(--body); letter-spacing:.12em; text-transform:uppercase; color:#cdc6f2; }
+.home-board .hb-row { display:flex; align-items:center; gap:8px; width:100%; min-height:19px; line-height:1.45; }
+.home-board .hb-row.you { color:#ffd9a3; }
+.home-board .hb-medal { flex:0 0 16px; display:inline-flex; align-items:center; justify-content:center;
+  width:16px; height:16px; border-radius:5px; background:#ffffff1f; color:#e8e2ff;
+  font:700 10px/1 var(--body); font-variant-numeric:tabular-nums; }
+.home-board .hb-row.you .hb-medal { background:#ffd9a32e; color:#ffd9a3; }
+.home-board .hb-name { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
 .home-board .hb-val { flex:0 0 auto; font-weight:700; font-variant-numeric:tabular-nums; }
-.home-board .hb-foot { margin-top:8px; padding-top:8px; border-top:1px solid #ffffff1f;
-  font:700 9px/1.3 var(--body); letter-spacing:.12em; text-transform:uppercase; color:#bdb6e4; }
-@media(max-width:420px) {
-  .home-board { padding:10px 12px; }
-  .home-board .hb-row { font-size:12px; }
-}
+.home-board .hb-go { flex:0 0 auto; text-align:right; font:700 9px/1.2 var(--body); letter-spacing:.1em; text-transform:uppercase; color:#bdb6e4; white-space:nowrap; }
+@media(max-width:420px) { .home-board { font-size:12px; padding:7px 10px 8px; } }
 /* Solo half of the Play grid: solo modes are single-card rows (one entry
    each), so they get the wide layout rather than the two-up rival grid. */
-.play-destinations.solo-destinations { grid-template-columns:1fr; }
-.destination-grid { gap:10px; }
+/* Every group is single-column (see .destination-grid); kept explicit so a
+   later edit to the base rule cannot silently re-grid the Play block. */
+.play-destinations, .play-destinations.solo-destinations,
+.utility-destinations, .progress-destinations { grid-template-columns:minmax(0,1fr); }
+/* Odd tiles need no special case any more: a single column has no cell to
+   leave dead. The rule is kept as a no-op guard for any future re-grid. */
+.destination-grid > .destination:last-child:nth-child(odd) { grid-column:1 / -1; }
+.destination-grid { gap:8px; }
 .destination-grid .destination {
-  position:relative; display:flex; align-items:center; gap:12px; padding:14px;
+  position:relative; display:flex; align-items:center; gap:10px; padding:10px 12px;
   background:linear-gradient(145deg,#fffdf4,#f3e8d3); border:1px solid #d5c4a8;
-  border-top-color:#fffef7; border-radius:17px; min-height:90px;
-  box-shadow:inset 0 0 0 1px #ffffff65,0 3px 0 #d6c4a34d,0 5px 12px #8b70420b;
+  border-top-color:#fffef7; border-radius:15px; min-height:60px;
+  box-shadow:inset 0 0 0 1px #ffffff65,0 2px 0 #d6c4a34d,0 4px 10px #8b70420b;
   transition:background-color .15s,border-color .15s,box-shadow .15s;
 }
 .destination-grid .destination:hover { border-color:#ad9471; box-shadow:inset 0 0 0 1px #fff7dd,0 3px 0 #cab69080,0 6px 16px #8b704218; }
 .destination-grid .destination:active { box-shadow:inset 0 2px 5px #80664320; }
 .destination-grid .destination:disabled { opacity:.5; box-shadow:none; cursor:not-allowed; }
-.destination-grid .destination-art { display:block; flex:0 0 48px; width:48px; height:48px; margin:0; padding:3px; }
+/* The icon plate runs the FULL HEIGHT of the row (align-self stretch) so the
+   art reads as part of the bar instead of a small chip floating in it. */
+.destination-grid .destination-art { display:block; flex:0 0 54px; align-self:stretch; width:54px; height:auto; min-height:52px; margin:0; padding:4px; }
 .destination-grid .destination-copy { display:block; min-width:0; margin:0; }
 .destination-grid .destination-copy b { font:600 15px/1.25 var(--display); color:#3b4236; }
 .destination-grid .destination-copy > span { font:400 11px/1.45 var(--body); margin-top:5px; color:#645d4d; }
-.destination-grid .destination-arrow { position:absolute; top:8px; right:10px; margin:0; color:#8b8068; font-size:12px; }
+.destination-grid .destination-arrow { position:absolute; top:50%; right:10px; transform:translateY(-50%); margin:0; color:#8b8068; font-size:12px; }
 .play-destinations .destination[data-icon="online"] { background:#fffaf5; border-color:#dcc9ac; }
 .play-destinations .destination[data-icon="versus"] { background:#f5f8fc; border-color:#c5d0e0; }
 .play-destinations .destination[data-icon="compass"] { background:#fffbf5; border-color:#dcc9ac; }
 .play-destinations .destination[data-icon="endless"] { background:#faf7fc; border-color:#d5c5dd; }
 .utility-destinations { border:0; padding-top:0; }
-.utility-destinations .destination { flex-direction:column; gap:5px; padding:12px 8px; text-align:center; }
-.utility-destinations .destination-art { flex-basis:38px; width:38px; height:38px; }
+.utility-destinations .destination { flex-direction:row; align-items:center; gap:10px; padding:9px 11px; text-align:left; min-height:56px; }
+.utility-destinations .destination-art { flex-basis:44px; width:44px; }
 .utility-destinations .destination-arrow { display:none; }
 .utility-destinations .destination-copy b { font-size:14px; }
 .utility-destinations .destination-copy > span { font-size:10px; }
-.progress-destinations .destination { min-height:74px; padding:10px; gap:8px; border-radius:13px; }
-.progress-destinations .destination-art { flex-basis:34px; width:34px; height:34px; padding:1px; }
+.progress-destinations .destination { min-height:62px; padding:9px 11px; gap:9px; border-radius:14px; }
+.progress-destinations .destination-art { flex-basis:44px; width:44px; padding:3px; }
 .progress-destinations .destination-copy b { font-size:13px; }
 .progress-destinations .destination-copy > span { font-size:10px; }
 .progress-destinations .destination-arrow { display:none; }
@@ -460,10 +471,14 @@
   .home-section-title > small { font-size:7px; }
   .home-subsection > span { font-size:10px; }
   .home-subsection > small { font-size:7px; }
-  .play-destinations .destination { flex-direction:column; align-items:flex-start; gap:7px; padding:12px; }
-  .play-destinations .destination-art { flex-basis:38px; width:38px; height:38px; }
+  /* Rows stay rows on a phone: an icon + two lines of copy is one scan line,
+     and stacked tiles were 120px of mostly empty card each. */
+  .play-destinations .destination,
+  .utility-destinations .destination,
+  .progress-destinations .destination { flex-direction:row; align-items:center; gap:9px; padding:8px 10px; min-height:54px; }
+  .destination-grid .destination-art { flex-basis:40px; width:40px; }
   .destination-grid .destination-copy b { font-size:13px; }
-  .progress-destinations .destination { flex-direction:column; align-items:flex-start; }
+  .destination-grid .destination-copy > span { font-size:10.5px; }
 }
 @media(max-height:400px) and (min-width:550px) {
   .menu-hero .hero { min-height:76px; padding:12px 18px; margin-bottom:12px; }
@@ -480,7 +495,7 @@
 .menu-hero .hero-sub { text-shadow:none; }
 .menu-hero .home-launch { background:linear-gradient(115deg,#ffe178,#ffc348); color:#653d19; border-color:#d99a28; border-top-color:#fff1b8; box-shadow:inset 0 1px #fff9df,0 4px 0 #d29026,0 8px 20px #e5aa2530; }
 /* Room shortcuts use the same illustration/copy anatomy as Home. */
-@media(max-width:420px) { .room-entry + .destination-grid .destination { flex-direction:column; align-items:flex-start; gap:7px; } }
+@media(max-width:420px) { .room-entry + .destination-grid .destination { flex-direction:row; align-items:center; gap:9px; } }
 .destination-grid .destination-copy { overflow-wrap:anywhere; }
 
 /* Illustrated hangar: browser controls stay native; purchases stay explicit. */
@@ -3925,4 +3940,15 @@ hr.divider {
   border-color: rgba(185,135,50,.8);
   box-shadow: 0 2px 0 rgba(185,135,50,.4), 0 8px 24px rgba(139,112,66,.2);
   transform: translateY(-1px);
+}
+/* Short windows (laptops at 768, phones at 640): the hero blurb and the big
+   title both cost Play-block height without adding meaning — the game is one
+   button, and the button says what to do. */
+@media (max-height: 720px) {
+  .menu-hero .hero p, .menu-hero .hero .hero-sub { display: none; }
+  .menu-hero .hero h1 { font-size: 38px; }
+}
+@media (max-height: 560px) {
+  .menu-hero .hero h1 { font-size: 30px; }
+  .menu-hero .hero { min-height: 84px; }
 }

@@ -26,6 +26,7 @@ import type {
 import { truncate } from "./math";
 import { PROTOCOL_VERSION } from "./protocol/v1";
 import { isPokiMultiplayerAvailable, makePokiRoomCode as makeRoomCode, POKI_NETLIB_GAME_ID as NETLIB_GAME_ID } from "./PokiMpUtils";
+import { gradeStateCadence } from "./RacePolish";
 import { normalizeRooms, sortRooms, type LiveRoom } from "./RoomBrowser";
 
 /** Outbound state rate — same 15 Hz cadence as the WS transport. */
@@ -137,6 +138,8 @@ export class PokiNetlibClient implements NetTransport {
   private clock = 0;
   /** Our interpolation clock is driven by local time + timestamps from the host. */
   private serverClock = 0;
+  /** Inbound state intervals, for the link-quality grade (see Realtime). */
+  private readonly stateIntervals: number[] = [];
   private pendingEmotes: { id: string; emote: string }[] = [];
   private pendingEvents: PresenceEvent[] = [];
   private lastSent = { x: 0, y: 0, rot: 0, d: 0 };
@@ -158,6 +161,11 @@ export class PokiNetlibClient implements NetTransport {
 
   get connected(): boolean {
     return this.netReady || this.isAutonomous;
+  }
+
+  /** Inbound cadence grade — "unknown" until enough peer state has arrived. */
+  get connectionQuality(): "unknown" | "good" | "fair" | "poor" {
+    return gradeStateCadence(this.stateIntervals);
   }
 
   get id(): string {
@@ -436,6 +444,12 @@ export class PokiNetlibClient implements NetTransport {
             if (ts > this.serverClock) this.serverClock = ts;
             const prev = t.buffer[t.buffer.length - 1];
             const dt = prev ? Math.max(1e-4, ts - prev.t) : 1;
+            // Inbound cadence: the same signal the WebSocket transport grades,
+            // so the lobby's link badge means the same thing on both.
+            if (prev) {
+              this.stateIntervals.push(dt);
+              while (this.stateIntervals.length > 12) this.stateIntervals.shift();
+            }
             const vx = prev ? (s.x - prev.x) / dt : 0;
             const vy = prev ? (s.y - prev.y) / dt : 0;
             t.buffer.push({ t: ts, x: s.x, y: s.y, rot: s.r, vx, vy });

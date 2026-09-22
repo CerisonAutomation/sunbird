@@ -13,7 +13,7 @@ import type { ActivePower } from "./PowerUps";
 import type { SessionGoal } from "./Engagement";
 import { PVP_MODES, type ModeDef, type PvpWorldCourse, type ModeId } from "./Modes";
 import type { RacerStats } from "./Racer";
-import { CUSTOM_PILOT_NAMES, LEADERBOARD_CLOUD_LABEL, PORTAL_DISPLAY_NAME, PORTAL_EDITION_NOTE, SELL_AD_REMOVAL, SQUAD_CHAT } from "./edition";
+import { CUSTOM_PILOT_NAMES, LEADERBOARD_CLOUD_LABEL, POKI_EDITION, PORTAL_DISPLAY_NAME, PORTAL_EDITION_NOTE, SELL_AD_REMOVAL, SQUAD_CHAT } from "./edition";
 import { leaderboardBackend } from "./Leaderboard";
 import type { BoardMetric, BoardPage, BoardScope } from "./Leaderboard";
 import type { TournamentView } from "./Tournaments";
@@ -242,6 +242,8 @@ export type HudSnapshot = {
    * all rather than an empty box, and no extra request is made to fill it.
    */
   homeBoard: { name: string; value: string; you: boolean }[];
+  /** Signed-in portal username, or "" when signed out / no portal accounts. */
+  portalAccountName: string;
   /** Live sky-ring chain: how many in a row, and how long the window is open. */
   ringChain: number;
   ringChainFrac: number;
@@ -1712,10 +1714,10 @@ function renderCoins(html: string): string {
  * configured. Naming the source honestly is the difference between a board the
  * player trusts and one that looks like a placeholder.
  */
-function boardSource(s: HudSnapshot): { chip: string; sentence: string } {
+function boardSource(_s: HudSnapshot): { chip: string; sentence: string } {
   const backend = leaderboardBackend();
   if (backend === "auds") {
-    return { chip: LEADERBOARD_CLOUD_LABEL, sentence: `Scores sync to ${PORTAL_DISPLAY_NAME} cloud.` };
+    return { chip: LEADERBOARD_CLOUD_LABEL, sentence: `Scores sync to ${PORTAL_DISPLAY_NAME}'s worldwide board.` };
   }
   if (backend === "http") {
     return { chip: "🌐 global", sentence: "Scores sync to the global leaderboard." };
@@ -1724,8 +1726,8 @@ function boardSource(s: HudSnapshot): { chip: string; sentence: string } {
   // concludes the board is broken, when what is true is narrower — this build
   // has no cloud board configured, so the standings are the ones on this
   // device. Say that, in the portal's own words.
-  return s.portalName === "poki"
-    ? { chip: "Poki · on-device", sentence: "This build keeps scores on your device." }
+  return POKI_EDITION
+    ? { chip: `${PORTAL_DISPLAY_NAME} · on-device`, sentence: "This build keeps scores on your device." }
     : { chip: "💾 local", sentence: "Rankings are stored on this device. Fly well to climb!" };
 }
 
@@ -1733,8 +1735,12 @@ function renderBoard(s: HudSnapshot): string {
   const page = s.board;
   // More boards: all-time and today answer "how good am I", the week board
   // answers "how am I flying lately", and "You" is the personal history.
+  // The all-time ladder is the portal's own worldwide board on the Poki
+  // edition (SDK `init({ submitScore })`), so there the tab is simply the
+  // portal's name — a player should never have to guess whose numbers these
+  // are, and "All-time" made the Poki board look like a fourth in-game list.
   const scopes: { id: BoardScope; label: string }[] = [
-    { id: "global", label: "All-time" },
+    { id: "global", label: POKI_EDITION ? PORTAL_DISPLAY_NAME : "All-time" },
     { id: "week", label: "This week" },
     { id: "daily", label: "Today" },
     { id: "friends", label: "You" },
@@ -2562,18 +2568,33 @@ function renderNameEntry(s: HudSnapshot): string {
  * menu already fetches, and it disappears when there is nothing to show.
  */
 function homeBoardStrip(s: HudSnapshot): string {
-  if (!s.homeBoard.length) return "";
-  const medals = ["🥇", "🥈", "🥉"];
+  const rows = s.homeBoard.slice(0, 3);
+  if (!rows.length) return "";
+  // Rank badges are drawn, not emoji: medal glyphs render as tofu boxes on
+  // font sets without the emoji face (several platforms ship none by default),
+  // and a row of empty squares under "Top pilots" reads as broken.
+  const medals = ["1", "2", "3"];
+  // Three compact rows in ONE panel, not three stacked cards. The rows are the
+  // live top of the ladder — the player's own line is marked, so the strip says
+  // "you belong on this board" instead of "here is a table" — and the whole
+  // panel opens the full leaderboards. Density is what keeps it above the Play
+  // grid: the earlier three-card version cost ~3x this height and pushed PvP
+  // off a 640-tall phone entirely.
   return `
     <button class="home-board" data-ui data-action="open-board" aria-label="Open the leaderboards">
-      <div class="hb-head"><b>Top wings</b><small>${boardSource(s).chip}</small></div>
-      ${s.homeBoard
+      <span class="hb-head">
+        <span class="hb-title">🏆 Top pilots</span>
+        <span class="hb-go">All boards ›</span>
+      </span>
+      ${rows
         .map(
-          (e, i) =>
-            `<div class="hb-row ${e.you ? "you" : ""}"><span class="hb-medal">${medals[i] ?? i + 1}</span><span class="hb-name">${escapeHtml(e.name)}</span><span class="hb-val">${e.value}</span></div>`,
+          (row, i) => `<span class="hb-row${row.you ? " you" : ""}">
+            <span class="hb-medal">${medals[i]}</span>
+            <span class="hb-name">${escapeHtml(row.name)}</span>
+            <span class="hb-val">${row.value}</span>
+          </span>`,
         )
         .join("")}
-      <div class="hb-foot">See all boards ›</div>
     </button>`;
 }
 
@@ -3125,6 +3146,13 @@ function renderSettings(s: HudSnapshot): string {
     <div class="setting-row setting-select"><label for="render-quality">Render quality</label><select id="render-quality" data-ui data-action="set-quality">${["auto", "high", "low"].map(q => `<option value="${q}" ${s.settings.quality === q ? "selected" : ""}>${q === "auto" ? "Auto · recommended" : q === "high" ? "High · more detail" : "Low · less GPU work"}</option>`).join("")}</select></div>
     <div class="setting-row"><span>Flights flown</span><b>${s.runsPlayed}</b></div>
     <button class="soft-btn wide" data-ui data-action="toggle-fullscreen">⛶ Fullscreen mode</button>
+    <!-- Privacy policy, linked from inside the game. The platform guide asks
+         for exactly this before it approves an external service (multiplayer,
+         storage) for a game: a live policy page the player can reach from the
+         build. The URL comes from ./legal.ts so each deploy points at its own
+         hosted copy. Kept free of any portal name so this template renders
+         identically in every edition. -->
+    <button class="soft-btn wide" data-ui data-action="open-privacy">🔒 Privacy policy</button>
     ${s.canInstall ? `<button class="soft-btn wide" data-ui data-action="install-app">⬇ Install Sunbird</button>` : ""}
     <details class="danger-zone" data-ref="resetOptions"><summary>Manage saved progress</summary><p class="fineprint">Reset deletes progress saved on this device. Export a save code from Account first.</p>
     <button class="ghost-btn danger" data-ui data-action="reset-progress">${s.resetArmed ? "Confirm: erase saved progress" : "Reset progress"}</button></details>
@@ -3201,8 +3229,25 @@ function renderTrophies(s: HudSnapshot): string {
 }
 
 function renderAccount(s: HudSnapshot): string {
+  // Portal account block: on Poki the player may be signed in, and the game is
+  // required to be honest about who it thinks they are (their name is what
+  // goes on the board). Sign-in is offered only behind a button — Poki's docs
+  // forbid prompting for an account on load.
+  const portalAccount = s.portalName !== "none"
+    ? `<div class="section-title">${PORTAL_DISPLAY_NAME} account</div>
+    <div class="sheet">
+      ${
+        s.portalAccountName
+          ? `<div class="code-row"><span>Signed in as <b>${escapeHtml(s.portalAccountName)}</b></span><span class="tag on">Linked</span></div>
+             <p class="fineprint">Your progress and leaderboard scores follow this ${PORTAL_DISPLAY_NAME} account across devices.</p>`
+          : `<div class="code-row"><span>Not signed in</span><button class="mini-btn" data-ui data-action="portal-sign-in">Sign in</button></div>
+             <p class="fineprint">Sign in to carry your progress between devices and appear on the board under your own name.</p>`
+      }
+    </div>`
+    : "";
   return `
     ${head("Account")}
+    ${portalAccount}
     <div class="section-title">Membership</div>
     ${!SELL_AD_REMOVAL ? "" : `
     <div class="sheet">
@@ -3496,9 +3541,14 @@ function renderContinue(s: HudSnapshot): string {
     <div class="result-actions">
       <button class="play-again-btn ${s.canAffordContinue ? "" : "off"}" data-ui data-action="continue-coins" ${s.canAffordContinue ? "" : "disabled"}>Spend ● ${s.continueCost} <small>(you have ${s.wallet})</small></button>
       <button class="soft-btn" data-ui data-action="continue-sleep">Let it sleep</button>
+      ${/* The rewarded option is an action in the same row as the standard
+           ones, so it is the same size as them — never a bigger, louder
+           button (requirements: standard equal or larger, positioned next to
+           or above the reward option). The 🎬 marks it as a video, and it is
+           not green. */ ""}
+      ${s.adAvailable ? `<button class="soft-btn" data-ui data-action="continue-ad">🎬 ${portal ? "Watch for Second Wind" : "Watch a short clip → Second Wind"}</button>` : ""}
     </div>
     ${!portal && s.gold ? `<button class="soft-btn wide" data-ui data-action="continue-gold">✦ Gold · free wake-up</button>` : ""}
-    ${s.adAvailable ? `<button class="soft-btn wide" data-ui data-action="continue-ad">🎬 ${portal ? "Watch for Second Wind" : "Watch a short clip → Second Wind"}</button>` : ""}
     <p class="fineprint replay-note">Sleep ends the flight and shows your recap. Waking up keeps this run alive from where it landed.</p>
   `;
 }

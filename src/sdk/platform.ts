@@ -132,6 +132,24 @@ export interface PlatformAdapter {
   captureError(err: string | Error): void;
   /** Device class as the portal reports it; null when unavailable. */
   deviceCategory(): "mobile" | "tablet" | "desktop" | null;
+  /**
+   * The language the portal says this player uses (Poki `getLanguage()`), or
+   * null to fall back to browser detection. The guide recommends serving the
+   * player's own language automatically rather than making them find a
+   * setting, and the portal knows it more reliably than `navigator.language`.
+   */
+  getLanguage(): string | null;
+  /**
+   * Reposition the portal's own overlay (the mobile Poki pill) so it does not
+   * cover game UI. No-op where the portal has no such element.
+   */
+  movePill(topPercent: number, topPx: number): void;
+  /**
+   * Level-2 Playtest recording hooks (Poki game-dev-tools). Turning capture on
+   * records the HTML around the canvas so the recording shows what the player
+   * saw; a no-op everywhere else.
+   */
+  playtestCapture(on: boolean): void;
   /** Open an external URL through the portal (required instead of navigating). */
   openExternalLink(url: string): void;
   /** Account linking prompt (identity upgrade flow). True when completed. */
@@ -226,6 +244,53 @@ export function attachPortalErrorReporters(adapter: PlatformAdapter): () => void
   return () => {
     window.removeEventListener("error", onError);
     window.removeEventListener("unhandledrejection", onRejection);
+  };
+}
+
+/**
+ * Stop the host page from scrolling under the game.
+ *
+ * Poki's HTML5 SDK page spells this out: space and the arrow keys scroll the
+ * page by default, and on Poki the game sits inside a longer page that can
+ * scroll — the game must swallow those keys and wheel events, or pressing
+ * space mid-run scrolls the page behind the canvas.
+ *
+ * Two deliberate exceptions, because the snippet in the docs is blunter than a
+ * real game can afford:
+ *   • the game's own scrollable surfaces (`.overlay` menus, the emote wheel)
+ *     must keep scrolling — the game explicitly allows them to; and
+ *   • keys must not be swallowed while a native control has focus, or
+ *     space/arrow keys would stop activating buttons (a keyboard-accessibility
+ *     regression in the menus).
+ *
+ * Returns the detacher, so a disposed game leaves no listeners behind.
+ */
+export function installPageScrollGuards(): () => void {
+  if (typeof window === "undefined") return () => {};
+
+  const SCROLLABLE = ".overlay, .emote-wheel, [data-scroll-surface]";
+  const inScrollSurface = (target: EventTarget | null): boolean =>
+    target instanceof Element ? target.closest(SCROLLABLE) !== null : false;
+  const interactive = (target: EventTarget | null): boolean =>
+    target instanceof Element ? target.closest("button, a, input, textarea, select, summary, [role=button], [contenteditable]") !== null : false;
+
+  const onKeyDown = (e: KeyboardEvent): void => {
+    if (e.key !== " " && e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    if (e.defaultPrevented) return;
+    // A focused control owns its keys; a scrollable menu owns its arrows.
+    if (interactive(e.target) || inScrollSurface(e.target)) return;
+    e.preventDefault();
+  };
+  const onWheel = (e: WheelEvent): void => {
+    if (inScrollSurface(e.target)) return;
+    e.preventDefault();
+  };
+
+  window.addEventListener("keydown", onKeyDown, { passive: false });
+  window.addEventListener("wheel", onWheel, { passive: false });
+  return () => {
+    window.removeEventListener("keydown", onKeyDown);
+    window.removeEventListener("wheel", onWheel);
   };
 }
 
@@ -456,9 +521,10 @@ function bootstrapSdk(): Promise<{ name: PlatformName; platformEnvironment: stri
     type PokiGlobal = {
       init?: (options?: { submitScore?: (submit: (leaderboard: string, score: number) => void) => void }) => Promise<void>;
       setDebug?: (v: boolean) => void;
-      enableEventTracking?: () => void;
       gameLoadingStart?: () => void;
       movePill?: (x: number, y: number) => void;
+      /** Game Events (`measure()`) reporting — see developers.poki.com/guide/game-events. */
+      enableEventTracking?: () => void;
     };
     const getPoki = (): PokiGlobal | undefined => (window as unknown as { PokiSDK?: PokiGlobal }).PokiSDK;
     boot = ensureSdk().then(async (loaded) => {
@@ -470,8 +536,11 @@ function bootstrapSdk(): Promise<{ name: PlatformName; platformEnvironment: stri
         // submitPlatformScore(). Passing no options would silently leave the
         // portal leaderboards unwired.
         await getPoki()?.init?.(pokiInitOptions());
-        // Enable Poki event tracking after init for analytics.
-        getPoki()?.enableEventTracking?.();
+        // Game Events: the SDK only reports measure() checkpoints once event
+        // tracking is switched on, and the dashboard's drop-off funnel / C2P
+        // read-outs are built from exactly those events. Same handshake shape
+        // as init — optional, so an older CDN build degrades to plain events.
+        try { getPoki()?.enableEventTracking?.(); } catch { /* events optional */ }
         // gameLoadingStart() fires exactly once, right after init, before
         // any asset/3D scene work begins. Game.loadingFinished() is called
         // by the Game constructor once the renderer/HUD/terrain are ready.
