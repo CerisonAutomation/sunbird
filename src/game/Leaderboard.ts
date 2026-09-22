@@ -47,8 +47,8 @@ async function signScore(deviceId: string, distance: number, score: number): Pro
 const KEY = "sunbird.board.v1";
 const NAME_KEY = "sunbird.pilotname";
 
-export type BoardScope = "global" | "daily" | "friends";
-export type BoardMetric = "distance" | "altitude" | "perfects" | "coins";
+export type BoardScope = "global" | "daily" | "week" | "friends";
+export type BoardMetric = "distance" | "altitude" | "perfects" | "coins" | "score";
 
 export type BoardEntry = {
   id: string;
@@ -58,6 +58,7 @@ export type BoardEntry = {
   altitude: number;
   perfects: number;
   coins: number;
+  score: number;
   skin: string;
   date: string;
   you: boolean;
@@ -126,10 +127,11 @@ export function savePilotName(name: string): string {
   return clean;
 }
 
-function metricOf(row: { distance: number; altitude: number; perfects: number; coins: number }, m: BoardMetric): number {
+function metricOf(row: { distance: number; altitude: number; perfects: number; coins: number; score?: number }, m: BoardMetric): number {
   if (m === "altitude") return row.altitude;
   if (m === "perfects") return row.perfects;
   if (m === "coins") return row.coins;
+  if (m === "score") return row.score ?? 0;
   return row.distance;
 }
 
@@ -140,7 +142,7 @@ const valueForMetric = metricOf;
 function localBestByDevice(): Map<BoardMetric, number> {
   const out = new Map<BoardMetric, number>();
   for (const r of readLocal()) {
-    for (const m of ["distance", "altitude", "perfects", "coins"] as BoardMetric[]) {
+    for (const m of ["distance", "altitude", "perfects", "coins", "score"] as BoardMetric[]) {
       const v = valueForMetric(r, m);
       if (v > (out.get(m) ?? 0)) out.set(m, v);
     }
@@ -281,6 +283,7 @@ export class Leaderboard {
               altitude: Number((it.data as Record<string, unknown> | undefined)?.altitude ?? (metric === "altitude" ? it.values.value : 0)),
               perfects: Number((it.data as Record<string, unknown> | undefined)?.perfects ?? (metric === "perfects" ? it.values.value : 0)),
               coins: Number((it.data as Record<string, unknown> | undefined)?.coins ?? (metric === "coins" ? it.values.value : 0)),
+              score: Number((it.data as Record<string, unknown> | undefined)?.score ?? (metric === "score" ? it.values.value : 0)),
               skin: String((it.data as Record<string, unknown> | undefined)?.skin ?? "ember"),
               date: String(it.values.date ?? dateSeed()),
               you: Boolean(it.you),
@@ -442,6 +445,7 @@ export class Leaderboard {
       altitude: num(r.altitude),
       perfects: num(r.perfects),
       coins: num(r.coins),
+      score: num(r.score),
     };
     const id = String(r.deviceId ?? r.id ?? "");
     return {
@@ -459,6 +463,14 @@ export class Leaderboard {
     const today = dateSeed();
     let rows = readLocal();
     if (scope === "daily") rows = rows.filter((r) => r.date === today);
+    if (scope === "week") {
+      // Rolling 7 days ending today — matches the server's window exactly, so
+      // the same flights appear on both backends.
+      const from = new Date(`${today}T00:00:00Z`);
+      from.setUTCDate(from.getUTCDate() - 6);
+      const fromStr = from.toISOString().slice(0, 10);
+      rows = rows.filter((r) => r.date >= fromStr && r.date <= today);
+    }
     if (scope === "friends") rows = rows.filter((r) => r.deviceId === this.deviceId || r.deviceId.startsWith("friend-"));
 
     // Keep only each pilot's personal best for the selected metric.
@@ -477,6 +489,7 @@ export class Leaderboard {
       altitude: r.altitude,
       perfects: r.perfects,
       coins: r.coins,
+      score: r.score ?? 0,
       skin: r.skin,
       date: r.date,
       you: r.deviceId === this.deviceId,

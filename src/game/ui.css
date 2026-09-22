@@ -708,6 +708,11 @@ button {
 }
 
 /* ---------- continue ---------- */
+/* The second-wind card now borrows the results card's language (kicker,
+   stat summary, action row). This strip replaces the old animated count
+   ring — same information, same chrome as every other status strip. */
+.wake-strip { text-align: center; }
+.wake-strip b { font-variant-numeric: tabular-nums; }
 .count-ring {
   width: 72px;
   height: 72px;

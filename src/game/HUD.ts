@@ -236,6 +236,15 @@ export type HudSnapshot = {
   boardScope: BoardScope;
   boardMetric: BoardMetric;
   boardOnline: boolean;
+  /**
+   * Top three pilots from the board already cached at menu time, for the home
+   * strip. Empty until a page is in hand — the strip then renders nothing at
+   * all rather than an empty box, and no extra request is made to fill it.
+   */
+  homeBoard: { name: string; value: string; you: boolean }[];
+  /** Live sky-ring chain: how many in a row, and how long the window is open. */
+  ringChain: number;
+  ringChainFrac: number;
   cups: TournamentView[];
   trails: { id: string; label: string; equipped: boolean }[];
   lastPrize: string;
@@ -424,6 +433,9 @@ export class HUD {
   private sunKnob!: HTMLElement;
   private feverWrap!: HTMLElement;
   private feverFill!: HTMLElement;
+  private ringChainEl!: HTMLElement;
+  private ringChainCount!: HTMLElement;
+  private ringChainFill!: HTMLElement;
   private hintEl!: HTMLElement;
   private menuEl!: HTMLElement;
   private menuCard!: HTMLElement;
@@ -600,6 +612,13 @@ export class HUD {
           <div class="ghost-chip hidden" data-ref="ghostChip"></div>
         </div>
         <div class="power-chips" data-ref="powers"></div>
+        <!-- Ring chain meter: the objective a long flight is chasing. Hidden
+             until the first hoop of a chain, then it counts down the window so
+             the player can see the next ring is still worth diving for. -->
+        <div class="ring-chain hidden" data-ref="ringChain">
+          <b data-ref="ringChainCount">×2</b>
+          <i><s data-ref="ringChainFill"></s></i>
+        </div>
         <div class="fever-wrap" data-ref="feverWrap">
           <div class="fever-label">FEVER</div>
           <div class="fever-bar"><div class="fever-fill" data-ref="feverFill"></div></div>
@@ -1098,6 +1117,16 @@ export class HUD {
       this.feverWrap.classList.toggle("on", s.feverOn);
       this.setStyle(this.feverFill, "feverFill", "width", `${Math.max(0, Math.min(1, s.fever)) * 100}%`);
 
+      // Ring chain: the airborne objective, so it is always visible while it
+      // is live — count first (big), remaining window second (the bar).
+      const chained = s.ringChain > 1;
+      this.ringChainEl.classList.toggle("hidden", !chained);
+      if (chained) {
+        this.ringChainEl.classList.toggle("hot", s.ringChain >= 3);
+        this.setText(this.ringChainCount, "ringChainCount", `×${s.ringChain}`);
+        this.setStyle(this.ringChainFill, "ringChainFill", "width", `${Math.max(0, Math.min(1, s.ringChainFrac)) * 100}%`);
+      }
+
       // Timed power-ups live ONLY in the power strip (countdown bars) — chips
       // here double-printed the same power-up (the old bug: pickup magnet fed
       // both magnetTimer AND PowerUps, so "🧲" showed twice). Chips remain as
@@ -1495,6 +1524,9 @@ export class HUD {
     this.sunKnob = grab("sunKnob");
     this.feverWrap = grab("feverWrap");
     this.feverFill = grab("feverFill");
+    this.ringChainEl = grab("ringChain");
+    this.ringChainCount = grab("ringChainCount");
+    this.ringChainFill = grab("ringChainFill");
     this.hintEl = grab("hint");
     this.menuEl = grab("menu");
     this.menuCard = grab("menuCard");
@@ -1657,28 +1689,62 @@ function renderCoins(html: string): string {
   return html.replace(/●\s?/g, COIN_SVG);
 }
 
+/**
+ * Where the numbers on the board actually come from, in the player's language.
+ *
+ * The chip used to read "Local" on every build, which was wrong on the portal
+ * editions: those publish and read through the portal's own cloud when that is
+ * configured. Naming the source honestly is the difference between a board the
+ * player trusts and one that looks like a placeholder.
+ */
+function boardSource(s: HudSnapshot): { chip: string; sentence: string } {
+  const backend = leaderboardBackend();
+  if (backend === "auds") {
+    return { chip: LEADERBOARD_CLOUD_LABEL, sentence: `Scores sync to ${PORTAL_DISPLAY_NAME} cloud.` };
+  }
+  if (backend === "http") {
+    return { chip: "🌐 global", sentence: "Scores sync to the global leaderboard." };
+  }
+  // Portal builds name the portal: a Poki player reading "Local" on a Poki page
+  // concludes the board is broken, when what is true is narrower — this build
+  // has no cloud board configured, so the standings are the ones on this
+  // device. Say that, in the portal's own words.
+  return s.portalName === "poki"
+    ? { chip: "Poki · on-device", sentence: "This build keeps scores on your device." }
+    : { chip: "💾 local", sentence: "Rankings are stored on this device. Fly well to climb!" };
+}
+
 function renderBoard(s: HudSnapshot): string {
   const page = s.board;
+  // More boards: all-time and today answer "how good am I", the week board
+  // answers "how am I flying lately", and "You" is the personal history.
   const scopes: { id: BoardScope; label: string }[] = [
     { id: "global", label: "All-time" },
+    { id: "week", label: "This week" },
     { id: "daily", label: "Today" },
     { id: "friends", label: "You" },
   ];
   const metrics: { id: BoardMetric; label: string }[] = [
     { id: "distance", label: "Distance" },
+    { id: "score", label: "Score" },
     { id: "altitude", label: "Altitude" },
     { id: "perfects", label: "Perfects" },
     { id: "coins", label: "Coins" },
   ];
   const fmt = (v: number): string =>
-    s.boardMetric === "distance" || s.boardMetric === "altitude" ? `${Math.round(v)} m` : String(Math.round(v));
+    s.boardMetric === "distance" || s.boardMetric === "altitude"
+      ? `${Math.round(v)} m`
+      : s.boardMetric === "score"
+        ? Math.round(v).toLocaleString()
+        : String(Math.round(v));
 
   // Never imply a device-only ladder is worldwide.
+  const source = boardSource(s);
   const status = !s.boardOnline
-    ? `<span class="board-badge local">On-device board</span>`
+    ? `<span class="board-badge local">${source.chip}</span>`
     : page?.stale
       ? `<span class="board-badge warn">Offline — showing cached</span>`
-      : `<span class="board-badge live">Live global</span>`;
+      : `<span class="board-badge live">${source.chip}</span>`;
 
   const medals = ["🥇", "🥈", "🥉"];
   const rows =
@@ -1745,13 +1811,7 @@ function renderBoard(s: HudSnapshot): string {
         : `<button class="primary-btn gold wide" data-ui data-action="claim-rank-prize">Claim Rank Prize 🏆</button>`}
     </div>
     <button class="soft-btn wide" data-ui data-action="board-refresh">${s.boardLoading ? "Refreshing…" : "↻ Refresh"}</button>
-    <p class="fineprint">${
-      s.boardOnline
-        ? `Scores sync to the ${
-            leaderboardBackend() === "auds" ? LEADERBOARD_CLOUD_LABEL : leaderboardBackend() === "http" ? "🌐 global" : "💾 local"
-          } leaderboard.`
-        : "Rankings are stored locally. Fly well to climb the leaderboard!"
-    }</p>
+    <p class="fineprint">${source.sentence}</p>
   `;
 }
 
@@ -2214,7 +2274,7 @@ function renderRank(s: HudSnapshot): string {
   const r = s.rival;
   const wl = r.wins + r.losses > 0 ? Math.round((r.wins / (r.wins + r.losses)) * 100) : 0;
   return `
-    ${head("Rival Rank", "back", `<span class="pill">● Local</span>`)}
+    ${head("Rival Rank", "back", `<span class="pill">${boardSource(s).chip}</span>`)}
     <div class="rank-hero">
       <div class="rank-div-big">${r.divisionIcon}</div>
       <div class="rank-hero-num">${r.rating}</div>
@@ -2476,6 +2536,29 @@ function renderNameEntry(s: HudSnapshot): string {
   `;
 }
 
+/**
+ * "Top wings" — the live board, three rows, on the home screen.
+ *
+ * Competition is a reason to press play again, so the standing is shown above
+ * the Play grid, not only behind a menu page. It is a view onto the page the
+ * menu already fetches, and it disappears when there is nothing to show.
+ */
+function homeBoardStrip(s: HudSnapshot): string {
+  if (!s.homeBoard.length) return "";
+  const medals = ["🥇", "🥈", "🥉"];
+  return `
+    <button class="home-board" data-ui data-action="open-board" aria-label="Open the leaderboards">
+      <div class="hb-head"><b>Top wings</b><small>${boardSource(s).chip}</small></div>
+      ${s.homeBoard
+        .map(
+          (e, i) =>
+            `<div class="hb-row ${e.you ? "you" : ""}"><span class="hb-medal">${medals[i] ?? i + 1}</span><span class="hb-name">${escapeHtml(e.name)}</span><span class="hb-val">${e.value}</span></div>`,
+        )
+        .join("")}
+      <div class="hb-foot">See all boards ›</div>
+    </button>`;
+}
+
 function renderMain(s: HudSnapshot): string {
   return `
     <button
@@ -2501,9 +2584,17 @@ function renderMain(s: HudSnapshot): string {
       </div>
     </header>
 
+    ${homeBoardStrip(s)}
     <button class="primary-btn home-launch" data-ui data-action="pvp-practice" aria-label="Play free flight now"><span class="launch-art">${menuIcon("flight")}</span><span class="launch-copy"><small>${t("onboarding.skyIsYours", undefined, "THE SKY IS YOURS")}</small><b>Fly now</b><span>${t("onboarding.launchSub", undefined, "Hold to dive · release to glide")}</span></span><span class="launch-arrow" aria-hidden="true">${arrowRightSvg()}</span></button>
+    <!-- 01 — PLAY. PvP and AI PvP are the first two entries *inside* Play —
+         they are ways of playing, not separate apps, so they sit underneath
+         the Play heading rather than beside it. Solo play follows in the same
+         group so the whole block reads as one hierarchy. -->
     <div class="home-section-title"><span>${t("hud.menu.chooseAdventure", undefined, "Choose your adventure")}</span><small>01 — PLAY</small></div>
-    <nav class="destination-grid play-destinations" aria-label="Choose how to play">${menuLinks(PLAY_DESTINATIONS)}</nav>
+    <div class="home-subsection" role="presentation"><span>Play with rivals</span><small>PvP &amp; PvAI</small></div>
+    <nav class="destination-grid play-destinations" aria-label="Play against other pilots">${menuLinks(PLAY_DESTINATIONS.filter((d) => d.action !== "mode-select" && d.action !== "start-endless"))}</nav>
+    <div class="home-subsection" role="presentation"><span>Play solo</span><small>Solo skies</small></div>
+    <nav class="destination-grid play-destinations solo-destinations" aria-label="Play solo">${menuLinks(PLAY_DESTINATIONS.filter((d) => d.action === "mode-select" || d.action === "start-endless"))}</nav>
     <div class="home-section-title"><span>${t("hud.menu.makeItYours", undefined, "Make it yours")}</span><small>02 — HANGAR</small></div>
     <nav class="destination-grid utility-destinations" aria-label="Your hangar">${menuLinks(COLLECTION_DESTINATIONS)}</nav>
     <div class="home-section-title"><span>${t("hud.menu.everyFlightCounts", undefined, "Every flight counts")}</span><small>03 — DISCOVER</small></div>
@@ -3315,16 +3406,30 @@ function renderContinue(s: HudSnapshot): string {
   // momentum). It explains why this run is worth resuming — it never changes
   // what the options are, and the standard non-ad options stay in the primary
   // position above the rewarded one (MON-05…MON-08).
+  // One card language for the whole app: the second-wind offer is a *recap*
+  // screen like any other, so it uses the same kicker / heading / stat strip /
+  // action row as the results card instead of the old bespoke "zzz" panel.
+  // MON-05…MON-08 still hold: the standard options sit above the rewarded one,
+  // the rewarded button keeps its 🎬 label, and "let it sleep" is a plain
+  // exit — never hidden, never the only way out.
   return `
-    <div class="zzz">z z z</div>
+    <div class="results-kicker">${escapeHtml(s.modeName)} · flight recap</div>
     <h2>Second wind?</h2>
     <p class="tagline">Sunbird is dozing off at ${formatDistance(s.distance)}.</p>
     ${s.continueReason ? `<p class="continue-reason${s.continueHighlight ? " is-highlight" : ""}">${escapeHtml(s.continueReason)}</p>` : ""}
-    <div class="count-ring" data-live="contTimer">${Math.ceil(s.continueTimer)}</div>
-    ${!portal && s.gold ? `<button class="primary-btn gold" data-ui data-action="continue-gold">✦ Gold · free wake-up</button>` : ""}
-    <button class="primary-btn ${s.canAffordContinue ? "" : "off"}" data-ui data-action="continue-coins" ${s.canAffordContinue ? "" : "disabled"}>Spend ● ${s.continueCost} <small>(you have ${s.wallet})</small></button>
+    <div class="over-stats result-summary">
+      <div><span>${t("hud.stat.distance", undefined, "Distance")}</span><b>${formatDistance(s.distance)}</b></div>
+      <div><span>Score</span><b>${Math.floor(s.score).toLocaleString()}</b></div>
+      <div><span>${t("hud.stat.coins", undefined, "Coins")}</span><b>${s.coins}</b></div>
+    </div>
+    <div class="reward-strip wake-strip" role="status">⏳ Second wind closes in <b data-live="contTimer">${Math.ceil(s.continueTimer)}</b>s</div>
+    <div class="result-actions">
+      <button class="play-again-btn ${s.canAffordContinue ? "" : "off"}" data-ui data-action="continue-coins" ${s.canAffordContinue ? "" : "disabled"}>Spend ● ${s.continueCost} <small>(you have ${s.wallet})</small></button>
+      <button class="soft-btn" data-ui data-action="continue-sleep">Let it sleep</button>
+    </div>
+    ${!portal && s.gold ? `<button class="soft-btn wide" data-ui data-action="continue-gold">✦ Gold · free wake-up</button>` : ""}
     ${s.adAvailable ? `<button class="soft-btn wide" data-ui data-action="continue-ad">🎬 ${portal ? "Watch for Second Wind" : "Watch a short clip → Second Wind"}</button>` : ""}
-    <button class="ghost-btn" data-ui data-action="continue-sleep">Let it sleep</button>
+    <p class="fineprint replay-note">Sleep ends the flight and shows your recap. Waking up keeps this run alive from where it landed.</p>
   `;
 }
 

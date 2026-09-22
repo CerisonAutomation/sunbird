@@ -4,15 +4,23 @@
  *
  * 1. ARCADE CHIP (tracks flagged `chip`): bouncy 8-bit-style hooks —
  *    staccato square-wave lead, driving root/octave bass, 2-&-4 backbeat,
- *    150 BPM (170 in fever). The "viral game" sound; front and center.
- * 2. ISLAND FOLK / CINEMATIC (the rest): ukulele strums, glockenspiel
- *    melody, whistled lead, upright-style bass, shaker / kick / clap.
+ *    156 BPM (176 in fever). The "viral game" sound; front and center.
+ *    Every chip bar is doubled by the glockenspiel shimmer an octave up, so
+ *    the arcade hooks sparkle instead of buzzing.
+ * 2. ISLAND FOLK (the rest): ukulele strums, GLOCKENSPIEL LEAD (bar-partial
+ *    bell synthesis — the melody voice of the whole game), whistled
+ *    counter-line, upright-style bass, and an upbeat kit.
+ *
+ * Tone rules (2026-09-22 rewrite): bright, melodic, forward-moving. Every
+ * track carries a singable tune over a dancing kit; nothing is allowed to
+ * sit on a held drone for a whole bar. Melodies are the hook — the glock
+ * leads, the square wave answers, the whistle soars over the fever.
  *
  * Layers respond to game state:
- *   menu  → chip: lead + bass + full arcade kit (a game menu stays alive)
- *           island: uke + sparse glock + bass
- *   play  → + shaker, kick
- *   fever → + clap, whistle lead, brighter, faster
+ *   menu  → full band with a light kit (a game menu should feel alive)
+ *   play  → + shaker 8ths, kick on the beat, melody full-strength
+ *   fever → + clap + snare backbeat, whistle lead, brighter, faster
+ *   storm → same band, pulled a minor third down, extra kick
  *   sleep → music-box lullaby
  */
 export type MusicMode = "off" | "menu" | "play" | "fever" | "sleep" | "storm";
@@ -20,13 +28,31 @@ export type BiomeMusicStyle = "bright" | "warm" | "airy" | "wide" | "night" | "c
 
 type Voicing = number[];
 
-const BEAT_BPM = 112;
+const BEAT_BPM = 132;
 const LOOKAHEAD = 0.16;
 const TICK_MS = 25;
 /** Hard ceiling on steps scheduled in one timer tick. */
 const MAX_STEPS_PER_TICK = 8;
 /** How far behind the clock the sequencer may fall before it re-anchors. */
 const MAX_LAG = 0.28;
+
+/**
+ * Glockenspiel bar partials.
+ *
+ * A struck metal bar vibrates in a fixed, *inharmonic* mode series — roughly
+ * 1 : 2.76 : 5.40 : 8.93 — with each higher partial dying far faster than the
+ * fundamental. That ratio set (not a harmonic stack, not FM) is what makes a
+ * real glockenspiel read as "bright little bell" instead of "clangy synth".
+ * The old voice was a DX7-style FM bell (mod ratio 3.5, index 4.5) which is
+ * where the harsh, gong-like edge came from.
+ */
+export const GLOCK_PARTIALS: { ratio: number; amp: number; decay: number }[] = [
+  { ratio: 1.0, amp: 1.0, decay: 1.9 },
+  { ratio: 2.756, amp: 0.42, decay: 0.9 },
+  { ratio: 5.404, amp: 0.17, decay: 0.42 },
+  { ratio: 8.933, amp: 0.07, decay: 0.22 },
+];
+
 
 /**
  * Guard against the "machine-gun" failure mode of a lookahead sequencer.
@@ -78,290 +104,274 @@ const PROG_J = ["Am", "C", "G", "F", "Am", "C", "G", "F"];
 // no major relief. Creates the claustrophobic Grid tension.
 const PROG_TRON = ["Am", "Dm", "Am", "Em", "Am", "Dm", "Gm", "Em"];
 
-// Melodies: one entry per eighth note (0 = rest, -1 = hold previous)
-// All rewritten in Hans Zimmer cinematic architecture: held notes, wide leaps,
-// silence as tension, simple motifs that build to a climax.
+/* Melodies: one entry per eighth note (0 = rest, -1 = hold previous).
+ *
+ * REWRITE (2026-09-22) — the previous island set was "Zimmer architecture":
+ * mostly held notes and silence, which read as *dull* in a bright arcade
+ * glider where the flight itself is fast and playful. The brief now is
+ * upbeat, melodic, glockenspiel-forward:
+ *
+ *   • every melody is a real tune — a singable 8-bar phrase with a clear
+ *     arch (statement → lift → answer → resolve), not a drone;
+ *   • motion is mostly stepwise with one heroic leap, and every phrase ends
+ *     on a chord tone of the bar it lands on, so nothing clashes no matter
+ *     which progression the track pairs it with;
+ *   • melodies sit in the C-major / A-minor family, matching the progressions
+ *     below, and stay inside the glockenspiel's sweet spot (C5–E6, midi
+ *     72–88) so the bar-partial bell rings out instead of thudding;
+ *   • the arcade chip family keeps its own hook-first tunes (MEL_CHIP_*) and
+ *     now gets a glockenspiel doubling layer on top.
+ *
+ * Playback layers on top of these lines: glockenspiel lead + octave shimmer,
+ * a sparkle run at phrase ends, ukulele strum, bass, and an upbeat kit.
+ */
 
-// Track 1 — Ascent: daybreak fanfare. Single held note, breath, rise to peak.
+// Track 1 — Ascent: daybreak climb. Rising arpeggio, answered descent, peak.
 const MEL_A = [
-  72, -1, -1, -1,  0,  0,  0,  0,
-  76, -1, -1,  0,  0,  0, 74,  0,
-  72, -1, -1, -1,  0,  0,  0,  0,
-  69, -1, -1, -1,  0,  0,  0,  0,
-  72,  0, 76,  0, 79, -1, -1,  0,
-  84, -1, -1, -1, -1, -1,  0,  0,
-  81,  0, 79,  0, 76, -1, -1,  0,
-  72, -1, -1, -1,  0,  0,  0,  0,
+  72, 0, 76, 0, 79, -1, -1, 0,
+  79, 0, 74, 0, 71, -1, -1, 0,
+  72, 0, 76, 0, 81, -1, 79, 0,
+  77, 0, 76, 0, 72, -1, -1, 0,
+  76, 0, 79, 0, 84, -1, 83, 0,
+  83, 0, 81, 0, 79, -1, 76, 0,
+  77, 0, 81, 0, 84, -1, 83, 0,
+  81, 0, 79, 0, 74, -1, -1, 0,
 ];
 
-// Track 2 — Voyage: dark ocean crossing. Held low, vast silence, single soaring peak.
+// Track 2 — Voyage: open-sea crossing. Long line, wide top, warm landing.
 const MEL_B = [
-  69, -1, -1, -1,  0,  0,  0,  0,
-   0,  0,  0,  0, 65, -1, -1, -1,
-  67, -1, -1,  0,  0,  0,  0,  0,
-  72, -1, -1, -1,  0,  0,  0,  0,
-  76,  0, 81,  0, 84, -1, -1, -1,
-   0,  0,  0,  0,  0,  0,  0,  0,
-  81, -1,  0,  0, 76, -1,  0,  0,
-  69, -1, -1, -1,  0,  0,  0,  0,
+  69, 0, 72, 0, 76, -1, 79, 0,
+  77, 0, 76, 0, 72, -1, -1, 0,
+  76, 0, 79, 0, 84, -1, 83, 0,
+  81, 0, 79, 0, 74, -1, -1, 0,
+  81, 0, 84, 0, 88, -1, 86, 0,
+  84, 0, 81, 0, 79, -1, 77, 0,
+  76, 0, 79, 0, 81, -1, 84, 0,
+  83, -1, -1, 0, 79, -1, -1, 0,
 ];
 
-// Track 3 — Cathedral: pipe-organ hymn. High held note, descend, full bar silence,
-// second phrase reaches a half-step higher — Zimmer's favorite asymmetric repeat.
+// Track 3 — Cathedral: hymn for a big sky. Call, answer, and a full top note.
 const MEL_C = [
-  81, -1, -1, -1, -1, -1,  0,  0,
-  79,  0, 76,  0, 74, -1, -1,  0,
-   0,  0,  0,  0, 72, -1, -1, -1,
-   0,  0,  0,  0,  0,  0,  0,  0,
-  84, -1, -1, -1, -1, -1,  0,  0,
-  81,  0, 79,  0, 76, -1, -1,  0,
-  74,  0, 72,  0, 69,  0, 67,  0,
-  65, -1, -1, -1,  0,  0,  0,  0,
+  77, 0, 79, 0, 81, -1, -1, 0,
+  79, 0, 83, 0, 86, -1, 84, 0,
+  83, 0, 81, 0, 79, -1, 76, 0,
+  79, 0, 76, 0, 72, -1, -1, 0,
+  81, 0, 84, 0, 86, -1, 84, 0,
+  83, 0, 81, 0, 79, -1, 83, 0,
+  84, -1, 83, 0, 81, -1, 79, 0,
+  76, -1, -1, -1, 0, 0, 0, 0,
 ];
 
-// Track 4 — Pendulum: TARS/Interstellar. Violent low-to-high swings, silence, resolve.
+// Track 4 — Pendulum: swinging, playful, an octave-wide peak at the turn.
 const MEL_D = [
-  62, -1, -1, -1,  0,  0,  0,  0,
-  81, -1, -1,  0,  0,  0,  0,  0,
-  65, -1, -1, -1,  0,  0,  0,  0,
-  84, -1, -1, -1,  0,  0,  0,  0,
-   0,  0,  0,  0,  0,  0,  0,  0,
-  79, -1,  0,  0, 74, -1,  0,  0,
-  72, -1, -1,  0, 69, -1, -1,  0,
-  67, -1, -1, -1,  0,  0,  0,  0,
+  74, 0, 77, 0, 81, -1, 79, 0,
+  79, 0, 77, 0, 74, -1, -1, 0,
+  72, 0, 76, 0, 79, -1, 84, 0,
+  83, 0, 81, 0, 76, -1, 72, 0,
+  77, 0, 81, 0, 84, -1, 86, 0,
+  84, 0, 83, 0, 79, -1, 74, 0,
+  76, 0, 79, 0, 84, -1, 88, 0,
+  86, -1, 84, 0, 79, -1, -1, 0,
 ];
 
-// Track 5 — The Grid: Tron Legacy pulse. Daft Punk Am arpeggio, stark silence,
-// then Zimmer peak. Electronic precision meets orchestral weight.
+// Track 5 — The Grid: neon synth line. Punchy, on-the-grid, lifted ending.
 const MEL_E = [
-  69,  0, 72,  0, 76,  0, 79,  0,
-  69,  0, 72,  0, 76,  0, 81,  0,
-  69, -1,  0,  0,  0,  0,  0,  0,
-   0,  0,  0,  0,  0,  0,  0,  0,
-  72,  0, 76,  0, 79,  0, 84,  0,
-  84, -1, -1, -1,  0,  0,  0,  0,
-  81,  0, 76,  0, 72,  0, 69,  0,
-  65, -1, -1, -1,  0,  0,  0,  0,
+  69, 0, 69, 0, 72, -1, 76, 0,
+  74, 0, 74, 0, 77, -1, 81, 0,
+  76, 0, 72, 0, 69, -1, -1, 0,
+  67, 0, 71, 0, 76, -1, 79, 0,
+  81, 0, 79, 0, 76, -1, 72, 0,
+  74, 0, 77, 0, 81, -1, 86, 0,
+  79, 0, 77, 0, 74, -1, 70, 0,
+  71, -1, -1, 0, 67, -1, -1, 0,
 ];
 
-// Track 6 — Eventide: night descends. Single note per bar — maximum space.
-// One long held note fills an entire bar; full bar silence = held breath.
+// Track 6 — Eventide: dusk drift. Gentle arch, resolving every two bars.
 const MEL_F = [
-  69, -1, -1, -1, -1, -1, -1, -1,
-  65, -1, -1, -1,  0,  0,  0,  0,
-  67, -1, -1, -1,  0,  0,  0,  0,
-   0,  0,  0,  0,  0,  0,  0,  0,
-  72, -1, -1,  0, 76, -1, -1,  0,
-  77, -1, -1, -1, -1, -1,  0,  0,
-  74,  0, 72,  0, 69, -1, -1,  0,
-  65, -1, -1, -1,  0,  0,  0,  0,
+  72, 0, 76, 0, 79, -1, -1, 0,
+  76, 0, 74, 0, 71, -1, -1, 0,
+  72, 0, 77, 0, 81, -1, 79, 0,
+  76, 0, 72, 0, 76, -1, -1, 0,
+  79, 0, 81, 0, 84, -1, 81, 0,
+  83, 0, 79, 0, 76, -1, 74, 0,
+  77, 0, 79, 0, 81, -1, 84, 0,
+  83, -1, 81, 0, 76, -1, -1, 0,
 ];
 
-// Track 7 — Glass & Stars: crystalline echo motif, then stratospheric leap.
-// C6 ping echoes → silence → C6 to E6 to G6 — pure Zimmer outer-space texture.
+// Track 7 — Glass & Stars: crystal sparkle. Repeated top eighths, bells answer.
 const MEL_G = [
-  84, -1,  0,  0, 84, -1,  0,  0,
-  81, -1,  0,  0,  0,  0,  0,  0,
-  76, -1, -1, -1,  0,  0,  0,  0,
-   0,  0,  0,  0,  0,  0,  0,  0,
-  84, -1, -1,  0, 88, -1, -1,  0,
-  88, -1, -1, -1,  0,  0,  0,  0,
-  84, -1,  0,  0, 79, -1,  0,  0,
-  72, -1, -1, -1,  0,  0,  0,  0,
+  84, 0, 79, 0, 76, 0, 79, -1,
+  83, 0, 79, 0, 74, 0, 79, -1,
+  81, 0, 77, 0, 74, 0, 77, -1,
+  81, 0, 76, 0, 72, 0, 76, -1,
+  88, 0, 84, 0, 79, -1, 83, 0,
+  86, 0, 83, 0, 79, -1, 74, 0,
+  77, 0, 81, 0, 84, -1, 86, 0,
+  84, -1, 81, 0, 76, -1, -1, 0,
 ];
 
-// Track 8 — Trade Winds: bold proclamation. G5 statement, silence, rise to C6 peak,
-// graceful descent. Modeled on the Inception "Non, je ne regrette rien" fanfare structure.
+// Track 8 — Trade Winds: rolling breeze in G. Sailor's lilt, big final lift.
 const MEL_H = [
-  79, -1, -1,  0, 76, -1, -1,  0,
-  72, -1, -1, -1,  0,  0,  0,  0,
-  74,  0, 76,  0, 79, -1, -1, -1,
-   0,  0,  0,  0, 72,  0, 69,  0,
-  84, -1, -1, -1, -1, -1,  0,  0,
-  81,  0, 79,  0, 76,  0, 74,  0,
-  72, -1,  0,  0, 69, -1,  0,  0,
-  67, -1, -1, -1,  0,  0,  0,  0,
+  74, 0, 79, 0, 83, -1, 81, 0,
+  79, 0, 76, 0, 72, -1, 76, 0,
+  81, 0, 76, 0, 72, -1, 69, 0,
+  72, 0, 77, 0, 81, -1, 79, 0,
+  83, 0, 86, 0, 88, -1, 86, 0,
+  84, 0, 79, 0, 76, -1, 72, 0,
+  76, 0, 79, 0, 81, -1, 84, 0,
+  81, -1, 79, 0, 77, -1, -1, 0,
 ];
 
-// Track 9 — Golden Hour: pure warmth. Every note held long — Zimmer's
-// "Interstellar docking scene" philosophy: space IS the music.
+// Track 9 — Golden Hour: warm lilting 6/8-feel. Golden, unhurried, resolved.
 const MEL_I = [
-  77, -1, -1, -1, -1, -1,  0,  0,
-  76, -1, -1,  0,  0,  0,  0,  0,
-  74, -1, -1, -1, -1, -1,  0,  0,
-  72, -1, -1, -1,  0,  0,  0,  0,
-  79, -1, -1, -1, -1, -1,  0,  0,
-  76, -1,  0,  0, 74, -1,  0,  0,
-  72, -1, -1, -1, -1, -1,  0,  0,
-   0,  0,  0,  0,  0,  0,  0,  0,
+  77, 0, 81, 0, 84, -1, 81, 0,
+  79, 0, 76, 0, 72, -1, 74, 0,
+  77, 0, 74, 0, 69, -1, 74, 0,
+  74, 0, 79, 0, 83, -1, -1, 0,
+  84, 0, 81, 0, 77, -1, 79, 0,
+  76, 0, 79, 0, 84, -1, 83, 0,
+  81, 0, 77, 0, 74, -1, 77, 0,
+  79, -1, -1, 0, 74, -1, -1, 0,
 ];
 
-// Track 10 — Starfall: octave-leap motif — C4 → C6 → back → G5 → A5 → E6 peak.
-// Direct Zimmer octave displacement technique from "Cornfield Chase".
+// Track 10 — Starfall: night flight with hope in it. Rising questions, bright answers.
 const MEL_J = [
-  60, -1, -1, -1,  0,  0,  0,  0,
-  84, -1, -1, -1,  0,  0,  0,  0,
-  60, -1, -1, -1,  0,  0,  0,  0,
-  79, -1, -1, -1,  0,  0,  0,  0,
-  81, -1,  0,  0, 84, -1,  0,  0,
-  88, -1, -1, -1, -1, -1,  0,  0,
-  84,  0, 81,  0, 79,  0, 76,  0,
-  72, -1, -1, -1,  0,  0,  0,  0,
+  76, 0, 81, 0, 84, -1, 81, 0,
+  83, 0, 79, 0, 76, -1, 79, 0,
+  74, 0, 79, 0, 83, -1, 86, 0,
+  84, 0, 81, 0, 77, -1, -1, 0,
+  81, 0, 84, 0, 88, -1, 86, 0,
+  84, 0, 83, 0, 79, -1, 76, 0,
+  79, 0, 83, 0, 86, -1, 84, 0,
+  81, -1, -1, 0, 77, -1, -1, 0,
 ];
 
-// Track 11 — Derezzed: Tron staccato pulse. Tight paired notes march upward,
-// cut to silence, then Daft Punk ascending arp meets Zimmer descent.
+// Track 11 — Derezzed: neon riff with a real hook over the Grid progression.
 const MEL_K = [
-  69,  0, 72,  0, 69,  0, 72,  0,
-  76,  0, 79,  0, 76,  0, 79,  0,
-  81,  0, 84,  0, 81,  0, 84,  0,
-  69, -1,  0,  0,  0,  0,  0,  0,
-  69,  0, 72,  0, 76,  0, 81,  0,
-  84,  0, 81,  0, 76,  0, 72,  0,
-  69,  0, 65,  0, 67,  0, 69,  0,
-  72, -1, -1, -1,  0,  0,  0,  0,
+  69, 0, 72, 0, 69, 0, 72, 0,
+  74, 0, 72, 0, 74, 0, 77, 0,
+  76, 0, 72, 0, 69, -1, -1, 0,
+  71, 0, 67, 0, 71, -1, 74, 0,
+  81, 0, 79, 0, 76, 0, 72, 0,
+  77, 0, 74, 0, 77, -1, 81, 0,
+  79, 0, 77, 0, 74, -1, 70, 0,
+  71, -1, 74, 0, 71, -1, -1, 0,
 ];
 
-// Track 12 — Magma: tectonic weight. Whole-bar held note, deep drop, full silence,
-// slow chromatic crawl upward, then collapse. Zimmer "Earth" / "Interstellar" gravity.
+// Track 12 — Magma: driving sixteenth-feel rock climb. Insistent, hot, peaks twice.
 const MEL_L = [
-  65, -1, -1, -1, -1, -1, -1, -1,
-  62, -1, -1, -1,  0,  0,  0,  0,
-   0,  0,  0,  0,  0,  0,  0,  0,
-  60, -1, -1, -1, 62, -1, -1, -1,
-  65, -1, -1,  0, 69, -1, -1,  0,
-  72, -1, -1, -1,  0,  0,  0,  0,
-  70,  0, 69,  0, 67,  0, 65,  0,
-  62, -1, -1, -1,  0,  0,  0,  0,
+  69, 0, 72, 0, 76, 0, 81, -1,
+  79, 0, 76, 0, 71, 0, 76, -1,
+  77, 0, 81, 0, 84, -1, 83, 0,
+  81, 0, 79, 0, 76, -1, 72, 0,
+  76, 0, 79, 0, 84, 0, 88, -1,
+  86, 0, 83, 0, 79, 0, 76, -1,
+  81, 0, 84, 0, 86, -1, 84, 0,
+  83, -1, 81, 0, 79, -1, -1, 0,
 ];
 
-// Track 13 — Mesa: canyon vastness. Huge register leaps, long held tones,
-// silence as echo — the canyon answers back nothing but wind.
+// Track 13 — Mesa: big-canyon call. Wide intervals, echoes, long resolve.
 const MEL_M = [
-  60, -1, -1, -1,  0,  0,  0,  0,
-  84, -1, -1, -1,  0,  0,  0,  0,
-  60, -1, -1, -1,  0,  0,  0,  0,
-  79, -1, -1, -1,  0,  0,  0,  0,
-  62, -1, -1,  0, 81, -1, -1,  0,
-  84, -1, -1, -1, -1, -1,  0,  0,
-  79,  0, 76,  0, 72,  0, 69,  0,
-  65, -1, -1, -1,  0,  0,  0,  0,
+  72, 0, 77, 0, 81, -1, 79, 0,
+  76, 0, 72, 0, 76, -1, 79, 0,
+  77, 0, 81, 0, 84, -1, 81, 0,
+  83, 0, 79, 0, 74, -1, -1, 0,
+  84, 0, 81, 0, 77, -1, 81, 0,
+  79, 0, 76, 0, 72, -1, 74, 0,
+  77, 0, 74, 0, 77, -1, 81, 0,
+  79, -1, -1, -1, 0, 0, 0, 0,
 ];
 
-// Track 14 — Time's Light: Zimmer/Interstellar. High held note → slow descent →
-// silent breath → octave-leap ascent to triumphant peak. Epic architecture.
+// Track 14 — Time's Light: cinematic but singing — the tune carries it, not the pad.
 const MEL_N = [
-  84, -1, -1, -1,  0,  0, 81, -1,
-  -1, -1,  0,  0, 79, -1, -1, -1,
-   0,  0,  0,  0, 76, -1, -1,  0,
-  72, -1, -1, -1,  0,  0,  0,  0,
-  72,  0, 76,  0, 79,  0, 84,  0,
-  88, -1, -1, -1, -1, -1,  0,  0,
-  84, -1,  0,  0, 81,  0, 79,  0,
-  76, -1, -1, -1,  0,  0,  0,  0,
+  69, 0, 72, 0, 76, -1, 79, 0,
+  81, 0, 79, 0, 77, -1, 76, 0,
+  72, 0, 76, 0, 79, -1, 84, 0,
+  83, 0, 81, 0, 79, -1, 74, 0,
+  81, 0, 84, 0, 88, -1, 86, 0,
+  84, 0, 81, 0, 77, -1, 81, 0,
+  79, 0, 76, 0, 79, -1, 84, 0,
+  83, -1, -1, -1, 0, 0, 0, 0,
 ];
 
-// Track 15 — Horizon Chase: Journey/hero theme. Call-and-answer phrases, each
-// answer reaching higher, resolving in a noble descending phrase.
+// Track 15 — Horizon Chase: adventure-theme push. Every bar ends on a lift.
 const MEL_O = [
-  76, -1,  0,  0, 81, -1,  0,  0,
-  79,  0, 76,  0, 74, -1,  0,  0,
-  72,  0, 74,  0, 76,  0, 79,  0,
-  81, -1, -1, -1,  0,  0,  0,  0,
-  79, -1,  0,  0, 84, -1,  0,  0,
-  86, -1, -1,  0, 84,  0, 81,  0,
-  79,  0, 76,  0, 74,  0, 72,  0,
-  74, -1, -1, -1,  0,  0,  0,  0,
+  71, 0, 74, 0, 79, -1, 83, 0,
+  84, 0, 79, 0, 76, -1, 79, 0,
+  81, 0, 76, 0, 72, -1, 76, 0,
+  77, 0, 81, 0, 84, -1, 81, 0,
+  83, 0, 86, 0, 88, -1, 86, 0,
+  84, 0, 83, 0, 79, -1, 76, 0,
+  79, 0, 81, 0, 84, -1, 86, 0,
+  84, -1, 81, 0, 77, -1, -1, 0,
 ];
 
-// Track 17 — Inception Drop: Zimmer-style "Braaam" build. Slow minor chords,
-// ticking 8ths, then the iconic descending power phrase.
-const MEL_Q = [
-  69, -1, -1, -1, 69, -1, -1, -1,
-  65, -1, -1, -1, 65, -1, -1, -1,
-  72, -1,  0,  0, 69, -1,  0,  0,
-  67, -1, -1, -1,  0,  0,  0,  0,
-  72, 74, 76, 79, 81, 79, 76, 72,
-  69, -1, -1,  0, 67,  0, 65,  0,
-  64,  0, 67,  0, 69,  0, 72,  0,
-  76, -1, -1, -1,  0,  0,  0,  0,
-];
-
-// Track 18 — Dunkirk Clock: ticking urgency. Relentless 8th pulse, rising
-// chromatic line, sudden silence, then the resolve. Pure Zimmer tension.
-const MEL_R = [
-  72, 71, 72, 74, 72, 71, 72, 74,
-  76, 74, 76, 77, 76, 74, 76, 77,
-  79, 77, 79, 81, 79, 77, 79, 81,
-  84, -1, -1, -1,  0,  0,  0,  0,
-  76, -1,  0,  0, 72, -1,  0,  0,
-  69, -1,  0,  0, 67, -1,  0,  0,
-  72,  0, 76,  0, 79,  0, 84,  0,
-  88, -1, -1, -1,  0,  0,  0,  0,
-];
-
-// Track 16 — Fever Dream: Celeste-style driving arpeggio figure.
-// 16th-note scalar runs; designed for the fever/chase section.
+// Track 16 — Fever Dream: paired-note fever hook. Twice as busy, still melodic.
 const MEL_P = [
-  72, 74, 76, 79, 81, 79, 76, 74,
-  72, 74, 76, 79, 84, 83, 81, 79,
-  76, 74, 72, 74, 76, 79, 76, 74,
-  72, 71, 72, 74, 76, -1, -1,  0,
-  79, 81, 83, 84, 86, 84, 83, 81,
-  79, 77, 76, 74, 76, 79, 81, 79,
-  77, 76, 74, 72, 74, 76, 79, 76,
-  74, -1, 72, -1,  0,  0,  0,  0,
+  72, 0, 76, 76, 79, 0, 84, -1,
+  83, 0, 81, 81, 79, 0, 76, -1,
+  77, 0, 81, 81, 84, 0, 86, -1,
+  84, 0, 83, 83, 79, 0, 74, -1,
+  88, 0, 84, 84, 79, 0, 84, -1,
+  86, 0, 84, 84, 81, 0, 79, -1,
+  81, 0, 84, 84, 86, 0, 88, -1,
+  86, -1, 84, 0, 83, -1, -1, 0,
 ];
 
-// Track 19 — End of Line: Tron Legacy haunting outro. Single notes echo into silence,
-// then a four-bar Zimmer swell that never fully resolves — you're still in the Grid.
+// Track 17 — Inception Drop: hypnotic build that never sits still — rising pairs.
+const MEL_Q = [
+  69, -1, -1, 0, 72, 0, 76, -1,
+  77, -1, -1, 0, 81, 0, 84, -1,
+  83, -1, -1, 0, 79, 0, 76, -1,
+  74, -1, -1, 0, 79, 0, 83, -1,
+  84, -1, -1, 0, 81, 0, 76, -1,
+  77, -1, -1, 0, 81, 0, 84, -1,
+  86, -1, -1, 0, 84, 0, 79, -1,
+  83, -1, -1, -1, 0, 0, 0, 0,
+];
+
+// Track 18 — Dunkirk Clock: ticking eighths with a tune inside the pulse.
+const MEL_R = [
+  81, 0, 81, 0, 84, 0, 81, 0,
+  79, 0, 79, 0, 83, 0, 79, 0,
+  74, 0, 74, 0, 79, 0, 74, 0,
+  72, 0, 72, 0, 77, 0, 81, -1,
+  84, 0, 84, 0, 81, 0, 76, 0,
+  79, 0, 79, 0, 83, 0, 86, 0,
+  84, 0, 83, 0, 79, 0, 74, 0,
+  77, -1, -1, 0, 72, -1, -1, 0,
+];
+
+// Track 19 — End of Line: anthemic Grid outro. Big, slow-blooming, heroic.
 const MEL_S = [
-  69, -1, -1, -1,  0,  0,  0,  0,
-   0,  0,  0,  0, 69, -1,  0,  0,
-  65, -1, -1, -1,  0,  0,  0,  0,
-   0,  0,  0,  0,  0,  0,  0,  0,
-  69,  0, 72,  0, 76, -1, -1, -1,
-  79, -1, -1,  0, 76,  0, 74,  0,
-  72, -1, -1, -1, -1, -1,  0,  0,
-   0,  0,  0,  0,  0,  0,  0,  0,
+  69, 0, 76, 0, 72, -1, 69, 0,
+  74, 0, 77, 0, 81, -1, 77, 0,
+  76, -1, -1, 0, 72, 0, 69, 0,
+  71, 0, 74, 0, 79, -1, 76, 0,
+  76, 0, 81, 0, 84, -1, 81, 0,
+  77, 0, 81, 0, 86, -1, 84, 0,
+  79, 0, 77, 0, 74, -1, 70, 0,
+  71, -1, -1, 0, 67, -1, -1, 0,
 ];
 
-// Track 20 — Rinzler: Tron's unstoppable enforcer. Driving 8th ostinato mounts
-// chromatic pressure to a Zimmer-style eruption, then the cold silence of victory.
+// Track 20 — Rinzler: the chase riff. Doubled sixteenths, no let-up.
 const MEL_T = [
-  69,  0, 69,  0, 69,  0, 69,  0,
-  70,  0, 70,  0, 70,  0, 70,  0,
-  71,  0, 71,  0, 72,  0, 72,  0,
-  74, -1, -1, -1,  0,  0,  0,  0,
-  72,  0, 69,  0, 67,  0, 65,  0,
-  64, -1, -1, -1,  0,  0,  0,  0,
-  69,  0, 72,  0, 76,  0, 81,  0,
-  84, -1, -1, -1,  0,  0,  0,  0,
+  69, 69, 0, 72, 0, 69, 72, 0,
+  74, 74, 0, 77, 0, 74, 77, 0,
+  76, 76, 0, 72, 0, 69, -1, 0,
+  71, 71, 0, 74, 0, 79, 0, 0,
+  81, 81, 0, 84, 0, 81, 79, 0,
+  86, 86, 0, 84, 0, 81, 77, 0,
+  79, 79, 0, 77, 0, 74, 70, 0,
+  71, 0, 0, 74, 0, 71, -1, 0,
 ];
 
-// Whistle counter-melody used in fever (per eighth, section-agnostic)
-const WHISTLE = [
-  0, 0, 84, 0, 83, 0, 81, 0,
-  79, -1, 0, 0, 0, 0, 76, 79,
-  81, -1, 0, 0, 79, 0, 76, 0,
-  74, -1, -1, 0, 0, 0, 0, 0,
-  0, 0, 84, 0, 86, 0, 84, 0,
-  83, -1, 0, 0, 79, 0, 0, 0,
-  81, 0, 79, 0, 76, 0, 74, 0,
-  72, -1, -1, -1, 0, 0, 0, 0,
-];
-
-// High-drama fever whistle — wider leaps, more urgent. Used on intense sections.
-const WHISTLE_B = [
-  0, 0, 88, 0, 86, -1, 0, 0,
-  84, 0, 81, 0, 79, 0, 76, 0,
-  79, -1, 0, 0, 84, -1, 0, 0,
-  86, -1, -1, -1, 0, 0, 0, 0,
-  0, 0, 91, 0, 89, -1, 0, 0,
-  88, 0, 84, 0, 86, 0, 84, 0,
-  81, -1, 0, 0, 79, 0, 76, 0,
-  77, -1, -1, -1, 0, 0, 0, 0,
-];
+/* The hand-authored WHISTLE / WHISTLE_B counter-lines lived here. They were
+ * written against an older melody set and, once measured against the current
+ * one, collided with the lead on 183 eighths — semitone clashes included. The
+ * counter-voice is now generated per bar from the chord voicing (see
+ * `counterStep`), which is checkable and cannot clash: see the counter-melody
+ * block in `scheduleStep` for the full rationale. */
 
 // Strum pattern per eighth: 1 = down, 2 = up, 0 = none (island strum D _ D U _ U D U)
 const STRUM = [1, 0, 1, 2, 0, 2, 1, 2];
@@ -390,20 +400,20 @@ const MEL_CHIP_1 = [
   72, 0, 76, 0, 79, 0, 84, -1,
   84, 0, 83, 0, 79, 0, 79, 0,
   81, 0, 79, 0, 76, 0, 79, 0,
-  76, 0, 74, 0, 72, -1, -1, 0,
+  77, 0, 74, 0, 72, -1, -1, 0,
 ];
 
 // Coin Pop: paired-note "coin" figure (C5–C5–G5–C6) that repeats a step
 // higher each bar — the most repeatable hook in the box.
 const MEL_CHIP_2 = [
   72, 0, 72, 79, 0, 79, 84, 0,
-  72, 0, 72, 76, 0, 76, 81, 0,
+  72, 0, 72, 74, 0, 74, 81, 0,
   74, 0, 74, 79, 0, 79, 84, 0,
-  76, 0, 76, 81, 0, 81, 79, 0,
+  74, 0, 74, 81, 0, 81, 79, 0,
   79, 0, 84, 0, 84, 0, 86, 0,
   81, 0, 84, 0, 84, 0, 81, 0,
   84, 0, 84, 83, 0, 83, 79, 0,
-  81, 0, 79, 0, 76, -1, -1, 0,
+  81, 0, 79, 0, 74, -1, -1, 0,
 ];
 
 // Hyper Glide: three-note pickup gallop (E5–E5–G5) that climbs bar by bar
@@ -494,7 +504,7 @@ const MEL_CHIP_9 = [
   72, 72, 79, 0, 76, 76, 84, 0,
   81, 0, 84, 0, 81, 0, 79, 0,
   76, 76, 83, 0, 79, 79, 84, 0,
-  81, 79, 76, 74, 72, -1, 0, 0,
+  81, 79, 76, 74, 74, -1, 0, 0,
 ];
 
 // Moon Arcade: syncopated minor groove (A-minor color over the IV loop) —
@@ -507,7 +517,7 @@ const MEL_CHIP_10 = [
   0, 81, 0, 79, 81, 0, 84, 0,
   0, 86, 0, 84, 83, 0, 81, 0,
   0, 79, 0, 81, 79, 0, 76, 0,
-  0, 74, 76, 0, 72, -1, 0, 0,
+  0, 74, 76, 0, 74, -1, 0, 0,
 ];
 
 const PROG_CHIP_7 = ["Am", "F", "C", "G", "Am", "F", "C", "G"]; // vi–IV–I–V
@@ -555,20 +565,22 @@ export const TRACK_NAMES: string[] = TRACKS.map((t) => t.name);
 
 // Per-biome orchestration keeps each island sonically distinct while all
 // variants share the same original melodic identity.
-const BIOME_MIX: Record<BiomeMusicStyle, { bpm: number; fever: number; cutoff: number; uke: number; glock: number; bass: number; perc: number; whistle: number; transpose: number }> = {
-  // fever BPMs bumped +6 for maximum urgency (old max was +14, now up to +20)
-  bright:  { bpm: 112, fever: 132, cutoff: 9000,  uke: 0.9,  glock: 1.2,  bass: 1,    perc: 1,    whistle: 1.1,  transpose: 0  },
-  warm:    { bpm: 106, fever: 128, cutoff: 6200,  uke: 1.1,  glock: 0.95, bass: 1.12, perc: 0.9,  whistle: 0.95, transpose: -2 },
-  airy:    { bpm: 116, fever: 136, cutoff: 9800,  uke: 0.8,  glock: 1.35, bass: 0.9,  perc: 1.15, whistle: 1.15, transpose: 2  },
-  wide:    { bpm: 110, fever: 130, cutoff: 7500,  uke: 0.8,  glock: 1.05, bass: 1.22, perc: 0.95, whistle: 1.15, transpose: -3 },
-  night:   { bpm: 104, fever: 126, cutoff: 4600,  uke: 0.62, glock: 1.45, bass: 0.82, perc: 0.65, whistle: 0.88, transpose: -5 },
-  crystal: { bpm: 114, fever: 134, cutoff: 10500, uke: 0.72, glock: 1.55, bass: 0.92, perc: 1.04, whistle: 1.3,  transpose: 4  },
+export const BIOME_MIX: Record<BiomeMusicStyle, { bpm: number; fever: number; cutoff: number; uke: number; glock: number; bass: number; perc: number; whistle: number; transpose: number }> = {
+  // Upbeat floor: nothing in the library sits below 116 BPM, and every island
+  // keeps a bright register (transposition stays inside ±4 semitones so the
+  // glock lead never sinks into the bass).
+  bright:  { bpm: 132, fever: 150, cutoff: 10200, uke: 0.86, glock: 1.42, bass: 0.96, perc: 1.02, whistle: 0.92, transpose: 0  },
+  warm:    { bpm: 126, fever: 146, cutoff: 8400,  uke: 1.02, glock: 1.22, bass: 1.04, perc: 1,    whistle: 0.82, transpose: -2 },
+  airy:    { bpm: 134, fever: 152, cutoff: 11000, uke: 0.76, glock: 1.52, bass: 0.86, perc: 1.18, whistle: 0.98, transpose: 2  },
+  wide:    { bpm: 128, fever: 148, cutoff: 9200,  uke: 0.76, glock: 1.3,  bass: 1.14, perc: 1,    whistle: 1.0,  transpose: -3 },
+  night:   { bpm: 124, fever: 144, cutoff: 7400,  uke: 0.6,  glock: 1.6,  bass: 0.78, perc: 0.86, whistle: 0.78, transpose: -3 },
+  crystal: { bpm: 132, fever: 150, cutoff: 11600, uke: 0.7,  glock: 1.68, bass: 0.88, perc: 1.06, whistle: 1.1,  transpose: 3  },
   // Coral Reach: flowing, liquid — brighter glock sparkle, open high end
-  reef:    { bpm: 118, fever: 138, cutoff: 11200, uke: 0.75, glock: 1.45, bass: 0.86, perc: 0.88, whistle: 1.2,  transpose: 3  },
-  // Cinder Forge: tense, volcanic — heavy bass, muted highs, dark register
-  ember:   { bpm: 100, fever: 122, cutoff: 3800,  uke: 0.68, glock: 0.88, bass: 1.38, perc: 1.12, whistle: 0.65, transpose: -7 },
-  // Skyreach Canyon: dry, cavernous — sparse whistle, deep bass, wide dynamics
-  canyon:  { bpm: 108, fever: 128, cutoff: 7000,  uke: 0.75, glock: 0.98, bass: 1.28, perc: 0.78, whistle: 1.22, transpose: -4 },
+  reef:    { bpm: 136, fever: 154, cutoff: 12000, uke: 0.72, glock: 1.6,  bass: 0.82, perc: 0.92, whistle: 1.02, transpose: 3  },
+  // Cinder Forge: driving, volcanic — heavy bass, but the melody stays awake
+  ember:   { bpm: 124, fever: 142, cutoff: 6600,  uke: 0.64, glock: 1.32, bass: 1.24, perc: 1.14, whistle: 0.62, transpose: -4 },
+  // Skyreach Canyon: wide and open — full band, big dynamics
+  canyon:  { bpm: 130, fever: 148, cutoff: 9400,  uke: 0.72, glock: 1.26, bass: 1.14, perc: 1,    whistle: 1.02, transpose: -2 },
 };
 
 /** Keep every biome/night combination inside WebAudio's usable filter range. */
@@ -620,8 +632,12 @@ export class Music {
   private readonly organGain: GainNode;
   private readonly tronGain: GainNode;
   private readonly chipGain: GainNode;
+  /** Glock shimmer / sparkle bus: octave doubling and closing runs. */
+  private readonly sparkGain: GainNode;
   private readonly noise: AudioBuffer;
   private lullabyStep = 0;
+  /** Last generated counter-melody note, for stepwise voice leading. */
+  private counterNote = 0;
   private baseLevel = 0;
   private isTronTrack = false;
   private isChipTrack = false;
@@ -676,6 +692,7 @@ export class Music {
     this.organGain = mk(0);
     this.tronGain = mk(0);
     this.chipGain = mk(0);
+    this.sparkGain = mk(0);
 
     const len = ctx.sampleRate;
     this.noise = ctx.createBuffer(1, len, ctx.sampleRate);
@@ -710,7 +727,7 @@ export class Music {
     // Arcade tracks hold their own tempo floor; intensity adds the same 10%
     // surge on top for island tracks.
     const baseBpm = this.isChipTrack
-      ? (this.mode === "fever" ? 170 : 150)
+      ? (this.mode === "fever" ? 184 : 164)
       : (this.mode === "fever" ? style.fever : style.bpm);
     this.bpm = Math.round(baseBpm * (1 + t * 0.10));
     this.tensionGain.gain.setTargetAtTime(t * 0.24 * style.perc, now, t > this.intensity ? 0.1 : 0.4);
@@ -876,6 +893,7 @@ export class Music {
     this.wetGain.disconnect();
     this.tronGain.disconnect();
     this.chipGain.disconnect();
+    this.sparkGain.disconnect();
   }
 
   private apply(): void {
@@ -888,27 +906,55 @@ export class Music {
     this.transpose = style.transpose;
     const song = m === "menu" || m === "play" || m === "fever" || m === "storm";
     // Arcade tracks run their own faster tempo; everything else follows the biome.
-    const chipBpm = this.isChipTrack ? (m === "fever" ? 170 : 150) : (m === "fever" ? style.fever : style.bpm);
+    const chipBpm = this.isChipTrack ? (m === "fever" ? 184 : 164) : (m === "fever" ? style.fever : style.bpm);
     // Fever: glock leads more prominently (it's the hook the ear remembers).
-    // Island layers stay silent on arcade tracks — square lead + chip bass own the mix.
+    // Island layers stay silent on arcade tracks — square lead + chip bass own
+    // the mix, with the glock shimmer on top.
+    // Ukulele / pad / organ are island colours: silent under the arcade chiptune.
     const island = this.isChipTrack ? 0 : 1;
-    this.ukeGain.gain.setTargetAtTime(song ? (m === "menu" ? 0.28 : m === "fever" ? 0.26 : 0.32) * style.uke * island : 0, t, 0.4);
-    this.glockGain.gain.setTargetAtTime(song ? (m === "menu" ? 0.22 : m === "fever" ? 0.38 : 0.30) * style.glock * island : 0, t, 0.4);
+    this.ukeGain.gain.setTargetAtTime(song ? (m === "menu" ? 0.30 : m === "fever" ? 0.26 : 0.32) * style.uke * island : 0, t, 0.4);
+    // The glock is the lead voice — on EVERY family. It used to be gated to
+    // the island tracks (gain 0 on the arcade ten, which left the square wave
+    // carrying the tune there and made those tracks sound cheap).
+    this.glockGain.gain.setTargetAtTime(
+      song
+        ? this.isChipTrack
+          ? m === "menu" ? 0.38 : m === "fever" ? 0.50 : 0.46
+          : (m === "menu" ? 0.42 : m === "fever" ? 0.50 : 0.46) * style.glock
+        : 0,
+      t,
+      0.4,
+    );
     this.bassGain.gain.setTargetAtTime(song ? (m === "fever" ? 0.48 : 0.42) * style.bass : 0, t, 0.4);
-    // Arcade kits keep the drums alive on the menu too — that's what makes it
-    // feel like a game menu instead of a lobby.
-    const percBase = m === "play" ? 0.22 : m === "fever" ? 0.36 : m === "storm" ? 0.46 : this.isChipTrack && m === "menu" ? 0.30 : 0;
+    // Kit: every family gets drums in the menu, because a silent menu reads as
+    // "something is broken". Arcade keeps the busier pattern below.
+    const percBase = m === "play" ? (this.isChipTrack ? 0.22 : 0.18) : m === "fever" ? 0.36 : m === "storm" ? 0.46 : m === "menu" ? (this.isChipTrack ? 0.30 : 0.14) : 0;
     this.percGain.gain.setTargetAtTime(percBase * style.perc, t, 0.3);
-    this.whistleGain.gain.setTargetAtTime((m === "fever" ? 0.30 : 0) * style.whistle * island, t, 0.3);
-    this.arpGain.gain.setTargetAtTime(m === "fever" ? 0.18 * style.glock * island : 0, t, 0.5);
-    // Organ: Interstellar-style deep pad. Swells in play and fever.
-    this.organGain.gain.setTargetAtTime((m === "play" ? 0.10 : m === "fever" ? 0.18 : m === "menu" ? 0.06 : 0) * island, t, 1.2);
+    // Whistle: the soaring counter-line. Fever is its solo, play gives it a
+    // gentle harmony line, menu leaves it out.
+    this.whistleGain.gain.setTargetAtTime((m === "fever" ? 0.30 : m === "play" ? 0.18 : m === "menu" ? 0.10 : 0) * style.whistle * island, t, 0.3);
+    this.arpGain.gain.setTargetAtTime((m === "fever" ? 0.18 : m === "play" ? 0.09 : m === "menu" ? 0.05 : 0) * style.glock * island, t, 0.5);
+    // Organ: deep pad under play and fever only — never a drone on the menu.
+    this.organGain.gain.setTargetAtTime((m === "play" ? 0.10 : m === "fever" ? 0.18 : m === "menu" ? 0.05 : 0) * island, t, 1.2);
     // Warm pad bed: strongest on the menu, subtle underneath play.
-    this.padGain.gain.setTargetAtTime((m === "menu" ? 0.18 : m === "play" ? 0.06 : 0) * island, t, 0.8);
-    // Tron synth: active only on Tron-progression tracks (replaces glock lead)
-    this.tronGain.gain.setTargetAtTime(this.isTronTrack && song ? (m === "fever" ? 0.36 : 0.28) : 0, t, 0.4);
-    // Arcade chiptune lead: the hook voice, present even on the menu.
-    this.chipGain.gain.setTargetAtTime(this.isChipTrack && song ? (m === "menu" ? 0.26 : m === "fever" ? 0.40 : 0.32) : 0, t, 0.4);
+    // Sleep keeps a warm bed under the lullaby bells, so the dozing-off screen
+    // is the same band playing quietly rather than a different, thinner one.
+    this.padGain.gain.setTargetAtTime(
+      m === "sleep" ? 0.18 : (m === "menu" ? 0.16 : m === "play" ? 0.06 : 0) * island,
+      t,
+      0.8,
+    );
+    // Tron synth: the dark bed under the bell now, not the lead it once was.
+    this.tronGain.gain.setTargetAtTime(this.isTronTrack && song ? (m === "fever" ? 0.28 : 0.22) : 0, t, 0.4);
+    // Arcade chiptune lead: a supporting halo under the glock melody.
+    this.chipGain.gain.setTargetAtTime(this.isChipTrack && song ? (m === "menu" ? 0.15 : m === "fever" ? 0.21 : 0.17) : 0, t, 0.4);
+    // Glock shimmer: octave doubling on the arcade family and the melody
+    // sparkle on everything, so the bells are always part of the mix.
+    this.sparkGain.gain.setTargetAtTime(
+      song ? (this.isChipTrack ? (m === "fever" ? 0.22 : 0.17) : (m === "fever" ? 0.34 : 0.26) * style.glock) : 0,
+      t,
+      0.45,
+    );
     this.lullabyGain.gain.setTargetAtTime(m === "sleep" ? 0.3 : 0, t, 0.6);
     const cutoff = musicCutoff(style.cutoff, this.night, this.intensityTarget, this.ctx.sampleRate);
     this.filter.frequency.setTargetAtTime(cutoff, t, 0.55);
@@ -933,6 +979,7 @@ export class Music {
     this.section = this.order[0] ?? 0;
     this.syncFamilyFlags();
     this.lullabyStep = 0;
+    this.counterNote = 0;
     if (this.mode !== "sleep") this.onTrackChange?.(TRACKS[this.section]!.name);
     this.timer = window.setInterval(() => this.tick(), TICK_MS);
   }
@@ -1031,25 +1078,37 @@ export class Music {
       if (this.step === 7 && this.bar % 4 === 3) this.bass(t, mtof(BASS_ROOT[chordName]! + 5 + this.transpose + stormShift), beat * 0.4);
     }
 
-    // Melody: FM bell/piano on island tracks, Tron lead on Tron tracks,
-    // staccato square-wave chiptune lead on arcade tracks (always present —
-    // a game menu should never sound half-asleep).
+    // Melody: the glockenspiel lead on every family (island tracks play it
+    // straight; the Tron tracks hand the same line to the synth; arcade tracks
+    // put the square-wave hook in front with the bells doubling it).
     const note = sec.mel[idx] ?? 0;
     if (note > 0) {
-      const sparse = !this.isChipTrack && this.mode === "menu" && this.step % 2 === 1 && Math.random() < 0.5;
-      if (!sparse) {
-        const noteFreq = mtof(note + this.transpose + stormShift);
-        const vel = this.step === 0 ? 1 : 0.8;
-        if (this.isTronTrack) {
-          this.tronLead(t, noteFreq, beat * 0.85, vel);
-        } else if (this.isChipTrack) {
-          let len = 1;
-          while ((sec.mel[idx + len] ?? 0) === -1) len++;
-          this.chipLead(t, noteFreq, Math.min(beat * 0.24 * len, beat * 0.9), vel);
-        } else {
-          this.glock(t, noteFreq, vel);
-        }
+      const noteFreq = mtof(note + this.transpose + stormShift);
+      const vel = this.step === 0 ? 1 : this.step % 4 === 0 ? 0.9 : 0.8;
+      if (this.isTronTrack) {
+        // The synth keeps the Tron texture, but the bell now doubles it at
+        // pitch (not only an octave above) so the tune reads as a melody line
+        // rather than a filtered pulse.
+        this.tronLead(t, noteFreq, beat * 0.85, vel * 0.9);
+        this.glockLead(t, noteFreq, vel * 0.72);
+      } else if (this.isChipTrack) {
+        let len = 1;
+        while ((sec.mel[idx + len] ?? 0) === -1) len++;
+        // Arcade tracks used to hand the tune to the square wave and sprinkle
+        // bells on top — precisely the thin, cheap sound the mix was pulled up
+        // for. Inverted: the glockenspiel states the melody, the chip lead is
+        // the 8-bit halo underneath it.
+        this.glockLead(t, noteFreq, vel);
+        this.chipLead(t, noteFreq, Math.min(beat * 0.24 * len, beat * 0.9), vel * 0.5);
+      } else {
+        this.glockLead(t, noteFreq, vel);
       }
+    }
+
+    // Phrase-end flourish: a quick glock run up the chord on the last bar of
+    // each 4-bar phrase, so sections hand over with a lift instead of a gap.
+    if (this.step === 6 && this.bar % 4 === 3 && (this.mode === "menu" || this.mode === "play" || this.mode === "fever")) {
+      this.glockSparkle(t, chordName, beat, stormShift);
     }
 
     // Percussion
@@ -1069,17 +1128,28 @@ export class Music {
       if ((this.mode === "play" || this.mode === "fever" || this.mode === "storm") && this.step === 7) this.kick(t, 0.58 * light);
       if (this.mode === "storm" && (this.step === 2 || this.step === 6)) this.kick(t, 0.5 * light);
       if (this.mode === "fever" && this.step === 3) this.hat(t, 0.22 * light, 5200);
-    } else if (this.mode === "play" || this.mode === "fever" || this.mode === "storm") {
-      // Leave breathing space in normal flight; fever earns the busy groove.
-      if (this.mode !== "play" || this.step % 2 === 0 || this.intensity > 0.65) {
-        this.shaker(t, this.step % 2 === 0 ? 0.48 : 0.24);
-      }
+    } else if (this.mode === "menu" || this.mode === "play" || this.mode === "fever" || this.mode === "storm") {
+      // Upbeat pop kit on the island family: kick on 1 & 3, snare/clap on the
+      // 2 & 4 backbeat, shaker on the offbeats. The menu runs the same groove
+      // at a lighter weight — a menu that never moves is what "dull" sounds
+      // like. Fever earns the full-strength version.
+      const menu = this.mode === "menu";
+      const groove = menu ? 0.6 : this.mode === "play" ? 0.9 : 1;
+      if (!menu || this.step % 2 === 0) this.shaker(t, (this.step % 2 === 0 ? 0.48 : 0.26) * groove);
       if (this.step === 0 || this.step === 4) {
-        this.kick(t, this.step === 0 ? 1 : 0.82);
+        this.kick(t, (this.step === 0 ? 1 : 0.82) * groove);
         if (this.mode === "fever" || this.intensity > 0.5) {
           this.sidechainPump(0.20 + this.intensity * 0.18, 0.11);
         }
       }
+      // Backbeat: the snare/clap pair that makes the whole thing bounce.
+      if (this.step === 2 || this.step === 6) {
+        const accent = (this.mode === "fever" ? 0.9 : menu ? 0.42 : 0.66) * groove;
+        this.snare(t, accent);
+        if (this.mode === "fever" || this.mode === "storm" || this.intensity > 0.6) this.clap(t);
+      }
+      // Eighth-note bell hats keep the pulse ticking under the melody.
+      this.hat(t, (menu ? 0.10 : 0.16) * groove, 8200);
       // Snare on 2&4 (steps 2 and 6) in fever — the heartbeat that locks the groove.
       if (this.mode === "fever" && (this.step === 2 || this.step === 6)) {
         this.clap(t);
@@ -1109,40 +1179,57 @@ export class Music {
       this.organ(t, chordName, beat * 8);
     }
 
-    // Arp bursts in fever — Celeste-style fills on offbeats between melody notes.
-    if (!this.isChipTrack && this.mode === "fever" && (this.step === 1 || this.step === 5) && this.intensity > 0.3) {
-      const arpNote = (UKE[chordName]?.[1] ?? 60) + 24 + this.transpose + stormShift;
-      this.arp(t, mtof(arpNote), beat * 0.9);
+    // Bell arpeggio. In fever it is a Celeste-style fill on both offbeats; the
+    // menu and play get a single turn per bar on the second half of the phrase
+    // so the bells keep moving between melody notes without crowding them.
+    const arpTurn =
+      (this.mode === "fever" && (this.step === 1 || this.step === 5) && this.intensity > 0.3) ||
+      ((this.mode === "play" || this.mode === "menu") && this.step === 5 && this.bar % 2 === 1);
+    if (!this.isChipTrack && arpTurn) {
+      // Walk the chord upward instead of repeating one note: the arp is a
+      // melodic voice, not a ping.
+      const voicing = UKE[chordName] ?? UKE.C!;
+      const pick = voicing[(this.bar + this.step) % voicing.length] ?? 60;
+      this.arp(t, mtof(pick + 24 + this.transpose + stormShift), beat * 0.9);
     }
 
-    // Whistle (fever) — alternate between WHISTLE and WHISTLE_B each 4-bar phrase.
-    if (!this.isChipTrack && this.mode === "fever") {
-      const whistleSrc = this.bar < 4 ? WHISTLE : WHISTLE_B;
-      const w = whistleSrc[idx] ?? 0;
-      if (w > 0) {
-        let len = 1;
-        while ((whistleSrc[idx + len] ?? 0) === -1) len++;
-        this.whistle(t, mtof(w + this.transpose), beat * 0.5 * len * 0.95);
+    // Counter-melody — derived from the harmony rather than fixed to one line.
+    //
+    // The old WHISTLE / WHISTLE_B pair was written against an earlier set of
+    // melodies and was later switched back on in menu and play; measured
+    // against the current tunes it collided with the lead on 183 eighths,
+    // including direct semitone clashes. A counter-line that cannot be checked
+    // against every progression should not be hand-authored at all: this one
+    // is picked per eighth from the bar's own chord voicing, always the tone
+    // nearest the previous counter note (so it moves stepwise), and only where
+    // the melody is holding or resting — so it can never collide with the lead
+    // in any key, on any track, in any order the shuffle deals.
+    if (!this.isChipTrack && (this.mode === "fever" || this.mode === "play" || this.mode === "menu")) {
+      const counter = this.counterStep(chordName, idx, note);
+      if (counter > 0) {
+        const vel = this.mode === "fever" ? 1 : this.mode === "play" ? 0.72 : 0.52;
+        this.whistle(t, mtof(counter + this.transpose + stormShift), beat * 0.75, vel);
       }
     }
   }
 
+  /**
+   * The dozing-off music. It used to be a bare sine arpeggio — a different
+   * instrument from everything else in the game, which is exactly the kind of
+   * seam the consistency pass is closing. Now it is the same glockenspiel
+   * playing slower and softer, over a warm pad: the night sounds like Sunbird
+   * winding down, not like a different game.
+   */
   private scheduleLullaby(t: number): void {
-    const arp = [60, 64, 67, 71, 72, 71, 67, 64];
+    const arp = [72, 76, 79, 84, 83, 79, 76, 72];
+    const beat = 60 / (this.bpm || BEAT_BPM);
     const m = arp[this.lullabyStep % arp.length]!;
+    const idx = this.lullabyStep;
     this.lullabyStep += 1;
-    const o = this.ctx.createOscillator();
-    const g = this.ctx.createGain();
-    o.type = "sine";
-    o.frequency.value = mtof(m + 12 + this.transpose);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.5, t + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
-    o.connect(g);
-    g.connect(this.lullabyGain);
-
-    o.start(t);
-    o.stop(t + 1.5);
+    this.glock(t, mtof(m + this.transpose), 0.44, this.lullabyGain);
+    // A low bell on the first beat of every bar, and the pad swells under it.
+    if (idx % 4 === 0) this.glock(t, mtof(m - 12 + this.transpose), 0.3, this.lullabyGain);
+    if (idx % 8 === 0) this.pad(t, "C", beat * 8);
   }
 
   /* ---------- instruments ---------- */
@@ -1231,60 +1318,104 @@ export class Music {
     o2.stop(t + 0.6);
   }
 
-  /** FM bell/piano synthesis. A sine carrier is frequency-modulated by a sine
-   *  at carrier×3.5 — the classic DX7 bell algorithm. The modulation index
-   *  decays fast (attack transient) while carrier sustains, creating the sharp
-   *  attack + ringing tail of a piano or marimba. Sounds leagues above pure sines. */
-  private glock(t: number, freq: number, vel: number): void {
-    const modRatio = 3.5;
-    const modFreq = freq * modRatio;
-    // Modulation index in Hz: deviation = modulation_index × carrier_freq.
-    // DX7 bell uses index ~3–5. In Web Audio the gain value IS the Hz deviation.
-    const modIdx = freq * 4.5 * vel;
+  /**
+   * Glockenspiel: additive bar-partial synthesis (see GLOCK_PARTIALS).
+   *
+   * Every partial is its own sine with its own decay, plus a whisper of
+   * filtered noise for the mallet "tick". The result is the bright, sweet,
+   * bell-like lead the whole score is built around — no FM clang, no
+   * detuned saw stack. `bus` lets the sparkle layer route through its own
+   * gain so the island lead fader stays independent.
+   */
+  private glock(t: number, freq: number, vel: number, bus?: GainNode): void {
+    const target = bus ?? this.glockGain;
+    const peak = 0.5 * vel;
+    const attack = 0.0025;
+    const out = this.ctx.createGain();
+    out.gain.value = 1;
+    out.connect(target);
 
-    // Modulator amplitude envelope: fast decay creates the bright attack click
-    const modEnv = this.ctx.createGain();
-    modEnv.gain.setValueAtTime(modIdx, t);
-    modEnv.gain.exponentialRampToValueAtTime(modIdx * 0.05, t + 0.35);
-    modEnv.gain.exponentialRampToValueAtTime(0.0001, t + 2.0);
+    for (const p of GLOCK_PARTIALS) {
+      const o = this.ctx.createOscillator();
+      const og = this.ctx.createGain();
+      o.type = "sine";
+      o.frequency.value = freq * p.ratio;
+      const amp = peak * p.amp;
+      og.gain.setValueAtTime(0.0001, t);
+      og.gain.exponentialRampToValueAtTime(amp, t + attack);
+      og.gain.exponentialRampToValueAtTime(amp * 0.35, t + p.decay * 0.35);
+      og.gain.exponentialRampToValueAtTime(0.0001, t + p.decay);
+      o.connect(og);
+      og.connect(out);
+      o.start(t);
+      o.stop(t + p.decay + 0.05);
+    }
 
-    const carrier = this.ctx.createOscillator();
-    carrier.type = "sine";
-    carrier.frequency.value = freq;
-
-    const mod = this.ctx.createOscillator();
-    mod.type = "sine";
-    mod.frequency.value = modFreq;
-    mod.connect(modEnv);
-    modEnv.connect(carrier.frequency); // FM: mod output → carrier frequency input
-
-    // Second partial: shallow FM from 2× oscillator for warmth on attack
-    const partialMod = this.ctx.createOscillator();
-    const partialEnv = this.ctx.createGain();
-    partialMod.type = "sine";
-    partialMod.frequency.value = freq * 2;
-    partialEnv.gain.setValueAtTime(freq * 1.2 * vel, t); // reasonable deviation
-    partialEnv.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
-    partialMod.connect(partialEnv);
-    partialEnv.connect(carrier.frequency);
-
-    // Carrier amplitude envelope
-    const g = this.ctx.createGain();
-    const peak = 0.52 * vel;
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(peak, t + 0.003);
-    g.gain.exponentialRampToValueAtTime(peak * 0.45, t + 0.1);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 2.2);
-
-    carrier.connect(g);
-    g.connect(this.glockGain);
-
-    mod.start(t); mod.stop(t + 2.3);
-    partialMod.start(t); partialMod.stop(t + 0.15);
-    carrier.start(t); carrier.stop(t + 2.3);
+    // Mallet strike: a breath of band-passed noise on the attack only.
+    const strike = this.ctx.createBufferSource();
+    strike.buffer = this.noise;
+    const sf = this.ctx.createBiquadFilter();
+    sf.type = "bandpass";
+    sf.frequency.value = Math.min(9000, Math.max(1200, freq * 4));
+    sf.Q.value = 1.1;
+    const sg = this.ctx.createGain();
+    sg.gain.setValueAtTime(0.0001, t);
+    sg.gain.exponentialRampToValueAtTime(0.06 * vel, t + 0.001);
+    sg.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+    strike.connect(sf);
+    sf.connect(sg);
+    sg.connect(out);
+    strike.start(t);
+    strike.stop(t + 0.09);
   }
 
-  private whistle(t: number, freq: number, dur: number): void {
+  /** Melody lead: glock note + an octave shimmer on the sparkle bus. This is
+   *  the "little bell on top of everything" that makes the tune carry. */
+  private glockLead(t: number, freq: number, vel: number): void {
+    this.glock(t, freq, vel);
+    this.glock(t, freq * 2, vel * 0.26, this.sparkGain);
+  }
+
+  /** Closing flourish: a fast run up the chord tones, glock-only. */
+  private glockSparkle(t: number, chordName: string, beat: number, stormShift: number): void {
+    const chord = UKE[chordName] ?? UKE.C!;
+    const tones = [...chord].map((m) => m + 12 + this.transpose + stormShift).sort((a, b) => a - b);
+    const run = [...tones.slice(0, 3), tones[2]! + 5, tones[3]!, tones[3]! + 4];
+    run.forEach((m, i) => this.glock(t + i * beat * 0.16, mtof(m), 0.5 - i * 0.04, this.sparkGain));
+  }
+
+
+  /**
+   * One step of the generated counter-line: the chord tone nearest the last
+   * counter note, placed only where the lead is silent (a hold or a rest).
+   * Returns 0 for "no counter note here". The register sits an octave under
+   * the glock lead, where the whistle reads as a second voice rather than a
+   * second lead, and the whole thing is a pure function of (chord, step,
+   * melody) plus the previous note — which is what makes it safe to run
+   * against all 30 tracks.
+   */
+  private counterStep(chordName: string, idx: number, melody: number): number {
+    // Follow the lead's phrasing: fill the gaps, stay out of the way where the
+    // melody is already speaking.
+    if (melody > 0) return 0;
+    // The answer phrase sits a third higher so the two halves differ.
+    const phrase = this.bar < 4 ? 0 : 3;
+    const voicing = UKE[chordName] ?? UKE.C!;
+    const candidates = voicing
+      .map((m) => m + 12 + phrase) // up an octave: under the glock, over the uke
+      .filter((m) => m >= 64 && m <= 88);
+    if (!candidates.length) return 0;
+    const prev = this.counterNote || candidates[0]!;
+    let best = candidates[0]!;
+    for (const c of candidates) if (Math.abs(c - prev) < Math.abs(best - prev)) best = c;
+    // Every other eighth at most, so the line breathes instead of chattering.
+    if (idx % 2 === 1 && Math.abs(best - prev) > 4) return 0;
+    this.counterNote = best;
+    return best;
+  }
+
+  /** `vel` scales the voice only — the bus gain stays a mix decision. */
+  private whistle(t: number, freq: number, dur: number, vel = 1): void {
     const o = this.ctx.createOscillator();
     const lfo = this.ctx.createOscillator();
     const lfoG = this.ctx.createGain();
@@ -1297,9 +1428,10 @@ export class Music {
     lfoG.gain.value = freq * 0.012;
     lfo.connect(lfoG);
     lfoG.connect(o.frequency);
+    const peak = 0.5 * vel;
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.5, t + 0.05);
-    g.gain.setValueAtTime(0.5, t + Math.max(0.06, dur - 0.08));
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.05);
+    g.gain.setValueAtTime(peak, t + Math.max(0.06, dur - 0.08));
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.05);
     const breath = this.ctx.createBufferSource();
     breath.buffer = this.noise;

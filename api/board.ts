@@ -1,4 +1,4 @@
-// GET /api/board?scope=global|daily&metric=distance|altitude|perfects|coins&device=<id>
+// GET /api/board?scope=global|daily|week&metric=distance|altitude|perfects|coins|score&device=<id>
 //
 // Implements the `GET /board` half of LEADERBOARD_API.md: returns the top 50
 // pilots sorted by the requested metric, plus the requesting device's rank.
@@ -8,7 +8,7 @@ import { handleOptions, json, todayStr } from "./_lib/http.js";
 
 export const config = { runtime: "edge" };
 
-const METRICS = ["distance", "altitude", "perfects", "coins"] as const;
+const METRICS = ["distance", "altitude", "perfects", "coins", "score"] as const;
 type Metric = (typeof METRICS)[number];
 
 const metricOf = (row: BoardRow, metric: Metric): number => row[metric];
@@ -62,7 +62,19 @@ export default async function handler(request: Request): Promise<Response> {
   const device = url.searchParams.get("device") || "";
 
   const rows = await allRows();
-  const list = scope === "daily" ? rows.filter((r) => r.date === todayStr()) : rows;
+  const today = todayStr();
+  const list =
+    scope === "daily"
+      ? rows.filter((r) => r.date === today)
+      : scope === "week"
+        ? rows.filter((r) => {
+            // Rolling 7-day window (today inclusive), shared with the client's
+            // on-device fallback so both backends agree on membership.
+            const from = new Date(`${today}T00:00:00Z`);
+            from.setUTCDate(from.getUTCDate() - 6);
+            return r.date >= from.toISOString().slice(0, 10) && r.date <= today;
+          })
+        : rows;
   list.sort((a, b) => metricOf(b, metric) - metricOf(a, metric));
 
   const rank = list.findIndex((r) => r.deviceId === device) + 1;

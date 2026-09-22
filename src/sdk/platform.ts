@@ -372,13 +372,25 @@ function ensureSdk(): Promise<PlatformName> {
           existing.addEventListener("error", () => resolve("none"), { once: true });
           return;
         }
-        const script = document.createElement("script");
-        script.src = POKI_SRC;
-        script.async = true;
-        script.dataset.sunbirdSdk = "poki";
-        script.onload = () => { script.dataset.loaded = "true"; resolve("poki"); };
-        script.onerror = () => resolve("none");
-        document.head.appendChild(script);
+        // One retry: the CDN occasionally fails a cold request on a flaky
+        // connection, and a single failure used to cost the player every ad
+        // (and every rewarded reward) for the whole session.
+        let attempt = 0;
+        const inject = (): void => {
+          attempt += 1;
+          const script = document.createElement("script");
+          script.src = POKI_SRC;
+          script.async = true;
+          script.dataset.sunbirdSdk = "poki";
+          script.onload = () => { script.dataset.loaded = "true"; resolve("poki"); };
+          script.onerror = () => {
+            script.remove();
+            if (attempt < 2) { window.setTimeout(inject, 400); return; }
+            resolve("none");
+          };
+          document.head.appendChild(script);
+        };
+        inject();
       }
     });
     return loadPromise;

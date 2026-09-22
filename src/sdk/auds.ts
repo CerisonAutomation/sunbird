@@ -151,7 +151,7 @@ export class PokiAuds {
 
   /** Submit a public score entry (immutable after POST — no secret retained). */
   async submitScore(args: {
-    metric: "distance" | "altitude" | "perfects" | "coins";
+    metric: "distance" | "altitude" | "perfects" | "coins" | "score";
     name: string;
     deviceId: string;
     value: number;
@@ -203,7 +203,7 @@ export class PokiAuds {
 
   /** Fetch top N + caller's approximate rank for a metric. */
   async fetchTop(args: {
-    metric: "distance" | "altitude" | "perfects" | "coins";
+    metric: "distance" | "altitude" | "perfects" | "coins" | "score";
     deviceId: string;
     limit?: number;
   }): Promise<{ entries: (AudsItem & { you?: boolean })[]; yourRank: number; total: number } | null> {
