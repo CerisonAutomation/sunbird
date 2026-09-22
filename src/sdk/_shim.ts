@@ -30,6 +30,14 @@ class StubAdapter implements PlatformAdapter {
   async showMidgameAd(): Promise<void> {}
   async showRewardedAd(): Promise<boolean> { return false; }
   mountBanner(_container: HTMLElement): void {}
+
+  getLanguage(): string | null {
+    return null;
+  }
+
+  movePill(_topPercent: number, _topPx: number): void {}
+
+  playtestCapture(_on: boolean): void {}
   async saveCloud<T>(_key: string, _value: T): Promise<void> {}
   async loadCloud<T>(_key: string): Promise<T | null> { return null; }
   async removeCloud(_key: string): Promise<void> {}

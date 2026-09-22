@@ -21,13 +21,14 @@ import { LaunchSystem, ratingLabel, type LaunchResult } from "./LaunchSystem";
 import { isRaceMode, MASS_RACE_FIELD, MODES, modeById, PVP_MODES, PVP_WORLDS, RACE_FINISH, type ModeDef, type ModeId, type PvpWorldCourse } from "./Modes";
 import { MassRace } from "./MassRace";
 import { FinishGate } from "./FinishGate";
-import { fetchPublicRooms, isMultiplayerConfigured, makeRoomCode, RealtimeClient, type AnyRealtimeClient } from "./Realtime";
+import { fetchPublicRooms, isMultiplayerConfigured, makeRoomCode, type AnyRealtimeClient } from "./Realtime";
+import { createNetTransport, prewarmNetTransport } from "./net-transport";
 import { photoFinishMessage } from "./RacePolish";
 import { SlopeChain } from "./SlopeChain";
 import { RoomWatcher, ROOM_POLL_MS, roomSummaryLine, summarizeRooms, type LiveRoom } from "./RoomBrowser";
 import { Leaderboard, loadPilotName, savePilotName, isLeaderboardOnline, type BoardMetric, type BoardPage, type BoardScope } from "./Leaderboard";
 import { generatePilotName, isPilotNameClean } from "./pilotNameGenerator";
-import { setLocale, whenLocaleReady, type SupportedLocale } from "../i18n";
+import { adoptPortalLocale, setLocale, whenLocaleReady, type SupportedLocale } from "../i18n";
 import { Tournaments, TRAILS, weekKey, type PrizeGrant } from "./Tournaments";
 import {
   dailyChallenge,
@@ -118,9 +119,9 @@ import { buildChallengeUrl, readChallengeFromUrl, type RivalChallenge } from "./
 import { flag } from "./Flags";
 import { variant } from "./Experiments";
 import { buildRoomInviteUrl, normalizeRoomCode, readRoomInviteFromUrl } from "./RoomInvite";
-import { PORTAL_BANNER_ID, attachPortalErrorReporters, initPlatform, isCoarsePointer, isPortalBuild, portalTarget as getPortalTarget, type PlatformAdapter } from "../sdk/platform";
+import { PORTAL_BANNER_ID, attachPortalErrorReporters, initPlatform, installPageScrollGuards, isCoarsePointer, isPortalBuild, portalTarget as getPortalTarget, type PlatformAdapter } from "../sdk/platform";
 import { CUSTOM_PILOT_NAMES, POKI_MULTIPLAYER, SELL_AD_REMOVAL, SQUAD_CHAT } from "./edition";
-import type { PokiNetlibClient } from "./PokiNetlib";
+import { PRIVACY_URL } from "./legal";
 import { GameplayEventSink } from "./GameplayEvents";
 import { LivingBackground } from "./LivingBackground";
 import { Sky } from "./Sky";
@@ -130,13 +131,11 @@ import { Watchdog } from "./resilience/Watchdog";
 import { TerrainSystem } from "./TerrainSystem";
 import { Weather } from "./Weather";
 
-// On Poki builds, eagerly fetch the PokiNetlib module so createNetTransport
-// can instantiate PokiNetlibClient synchronously when the player first taps PvP.
-// The dynamic import keeps @poki/netlib out of non-Poki bundles (Rollup DCE).
-let _PokiNetlibClass: typeof PokiNetlibClient | null = null;
-if (POKI_MULTIPLAYER) {
-  void import("./PokiNetlib").then((m) => { _PokiNetlibClass = m.PokiNetlibClient; }).catch(() => { /* best-effort */ });
-}
+// On Poki builds, warm the Netlib module in the background so the first PvP tap
+// doesn't wait on the chunk. The import itself lives in the per-target
+// transport module, so `@poki/netlib` stays out of every other bundle (Rollup
+// DCE) while the Poki build still gets a warm module.
+if (POKI_MULTIPLAYER) prewarmNetTransport();
 
 export type GameState = UiState;
 type AdReason = "continue" | "interstitial";
@@ -185,6 +184,8 @@ export class Game {
   private platform: PlatformAdapter | null = null;
   /** Detaches the window error → `captureError` reporters (see platform boot). */
   private detachPortalErrorReporters: (() => void) | null = null;
+  /** Detacher for the host-page scroll guards (see installPageScrollGuards). */
+  private detachPageScrollGuards: (() => void) | null = null;
   /**
    * Every gameplayStart/gameplayStop that reaches a portal funnels through
    * this sink — Poki forbids a gameplay event following an identical one.
@@ -368,6 +369,10 @@ export class Game {
   private readonly board: Leaderboard;
   private readonly cups: Tournaments;
   private pilotName = "";
+  /** True once the player picked a call sign (dice/save), which outranks the portal name. */
+  private pilotNameChosen = false;
+  /** Signed-in portal username, shown on the account screen. */
+  private portalAccountName = "";
   private boardScope: BoardScope = "global";
   private boardMetric: BoardMetric = "distance";
   private boardPage: BoardPage | null = null;
@@ -379,6 +384,8 @@ export class Game {
   private raceField = 0;
   private raceFinishTime = 0;
   private net: AnyRealtimeClient | null = null;
+  /** Single-flight transport creation (see ensureNet) — Poki's client is async. */
+  private netPending: Promise<AnyRealtimeClient> | null = null;
   private roomCode = "";
   /** True when the current roomCode was entered/invited by another player
    *  (vs. generated locally by host-room or by quick-match shuffle). Only
@@ -940,6 +947,26 @@ export class Game {
       // Surface runtime failures in the portal's error dashboard, not only in
       // a console nobody watches on a portal.
       this.detachPortalErrorReporters = attachPortalErrorReporters(adapter);
+      // Poki requirement: space/arrow keys and the wheel must not scroll the
+      // host page while the game is embedded in it.
+      this.detachPageScrollGuards = installPageScrollGuards();
+      // Poki User Accounts: a signed-in player is shown under their Poki
+      // username rather than a generated call sign — that is the name their
+      // friends recognise and the name that belongs on the board. It is only
+      // adopted when the player has not chosen a name of their own in this
+      // save, and rolling the dice always wins over it (the dice handler
+      // overwrites this later). `getUser()` is read-only, so this can never
+      // pop an account prompt on load — the prompt is user-initiated only.
+      void this.adoptPortalIdentity();
+      // Localization: adopt the portal's language for the first paint, before
+      // the player has chosen one themselves (guide: serve the player's own
+      // language automatically rather than making them hunt for a setting).
+      void adoptPortalLocale(adapter.getLanguage()).then((changed) => {
+        if (changed && !this.disposed) this.bump();
+      });
+      // Keep the mobile Poki pill off the HUD: the daylight meter and the
+      // mute/pause cluster own the top band.
+      adapter.movePill(0, 56);
       adapter.loadingFinished();
       adapter.signalGameReady();
       // Late-landing sync: if the player is already mid-flight when the
@@ -996,21 +1023,54 @@ export class Game {
     bootStage("flight");
     this.bump();
     this.pushHud();
-    // Show name entry on first use
+    // First use: ask for a name only where the player can actually choose one.
+    // Portal editions roll a curated call sign instead of accepting typed text
+    // (edition CUSTOM_PILOT_NAMES), so a "confirm your name" screen there has
+    // nothing to confirm — it is one screen and one tap between the visitor and
+    // the first `gameplayStart()`, and that first gameplay event is exactly what
+    // Poki measures as conversion to play. The generated name is accepted
+    // silently instead; the 🎲 on the board page can still reroll it, and
+    // `pilotNameChosen` stays false so a signed-in player is still adopted by
+    // `adoptPortalIdentity()` when the portal identity resolves.
     if (!this.save.state.pilotNameCustomized && this.state === "menu") {
-      this.setScreen("nameEntry");
-      this.hud.setValue("pilotNameInput", this.pilotName);
+      if (CUSTOM_PILOT_NAMES) {
+        this.setScreen("nameEntry");
+        this.hud.setValue("pilotNameInput", this.pilotName);
+      } else {
+        this.save.state.pilotNameCustomized = true;
+        this.save.persist();
+      }
     }
   }
 
-  private createNetTransport(deviceId: string, pilotName: string, skinId: string): AnyRealtimeClient {
-    if (POKI_MULTIPLAYER && _PokiNetlibClass) {
-      return new _PokiNetlibClass(deviceId, pilotName, skinId, 0.06);
-    }
-    return new RealtimeClient(deviceId, pilotName, skinId, 0.06);
+  /**
+   * Builds this edition's realtime client through the per-target transport
+   * module (`./net-transport`, swapped on the Poki target for the Netlib P2P
+   * client) and seats it. Async because the Poki client arrives via a dynamic
+   * import, and single-flight: preseatLobby() and connectRace() can both run
+   * before the import resolves, and two clients in one lobby is exactly the
+   * bug this funnel prevents.
+   */
+  private ensureNet(seed: string, remote: boolean): void {
+    this.netPending ??= createNetTransport(this.save.state.deviceId, this.pilotName, this.skin.id);
+    void this.netPending
+      .then((client) => {
+        if (this.disposed) return;
+        this.net = client;
+        this.massRace.attachTransport(client);
+        client.setIdentity(this.racedName(), this.skin.id, 0.06);
+        client.connect(this.roomCode, seed, remote);
+      })
+      .catch(() => {
+        // A transport that cannot be created leaves `this.net` null, which is
+        // the same state as "multiplayer unavailable": MassRace keeps flying
+        // the local squadron and the UI says so.
+      });
   }
 
   dispose(): void {
+    this.detachPageScrollGuards?.();
+    this.detachPageScrollGuards = null;
     if (this.disposed) return;
     this.disposed = true;
     this.watchdog.stop();
@@ -3493,9 +3553,10 @@ export class Game {
         if (this.state === "paused") this.closePauseScreen();
         this.exitVersus();
         if (this.state === "gameover" && this.portalEnabled() && this.platform && this.platform.name !== "none") {
-          // Leaving the recap for the menu is one of Poki's documented
-          // commercial-break points ("back to the main menu"); the SDK
-          // frequency-caps how often a real ad actually serves.
+          // Leaving the recap for the menu is a natural stop, and the portal's
+          // own frequency capping decides whether a real ad serves. The break
+          // routes through menuAfterPortalBreak(), so an absent/declined ad
+          // still lands the player in the menu instead of wedging in "ad".
           this.telemetry.track("portal_break_request", { portal: this.platform.name, placement: "to-menu" });
           void this.menuAfterPortalBreak();
           break;
@@ -3600,6 +3661,7 @@ export class Game {
         const chosen = freeText ? requested : generatePilotName();
         const next = savePilotName(chosen);
         this.pilotName = next;
+        this.pilotNameChosen = true;
         this.save.state.pilotName = next;
         this.save.state.pilotNameCustomized = true;
         if (freeText) this.hud.setValue("pilotName", next);
@@ -3613,6 +3675,7 @@ export class Game {
         this.hud.setValue("pilotName", gen);
         const next = savePilotName(gen);
         this.pilotName = next;
+        this.pilotNameChosen = true; // an explicit roll outranks a portal name
         this.save.state.pilotName = next;
         this.save.state.pilotNameCustomized = true;
         this.save.persist();
@@ -3698,9 +3761,17 @@ export class Game {
         // confirms, so a reload still lands on the welcome screen.
         const next = savePilotName(gen);
         this.pilotName = next;
+        this.pilotNameChosen = true; // explicit roll; never re-adopted from the portal
         this.save.state.pilotName = next;
         this.save.persist();
         this.bump();
+        break;
+      }
+      case "portal-sign-in": {
+        // Explicitly player-initiated, which is the only way Poki permits
+        // `login()`: it may show a full-screen auth panel and reload the page.
+        // Fire-and-forget from the (synchronous) action dispatcher.
+        void this.signInToPortal();
         break;
       }
       case "claim-rank-prize": {
@@ -4477,6 +4548,31 @@ export class Game {
       case "install-app":
         void this.installApp();
         break;
+      case "open-privacy": {
+        // Privacy policy, opened through the platform adapter: on Poki that is
+        // `PokiSDK.openExternalLink`, which opens the URL in Poki's own modal
+        // instead of navigating the game frame away. Same-origin deploys get a
+        // new tab. The page itself is `public/privacy.html` (SUBMISSION plan:
+        // SUB-06 … SUB-08).
+        const platform = this.platform;
+        if (platform && platform.name !== "none") {
+          platform.openExternalLink(PRIVACY_URL);
+        } else {
+          // Off-portal: a plain anchor click. Deliberately not window.open —
+          // portal gates ban popups bundle-wide, and a synthesized link is the
+          // same navigation without the popup semantics.
+          const link = document.createElement("a");
+          link.href = PRIVACY_URL;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          link.style.display = "none";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+        }
+        this.telemetry.track("privacy_open", { portal: platform?.name ?? "none" });
+        break;
+      }
       case "continue-coins":
         if (this.state === "continue" && this.save.spend(CONTINUE_COST)) this.doContinue("coins");
         break;
@@ -5356,6 +5452,58 @@ export class Game {
    * rewarded button would be a lie. Callers use this to skip the ad state
    * entirely and offer the coin / gold paths instead.
    */
+  /**
+   * Use the portal account's username as the pilot name when the player is
+   * signed in and has not picked a call sign themselves.
+   *
+   * Poki's User Accounts doc is explicit that `getUser()` is safe to call
+   * after load, and that `login()` must only run from a user interaction —
+   * this method only ever calls the former.
+   */
+  private async adoptPortalIdentity(): Promise<void> {
+    const platform = this.platform;
+    if (!platform || platform.name === "none") return;
+    try {
+      const identity = await platform.getIdentity();
+      if (this.disposed || !identity?.name) return;
+      this.portalAccountName = identity.name;
+      // Explicit choices win: the dice, a typed rename. The welcome screen's
+      // "let's fly" is NOT a choice — on a portal it merely accepts the curated
+      // name already on the plate — so a signed-in player is still adopted
+      // after it.
+      if (this.pilotNameChosen) return;
+      const next = identity.name.slice(0, 14);
+      if (!next || next === this.pilotName) return;
+      this.pilotName = next;
+      this.save.state.pilotName = next;
+      // The platform already knows who they are, so the name-entry screen has
+      // nothing to ask: straight to the menu (Poki: "skip the menu" / minimal
+      // first steps). The dice later still overrides both.
+      this.save.state.pilotNameCustomized = true;
+      this.save.persist();
+      this.bump();
+    } catch {
+      // No user accounts on this portal (or the player opted out): the
+      // generated call sign stays, which is the documented fallback.
+    }
+  }
+
+  /** Player-initiated portal sign-in. Never call this on load (Poki docs). */
+  private async signInToPortal(): Promise<void> {
+    const platform = this.platform;
+    if (!platform || platform.name === "none") return;
+    const linked = await platform.requestAccountLink();
+    if (this.disposed) return;
+    if (linked) {
+      await this.adoptPortalIdentity();
+      this.audio.fanfare();
+      this.hud.toast("Signed in — progress is now synced", "gold");
+    } else {
+      this.hud.toast("Sign-in cancelled", "info");
+    }
+    this.bump();
+  }
+
   private adsLive(): boolean {
     const platform = this.platform;
     if (!this.portalEnabled() || !platform || platform.name === "none") return false;
@@ -5580,12 +5728,15 @@ export class Game {
     // "circuits aren't actually PvP" bug.
     const seed = this.currentMatchSeed();
     const remote = this.joiningRemoteRoom;
-    if (!this.net) {
-      this.net = this.createNetTransport(this.save.state.deviceId, this.pilotName, this.skin.id);
+    if (this.net) {
+      // Already seated (a reconnect, or a second lobby visit): keep the same
+      // client and just re-announce ourselves into the room.
       this.massRace.attachTransport(this.net);
+      this.net.setIdentity(this.racedName(), this.skin.id, 0.06);
+      this.net.connect(this.roomCode, seed, remote);
+      return;
     }
-    this.net.setIdentity(this.racedName(), this.skin.id, 0.06);
-    this.net.connect(this.roomCode, seed, remote);
+    this.ensureNet(seed, remote);
   }
 
   /** Stable seed for matchmaking/connect that identifies ONE race uniquely:
@@ -5638,13 +5789,21 @@ export class Game {
     // Poki still never bails here and every other edition still bails unless a
     // multiplayer backend is configured.
     if (!isMultiplayerConfigured() && !POKI_MULTIPLAYER) return;
-    if (this.net?.connected) { this.massRace.attachTransport(this.net); return; }
-    if (!this.net) {
-      this.net = this.createNetTransport(this.save.state.deviceId, this.pilotName, this.skin.id);
+    const seed = this.currentMatchSeed();
+    const remote = this.joiningRemoteRoom;
+    if (this.net?.connected) {
       this.massRace.attachTransport(this.net);
+      this.net.setIdentity(this.racedName(), this.skin.id, 0.06);
+      this.net.connect(this.roomCode, seed, remote);
+      return;
     }
-    this.net.setIdentity(this.racedName(), this.skin.id, 0.06);
-    this.net.connect(this.roomCode, this.currentMatchSeed(), this.joiningRemoteRoom);
+    if (this.net) {
+      this.massRace.attachTransport(this.net);
+      this.net.setIdentity(this.racedName(), this.skin.id, 0.06);
+      this.net.connect(this.roomCode, seed, remote);
+      return;
+    }
+    this.ensureNet(seed, remote);
   }
 
   private disconnectRace(): void {
@@ -5934,7 +6093,11 @@ export class Game {
    */
   private async menuAfterPortalBreak(): Promise<void> {
     const platform = this.platform;
-    if (!this.adsLive() || !platform || platform.name === "none") return;
+    if (!this.adsLive() || !platform || platform.name === "none") {
+      this.goToMenu();
+      this.bump();
+      return;
+    }
     this.setState("ad");
     await platform.commercialBreak();
     if (this.disposed) return;
@@ -6132,7 +6295,23 @@ export class Game {
     // just-finished run shows up immediately (cache-first, non-blocking). Only
     // do this for the real main menu — during pause, "main" is the pause card.
     if (s === "main" && this.state !== "paused") void this.refreshBoard();
+    this.measureScreenExposure(s);
     this.bump();
+  }
+
+  /**
+   * Game Events pairing rule: every `interact` needs a `visible` for the same
+   * element, otherwise exposure and engagement cannot be compared. Two elements
+   * are measured on interaction only (`open-portal-leaderboard`, `equip-skin`),
+   * so the screen that shows them reports their exposure here — once per entry,
+   * which is exactly "the player saw this".
+   */
+  private measureScreenExposure(s: UiScreen): void {
+    const platform = this.platform;
+    if (!platform || platform.name === "none") return;
+    if (s === "board") platform.measure("button", "portal-leaderboard", "visible");
+    // The wardrobe lives in the shop screen's skin grid.
+    if (s === "shop") platform.measure("cosmetic", "skin-grid", "visible");
   }
 
   private bump(): void {
@@ -6574,6 +6753,7 @@ export class Game {
       boardScope: this.boardScope,
       boardMetric: this.boardMetric,
       boardOnline: isLeaderboardOnline(),
+      portalAccountName: this.portalAccountName,
       // Pulled from the page the menu already warms (scope global / distance):
       // no extra request, and nothing to render on a cold cache.
       homeBoard: (this.board.peek("global", "distance")?.entries ?? []).slice(0, 3).map((e) => ({
@@ -6618,7 +6798,7 @@ export class Game {
           ? this.massRace.rivals.slice(0, 12).map((r) => ({ id: r.id, name: r.name, skill: Math.round(r.skill * 100), hue: Math.round(r.hue * 360) }))
           : [],
       netState: this.net?.info().state ?? "offline",
-      linkQuality: this.net instanceof RealtimeClient ? this.net.connectionQuality : "unknown",
+      linkQuality: this.net?.connectionQuality ?? "unknown",
       netError: this.net?.info().error ?? "",
       draft: this.massRace.draft,
       finishRemaining: this.finishRemaining,

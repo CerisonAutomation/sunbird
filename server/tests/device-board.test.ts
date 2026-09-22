@@ -3,7 +3,7 @@ import { buildCtx } from "../src/server.js";
 import { V1_ROUTES } from "../src/http/api.js";
 import type { Ctx } from "../src/core/ctx.js";
 import type { Route } from "../src/http/router.js";
-import { Db, dataFilePath, emptyDbState } from "../src/store/db.js";
+import { Db, dataFilePath } from "../src/store/db.js";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -20,7 +20,20 @@ function route(method: string, path: string): Route {
   return r;
 }
 
-function get(ctx: Ctx, query: string): { entries: Record<string, unknown>[]; rank: number; total: number } {
+/** One best-row-per-device entry, as the /board contract returns it. */
+type BoardRow = {
+  deviceId: string;
+  name: string;
+  distance: number;
+  altitude: number;
+  perfects: number;
+  coins: number;
+  score: number;
+  date: string;
+  [key: string]: unknown;
+};
+
+function get(ctx: Ctx, query: string): { entries: BoardRow[]; rank: number; total: number } {
   const r = route("GET", "/board");
   return r.handler(ctx, {}, new URLSearchParams(query), {}, "") as never;
 }

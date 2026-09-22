@@ -1,16 +1,16 @@
 # Poki compliance report
 
 **Generated:** 2026-09-22 by `pnpm poki:audit` — do not edit by hand.
-**Result:** ✅ every satisfied rule verified · 104/118 rules verified · 77 of them hard requirements.
+**Result:** ✅ every satisfied rule verified · 159/188 rules verified · 131 of them hard requirements.
 
-**Scope:** the extracted guide corpus in this folder (`requirements.json`, version 2026-09-17). Rules marked *action* are human/submission steps, *deferred* are accepted gaps with a recorded reason — both are listed so nothing is silently skipped.
+**Scope:** the extracted guide corpus in this folder (`requirements.json`, version 2026-09-22). Rules marked *action* are human/submission steps, *deferred* are accepted gaps with a recorded reason — both are listed so nothing is silently skipped.
 
 | Status | Rules |
 |---|---|
-| satisfied | 104 |
-| action (submission step) | 4 |
+| satisfied | 159 |
+| action (submission step) | 8 |
 | deferred (accepted) | 0 |
-| informational | 10 |
+| informational | 21 |
 
 ## GK — Developer Guide overview
 
@@ -43,7 +43,7 @@
 | Rule | Kind | Requirement | Status | Verification |
 |---|---|---|---|---|
 | `EA-01` | requirement | Mobile first: prioritise mobile compatibility early, not as a late port. | ✅ | src/game/Game.ts matches /isCoarsePointer\(\)/ |
-| `EA-02` | requirement | Keep it small: target an 8–10 MB game file for older hardware and slow connections. | ✅ | gate wired: node scripts/verify-portal.mjs |
+| `EA-02` | requirement | Keep it small: target an 8–10 MB game file for older hardware and slow connections. | ✅ | gate wired: node scripts/verify-portal.mjs (needs sunbird-poki.zip — run with --run after build:portals) |
 | `EA-03` | recommendation | Skip the menu: let first-time players reach gameplay without splash/title/level-select detours. | ✅ | src/game/HUD.ts matches /home-launch/ |
 | `EA-04` | requirement | Loading screens must be visually engaging and include a progress bar. | ✅ | index.html matches /role="progressbar"/ |
 | `EA-05` | recommendation | Progressive loading: ship essential initial assets first, load the rest in the background. | ✅ | src/game/__tests__/boot-progress.test.ts |
@@ -148,8 +148,8 @@
 | Rule | Kind | Requirement | Status | Verification |
 |---|---|---|---|---|
 | `TOOL-01` | informational | The Inspector evaluates a web build against the platform's success factors. | ℹ️ info | Submission-time tool run. |
-| `TOOL-02` | requirement | The build must survive the Inspector's mobile and technical-optimisation passes (no external resources, no console errors, sane image weights). | ✅ | gate wired: node scripts/audit-zips.mjs |
-| `TOOL-03` | requirement | Uploadable as a folder with index.html at the root, working from any sub-path. | ✅ | gate wired: node scripts/verify-upload.mjs |
+| `TOOL-02` | requirement | The build must survive the Inspector's mobile and technical-optimisation passes (no external resources, no console errors, sane image weights). | ✅ | gate wired: node scripts/audit-zips.mjs (needs sunbird-poki.zip — run with --run after build:portals) |
+| `TOOL-03` | requirement | Uploadable as a folder with index.html at the root, working from any sub-path. | ✅ | gate wired: node scripts/verify-upload.mjs (needs sunbird-poki.zip, dist-poki/index.html — run with --run after build:portals) |
 | `TOOL-04` | informational | Netlib is a WebRTC-datachannel P2P library for web games. | ℹ️ info | src/game/PokiNetlib.ts |
 | `TOOL-05` | informational | Netlib is usable whether or not the game is hosted on Poki. | ℹ️ info | Availability note. |
 | `TOOL-06` | requirement | Feature-detect WebRTC and keep a non-P2P path when using Netlib. | ✅ | src/game/PokiMpUtils.ts matches /RTCPeerConnection/ |
@@ -165,8 +165,8 @@
 | `REQ-01` | requirement | Scale to 640x360, 836x470 and 1031x580 (plus real devices) with no crop or scroll. | ✅ | e2e/scaling.spec.ts (pinned: /640\|836\|1031/) |
 | `REQ-02` | requirement | Run inside a cross-origin iframe: no top-level navigation, window.open, dialogs, or console errors. | ✅ | src/rejection-guard.ts matches /unhandledrejection\|rejection/ |
 | `REQ-03` | requirement | Fully playable in incognito / with storage blocked. | ✅ | src/game/__tests__/storage.test.ts |
-| `REQ-04` | requirement | Initial download under ~5 MB, total under ~8 MB. | ✅ | gate wired: node scripts/verify-portal.mjs |
-| `REQ-05` | requirement | No service worker or manifest inside portal builds. | ✅ | gate wired: node scripts/verify-portal.mjs |
+| `REQ-04` | requirement | Initial download under ~5 MB, total under ~8 MB. | ✅ | gate wired: node scripts/verify-portal.mjs (needs sunbird-poki.zip — run with --run after build:portals) |
+| `REQ-05` | requirement | No service worker or manifest inside portal builds. | ✅ | gate wired: node scripts/verify-portal.mjs (needs sunbird-poki.zip — run with --run after build:portals) |
 | `REQ-06` | requirement | Fixed non-scrolling page with the canvas filling the viewport; portrait and landscape supported. | ✅ | src/index.css matches /position: fixed/ |
 | `REQ-10` | requirement | Lifecycle order init -> gameLoadingStart -> gameLoadingFinished, each phase marker once. | ✅ | src/sdk/__tests__/platform-failsafe.test.ts |
 | `REQ-11` | requirement | gameplayStart on real play start, gameplayStop on stop; never duplicated or inverted. | ✅ | e2e/poki-artifact.spec.ts |
@@ -175,30 +175,156 @@
 | `REQ-14` | requirement | Rewarded placements emit visible when shown and interact when chosen. | ✅ | src/game/Game.ts matches /continue-ad/ |
 | `REQ-15` | requirement | Mute audio and disable input for the whole ad break. | ✅ | src/game/Game.ts matches /beginPortalAd/ |
 | `REQ-16` | requirement | Work when the SDK is unavailable: boot anyway, never block on the portal. | ✅ | src/game/__tests__/journey-reliability.test.ts |
-| `REQ-20` | requirement | No in-app purchases on the platform and no UI implying them. | ✅ | gate wired: node scripts/verify-portal.mjs |
+| `REQ-20` | requirement | No in-app purchases on the platform and no UI implying them. | ✅ | gate wired: node scripts/verify-portal.mjs (needs sunbird-poki.zip — run with --run after build:portals) |
 | `REQ-21` | requirement | No secondary spendable currencies. | ✅ | src/game/__tests__/economy.test.ts |
-| `REQ-22` | requirement | No third-party ad systems. | ✅ | gate wired: node scripts/audit-zips.mjs |
+| `REQ-22` | requirement | No third-party ad systems. | ✅ | gate wired: node scripts/audit-zips.mjs (needs sunbird-poki.zip — run with --run after build:portals) |
 | `REQ-23` | requirement | No ad-timer or cooldown manipulation. | ✅ | src/game/Game.ts matches /portalEnabled\(\)/ |
-| `REQ-24` | requirement | External links only through the platform API; portal builds should have none. | ✅ | gate wired: node scripts/verify-portal.mjs |
+| `REQ-24` | requirement | External links only through the platform API; portal builds should have none. | ✅ | gate wired: node scripts/verify-portal.mjs (needs sunbird-poki.zip — run with --run after build:portals) |
 | `REQ-30` | requirement | All-ages content: no violence, sexual content, gambling, substances, fear or bullying. | ✅ attested | Family-friendly bird flight; no combat, no gore, no casino framing (the lucky wheel is a free daily gift, not a paid spin), no substances, no chat. |
-| `REQ-31` | requirement | No chat in multiplayer surfaces; emotes are the recommended alternative. | ✅ | gate wired: node scripts/verify-portal.mjs (needs sunbird-crazy.zip, sunbird-generic.zip — run with --run after build:portals) |
+| `REQ-31` | requirement | No chat in multiplayer surfaces; emotes are the recommended alternative. | ✅ | gate wired: node scripts/verify-portal.mjs (needs sunbird-poki.zip, sunbird-crazy.zip, sunbird-generic.zip — run with --run after build:portals) |
 | `REQ-32` | requirement | No PII collection; platform identity is display-only. | ✅ | src/sdk/poki.ts matches /getIdentity/ |
 | `REQ-33` | requirement | Originality: art, UI, mechanics, characters, audio and name must be the developer's own. | ✅ attested | Procedural biomes, custom UI, original bird/characters, procedural score; no third-party art or audio. |
 | `REQ-34` | requirement | AI-assisted production: no watermarks or prompt text; process documentable on request. | ✅ attested | No AI-generated asset files ship (art is procedural, audio is synthesized); production history is the git log. |
-| `REQ-35` | recommendation | External resources policy: prefer zero external requests; bundle assets and avoid CDNs. | ✅ | gate wired: node scripts/audit-zips.mjs |
+| `REQ-35` | recommendation | External resources policy: prefer zero external requests; bundle assets and avoid CDNs. | ✅ | gate wired: node scripts/audit-zips.mjs (needs sunbird-poki.zip — run with --run after build:portals) |
 | `REQ-40` | requirement | Identity is passive: never force a login at boot. | ✅ attested | login() is deliberately not called at boot (Poki's login reloads the page on first use); getUser() is passive with a local fallback name. |
 | `REQ-41` | recommendation | Platform tokens are short-lived and must be verified server-side immediately, never stored. | ✅ | src/sdk/poki.ts matches /getToken/ |
 | `REQ-42` | requirement | A player who is not signed in must still play the full game. | ✅ | src/game/__tests__/save.test.ts |
 | `REQ-50` | informational | Revenue split: 100% on search/owned traffic, 50/50 on platform-driven traffic. | ℹ️ info | Business term; nothing to implement. |
-| `REQ-51` | requirement | The submitted build is web-exclusive: no store build that double-serves the Poki artifact. | ✅ | gate wired: node scripts/audit-zips.mjs |
+| `REQ-51` | requirement | The submitted build is web-exclusive: no store build that double-serves the Poki artifact. | ✅ | gate wired: node scripts/audit-zips.mjs (needs sunbird-poki.zip — run with --run after build:portals) |
 | `REQ-52` | informational | Release flow: folder upload -> Inspector QA -> player-fit test -> web-fit test -> review. | 📋 action | Walk the Inspector QA modules on the unzipped folder (Event Log sequences, External Resources, Image Optimization, Scaling tests, mobile QR). |
 | `REQ-53` | informational | Web-fit metrics: C2P (click-to-play), CTR (thumbnail), time on page. | ℹ️ info | C2P is minimised by the sub-1 MB boot and immediate first frame; CTR by the specification-compliant thumbnail; time-on-page by the daily/weekly retention loops. |
 | `REQ-60` | requirement | Do not place HUD under the mobile platform pill; use movePill() to relocate it. | ✅ | src/sdk/platform.ts matches /movePill/ |
 | `REQ-61` | requirement | No player-authored text or personal-data collection: multiplayer-visible names must be curated, not typed by the player. | ✅ | src/game/__tests__/pilot-name-surface.test.ts (pinned: /CUSTOM_PILOT_NAMES/) |
 | `REQ-62` | requirement | No offer to remove or disable ads, and no ad-frequency claim in a portal paywall. | ✅ | src/game/__tests__/portal-policy.test.ts (pinned: /sponsored breaks/) |
-| `REQ-63` | requirement | Portal bundles must contain no ad-removal copy and no free-text name field (bundle-level enforcement of REQ-20 and the player-safety policy). | ✅ | gate wired: node scripts/verify-portal.mjs |
+| `REQ-63` | requirement | Portal bundles must contain no ad-removal copy and no free-text name field (bundle-level enforcement of REQ-20 and the player-safety policy). | ✅ | gate wired: node scripts/verify-portal.mjs (needs sunbird-poki.zip — run with --run after build:portals) |
 | `REQ-64` | requirement | A portal build must not describe or count ad breaks it does not schedule — the platform owns ad frequency. | ✅ | e2e/portal-policy.spec.ts (pinned: /must not offer ad removal/) |
 | `REQ-65` | requirement | A portal build must issue no request that can fail on the host origin (no relative calls to absent backends). | ✅ | e2e/portal-policy.spec.ts (pinned: /HTTP \$\{r.status/) |
+
+## SDK — PokiSDK: HTML5
+
+*Source page: [`10-sdk-html5.md`](./10-sdk-html5.md)*
+
+| Rule | Kind | Requirement | Status | Verification |
+|---|---|---|---|---|
+| `SDK-01` | requirement | The SDK is loaded from the platform CDN in the page head; never bundled or re-hosted. | ✅ | scripts/package-portal.mjs matches /game-cdn\.poki\.com/scripts/v2/poki-sdk\.js/ |
+| `SDK-02` | requirement | init() runs at start and the game continues on both then() and catch(). | ✅ | src/sdk/platform.ts matches /pokiInitOptions/ |
+| `SDK-03` | requirement | gameLoadingFinished() fires when loading completes, exactly once. | ✅ | src/sdk/poki.ts matches /loadingFinishedSent/ |
+| `SDK-04` | requirement | gameplayStart()/gameplayStop() mark play and its halt, never repeating the same phase. | ✅ | src/game/__tests__/poki-analytics.test.ts (pinned: /GameplayEventSink\|gameplayStart/) |
+| `SDK-05` | requirement | commercialBreak() fires at natural stops as the player heads back into gameplay. | ✅ | src/game/Game.ts matches /commercialBreak/ |
+| `SDK-06` | requirement | Audio is muted and input disabled for the duration of a break, restored afterwards. | ✅ | src/game/Game.ts matches /setAdMuted/ |
+| `SDK-07` | requirement | A break that does not interrupt gameplay carries no stop/start pair. | ✅ | src/game/Game.ts matches /No gameplay event is sent here on purpose/ |
+| `SDK-08` | requirement | rewardedBreak() rewards only on true, after telling the player an ad is coming. | ✅ | src/game/Game.ts matches /rewardedBreak/ |
+| `SDK-09` | informational | A rewarded break resets the platform's commercial ad timer. | ℹ️ info | Platform-side behaviour; the game schedules no ads of its own. |
+| `SDK-10` | requirement | Space/arrow keys and wheel must not scroll the host page. | ✅ | src/sdk/platform.ts matches /installPageScrollGuards/ |
+| `SDK-11` | requirement | Shareable links use shareableURL() and are read back with getURLParam(). | ✅ | src/sdk/poki.ts matches /shareableURL/ |
+| `SDK-12` | requirement | External navigation goes through openExternalLink() — the game frame never navigates away. | ✅ | src/game/Game.ts matches /openExternalLink/ |
+| `SDK-13` | recommendation | movePill(topPercent, topPx) keeps the mobile pill clear of the UI; topPercent is 0–50. | ✅ | src/sdk/platform.ts matches /movePill/ |
+| `SDK-14` | informational | Pill is 46x62 below 1211px wide and 92x64 at 1211px and up. | ℹ️ info | Platform-drawn element; sizing is informational for layout decisions. |
+| `SDK-15` | requirement | The build is uploaded as a folder with index.html at the root and its event log checked in the Inspector. | 📋 action | gate wired: pnpm verify:upload |
+
+## EV — SDK overview & events
+
+*Source page: [`11-sdk-events.md`](./11-sdk-events.md)*
+
+| Rule | Kind | Requirement | Status | Verification |
+|---|---|---|---|---|
+| `EV-02` | informational | gameLoadingFinished() is required to track loading and C2P. | ℹ️ info | Tracked by SDK-03. |
+| `EV-03` | requirement | gameplayStart() = player starts interacting; gameplayStop() = gameplay halts. | ✅ | src/game/GameplayEvents.ts matches /send\(phase/ |
+| `EV-04` | requirement | Signal commercial opportunities liberally at natural stops; the platform decides when an ad shows. | ✅ | src/game/Game.ts matches /onAdOpened: \(\) => this.beginPortalAd\(\)/ |
+| `EV-06` | requirement | Startup order is gameLoadingFinished() then gameplayStart(). | ✅ | src/game/__tests__/poki-analytics.test.ts (pinned: /gameplayStart/) |
+| `EV-07` | requirement | Death/next-level/pause sequence is stop → commercialBreak → start. | ✅ | src/game/__tests__/poki-analytics.test.ts (pinned: /commercialBreak/) |
+| `EV-08` | requirement | Revive sequence is stop → rewardedBreak → start. | ✅ | src/game/__tests__/poki-analytics.test.ts (pinned: /rewardedBreak/) |
+| `EV-09` | requirement | Non-interrupting ads need no stop/start pair. | ✅ | src/game/Game.ts matches /stop/start pairs/ |
+| `EV-10` | requirement | No consecutive duplicate phases and no gameplay phase while an ad is on screen. | ✅ | src/game/__tests__/poki-analytics.test.ts (pinned: /break/) |
+| `EV-11` | requirement | The Inspector Event Log is the acceptance surface for the sequences. | 📋 action | Drop poki-upload/ into the Inspector and walk the event log before requesting review. |
+
+## GM — Game Events (measure)
+
+*Source page: [`12-game-events.md`](./12-game-events.md)*
+
+| Rule | Kind | Requirement | Status | Verification |
+|---|---|---|---|---|
+| `GM-01` | requirement | Event tracking is switched on at boot, or no measure() checkpoint is recorded. | ✅ | src/sdk/platform.ts matches /enableEventTracking/ |
+| `GM-02` | requirement | measure() uses short, stable category/what/action values. | ✅ | src/game/Game.ts matches /measure\("run"/ |
+| `GM-03` | requirement | '/' and '^' must not appear in any measure() value. | ✅ | src/game/__tests__/poki-game-events.test.ts (pinned: /reserved/) |
+| `GM-04` | requirement | Progress events pair start with exactly one of complete/fail, same category and what. | ✅ | src/game/Game.ts matches /this.runOutcome/ |
+| `GM-05` | requirement | Interaction events pair visible with interact for the same category/what. | ✅ | src/game/__tests__/poki-game-events.test.ts (pinned: /visible/) |
+| `GM-06` | requirement | measure() must not duplicate ad impressions or completions. | ✅ | src/game/Game.ts matches /rewarded bonus card is on the recap/ |
+| `GM-07` | recommendation | Rewarded placements are measured per placement. | ✅ | src/game/ContinueOffer.ts matches /continuePlacementLabel/ |
+| `GM-08` | recommendation | Custom events cover milestones and choices that fit no pattern. | ✅ | src/game/Game.ts matches /measure\("reward"/ |
+
+## NL — Poki Networking Library (Netlib)
+
+*Source page: [`13-netlib.md`](./13-netlib.md)*
+
+| Rule | Kind | Requirement | Status | Verification |
+|---|---|---|---|---|
+| `NL-02` | requirement | new Network(<game-id>) then create() a lobby or join(code) it. | ✅ | src/game/PokiNetlib.ts matches /new Network\(NETLIB_GAME_ID\)/ |
+| `NL-03` | requirement | Real-time state on the unreliable channel; critical events on reliable. | ✅ | src/game/PokiNetlib.ts matches /unreliable/ |
+| `NL-05` | requirement | WebRTC is feature-detected and a non-WebRTC path exists. | ✅ | src/game/PokiMpUtils.ts matches /RTCPeerConnection/ |
+| `NL-06` | requirement | The UI says whether the player is in a live room or a local/AI fallback. | ✅ | src/game/Game.ts matches /multiplayerLive/ |
+| `NL-07` | requirement | A dropped connection must not end the session; degrade to the local flock. | ✅ | src/game/PokiNetlib.ts matches /closedByUs/ |
+| `NL-08` | requirement | Netlib is loaded lazily so it never lands in the boot path. | ✅ | src/game/net-transport.poki.ts matches /await import\("\./PokiNetlib"\)/ |
+| `NL-09` | requirement | A Netlib build must not contain another platform's transport names or endpoints. | ✅ | gate wired: pnpm isolation:check |
+| `NL-10` | requirement | Lobby codes are short and unambiguous to read aloud. | ✅ | src/game/PokiMpUtils.ts matches /ABCDEFGHJKLMNPQRSTUVWXYZ/ |
+
+## AU — AUDS: Arbitrary User Data Store
+
+*Source page: [`14-auds.md`](./14-auds.md)*
+
+| Rule | Kind | Requirement | Status | Verification |
+|---|---|---|---|---|
+| `AU-01` | informational | POST …/<key> creates an entry from {data, values}; values accepts string\|number\|boolean. | ℹ️ info | API shape; implemented in src/sdk/auds.ts. |
+| `AU-02` | requirement | The create secret is returned once and must be stored if the entry will ever change. | ✅ | src/sdk/auds.ts matches /SECRET_STORAGE_PREFIX/ |
+| `AU-04` | requirement | List supports q=, sort=/-sort=, includedata and limit (1–100). | ✅ | src/sdk/auds.ts matches /sort=-/ |
+| `AU-07` | requirement | Public counters use POST …/_increment?key=<k>, key must contain 'count', no secret. | ✅ | src/game/SharedRun.ts matches /play-count/ |
+| `AU-09` | requirement | Published content is public: payloads from the network must be validated before use. | ✅ | src/game/Leaderboard.ts matches /truncate/ |
+| `AU-10` | requirement | AUDS is Poki-only; no other edition may reach auds.poki.io. | ✅ | src/sdk/auds.ts matches /createAudsIfConfigured/ |
+
+## UA — User Accounts & cloud gamesaves
+
+*Source page: [`15-user-accounts.md`](./15-user-accounts.md)*
+
+| Rule | Kind | Requirement | Status | Verification |
+|---|---|---|---|---|
+| `UA-01` | requirement | getUser() is called after load and every state (signed in, out, opted out) is handled. | ✅ | src/game/Game.ts matches /adoptPortalIdentity/ |
+| `UA-02` | requirement | login() is only called from a user interaction, never automatically on load. | ✅ | src/game/Game.ts matches /case "portal-sign-in"/ |
+| `UA-04` | requirement | getToken() tokens are short-lived (~1 min) and must not be stored or reused. | ✅ | src/sdk/poki.ts matches /getToken/ |
+| `UA-07` | requirement | Local-only data is prefixed poki_ignore so cloud gamesaves skip it. | ✅ | src/game/__tests__/storage.test.ts (pinned: /poki_ignore/) |
+| `UA-08` | requirement | The cloud save payload must stay under 1 MB gzipped. | ✅ | src/game/Storage.ts matches /LOCAL_ONLY_PREFIXES/ |
+| `UA-09` | requirement | Synced state must be safe to receive from another device. | ✅ | src/game/Storage.ts matches /physicalKey/ |
+| `UA-03` | informational | Inspector debug mode returns a static TestUser with a placeholder avatar. | ℹ️ info | The Account screen renders whatever getUser() returns. |
+
+## SUB — Submission readiness & policies
+
+*Source page: [`16-submission.md`](./16-submission.md)*
+
+| Rule | Kind | Requirement | Status | Verification |
+|---|---|---|---|---|
+| `SUB-01` | requirement | Upload a web build: folder with index.html at the root, working on desktop, mobile and tablet. | ✅ | gate wired: pnpm verify:upload |
+| `SUB-04` | requirement | Thumbnail: full-bleed square >=628px, one subject, minimal text, high contrast, not near #83FFE7. | ✅ | gate wired: pnpm verify:thumbnail |
+| `SUB-05` | recommendation | Suggested categories: up to four chosen for genuine fit. | 📋 action | Paste from docs/poki/SUBMISSION.md: Multiplayer, Racing, Flappy-style, Casual. |
+| `SUB-06` | requirement | A live privacy policy page is required before an external service can be approved. | ✅ | public/privacy.html |
+| `SUB-07` | requirement | The privacy policy must also be linked from inside the game. | ✅ | src/game/HUD.ts matches /open-privacy/ |
+| `SUB-08` | recommendation | Dashboard description and engine field describe the game and the tech. | 📋 action | Paste from docs/poki/SUBMISSION.md; engine entry is 'three-js'. |
+| `SUB-09` | requirement | External resources are requested in Settings → CSP; assets are bundled, not fetched from CDNs. | ✅ | gate wired: pnpm verify:portals |
+| `SUB-11` | requirement | No in-game chat systems; emoji/quick messages are the sanctioned alternative. | ✅ | src/game/edition.poki.ts matches /SQUAD_CHAT = false/ |
+| `SUB-12` | requirement | No external account systems and no collection of personal information. | ✅ | src/game/edition.poki.ts matches /CUSTOM_PILOT_NAMES = false/ |
+| `SUB-13` | requirement | Content must stay family-friendly (no violence, gambling, adult or scary themes). | ✅ attested | Game content: birds, islands, weather; currency earned only by flying. |
+| `SUB-14` | requirement | Controls offer alternatives so players who cannot use WASD are not excluded. | ✅ | src/game/Input.ts matches /pointerdown/ |
+| `SUB-16` | informational | Player fit test: 500 players; healthy = 3 min+ average and >=25% over 3 min. | ℹ️ info | Run after the thumbnail is uploaded; requires 10 playtest recordings watched first. |
+| `SUB-17` | informational | Web fit test weights CTR, average time on page and C2P equally; C2P comes from the first gameplayStart(). | ℹ️ info | C2P work already landed: portal editions skip the name screen and boot straight to play. |
+
+## PAR — Partnering, curation & release
+
+*Source page: [`17-partnering.md`](./17-partnering.md)*
+
+| Rule | Kind | Requirement | Status | Verification |
+|---|---|---|---|---|
+| `PAR-02` | informational | Web exclusivity: the same game may not be published on other web portals or aggregators. | ℹ️ info | Separate per-target artifacts; the exclusivity decision is a publishing choice. |
+| `PAR-05` | informational | Baseline signals: quality, player fit, and tech (load time, frame rate, file size). | ℹ️ info | gate wired: pnpm audit:zips |
+| `PAR-06` | recommendation | Beyond the baseline: originality, depth, first impression, cross-device feel, room to grow. | ℹ️ info | Documented in REBUILD_REPORT.md (30 tracks, seasons, wings, daily goals, endless/solo/race). |
+| `PAR-08` | informational | After final review: agreement, legal, QA, Soft Release, Global Release (~2-3 months). | ℹ️ info | Tracked in docs/poki/SUBMISSION.md as the roadmap after upload. |
 
 ## Actions and accepted gaps
 
@@ -208,6 +334,10 @@
 | `THB-09` | action | Record the 3-5 s capture from a real play session on a GPU machine: node scripts/capture-animated-thumbnail.mjs (serves poki-upload/, plays a scripted dive-glide loop, writes assets/submission/sunbird-thumbnail-animated.gif). Sandboxed/CI renderers read back WebGL too slowly for a smooth capture. |
 | `TOOL-08` | action | Submission step: ship with the Poki-issued game id (VITE_POKI_GAME_ID); without it every AUDS call is skipped, so the integration is dormant rather than broken. Portable builds cannot depend on it — `pnpm isolation:check` fails if auds.poki.io reaches a non-Poki edition. |
 | `REQ-52` | action | Walk the Inspector QA modules on the unzipped folder (Event Log sequences, External Resources, Image Optimization, Scaling tests, mobile QR). |
+| `SDK-15` | action | poki-upload/ + sunbird-poki.zip; verify:upload is the Inspector-shaped gate. Log check is a manual step before review. |
+| `EV-11` | action | Drop poki-upload/ into the Inspector and walk the event log before requesting review. |
+| `SUB-05` | action | Paste from docs/poki/SUBMISSION.md: Multiplayer, Racing, Flappy-style, Casual. |
+| `SUB-08` | action | Paste from docs/poki/SUBMISSION.md; engine entry is 'three-js'. |
 
 ## Evidence index
 
@@ -331,3 +461,73 @@
 | `REQ-63` | PORTAL_FORBIDDEN_MARKERS rejects /No sponsored breaks/i, ad-removal phrasing and data-ref="pilotName" in every portal zip; the direct build keeps both (dist/assets/Game-*.js). |
 | `REQ-64` | The Account screen's "Sponsored breaks respect a hard cap: N left today" line is now gated on portalName === "none"; e2e/portal-policy.spec.ts (pnpm test:policy) boots poki-upload/ in a real browser and scans the rendered text of 17 reachable screens for ad-removal/ad-schedule copy on desktop and phone. |
 | `REQ-65` | Squad.load() returned early only on abort/live/loading, so with VITE_SOCIAL_URL blanked it fetched a relative /register against the host origin — a 404 plus a console error the moment a player opened Squad on Poki. It now also bails when API is empty; the policy spec fails on any response >= 400 while walking every menu screen. |
+| `SDK-01` | scripts/package-portal.mjs injects the exact CDN script tag into the Poki head; ROOT-08 + the analytics test assert it survives packaging. |
+| `SDK-02` | bootstrapSdk() awaits init() inside a try; SDK_LOAD_TIMEOUT_MS and the loading failsafe keep a blocked CDN playable. |
+| `SDK-03` | One-shot flag in PokiAdapter.loadingFinished(); the entry-point failsafe routes through the same adapter. |
+| `SDK-04` | Every phase change funnels through GameplayEventSink (src/game/GameplayEvents.ts), which suppresses consecutive duplicates. |
+| `SDK-05` | Result/continue/pause transitions route through PlatformAdapter.commercialBreak(). |
+| `SDK-06` | beginPortalAd()/endPortalAd() silence audio and lock input; restore never depends on the pause callback firing. |
+| `SDK-07` | Documented and implemented in beginPortalAd(); pinned by the analytics test. |
+| `SDK-08` | The boolean gates the reward; the offer card is labelled with the 🎬 ad path beside a non-ad alternative. |
+| `SDK-09` | No internal ad timer exists (REQ-21), so the platform's timer is the only one. |
+| `SDK-10` | installPageScrollGuards() is wired in Game boot and detached on dispose. |
+| `SDK-11` | PokiAdapter.share() prefers the SDK URL builder and only degrades when the SDK is absent. |
+| `SDK-12` | The Settings privacy link routes through platform.openExternalLink(). |
+| `SDK-13` | Boot nudges to (50,-4) then (0,56) once the HUD exists — below the daylight meter, still above 50%. |
+| `SDK-14` | The HUD keeps the top-left band clear on both pill widths. |
+| `SDK-15` | poki-upload/ + sunbird-poki.zip; verify:upload is the Inspector-shaped gate. Log check is a manual step before review. |
+| `EV-02` | Fired once per boot. |
+| `EV-03` | The sink is the single emitter of both phases. |
+| `EV-04` | Breaks are requested at every natural halt (death, results exit, pause return). |
+| `EV-06` | The stub-SDK test asserts the boot order. |
+| `EV-07` | Pause→resume is asserted as commercialBreak start/end then gameplayStart. |
+| `EV-08` | Revive path asserted with the rewarded break. |
+| `EV-09` | Documented in beginPortalAd()'s comment and enforced by the sink. |
+| `EV-10` | The analytics test asserts zero gameplay events between break start and end. |
+| `EV-11` | Local stub-SDK probes cover the sequences; the Inspector is the platform's own check. |
+| `GM-01` | Called right after init({submitScore}) inside its own try. |
+| `GM-02` | run/<mode>/start + outcome, button/<placement>/visible + interact, reward/<placement>/granted. |
+| `GM-03` | Source-level scan of every measure() call site plus the two dynamic value definitions. |
+| `GM-04` | The settlement path sends one outcome per attempt. |
+| `GM-05` | Pinned by the game-events test (visible count >= interact count). |
+| `GM-06` | Only the offer UI is measured; ad playback is tracked by the ad calls themselves. |
+| `GM-07` | Placement labels ('continue-ad-<kind>') keep offers comparable across contexts. |
+| `GM-08` | reward/<placement>/granted records the milestone. |
+| `NL-02` | Host creates, guest joins by code; both wrapped behind the game's NetTransport interface. |
+| `NL-03` | 15 Hz unreliable state + reliable hello/start/place events. |
+| `NL-05` | isPokiMultiplayerAvailable() gates the Netlib client; net-transport.poki.ts falls back to the WebSocket client. |
+| `NL-06` | HUD status + race screen state the live/local truth; local rivals are labelled AI. |
+| `NL-07` | Reconnect + seat preservation in PokiNetlibClient; MassRace keeps flying the local squadron otherwise. |
+| `NL-08` | Dynamic import at race time; the library is not in the initial download. |
+| `NL-09` | Per-target transport module swap + isolation check. |
+| `NL-10` | No 0/O/1/I alphabet, five characters, shared with the WebSocket transport. |
+| `AU-01` | Create payloads keep values scalar. |
+| `AU-02` | Secrets are stored per entry; public score rows deliberately retain none (immutable). |
+| `AU-04` | Boards query the public sorted list with a limit. |
+| `AU-07` | Shared-run plays are counted through the public counter endpoint. |
+| `AU-09` | Leaderboard/SharedRun/GhostNet validate, clamp and truncate every network payload before rendering. |
+| `AU-10` | Gated on VITE_POKI_GAME_ID and asserted by pnpm isolation:check. |
+| `UA-01` | Adoption runs after boot; a null or throwing getUser() leaves the generated call sign in place. |
+| `UA-02` | Only the Account screen's Sign in button reaches signInToPortal(). |
+| `UA-04` | No backend needs the token, so the build never requests, stores or transmits one. |
+| `UA-07` | physicalKey() maps board/ghost/journal/squad caches, AUDS secrets and the probe onto poki_ignore.*; reads migrate legacy keys. |
+| `UA-08` | The synced set is the small progress/settings blob; large or device-specific data is ignored by construction. |
+| `UA-09` | Per-device identifiers, recordings and caches live outside the synced set. |
+| `UA-03` | TestUser renders as an ordinary signed-in account. |
+| `SUB-01` | poki-upload/ root index.html + responsive layout gates. |
+| `SUB-04` | THB gate measures size, bleed, corner mask, contrast, 128px legibility and weight. |
+| `SUB-05` | Categories are a dashboard field, not code. |
+| `SUB-06` | Self-contained policy page shipped with the standalone deploy; VITE_PRIVACY_URL can point at another host. |
+| `SUB-07` | Settings links it through platform.openExternalLink(). |
+| `SUB-08` | Dashboard fields. |
+| `SUB-09` | Bundled fonts/images + the portal external-URL gate. |
+| `SUB-11` | The chat UI is not in the portal bundle at all; emotes remain. |
+| `SUB-12` | No typed player text and no email/social login in any portal build. |
+| `SUB-13` | Reviewed against the content list; nothing to remove. |
+| `SUB-14` | Pointer drag, touch drag, keyboard and auto-glide all steer; menus are mouse/touch/keyboard navigable. |
+| `SUB-16` | Target metric for the first fit test. |
+| `SUB-17` | Measured by the platform. |
+| `PAR-02` | Kept as a build/publish policy rather than a code fork. |
+| `PAR-05` | 1.78 MB single-file build, adaptive quality tiers, measured device profile. |
+| `PAR-06` | Feature depth is tracked in the rebuild report. |
+| `PAR-08` | Planning note. |

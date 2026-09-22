@@ -59,6 +59,7 @@ type MusicInternals = {
   glockGain: { gain: { value: number } };
   chipGain: { gain: { value: number } };
   sparkGain: { gain: { value: number } };
+  whistleGain: { gain: { value: number } };
   percGain: { gain: { value: number } };
 };
 const internals = (m: Music): MusicInternals => m as unknown as MusicInternals;
@@ -98,14 +99,17 @@ describe("arcade chiptune family", () => {
     const s = internals(music);
     expect(s.isChipTrack).toBe(true);
     expect(s.isTronTrack).toBe(false);
-    // Arcade tempo, island colours silent — but the glockenspiel is the lead
-    // voice here too, with the square wave demoted to a supporting halo.
-    // (This assertion used to read `glockGain === 0`, which is what made the
-    // arcade tracks sound like a bare 8-bit buzz instead of a melody.)
+    // Arcade tempo, island colours silent. The chip lead carries the hook —
+    // the bell is a shimmer layer above it, never the voice holding the tune
+    // (leading with bells on every family made the score read as one bright
+    // percussive instrument). Both layers must be audible: the assertion that
+    // the bell is *quieter* than the lead is the part that stops the score
+    // drifting back to bell-solo.
     expect(s.bpm).toBe(164);
     expect(s.chipGain.gain.value).toBeGreaterThan(0);
     expect(s.ukeGain.gain.value).toBe(0);
-    expect(s.glockGain.gain.value).toBeGreaterThan(s.chipGain.gain.value);
+    expect(s.glockGain.gain.value).toBeGreaterThan(0);
+    expect(s.glockGain.gain.value).toBeLessThan(s.chipGain.gain.value);
     expect(s.sparkGain.gain.value).toBeGreaterThan(0);
 
     // Let the sequencer actually run — it must not throw on chip steps.
@@ -127,10 +131,36 @@ describe("arcade chiptune family", () => {
     expect(s.bpm).toBe(132); // bright biome default (upbeat floor)
     expect(s.chipGain.gain.value).toBe(0);
     expect(s.ukeGain.gain.value).toBeGreaterThan(0);
-    // The glock is the lead voice now, and the menu still has a pulse.
-    expect(s.glockGain.gain.value).toBeGreaterThan(s.ukeGain.gain.value);
+    // The ukulele/whistle carries the tune and the bell shimmers underneath it.
+    // The reverse (bells as the loudest voice) is what made the darker biomes —
+    // night, crystal, reef — read as glockenspiel solos, so it is pinned here.
+    expect(s.glockGain.gain.value).toBeGreaterThan(0);
+    expect(s.glockGain.gain.value).toBeLessThan(s.ukeGain.gain.value);
     expect(s.percGain.gain.value).toBeGreaterThan(0);
     music.dispose();
+  });
+
+  it("keeps the bells under the lead voice in every biome and mode", () => {
+    vi.useFakeTimers();
+    const biomes = ["bright", "warm", "airy", "wide", "night", "crystal", "reef", "ember", "canyon"] as const;
+    const modes = ["menu", "play", "fever"] as const;
+    for (let track = 0; track < TRACKS.length; track++) {
+      for (const biome of biomes) {
+        const { music } = fixture();
+        music.setLevel(0.8);
+        music.setBiome(biome);
+        music.setTrack(track);
+        const s = internals(music);
+        for (const mode of modes) {
+          music.setMode(mode);
+          const lead = Math.max(s.chipGain.gain.value, s.ukeGain.gain.value, s.whistleGain.gain.value);
+          // Every layer that plays bells must sit strictly below the tune.
+          expect(s.glockGain.gain.value).toBeLessThan(lead);
+          expect(s.sparkGain.gain.value).toBeLessThan(lead);
+        }
+        music.dispose();
+      }
+    }
   });
 
   it("shuffling never gets stuck and announces chip track titles", () => {

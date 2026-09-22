@@ -59,6 +59,14 @@ function portalShimPlugin(): Plugin {
                 : null;
         return edition; // null => the neutral src/game/edition.ts
       }
+      // Per-target realtime transport. The Poki build must build a Netlib
+      // (WebRTC P2P) client and every other edition must build the WebSocket
+      // relay client; swapping the module keeps that decision out of shared
+      // code, so no build can name — or bundle — another platform's transport.
+      if (base === "net-transport" || base === "net-transport.ts") {
+        if (dir !== "game") return null;
+        return PORTAL === "poki" ? path.resolve(__dirname, "src/game/net-transport.poki.ts") : null;
+      }
       if (dir !== "sdk") return null;
       if (base === "poki" || base === "poki.ts") {
         if (PORTAL !== "poki") return shim;

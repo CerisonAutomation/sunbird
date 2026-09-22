@@ -170,7 +170,16 @@ for (const portal of PORTALS) {
 
   /* ------------------------------------------------ static remote assets */
   if (/(href|src)="\//.test(html)) fail(portal, 'absolute "/asset" reference (breaks portal CDN subpaths).');
-  const staticRemote = [...html.matchAll(/<(?:script|link|img|iframe)[^>]+(?:src|href|content)=["'](https?:[^"']+)["']/g)].map((m) => m[1]);
+  // The target portal's own SDK script is the single static remote reference a
+  // build is allowed: Poki's HTML5 guide requires the SDK tag in the page head
+  // verbatim, and it is the platform's own host rather than a third-party CDN
+  // asset. Anything else — a font host, a tracker, another portal's SDK — fails.
+  const allowSdk = portal === "poki"
+    ? /^https:\/\/game-cdn\.poki\.com\/scripts\/v2\/poki-sdk\.js$/
+    : null;
+  const staticRemote = [...html.matchAll(/<(?:script|link|img|iframe)[^>]+(?:src|href|content)=["'](https?:[^"']+)["']/g)]
+    .map((m) => m[1])
+    .filter((url) => !(allowSdk && allowSdk.test(url)));
   if (staticRemote.length) fail(portal, `static remote reference(s): ${[...new Set(staticRemote)].join(", ")}`);
 
   /* ------------------------------------------------- lifecycle + fixes */

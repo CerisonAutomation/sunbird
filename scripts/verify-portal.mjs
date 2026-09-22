@@ -10,9 +10,12 @@
  *   2. Staged index.html carries no manifest link (portals are not installable).
  *   3. No js.stripe.com request URL (external payments are banned on portals).
  *   4. No absolute href="/…"/src="/…" (portals serve from deep CDN subpaths).
- *   5. Correct SDK profile: poki/crazy bundles ship their portal integration;
- *      no bundle statically loads anything remote (dynamic SDK injection is
- *      target-gated in code); generic exposes no reachable SDK loader path.
+ *   5. Correct SDK profile: poki/crazy bundles ship their portal integration.
+ *      The ONLY static remote reference any zip may carry is the target
+ *      portal's own SDK script tag — Poki's HTML5 guide requires it verbatim
+ *      in the page head, and it is the platform's own host, so it is not the
+ *      "external asset" rule REQ-40 forbids. Every other remote reference
+ *      fails the gate, and generic exposes no reachable SDK loader path.
  *   6. icons/ + fonts/ ship inside the zip (self-contained, offline-safe).
  *   7. No third-party backend markers anywhere in the bundle: portals ship
  *      local/coin-only editions, so Stripe endpoints, live/test publishable
@@ -32,6 +35,20 @@ const SDK_URL = {
   poki: "game-cdn.poki.com",
   crazy: "sdk.crazygames.com",
   generic: null,
+};
+
+/**
+ * The one remote reference each portal's build is ALLOWED to load statically.
+ *
+ * Poki's SDK guide is explicit that the game loads the SDK in the page head
+ * (`<script src="https://game-cdn.poki.com/scripts/v2/poki-sdk.js">`), so the
+ * Poki zip legitimately contains that tag. Anything else remote — a font CDN,
+ * an analytics beacon, another portal's SDK — still fails.
+ */
+const STATIC_REMOTE_ALLOW = {
+  poki: [/^https:\/\/game-cdn\.poki\.com\/scripts\/v2\/poki-sdk\.js$/],
+  crazy: [/^https:\/\/sdk\.crazygames\.com\//],
+  generic: [],
 };
 
 function fail(msg) {
@@ -81,7 +98,10 @@ for (const portal of PORTALS) {
   // presence of the other host as an inert string literal is not a load.
   const want = SDK_URL[portal];
   if (want && !html.includes(want)) failures.push(`${portal}: portal SDK (${want}) missing from bundle.`);
-  const staticRemote = [...html.matchAll(/<(?:script|link|img)[^>]+(?:src|href)="(https?:[^"]+)"/g)].map((m) => m[1]);
+  const allow = STATIC_REMOTE_ALLOW[portal] ?? [];
+  const staticRemote = [...html.matchAll(/<(?:script|link|img)[^>]+(?:src|href)="(https?:[^"]+)"/g)]
+    .map((m) => m[1])
+    .filter((url) => !allow.some((re) => re.test(url)));
   if (staticRemote.length) failures.push(`${portal}: static remote reference(s): ${[...new Set(staticRemote)].join(", ")}.`);
   // Generic obeys the same static rule: ensureSdk() returns before touching
   // scriptFor() for "generic"/"none", so the SDK loader is unreachable there

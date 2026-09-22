@@ -8,7 +8,16 @@ export const PORTAL_DISPLAY_NAME = "Poki";
 
 export const PORTAL_EDITION_NOTE = "Poki edition · portal rewards enabled";
 
-export const LEADERBOARD_CLOUD_LABEL = "☁️ Poki cloud";
+/**
+ * Board-source chip. Poki's own leaderboards are the worldwide ladder on this
+ * edition (SDK `init({ submitScore })` + `showLeaderboard`), so the chip says
+ * the portal's name and nothing else: "Poki cloud" made players ask which
+ * cloud, and a globe emoji next to "Poki" reads as decoration at chip size.
+ */
+export const LEADERBOARD_CLOUD_LABEL = "Poki";
+
+/** True only in the Poki build (see edition.ts). */
+export const POKI_EDITION = true;
 
 /** Poki's netlib transport handles multiplayer; other builds have no room API. */
 export const POKI_MULTIPLAYER = true;

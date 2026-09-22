@@ -569,14 +569,20 @@ export const BIOME_MIX: Record<BiomeMusicStyle, { bpm: number; fever: number; cu
   // Upbeat floor: nothing in the library sits below 116 BPM, and every island
   // keeps a bright register (transposition stays inside ±4 semitones so the
   // glock lead never sinks into the bass).
-  bright:  { bpm: 132, fever: 150, cutoff: 10200, uke: 0.86, glock: 1.42, bass: 0.96, perc: 1.02, whistle: 0.92, transpose: 0  },
-  warm:    { bpm: 126, fever: 146, cutoff: 8400,  uke: 1.02, glock: 1.22, bass: 1.04, perc: 1,    whistle: 0.82, transpose: -2 },
-  airy:    { bpm: 134, fever: 152, cutoff: 11000, uke: 0.76, glock: 1.52, bass: 0.86, perc: 1.18, whistle: 0.98, transpose: 2  },
-  wide:    { bpm: 128, fever: 148, cutoff: 9200,  uke: 0.76, glock: 1.3,  bass: 1.14, perc: 1,    whistle: 1.0,  transpose: -3 },
-  night:   { bpm: 124, fever: 144, cutoff: 7400,  uke: 0.6,  glock: 1.6,  bass: 0.78, perc: 0.86, whistle: 0.78, transpose: -3 },
-  crystal: { bpm: 132, fever: 150, cutoff: 11600, uke: 0.7,  glock: 1.68, bass: 0.88, perc: 1.06, whistle: 1.1,  transpose: 3  },
-  // Coral Reach: flowing, liquid — brighter glock sparkle, open high end
-  reef:    { bpm: 136, fever: 154, cutoff: 12000, uke: 0.72, glock: 1.6,  bass: 0.82, perc: 0.92, whistle: 1.02, transpose: 3  },
+  // `glock` is the BELL SPARKLE weight, and it can never exceed 1: the bells are
+  // an octave doubling that sits *under* the voice carrying the tune (whistle,
+  // uke, chip lead, or Grid synth), never the other way round. Values above 1
+  // on the darker biomes (night/crystal/reef were 1.6–1.68) made exactly those
+  // tracks read as glockenspiel solos — the score that "sometimes" sounded
+  // wrong. Keep every row ≤ 1.
+  bright:  { bpm: 132, fever: 150, cutoff: 10200, uke: 0.86, glock: 0.82, bass: 0.96, perc: 1.02, whistle: 0.92, transpose: 0  },
+  warm:    { bpm: 126, fever: 146, cutoff: 8400,  uke: 1.02, glock: 0.72, bass: 1.04, perc: 1,    whistle: 0.82, transpose: -2 },
+  airy:    { bpm: 134, fever: 152, cutoff: 11000, uke: 0.76, glock: 0.88, bass: 0.86, perc: 1.18, whistle: 0.98, transpose: 2  },
+  wide:    { bpm: 128, fever: 148, cutoff: 9200,  uke: 0.76, glock: 0.78, bass: 1.14, perc: 1,    whistle: 1.0,  transpose: -3 },
+  night:   { bpm: 124, fever: 144, cutoff: 7400,  uke: 0.6,  glock: 0.6,  bass: 0.78, perc: 0.86, whistle: 0.78, transpose: -3 },
+  crystal: { bpm: 132, fever: 150, cutoff: 11600, uke: 0.7,  glock: 0.8,  bass: 0.88, perc: 1.06, whistle: 1.1,  transpose: 3  },
+  // Coral Reach: flowing, liquid — open high end, still a shimmer underneath.
+  reef:    { bpm: 136, fever: 154, cutoff: 12000, uke: 0.72, glock: 0.8,  bass: 0.82, perc: 0.92, whistle: 1.02, transpose: 3  },
   // Cinder Forge: driving, volcanic — heavy bass, but the melody stays awake
   ember:   { bpm: 124, fever: 142, cutoff: 6600,  uke: 0.64, glock: 1.32, bass: 1.24, perc: 1.14, whistle: 0.62, transpose: -4 },
   // Skyreach Canyon: wide and open — full band, big dynamics
@@ -913,15 +919,13 @@ export class Music {
     // Ukulele / pad / organ are island colours: silent under the arcade chiptune.
     const island = this.isChipTrack ? 0 : 1;
     this.ukeGain.gain.setTargetAtTime(song ? (m === "menu" ? 0.30 : m === "fever" ? 0.26 : 0.32) * style.uke * island : 0, t, 0.4);
-    // The glock is the lead voice — on EVERY family. It used to be gated to
-    // the island tracks (gain 0 on the arcade ten, which left the square wave
-    // carrying the tune there and made those tracks sound cheap).
+    // Bell mix = accompaniment, never the soloist: it carries the arpeggios and
+    // the phrase-end flourishes, sitting clearly UNDER whichever voice has the
+    // tune. These numbers are the whole "sometimes the music is shit" story —
+    // at menu 0.20 × a 1.6 biome weight the bells were the loudest voice on the
+    // darker tracks. Bells are now ~a third of the lead, on every family.
     this.glockGain.gain.setTargetAtTime(
-      song
-        ? this.isChipTrack
-          ? m === "menu" ? 0.38 : m === "fever" ? 0.50 : 0.46
-          : (m === "menu" ? 0.42 : m === "fever" ? 0.50 : 0.46) * style.glock
-        : 0,
+      song ? (m === "menu" ? 0.11 : m === "fever" ? 0.15 : 0.13) * style.glock : 0,
       t,
       0.4,
     );
@@ -932,8 +936,13 @@ export class Music {
     this.percGain.gain.setTargetAtTime(percBase * style.perc, t, 0.3);
     // Whistle: the soaring counter-line. Fever is its solo, play gives it a
     // gentle harmony line, menu leaves it out.
-    this.whistleGain.gain.setTargetAtTime((m === "fever" ? 0.30 : m === "play" ? 0.18 : m === "menu" ? 0.10 : 0) * style.whistle * island, t, 0.3);
-    this.arpGain.gain.setTargetAtTime((m === "fever" ? 0.18 : m === "play" ? 0.09 : m === "menu" ? 0.05 : 0) * style.glock * island, t, 0.5);
+    // Whistle: island lead voice *and* the counter-line, so it is the loudest
+    // melodic element on those tracks.
+    // Whistle: island lead voice *and* the counter-line, so it is the loudest
+    // melodic element on those tracks. Raised as the bells came down: it is the
+    // voice that should carry the tune on the island families.
+    this.whistleGain.gain.setTargetAtTime((m === "fever" ? 0.44 : m === "play" ? 0.38 : m === "menu" ? 0.26 : 0) * style.whistle * island, t, 0.3);
+    this.arpGain.gain.setTargetAtTime((m === "fever" ? 0.16 : m === "play" ? 0.08 : m === "menu" ? 0.045 : 0) * style.glock * island, t, 0.5);
     // Organ: deep pad under play and fever only — never a drone on the menu.
     this.organGain.gain.setTargetAtTime((m === "play" ? 0.10 : m === "fever" ? 0.18 : m === "menu" ? 0.05 : 0) * island, t, 1.2);
     // Warm pad bed: strongest on the menu, subtle underneath play.
@@ -944,14 +953,16 @@ export class Music {
       t,
       0.8,
     );
-    // Tron synth: the dark bed under the bell now, not the lead it once was.
-    this.tronGain.gain.setTargetAtTime(this.isTronTrack && song ? (m === "fever" ? 0.28 : 0.22) : 0, t, 0.4);
-    // Arcade chiptune lead: a supporting halo under the glock melody.
-    this.chipGain.gain.setTargetAtTime(this.isChipTrack && song ? (m === "menu" ? 0.15 : m === "fever" ? 0.21 : 0.17) : 0, t, 0.4);
+    // Tron synth: the lead on the Grid tracks, as it always was.
+    this.tronGain.gain.setTargetAtTime(this.isTronTrack && song ? (m === "fever" ? 0.36 : 0.30) : 0, t, 0.4);
+    // Arcade chiptune lead: carries the hook again — with a warmer voice than
+    // the one that used to sound thin (see chipLead), not by handing the tune
+    // to the bells.
+    this.chipGain.gain.setTargetAtTime(this.isChipTrack && song ? (m === "menu" ? 0.30 : m === "fever" ? 0.40 : 0.34) : 0, t, 0.4);
     // Glock shimmer: octave doubling on the arcade family and the melody
-    // sparkle on everything, so the bells are always part of the mix.
+    // sparkle on everything. Quiet by construction — a shimmer, not a voice.
     this.sparkGain.gain.setTargetAtTime(
-      song ? (this.isChipTrack ? (m === "fever" ? 0.22 : 0.17) : (m === "fever" ? 0.34 : 0.26) * style.glock) : 0,
+      song ? (this.isChipTrack ? (m === "fever" ? 0.20 : 0.16) : (m === "fever" ? 0.14 : 0.11) * style.glock) : 0,
       t,
       0.45,
     );
@@ -1085,23 +1096,28 @@ export class Music {
     if (note > 0) {
       const noteFreq = mtof(note + this.transpose + stormShift);
       const vel = this.step === 0 ? 1 : this.step % 4 === 0 ? 0.9 : 0.8;
+      // The glockenspiel is a SHIMMER LAYER, never the voice carrying the tune.
+      // Leading with bells on every family made the whole score read as one
+      // instrument — and a bright, percussive one at that, which is tiring over
+      // a long flight. Each family keeps its own lead voice (breathy whistle on
+      // the islands, square lead on the arcade tracks, synth on the Grid) and
+      // the bell doubles it an octave up, quietly.
       if (this.isTronTrack) {
-        // The synth keeps the Tron texture, but the bell now doubles it at
-        // pitch (not only an octave above) so the tune reads as a melody line
-        // rather than a filtered pulse.
-        this.tronLead(t, noteFreq, beat * 0.85, vel * 0.9);
-        this.glockLead(t, noteFreq, vel * 0.72);
+        this.tronLead(t, noteFreq, beat * 0.85, vel);
+        this.glock(t, noteFreq * 2, vel * 0.3, this.sparkGain);
       } else if (this.isChipTrack) {
         let len = 1;
         while ((sec.mel[idx + len] ?? 0) === -1) len++;
-        // Arcade tracks used to hand the tune to the square wave and sprinkle
-        // bells on top — precisely the thin, cheap sound the mix was pulled up
-        // for. Inverted: the glockenspiel states the melody, the chip lead is
-        // the 8-bit halo underneath it.
-        this.glockLead(t, noteFreq, vel);
-        this.chipLead(t, noteFreq, Math.min(beat * 0.24 * len, beat * 0.9), vel * 0.5);
+        this.chipLead(t, noteFreq, Math.min(beat * 0.24 * len, beat * 0.9), vel);
+        this.glock(t, noteFreq * 2, vel * 0.3, this.sparkGain);
       } else {
-        this.glockLead(t, noteFreq, vel);
+        // Island lead: the whistle, which is the one voice here with a natural
+        // singing shape (sine + vibrato + breath). Its note holds as long as
+        // the melody does, so phrases breathe instead of stuttering.
+        let len = 1;
+        while ((sec.mel[idx + len] ?? 0) === -1) len++;
+        this.whistle(t, noteFreq, Math.min(beat * 0.5 * len * 0.95, beat * 1.9), vel);
+        this.glock(t, noteFreq * 2, vel * 0.34, this.sparkGain);
       }
     }
 
@@ -1371,11 +1387,6 @@ export class Music {
 
   /** Melody lead: glock note + an octave shimmer on the sparkle bus. This is
    *  the "little bell on top of everything" that makes the tune carry. */
-  private glockLead(t: number, freq: number, vel: number): void {
-    this.glock(t, freq, vel);
-    this.glock(t, freq * 2, vel * 0.26, this.sparkGain);
-  }
-
   /** Closing flourish: a fast run up the chord tones, glock-only. */
   private glockSparkle(t: number, chordName: string, beat: number, stormShift: number): void {
     const chord = UKE[chordName] ?? UKE.C!;
@@ -1711,9 +1722,13 @@ export class Music {
     o.frequency.value = freq;
     o2.frequency.value = freq * 1.006; // slight detune for width
     f.type = "lowpass";
-    f.frequency.setValueAtTime(freq * 14, t);          // bright attack
-    f.frequency.exponentialRampToValueAtTime(Math.max(900, freq * 3.4), t + Math.min(dur, 0.16));
-    f.Q.value = 2.2;
+    // The old voice opened the filter to 14× the note and snapped it shut in
+    // 0.16 s, leaving a bare buzzing edge with no body — the "thin" part of the
+    // sound. A gentler sweep plus a triangle an octave down (sub, added below)
+    // keeps the 8-bit character but gives the hook some weight.
+    f.frequency.setValueAtTime(freq * 9, t);           // bright attack
+    f.frequency.exponentialRampToValueAtTime(Math.max(900, freq * 3.0), t + Math.min(dur, 0.22));
+    f.Q.value = 1.1;
     const peak = 0.34 * vel;
     const sustain = Math.max(0.04, dur - 0.035);
     g.gain.setValueAtTime(0.0001, t);
@@ -1723,6 +1738,16 @@ export class Music {
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.01);
     const mix2 = this.ctx.createGain();
     mix2.gain.value = 0.35;
+    // Body: a triangle one octave down, low level. Chiptunes on real hardware
+    // had this weight from the bass channel doubling the lead; a bare square
+    // does not.
+    const sub = this.ctx.createOscillator();
+    const subG = this.ctx.createGain();
+    sub.type = "triangle";
+    sub.frequency.value = freq / 2;
+    subG.gain.value = 0.30;
+    sub.connect(subG);
+    subG.connect(f);
     o.connect(f);
     o2.connect(mix2);
     mix2.connect(f);
@@ -1730,6 +1755,7 @@ export class Music {
     g.connect(this.chipGain);
     o.start(t); o.stop(t + dur + 0.03);
     o2.start(t); o2.stop(t + dur + 0.03);
+    sub.start(t); sub.stop(t + dur + 0.03);
   }
 
   /** Arcade chiptune bass: short, punchy square through a lowpass — the

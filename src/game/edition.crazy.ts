@@ -10,6 +10,9 @@ export const PORTAL_EDITION_NOTE = "CrazyGames edition · portal rewards enabled
 
 export const LEADERBOARD_CLOUD_LABEL = "☁️ cloud";
 
+/** True only in the Poki build (see edition.ts). */
+export const POKI_EDITION = false;
+
 /** CrazyGames multiplayer is its own instant-multiplayer module, not netlib. */
 export const POKI_MULTIPLAYER = false;
 

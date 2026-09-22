@@ -119,3 +119,65 @@ describe("Storage facade", () => {
     storage.removeItem("facade.two");
   });
 });
+
+/**
+ * Cloud-gamesave boundary (docs/poki/15-user-accounts.md, UA-07 … UA-09).
+ *
+ * Poki syncs `localStorage` to the player's account once they are signed in, and
+ * the documented way to keep something out of that sync is the `poki_ignore`
+ * prefix. The mapping has to happen at the storage facade, not at each call
+ * site, or one forgotten key silently ships a device cache — or, worse, an AUDS
+ * secret — to the cloud and eats the 1 MB budget.
+ *
+ * These assertions run against the real module with the Poki build flag set, so
+ * a regression in `physicalKey()`/`LOCAL_ONLY_PREFIXES` fails here rather than in
+ * production, where a stale cloud save is very hard to notice.
+ */
+describe("Poki cloud-gamesave boundary", () => {
+  const keys = [
+    "sunbird.board.v1",
+    "sunbird.ghost.pack",
+    "sunbird.journal.v1",
+    "sunbird.squad.local_cache",
+    "auds-singleton:anon:distance",
+    "auds-secret:anon:distance",
+    "sunbird.storage.probe",
+  ];
+
+  it("prefixes every local-only key with poki_ignore on a Poki build", async () => {
+    vi.stubEnv("VITE_PORTAL_TARGET", "poki");
+    const { physicalKey } = await freshFacade();
+    for (const key of keys) {
+      expect(physicalKey(key), `${key} must not sync to the cloud`).toBe(`poki_ignore.${key}`);
+    }
+    vi.unstubAllEnvs();
+  });
+
+  it("leaves player progress keys untouched, so they DO sync", async () => {
+    vi.stubEnv("VITE_PORTAL_TARGET", "poki");
+    const { physicalKey } = await freshFacade();
+    for (const key of ["sunbird.save.v1", "sunbird.pilotname", "sunbird.settings.v1"]) {
+      expect(physicalKey(key), `${key} is progress and must follow the player`).toBe(key);
+    }
+    vi.unstubAllEnvs();
+  });
+
+  it("uses the plain key on every non-Poki build", async () => {
+    vi.stubEnv("VITE_PORTAL_TARGET", "none");
+    const { physicalKey } = await freshFacade();
+    for (const key of keys) expect(physicalKey(key)).toBe(key);
+    vi.unstubAllEnvs();
+  });
+
+  it("removes both spellings, so a legacy key cannot come back", async () => {
+    vi.stubEnv("VITE_PORTAL_TARGET", "poki");
+    const { storage } = await freshFacade();
+    localStorage.setItem("sunbird.board.v1", "legacy");
+    localStorage.setItem("poki_ignore.sunbird.board.v1", "migrated");
+    storage.setItem("sunbird.board.v1", "fresh");
+    storage.removeItem("sunbird.board.v1");
+    expect(localStorage.getItem("sunbird.board.v1")).toBeNull();
+    expect(localStorage.getItem("poki_ignore.sunbird.board.v1")).toBeNull();
+    vi.unstubAllEnvs();
+  });
+});

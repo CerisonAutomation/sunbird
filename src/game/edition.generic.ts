@@ -14,6 +14,9 @@ export const PORTAL_EDITION_NOTE = "Portal edition";
 
 export const LEADERBOARD_CLOUD_LABEL = "☁️ cloud";
 
+/** True only in the Poki build (see edition.ts). */
+export const POKI_EDITION = false;
+
 export const POKI_MULTIPLAYER = false;
 
 /** Generic portal submissions ship no chat surface (Poki REQ-31 policy). */
