@@ -1793,10 +1793,20 @@ fieldset.squad-fields {
 .hud-controls { display: flex; gap: 8px; }
 .hud-controls .icon-btn { position: static; width: 44px; height: 44px; min-width: 44px; }
 .hud-header .mid-meta { margin: 0; flex-wrap: wrap; gap: 5px; }
+/* The top bar owns the top-right corner: the ×N ring counter and the mute /
+   pause pair live in it. The active-booster pills belong in that same corner,
+   directly under the two buttons. The lane ORDER (see the hud-header lane in
+   HUD.ts) does the placing — they are the second flow child — so they track the
+   button row without an absolute offset that has to be re-derived per
+   breakpoint. They are right-aligned to sit under the buttons. */
 .hud-header .power-chips,
 .hud-header .power-strip {
   position: static; transform: none; margin: 0;
   flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px;
+}
+.hud-header .power-strip {
+  align-self: flex-end; justify-content: flex-end;
+  margin-top: 4px; max-width: 100%;
 }
 .hud-header .power-chips:empty,
 .hud-header .power-strip:empty { display: none; }
@@ -1804,7 +1814,13 @@ fieldset.squad-fields {
 .play-hud .standings { top: calc(var(--hud-header-height, 110px) + 30px + env(safe-area-inset-top)); }
 .flight-messages {
   position: absolute;
-  top: calc(var(--hud-header-height, 110px) + 24px + env(safe-area-inset-top));
+  /* Below the two objective pills, not through them. `.ring-chain` occupies
+     H+4 .. H+39 and `.slope-chain` H+38 .. H+66 (including pill padding), and
+     this band is centred like they are, so at H+24 the coaching line printed
+     straight across both — most visibly as text on top of "FLOW". 72px clears
+     the lower pill's box with margin at every viewport. Measured with all five
+     surfaces visible: hint 148..232 vs slope-chain 162..190 before the fix. */
+  top: calc(var(--hud-header-height, 110px) + 82px + env(safe-area-inset-top));
   left: 50%; transform: translateX(-50%);
   width: min(520px, calc(100% - 100px));
   text-align: center;
@@ -1871,7 +1887,9 @@ fieldset.squad-fields {
   .hud-header { gap: 4px; }
   .flight-footer .goal-strip { display: none; }
   .flight-footer { gap: 4px; bottom: calc(8px + env(safe-area-inset-bottom)); }
-  .flight-messages { top: calc(var(--hud-header-height, 90px) + 18px + env(safe-area-inset-top)); }
+  /* Same rule on short landscape: the chain pills still occupy H+4 .. H+66,
+     so the coaching band keeps its clearance instead of snapping back up. */
+  .flight-messages { top: calc(var(--hud-header-height, 90px) + 76px + env(safe-area-inset-top)); }
   .flight-messages > .hint, .flight-messages > .launch-banner { font-size: 19px; }
   .hud-root[data-flying="true"] .toast { font-size: 12px; padding: 5px 10px; }
 }
@@ -1918,6 +1936,9 @@ fieldset.squad-fields {
   }
   .hud-header { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4px; }
   .hud-header .top-bar, .hud-header .roster-bar { grid-column: 1 / -1; }
+  /* The header becomes a 2-column grid here, so the booster row has to be told
+     to span it and stay right-aligned rather than taking the left cell. */
+  .hud-header .power-strip { grid-column: 1 / -1; justify-self: end; }
   .hud-header .roster-bar { justify-self: center; margin-top: 2px; }
   .hud-header .stat-sub, .hud-header .sun-caption { display: none; }
   .hud-header .mid-meta .biome-chip, .hud-header .gold-chip, .hud-header .vip-chip, .hud-header .ghost-chip { display: none; }
@@ -1932,6 +1953,18 @@ fieldset.squad-fields {
   /* Rewards still have sound and the goal/launch slot. A second transient pill
      is not worth covering the landing corridor on short embedded players. */
   .hud-root[data-flying="true"] .toasts { display: none; }
+}
+@media (max-height: 480px) {
+  /* Race mode on a 320-tall screen has no room for the coaching line. Measured
+     at 568x320 with the race fixture: the header ends at 144, the two chain
+     pills run 149..220, and the footer (draft meter + emote wheel + goal strip)
+     starts at 226 — about 6px between them. Something has to yield, and the
+     coaching pill is the transient, lowest-value element, which is the same
+     call the toast rule above already makes. The countdown/finish widgets stay:
+     they are the race itself, and they only render in their own states. */
+  .hud-root[data-flying="true"] .flight-messages > .hint,
+  .hud-root[data-flying="true"] .flight-messages > .launch-banner,
+  .hud-root[data-flying="true"] .flight-messages > .goal-pop { display: none; }
 }
 @media (max-height: 360px) {
   .flight-footer .fever-wrap { display: flex; align-items: center; gap: 8px; }
@@ -2369,7 +2402,7 @@ label { font-size: 12px; font-weight: 600; color: #666; margin-bottom: 6px; }
 
 /* Downslope-to-launch rhythm sits below the ring objective, never on top of it. */
 .slope-chain {
-  position: absolute; top: calc(var(--hud-header-height, 110px) + 38px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+  position: absolute; top: calc(var(--hud-header-height, 110px) + 47px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
   padding: 4px 10px; border-radius: 999px; pointer-events: none;
   background: rgba(16, 39, 32, .7); border: 1px solid rgba(127, 255, 180, .55);
   color: #c8ffda; font-size: 12px; font-weight: 900; letter-spacing: .08em;

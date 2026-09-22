@@ -102,10 +102,18 @@ export class SunbirdPage {
       await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
       // Same observed height contract as HUD's ResizeObserver, on the frozen
       // clone (the live observer still belongs to the original game instance).
-      for (const name of ["header", "footer"]) {
-        const lane = root.querySelector(name === "header" ? ".hud-header" : ".flight-footer")!;
-        root.style.setProperty(`--hud-${name}-height`, `${lane.getBoundingClientRect().height}px`);
-      }
+      // Mirror the SHIPPING contract exactly: HUD.ts measures each lane as the
+      // full offset from the play-hud edge (header.bottom - hud.top, and
+      // hud.bottom - footer.top), NOT the lane's own height. Setting the height
+      // here drifted from that, which made the ring/slope meters look 8px into
+      // the roster bar and hid real regressions behind layout the game never
+      // produces.
+      const hud = root.querySelector<HTMLElement>(".play-hud")!;
+      const hudRect = hud.getBoundingClientRect();
+      const header = root.querySelector<HTMLElement>(".hud-header")!;
+      const footer = root.querySelector<HTMLElement>(".flight-footer")!;
+      root.style.setProperty("--hud-header-height", `${header.getBoundingClientRect().bottom - hudRect.top}px`);
+      root.style.setProperty("--hud-footer-height", `${hudRect.bottom - footer.getBoundingClientRect().top}px`);
       // Let the measured CSS variables settle before reading overlap boxes.
       // Reduced-motion CSS still gives transitions a tiny nonzero duration.
       await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));

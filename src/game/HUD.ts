@@ -726,7 +726,11 @@ export class HUD {
     const top = this.root.querySelector<HTMLElement>(".top-bar")!;
     lane("hud-controls", ['[data-ref="muteBtn"]', '[data-ref="pauseBtn"]'], top);
     this.root.querySelector(".mid-meta")!.appendChild(this.root.querySelector(".combo")!);
-    const header = lane("hud-header", [".top-bar", ".mid-meta", ".power-chips", ".power-strip", ".roster-bar", ".versus-bar"]);
+    // The top bar owns the top-right corner (mute/pause, and the ring counter),
+    // so the active-booster pills sit directly under it — the lane order is what
+    // puts them there, in normal flow, rather than an absolute offset that has
+    // to be kept in sync with the button row's height.
+    const header = lane("hud-header", [".top-bar", ".power-strip", ".mid-meta", ".power-chips", ".roster-bar", ".versus-bar"]);
     lane("flight-messages", [".launch-banner", ".hint", ".goal-pop", ".finish-countdown", ".countdown"]);
     // `.fever-wrap` stays in the footer lane: it is `position: static` there
     // (see `.flight-footer .fever-wrap`), so it is a flow child of the footer.
