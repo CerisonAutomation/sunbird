@@ -22,6 +22,7 @@
     "verify:thumbnail": "node scripts/verify-thumbnail.mjs",
     "render:thumbnail": "node scripts/render-thumbnail.mjs",
     "poki:audit": "node scripts/poki-audit.mjs",
+    "canon:check": "node omnifusion/validate.mjs",
     "poki:preflight": "pnpm audit:ui && pnpm build:portals && pnpm verify:portals && pnpm isolation:check && pnpm audit:zips && pnpm verify:upload && pnpm verify:thumbnail && pnpm poki:audit -- --run",
     "test:mp": "node scripts/mp-smoke.mjs",
     "test:pvp": "vitest run src/game/__tests__/pvp-live.test.ts",
