@@ -3583,14 +3583,10 @@ export class Game {
         break;
       }
       case "rename-pilot": {
-        // Portal builds broadcast the pilot name to real players (netlib rooms,
-        // floating name tags, rosters). Free text there would be an unmoderated
-        // channel into a kids' platform, so those editions ship no text field at
-        // all (edition CUSTOM_PILOT_NAMES) and only ever fly curated generated
-        // names. This case stays tolerant of a stale button: it cannot be
-        // reached on a portal, and if it ever were it would still not accept
-        // player-typed text. The direct/web build owns its own surfaces and
-        // keeps free rename.
+        // Portal builds with CUSTOM_PILOT_NAMES allow free text, but all
+        // player-typed names must pass the profanity filter before being
+        // broadcast to other players. Direct/web builds own their surfaces
+        // and keep free rename without filtering.
         const freeText = CUSTOM_PILOT_NAMES;
         const requested = (this.hud.readValue("pilotName") || this.pilotName).trim();
         if (freeText && !isPilotNameClean(requested)) {
@@ -3661,6 +3657,10 @@ export class Game {
         const nameInput = this.hud.readValue("pilotNameInput");
         if (!nameInput || !nameInput.trim()) {
           this.hud.toast("Please enter a pilot name", "warn");
+          break;
+        }
+        if (!isPilotNameClean(nameInput.trim())) {
+          this.hud.toast("That call sign isn't allowed — try a different one", "warn");
           break;
         }
         const next = savePilotName(nameInput);

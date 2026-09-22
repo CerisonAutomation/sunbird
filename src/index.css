@@ -382,7 +382,7 @@ textarea {
    window left to extend it, so a fading bar is a visible "dive now". */
 .ring-chain {
   position: absolute;
-  top: 54px;
+  top: calc(var(--hud-header-height, 110px) + 4px + env(safe-area-inset-top));
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -2357,7 +2357,7 @@ label { font-size: 12px; font-weight: 600; color: #666; margin-bottom: 6px; }
 
 /* Downslope-to-launch rhythm sits below the ring objective, never on top of it. */
 .slope-chain {
-  position: absolute; top: 88px; left: 50%; transform: translateX(-50%);
+  position: absolute; top: calc(var(--hud-header-height, 110px) + 38px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
   padding: 4px 10px; border-radius: 999px; pointer-events: none;
   background: rgba(16, 39, 32, .7); border: 1px solid rgba(127, 255, 180, .55);
   color: #c8ffda; font-size: 12px; font-weight: 900; letter-spacing: .08em;
