@@ -13,6 +13,7 @@ Sunbird is a complete HTML5 arcade game: 8 flight modes, 40-pilot races, daily/w
 - **PvE** — seeded daily challenge, weekly gauntlet, storm weather, login calendar
 - **Honesty rule** — anything simulated on-device is badged as local/practice in the UI; server-owned results only where a backend actually referees (see [ROADMAP.md](./ROADMAP.md))
 - **Review** — 360° comparative review vs multiplayer/mobile category standards: [docs/COMPARATIVE_REVIEW_360.md](./docs/COMPARATIVE_REVIEW_360.md)
+- **Poki** — developer-guide implementation matrix, verified against Poki's public sources: [docs/POKI_IMPLEMENTATION_MATRIX.md](./docs/POKI_IMPLEMENTATION_MATRIX.md)
 
 ## Tech stack
 
