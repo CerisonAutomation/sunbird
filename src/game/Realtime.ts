@@ -1,5 +1,6 @@
 import type { NetTransport, RemoteSnapshot } from "./MassRace";
 import { truncate } from "./math";
+import { gradeStateCadence, type LinkQuality } from "./RacePolish";
 import { PROTOCOL_VERSION } from "./protocol/v1";
 import { normalizeRooms, roomListUrl, type LiveRoom } from "./RoomBrowser";
 import { POKI_MULTIPLAYER } from "./edition";
@@ -203,6 +204,8 @@ export class RealtimeClient implements NetTransport {
   private sendAcc = 0;
   private clock = 0;
   private serverClock = 0;
+  private lastStateFrameAt = -1;
+  private readonly stateIntervals: number[] = [];
   private backoff = 500;
   private retryTimer: number | null = null;
   private connectTimer: number | null = null;
@@ -517,6 +520,14 @@ export class RealtimeClient implements NetTransport {
         break;
       }
       case "state": {
+        if (this.lastStateFrameAt >= 0) {
+          const interval = this.clock - this.lastStateFrameAt;
+          if (interval > 0 && interval < 3) {
+            this.stateIntervals.push(interval);
+            while (this.stateIntervals.length > 12) this.stateIntervals.shift();
+          }
+        }
+        this.lastStateFrameAt = this.clock;
         this.serverClock = msg.t;
         for (const [id, x, y, rot, dist] of msg.pilots) {
           // Validate at the boundary: a non-finite coordinate (NaN/Infinity)
@@ -769,6 +780,11 @@ export class RealtimeClient implements NetTransport {
     const out = this.pendingEvents;
     this.pendingEvents = [];
     return out;
+  }
+
+  /** Inbound race-state cadence; unknown until enough live frames arrive. */
+  get connectionQuality(): LinkQuality {
+    return gradeStateCadence(this.stateIntervals);
   }
 
   roster(): RoomPeer[] {

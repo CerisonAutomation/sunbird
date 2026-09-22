@@ -245,6 +245,8 @@ export type HudSnapshot = {
   /** Live sky-ring chain: how many in a row, and how long the window is open. */
   ringChain: number;
   ringChainFrac: number;
+  slopeChain: number;
+  slopeScore: number;
   cups: TournamentView[];
   trails: { id: string; label: string; equipped: boolean }[];
   lastPrize: string;
@@ -270,6 +272,7 @@ export type HudSnapshot = {
   roomMuted: boolean;
   roomRivals: { id: string; name: string; skill: number; hue: number }[];
   netState: string;
+  linkQuality: "unknown" | "good" | "fair" | "poor";
   netError: string;
   draft: number;
   finishRemaining: number;
@@ -436,6 +439,7 @@ export class HUD {
   private ringChainEl!: HTMLElement;
   private ringChainCount!: HTMLElement;
   private ringChainFill!: HTMLElement;
+  private slopeChainEl!: HTMLElement;
   private hintEl!: HTMLElement;
   private menuEl!: HTMLElement;
   private menuCard!: HTMLElement;
@@ -619,6 +623,7 @@ export class HUD {
           <b data-ref="ringChainCount">×2</b>
           <i><s data-ref="ringChainFill"></s></i>
         </div>
+        <div class="slope-chain hidden" data-ref="slopeChain">〽 FLOW ×1</div>
         <div class="fever-wrap" data-ref="feverWrap">
           <div class="fever-label">FEVER</div>
           <div class="fever-bar"><div class="fever-fill" data-ref="feverFill"></div></div>
@@ -1119,6 +1124,10 @@ export class HUD {
 
       // Ring chain: the airborne objective, so it is always visible while it
       // is live — count first (big), remaining window second (the bar).
+      const slopeLinked = s.slopeChain > 0;
+      this.slopeChainEl.classList.toggle("hidden", !slopeLinked);
+      if (slopeLinked) this.setText(this.slopeChainEl, "slopeChain", `〽 FLOW ×${s.slopeChain} · ${s.slopeScore}`);
+
       const chained = s.ringChain > 1;
       this.ringChainEl.classList.toggle("hidden", !chained);
       if (chained) {
@@ -1223,7 +1232,7 @@ export class HUD {
         const now = performance.now();
         const rkey = s.roster
           .map((r) => `${r.id}${Math.round(r.progress * 50)}${r.finished ? "F" : ""}${r.emote}`)
-          .join("|");
+          .join("|") + `|${s.linkQuality}`;
         if (rkey !== this.lastRoster && now - this.lastRosterAt > 150) {
           this.lastRoster = rkey;
           this.lastRosterAt = now;
@@ -1242,7 +1251,8 @@ export class HUD {
             `<span class="rm-gap">${gapTxt}</span>` +
             `<span class="rm-count">${s.roster.length} birds</span>` +
             `${s.roomCode ? `<span class="rm-room">ROOM ${escapeHtml(s.roomCode)}</span>` : ""}` +
-            `<span class="rm-net ${s.netState}">${s.multiplayerLive ? s.netState : "practice"}</span></div>` +
+            `<span class="rm-net ${s.netState}">${s.multiplayerLive ? s.netState : "practice"}</span>` +
+            `${s.multiplayerLive && s.linkQuality !== "unknown" ? `<span class="link-quality ${s.linkQuality}" title="Live state cadence">${s.linkQuality} link</span>` : ""}</div>` +
             `<div class="roster-track" role="img" aria-label="Live race positions">${s.roster
               .map(
                 (r) =>
@@ -1527,6 +1537,7 @@ export class HUD {
     this.ringChainEl = grab("ringChain");
     this.ringChainCount = grab("ringChainCount");
     this.ringChainFill = grab("ringChainFill");
+    this.slopeChainEl = grab("slopeChain");
     this.hintEl = grab("hint");
     this.menuEl = grab("menu");
     this.menuCard = grab("menuCard");
@@ -3364,6 +3375,7 @@ function renderGameOver(s: HudSnapshot): string {
       <div><span>Rings</span><b>${s.rings}</b></div>
       <div><span>Balloons</span><b>${s.balloons}</b></div>
       <div><span>Sunflowers</span><b>${s.sunflowers}</b></div>
+      <div><span>Slope flow</span><b>${s.slopeScore} pts · ×${s.slopeChain}</b></div>
       <div><span>Islands</span><b>${s.island + 1}</b></div>
     </div></details>
     ${s.ghostDelta !== null ? `<div class="reward-strip ${s.ghostDelta >= 0 ? "" : "nest"}">${s.ghostDelta >= 0 ? `Beat your ghost by ${Math.round(s.ghostDelta)}m! 👻` : `${Math.round(-s.ghostDelta)}m behind your best ghost`}</div>` : ""}

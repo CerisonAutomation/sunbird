@@ -2354,3 +2354,13 @@ label { font-size: 12px; font-weight: 600; color: #666; margin-bottom: 6px; }
 ::-webkit-scrollbar-track { background: #f1f1f1; }
 ::-webkit-scrollbar-thumb { background: #bbb; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #888; }
+
+/* Downslope-to-launch rhythm sits below the ring objective, never on top of it. */
+.slope-chain {
+  position: absolute; top: 88px; left: 50%; transform: translateX(-50%);
+  padding: 4px 10px; border-radius: 999px; pointer-events: none;
+  background: rgba(16, 39, 32, .7); border: 1px solid rgba(127, 255, 180, .55);
+  color: #c8ffda; font-size: 12px; font-weight: 900; letter-spacing: .08em;
+  font-variant-numeric: tabular-nums;
+}
+.slope-chain.hidden { display: none; }

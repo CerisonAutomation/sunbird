@@ -5063,3 +5063,15 @@ h1, h2, h3, h4, h5, h6, .heading-art {
 /* Segmented unit toggle in settings (km / mi). */
 .toggle-group { display: inline-flex; gap: 6px; }
 .toggle-group .mini-btn { min-width: 44px; }
+.reward-strip.photo {
+  border: 1px solid rgba(55, 145, 220, .35);
+  box-shadow: 0 8px 24px rgba(36, 111, 175, .14);
+  font-weight: 800;
+  animation: photo-card-beat .55s ease-out both;
+}
+@keyframes photo-card-beat { from { transform: scale(.97); opacity: .3; } to { transform: scale(1); opacity: 1; } }
+.link-quality { padding: 2px 6px; border-radius: 999px; font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.link-quality.good { color: #124f2d; background: #bff2ce; }
+.link-quality.fair { color: #654500; background: #ffe6a0; }
+.link-quality.poor { color: #7b2020; background: #ffc6c6; }
+.sb-reduce-motion .reward-strip.photo { animation: none; }

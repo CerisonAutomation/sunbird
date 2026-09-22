@@ -22,6 +22,8 @@ import { isRaceMode, MASS_RACE_FIELD, MODES, modeById, PVP_MODES, PVP_WORLDS, RA
 import { MassRace } from "./MassRace";
 import { FinishGate } from "./FinishGate";
 import { fetchPublicRooms, isMultiplayerConfigured, makeRoomCode, RealtimeClient, type AnyRealtimeClient } from "./Realtime";
+import { photoFinishMessage } from "./RacePolish";
+import { SlopeChain } from "./SlopeChain";
 import { RoomWatcher, ROOM_POLL_MS, roomSummaryLine, summarizeRooms, type LiveRoom } from "./RoomBrowser";
 import { Leaderboard, loadPilotName, savePilotName, isLeaderboardOnline, type BoardMetric, type BoardPage, type BoardScope } from "./Leaderboard";
 import { generatePilotName } from "./pilotNameGenerator";
@@ -463,6 +465,7 @@ export class Game {
   private runRings = 0;
   private ringChain = 0;
   private ringChainTimer = 0;
+  private readonly slopeChain = new SlopeChain();
   private runBalloons = 0;
   private runSunflowers = 0;
   private readonly powers = new PowerUps();
@@ -1846,7 +1849,7 @@ export class Game {
           .sort((a, b) => Math.abs(a.distance - (you?.distance ?? 0)) - Math.abs(b.distance - (you?.distance ?? 0)))[0];
         if (rival && you && Math.abs(rival.distance - you.distance) < 25) {
           const won = you.distance > rival.distance;
-          this.photoFinish = won ? `Photo finish — you edged ${rival.name}` : `Photo finish — ${rival.name} pipped you`;
+          this.photoFinish = photoFinishMessage(won, rival.name, Math.abs(rival.distance - you.distance));
           if (!won) this.nemesis = rival.name;
           this.hud.toast(this.photoFinish, won ? "gold" : "warn");
           this.flash("perfect");
@@ -1989,6 +1992,12 @@ export class Game {
   private onLaunch(): void {
     const res = this.launch.evaluate(this.bird, this.terrain, this.runTime);
     this.lastLaunch = res;
+    const linked = this.slopeChain.launch(res.rating);
+    if (linked) {
+      this.bonus += linked.points;
+      this.audio.ringPass(linked.chain);
+      this.hud.toast(`SLOPE FLOW ×${linked.chain} +${linked.points}`, linked.chain >= 3 ? "gold" : "cloud");
+    }
     if (res.rating === "none") {
       if (this.bird.launchSpeed > 18) this.audio.chirp();
       return;
@@ -2051,6 +2060,7 @@ export class Game {
 
   /** Sunflower pad: a springy launch off a bloom — pure, reviewable bounce. */
   private onSunflower(): void {
+    this.slopeChain.break();
     this.runSunflowers += 1;
     this.bonus += 80;
     this.awardXp(XP_RULES.coin);
@@ -2069,6 +2079,7 @@ export class Game {
   /** Landings feed straight back into momentum, so they get feedback too. */
   private onLanding(): void {
     const q = this.bird.landingQuality;
+    this.slopeChain.land(q, this.terrain.slopeAt(this.bird.x), this.bird.impact);
     if (q >= LAND_PERFECT && this.bird.speed() > 30) {
       this.bonus += 12;
       this.audio.butter();
@@ -3218,6 +3229,7 @@ export class Game {
     this.runRings = 0;
     this.ringChain = 0;
     this.ringChainTimer = 0;
+    this.slopeChain.reset();
     this.dustCooldown = 0;
     this.runBalloons = 0;
     this.runSunflowers = 0;
@@ -6415,6 +6427,8 @@ export class Game {
       combo: Math.max(this.perfectChain, this.versus && this.p1 ? this.p1.launch.combo : this.launch.combo),
       ringChain: this.ringChain,
       ringChainFrac: RING_CHAIN_WINDOW > 0 ? this.ringChainTimer / RING_CHAIN_WINDOW : 0,
+      slopeChain: this.slopeChain.chain,
+      slopeScore: this.slopeChain.score,
       speedNorm: Math.min(1, this.bird.speed() / 100),
       gust: this.weather.gust,
       inThermal: this.weather.inThermal,
@@ -6498,6 +6512,7 @@ export class Game {
           ? this.massRace.rivals.slice(0, 12).map((r) => ({ id: r.id, name: r.name, skill: Math.round(r.skill * 100), hue: Math.round(r.hue * 360) }))
           : [],
       netState: this.net?.info().state ?? "offline",
+      linkQuality: this.net instanceof RealtimeClient ? this.net.connectionQuality : "unknown",
       netError: this.net?.info().error ?? "",
       draft: this.massRace.draft,
       finishRemaining: this.finishRemaining,
