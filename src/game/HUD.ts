@@ -3402,11 +3402,16 @@ function renderAd(s: HudSnapshot): string {
   }
   return `
     <div class="ad-label">Sponsored break · ${s.adReason === "continue" ? "your second wind is loading…" : "back to flying in a moment"}</div>
-    <div class="ad-creative">
-      <div class="ad-logo">☀️</div>
-      <h3>Nest Deluxe</h3>
-      <p>Sleep deeper. Fly farther. The premium nest for discerning sunbirds.</p>
-      <button class="mini-btn gold" data-ui data-action="open-pass">✦ Go ad-free with Gold</button>
+    <div class="ad-slot">
+      <div class="ad-slot-inner">
+        <div class="ad-slot-badge">AD</div>
+        <div class="ad-slot-content">
+          <div class="ad-slot-placeholder">
+            <span class="ad-slot-icon">📢</span>
+            <span class="ad-slot-text">Advertisement</span>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="ad-bar"><i data-live="adBar"></i></div>
     <div class="ad-actions">
