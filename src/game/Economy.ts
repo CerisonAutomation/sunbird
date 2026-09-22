@@ -646,6 +646,11 @@ const GOLD_FEATURES = [
   "2× coins on every flight",
   "+10 s longer days",
   ...(SELL_AD_REMOVAL ? ["No sponsored breaks, ever"] : []),
+  // NOTE: On portal builds (Poki) SELL_AD_REMOVAL=false and the continue screen
+  // always shows the rewarded ad path (portal owns monetisation). The "free second
+  // wind" perk is architecturally correct but invisible on Poki — don't try to
+  // surface it there. If Gold is ever cross-marketed to Poki players, add a
+  // compensating perk (e.g. +20% coin bonus) that works within portal rules.
   "Unlimited free second winds — the sun never wins",
   "Fly yesterday's hills or wild random seeds",
   "Unlocks the Nest Pass premium reward track",

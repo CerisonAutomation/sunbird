@@ -212,6 +212,7 @@
 .result-details .over-stats { margin-bottom: 12px; }
 .result-links { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
 .result-links .soft-btn { min-width: 0; font-size: 12px; padding: 10px 6px; }
+.result-links .soft-btn.gold-tint { background: rgba(255,210,100,0.18) !important; border-color: rgba(200,160,60,0.45) !important; color: #7a5000 !important; }
 .copy-dialog { z-index: 80; background: #142330b3; }
 .copy-dialog .cloud-box { min-height: 120px; user-select: text; }
 .solo-modes { margin: 12px 0; text-align: left; }
@@ -401,6 +402,7 @@
 .home-record b { display:block; font:600 18px var(--display); color:#3e5642; }
 .home-record .record-wallet { margin-left:auto; font:600 17px var(--display); text-align:right; color:#976425; }
 .record-wallet small { display:block; font:400 10px var(--body); color:#746650; }
+.home-record .record-pass { font:500 11px var(--body); color:#5a7a60; background:rgba(90,122,96,0.10); border:1px solid rgba(90,122,96,0.25); border-radius:20px; padding:2px 8px; cursor:pointer; white-space:nowrap; }
 .room-entry { position:relative; background:linear-gradient(145deg,#fff9e5,#ffebb9); border-color:#e8d099; }
 .room-entry-crest { width:58px; height:58px; margin:0 auto 12px; }
 .room-entry h3 { text-align:center; font:600 24px var(--display); color:#365444; }
@@ -2782,10 +2784,14 @@ button[data-action="board-refresh"],
 
 /* ── Fineprint / footer notes ────────────────────────────────────────────────── */
 .fineprint {
-  font: 400 10px/1.6 var(--body) !important;
+  font: 400 11px/1.6 var(--body) !important;
   color: #9a8060 !important;
   text-align: center !important;
   margin-top: 12px !important;
+}
+.fineprint.replay-note {
+  font-size: 12px !important;
+  color: #7a6040 !important;
 }
 
 /* ── Section art headers ─────────────────────────────────────────────────────── */

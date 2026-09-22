@@ -181,7 +181,7 @@
 | `REQ-23` | requirement | No ad-timer or cooldown manipulation. | ✅ | src/game/Game.ts matches /portalEnabled\(\)/ |
 | `REQ-24` | requirement | External links only through the platform API; portal builds should have none. | ✅ | gate wired: node scripts/verify-portal.mjs |
 | `REQ-30` | requirement | All-ages content: no violence, sexual content, gambling, substances, fear or bullying. | ✅ attested | Family-friendly bird flight; no combat, no gore, no casino framing (the lucky wheel is a free daily gift, not a paid spin), no substances, no chat. |
-| `REQ-31` | requirement | No chat in multiplayer surfaces; emotes are the recommended alternative. | ✅ | gate wired: node scripts/verify-portal.mjs |
+| `REQ-31` | requirement | No chat in multiplayer surfaces; emotes are the recommended alternative. | ✅ | gate wired: node scripts/verify-portal.mjs (needs sunbird-crazy.zip, sunbird-generic.zip — run with --run after build:portals) |
 | `REQ-32` | requirement | No PII collection; platform identity is display-only. | ✅ | src/sdk/poki.ts matches /getIdentity/ |
 | `REQ-33` | requirement | Originality: art, UI, mechanics, characters, audio and name must be the developer's own. | ✅ attested | Procedural biomes, custom UI, original bird/characters, procedural score; no third-party art or audio. |
 | `REQ-34` | requirement | AI-assisted production: no watermarks or prompt text; process documentable on request. | ✅ attested | No AI-generated asset files ship (art is procedural, audio is synthesized); production history is the git log. |

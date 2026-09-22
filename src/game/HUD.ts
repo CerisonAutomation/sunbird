@@ -20,7 +20,7 @@ import type { TournamentView } from "./Tournaments";
 import type { RosterBird, Standing, RivalNameTag } from "./MassRace";
 import { SUPPORTED_LOCALES, getLocale, t } from "../i18n";
 import * as THREE from "three";
-import { VIP_DAILY_GIFT } from "./constants";
+import { DAILY_STIPEND, PIGGY_BANK_CAP, PIGGY_BANK_MIN_SMASH, VIP_DAILY_GIFT } from "./constants";
 import { COLLECTIONS, dailyFlashBird, GOLD, skinById, STARTER_PACK, VIP, type BoostView, type ShopTrailView, type SkinView } from "./Economy";
 import { rivalPalette, skinPalette, sunSVG, sunbirdSVG } from "./Sunbird";
 import { formatDistance } from "./math";
@@ -1586,7 +1586,7 @@ function head(title: string, backAction = "back", right = ""): string {
 }
 
 function upsellStrip(): string {
-  return `<button class="upsell" data-ui data-action="open-paywall"><div><b>✦ Sunbird Gold &amp; VIP</b><span>2× coins · ad-free flights · Phoenix &amp; Aurora skins · Nest Pass</span></div><span class="mini-btn gold">See</span></button>`;
+  return `<button class="upsell" data-ui data-action="open-paywall"><div><b>✦ Sunbird Gold &amp; VIP</b><span>2× coins · ad-free · Phoenix &amp; Aurora skins · Nest Pass</span></div><span class="mini-btn gold">Unlock · ● 500</span></button>`;
 }
 
 function renderMissions(list: MissionView[], newly: string[] = []): string {
@@ -2526,11 +2526,11 @@ function renderMain(s: HudSnapshot): string {
       </button>
     </div>
 
-    <div class="home-section-title"><span>${t("hud.menu.chooseAdventure", undefined, "Choose your adventure")}</span><small>01 — PLAY</small></div>
+    <div class="home-section-title"><span>${t("hud.menu.chooseAdventure", undefined, "Fly")}</span><small>pick a mode</small></div>
     <nav class="destination-grid play-destinations" aria-label="Choose how to play">${menuLinks(PLAY_DESTINATIONS)}</nav>
-    <div class="home-section-title"><span>${t("hud.menu.makeItYours", undefined, "Make it yours")}</span><small>02 — HANGAR</small></div>
+    <div class="home-section-title"><span>${t("hud.menu.makeItYours", undefined, "Your hangar")}</span><small>skins, gear &amp; squad</small></div>
     <nav class="destination-grid utility-destinations" aria-label="Your hangar">${menuLinks(COLLECTION_DESTINATIONS)}</nav>
-    <div class="home-section-title"><span>${t("hud.menu.everyFlightCounts", undefined, "Every flight counts")}</span><small>03 — DISCOVER</small></div>
+    <div class="home-section-title"><span>${t("hud.menu.everyFlightCounts", undefined, "Progress")}</span><small>trophies, board &amp; pass</small></div>
     <nav class="destination-grid progress-destinations" aria-label="Challenges and progress">${menuLinks(
       PROGRESS_DESTINATIONS.map(item => {
         if (item.action === "open-challenges") {
@@ -2548,7 +2548,7 @@ function renderMain(s: HudSnapshot): string {
         return item;
       })
     )}</nav>
-    <div class="home-record"><span class="record-art">${menuIcon("medal")}</span><span>${t("hud.menu.personalBest", undefined, "Personal best")} <b>${formatDistance(s.bestDistance)}</b></span><span class="record-wallet">${s.wallet.toLocaleString()} <small>${t("hud.menu.coinBalance", undefined, "coin balance")}</small></span></div>
+    <div class="home-record"><span class="record-art">${menuIcon("medal")}</span><span>${t("hud.menu.personalBest", undefined, "Personal best")} <b>${formatDistance(s.bestDistance)}</b></span><span class="record-pass" data-ui data-action="open-pass">Nest Pass Lv.${s.season.tier}/${s.season.maxTier}</span><span class="record-wallet">● ${s.wallet.toLocaleString()} <small>${t("hud.menu.coinBalance", undefined, "coins")}</small></span></div>
   `;
 }
 
@@ -2595,9 +2595,9 @@ function renderProgress(s: HudSnapshot): string {
       <span class="pc-icon">🐷</span>
       <div class="pc-body">
         <b>Coin Piggy Bank</b>
-        <span>+20% flight bonus accumulated: ● ${s.piggyCoins} / 1,000</span>
+        <span>+20% flight bonus accumulated: ● ${s.piggyCoins} / ${PIGGY_BANK_CAP}</span>
       </div>
-      ${s.piggyCoins >= 50
+      ${s.piggyCoins >= PIGGY_BANK_MIN_SMASH
         ? `<button class="primary-btn gold" data-ui data-action="smash-piggy">Smash 🔨</button>`
         : `<span class="tag need">Fly to fill</span>`}
     </div>
@@ -2799,7 +2799,7 @@ function renderShop(s: HudSnapshot, browse: ShopBrowse): string {
       </div>
       ${s.stipendClaimed
         ? `<span class="tag on">Claimed Today ✓</span>`
-        : `<button class="primary-btn gold" data-ui data-action="claim-daily-stipend">Claim +● 250</button>`
+        : `<button class="primary-btn gold" data-ui data-action="claim-daily-stipend">Claim +● ${DAILY_STIPEND}</button>`
       }
     </div>
 
@@ -2851,7 +2851,7 @@ function renderShop(s: HudSnapshot, browse: ShopBrowse): string {
         <span class="pc-icon">✈️</span>
         <div class="pc-body">
           <b>Ace Wingman Bundle</b>
-          <span>3 Boosts · Tideglass Trail · +250 Coins</span>
+          <span>3 Boosts · Tideglass Trail · +${DAILY_STIPEND} Coins</span>
         </div>
       </div>
       ${s.wingmanBundle
@@ -3186,21 +3186,24 @@ export function renderFlightRecap(path: [number, number][]): string {
 
 /**
  * End-of-run 3× coin bonus card. Pure and exported so the claim contract is
- * unit-testable: the bonus claims ONCE per run (Game.multiplierClaimed), the
- * card carries no ad icon — it is a bonus, not an ad placement — and the
- * title never wraps (nowrap) so narrow phones don't get a four-line header.
+ * unit-testable: the bonus claims ONCE per run (Game.multiplierClaimed).
+ * On portal builds the button triggers a rewarded ad (🎬 icon); on direct
+ * builds it is a free bonus (MON-09: clapperboard only on rewarded placements).
  */
-export function renderCoinMultiplierCard(coins: number, claimed: boolean): string {
+export function renderCoinMultiplierCard(coins: number, claimed: boolean, portal = false): string {
   if (coins <= 0) return "";
   if (claimed) {
     return `<div class="multiplier-cta-card claimed">✓ 3× bonus applied &nbsp;+● ${coins * 2} extra coins</div>`;
   }
+  const btnLabel = portal
+    ? `🎬 Watch to triple · +● ${coins * 2}`
+    : `Claim 3× &nbsp;+● ${coins * 2}`;
   return `<div class="multiplier-cta-card">
       <div class="multiplier-cta-text">
         <b>3× Flight Coin Bonus</b>
         <span>Triple ● ${coins} → ● ${coins * 3}</span>
       </div>
-      <button class="primary-btn gold wide" data-ui data-action="multiply-run-coins">Claim 3× &nbsp;+● ${coins * 2}</button>
+      <button class="primary-btn gold wide" data-ui data-action="multiply-run-coins">${btnLabel}</button>
     </div>`;
 }
 
@@ -3250,6 +3253,12 @@ function renderGameOver(s: HudSnapshot): string {
            }
          </div>`
       : "";
+  // Clipboard score fallback — always visible when AUDS isn't available so
+  // players always have *some* share action on the results screen.
+  const clipboardShare = !s.share.available && !s.share.loaded && !s.share.code
+    ? `<button class="soft-btn wide" data-ui data-action="copy-score">📋 Copy score to clipboard</button>`
+    : "";
+
   // Async multiplayer by code. Only rendered when this build can actually
   // talk to AUDS (Poki + game id) or when the player has already loaded a run.
   const shareBlock =
@@ -3292,7 +3301,7 @@ function renderGameOver(s: HudSnapshot): string {
       <div><span>${t("hud.stat.coins", undefined, "Coins")}</span><b>${s.coins}</b></div>
     </div>
 
-    ${renderCoinMultiplierCard(s.coins, s.multiplierClaimed)}
+    ${renderCoinMultiplierCard(s.coins, s.multiplierClaimed, s.portalName !== "none")}
 
     ${renderNextFlight(s)}
     <details class="result-details" data-ref="flightDetails"><summary>Flight details <span>Landmarks &amp; skill</span></summary><div class="over-stats">
@@ -3312,13 +3321,14 @@ function renderGameOver(s: HudSnapshot): string {
     ${raceStrip}
     <div class="reached-strip">Reached <b>${s.biomeEmoji} ${s.biomeName}</b> · Island ${s.island + 1}</div>
 
+    ${clipboardShare}
     ${s.expShareFirst
       ? `<button class="soft-btn wide" data-ui data-action="share" ${s.shareBusy ? "disabled" : ""}>${s.shareBusy ? "Preparing…" : `${menuIcon("share")} Share this flight`}</button>
          <button class="soft-btn wide" data-ui data-action="throw-challenge">${menuIcon("versus")} Challenge a rival on these hills</button>`
       : `<button class="soft-btn wide" data-ui data-action="throw-challenge">${menuIcon("versus")} Challenge a rival on these hills</button>
          <button class="soft-btn wide" data-ui data-action="share" ${s.shareBusy ? "disabled" : ""}>${s.shareBusy ? "Preparing…" : `${menuIcon("share")} Share this flight`}</button>`}
     <div class="btn-row result-links">
-      <button class="soft-btn" data-ui data-action="open-shop">${menuIcon("shop")} Shop</button>
+      <button class="soft-btn gold-tint" data-ui data-action="open-shop">${menuIcon("shop")} Shop</button>
       <button class="soft-btn" data-ui data-action="open-pass">${menuIcon("pass")} Pass</button>
       <button class="soft-btn" data-ui data-action="open-atlas">${menuIcon("atlas")} Atlas</button>
 
@@ -3369,7 +3379,7 @@ function renderAd(s: HudSnapshot): string {
       <div class="ad-logo">☀️</div>
       <h3>Nest Deluxe</h3>
       <p>Sleep deeper. Fly farther. The premium nest for discerning sunbirds.</p>
-      <span class="ad-cta">Learn more</span>
+      <button class="mini-btn gold" data-ui data-action="open-pass">✦ Go ad-free with Gold</button>
     </div>
     <div class="ad-bar"><i data-live="adBar"></i></div>
     <div class="ad-actions">

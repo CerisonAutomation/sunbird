@@ -77,6 +77,7 @@ import {
   MANUAL_BOOST_TIME,
   PHYS_DT,
   PICKUP_SUN_TIME,
+  DAILY_STIPEND,
   REFERRAL_BONUS,
   STALL_SPEED,
   WATER_Y,
@@ -745,6 +746,16 @@ export class Game {
       this.joiningRemoteRoom = true;
       this.pendingRoomInvite = roomInvite;
     }
+
+    // Async-race share link: ?run=CODE → auto-populate the shared-run input
+    // so the friend who clicked a result link lands straight into loading that run.
+    try {
+      const runParam = new URLSearchParams(window.location.search).get("run");
+      if (runParam && runParam.length > 0) {
+        this.shareCode = runParam.trim();
+        window.history.replaceState({}, "", `${window.location.pathname}${window.location.hash}`);
+      }
+    } catch { /* non-browser env */ }
 
     this.onFocus = () => {
       if (!this.hidden) {
@@ -3305,16 +3316,18 @@ export class Game {
         break;
       }
       case "multiply-run-coins": {
-        // One claim per run. The old handler tripled runCoins on every click
-        // and the card re-armed from the live snapshot — an infinite 3× coin
-        // loop. Now it pays the bonus once and the card flips to a claimed
-        // chip (renderCoinMultiplierCard). No ad is shown, so no ad wording.
+        // One claim per run. The card flips to a "claimed" chip after use.
         if (this.state === "gameover" && !this.multiplierClaimed && this.runCoins > 0) {
-          const bonus = this.runCoins * 2;
-          this.multiplierClaimed = true;
-          this.save.addCoins(bonus);
-          this.audio.chapterFanfare();
-          this.hud.toast(`3× flight bonus — +● ${bonus} coins`, "gold");
+          if (this.platform && this.platform.name !== "none") {
+            // Portal build: gate the bonus behind a rewarded break.
+            void this.multiplyCoinsWithPortalReward();
+          } else {
+            const bonus = this.runCoins * 2;
+            this.multiplierClaimed = true;
+            this.save.addCoins(bonus);
+            this.audio.chapterFanfare();
+            this.hud.toast(`3× flight bonus — +● ${bonus} coins`, "gold");
+          }
         }
         this.bump();
         break;
@@ -3568,7 +3581,7 @@ export class Game {
           this.hud.toast("🔥 Rise from the ashes, Phoenix!", "gold");
         } else if (nameLower === "sunbird") {
           this.hud.toast("🌟 You ARE the Sunbird.", "gold");
-          this.save.addCoins(250);
+          this.save.addCoins(DAILY_STIPEND);
         } else {
           this.hud.toast(`Welcome, ${next}!`, "info");
         }
@@ -3898,11 +3911,11 @@ export class Game {
         // The card disables via the snapshot, but a double-tap can land before
         // the re-render — the handler must be its own guard.
         if (this.save.state.lastStipendClaimed === this.today) break;
-        this.save.addCoins(250);
+        this.save.addCoins(DAILY_STIPEND);
         this.save.state.lastStipendClaimed = this.today;
         this.audio.chapterFanfare();
         this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
-        this.hud.toast("🪙 Daily Flight Stipend Claimed! +● 250 coins!", "gold");
+        this.hud.toast(`🪙 Daily Flight Stipend Claimed! +● ${DAILY_STIPEND} coins!`, "gold");
         this.bump();
         break;
       }
@@ -3921,10 +3934,10 @@ export class Game {
         this.save.armBoost("magnet");
         this.save.ownTrail("trail_tide");
         this.save.equipTrail("trail_tide");
-        this.save.addCoins(250);
+        this.save.addCoins(DAILY_STIPEND);
         this.audio.chapterFanfare();
         this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
-        this.hud.toast("📦 Ace Wingman Crate Unlocked! 3 Boosts + Tideglass Trail + 250 Coins!", "gold");
+        this.hud.toast(`📦 Ace Wingman Crate Unlocked! 3 Boosts + Tideglass Trail + ${DAILY_STIPEND} Coins!`, "gold");
         this.bump();
         break;
       }
@@ -4030,6 +4043,15 @@ export class Game {
             this.shareError = "Sharing isn't available in this build — no platform store is configured.";
           }
           this.bump();
+        });
+        break;
+      }
+      case "copy-score": {
+        const dist = Math.round(this.runStats().distance);
+        const text = `I flew ${dist.toLocaleString()} m in Sunbird: Golden Flight! Can you beat it?`;
+        void copyText(text).then((ok) => {
+          if (this.disposed) return;
+          this.hud.toast(ok ? "Score copied to clipboard!" : text, ok ? "gold" : "info");
         });
         break;
       }
@@ -5338,25 +5360,41 @@ export class Game {
     // room starts (with a shared 6s countdown) only once every seated pilot
     // has readied up.
     const ready = this.net?.state === "lobby" ? (this.net.info().ready ? "ready" : "unready") : "none";
-    // Someone real is in the room — keep the search open until the room starts.
-    if (live > 0 && this.mmPhase === "waiting") this.mmPhase = "searching";
+
+    // "Waiting" phase: search window elapsed.
+    // If real pilots are still in the room, keep the lobby alive for ready-up
+    // rather than abandoning them to AI. If they all leave, restart a search.
     if (this.mmPhase === "waiting") {
-      this.hud.setMatchmaking(true, live, this.roomSize, 0, "waiting", this.mmRooms, ready);
-      return;
+      if (live > 0) {
+        this.hud.setMatchmaking(true, live, this.roomSize, 0, "waiting", this.mmRooms, ready);
+        return;
+      }
+      // Last real player left — reopen the search window.
+      this.mmPhase = "searching";
+      this.mmDeadline = performance.now() + Game.MM_WINDOW * 1000;
+      this.startRoomWatch();
+      this.hud.toast("Pilot left — searching again", "info");
     }
+
     const secsLeft = (this.mmDeadline - performance.now()) / 1000;
     this.hud.setMatchmaking(true, live, this.roomSize, Math.max(0, secsLeft), "searching", this.mmRooms, ready);
     if (secsLeft <= 0) {
-      // The window elapsed with nobody to race. Fall back to a clearly
-      // labeled AI flock so the pilot is never left staring at a dead
-      // search — real pilots still require an explicit Ready; only an
-      // empty room may launch on its own.
+      this.roomWatcher?.stop();
+      this.closeRoomBrowser();
+      if (live > 0) {
+        // Real pilots found before the window closed — hold the lobby open.
+        // The "start" net event fires once everyone readies (allReady in PokiNetlib).
+        this.mmPhase = "waiting";
+        this.hud.setMatchmaking(true, live, this.roomSize, 0, "waiting", this.mmRooms, ready);
+        this.hud.toast(`${live} pilot${live === 1 ? "" : "s"} found — hit Ready to race`, "gold");
+        this.telemetry.track("matchmaking_live_waiting", { count: live });
+        return;
+      }
+      // Empty lobby — fall back to AI flock.
       this.mmPhase = "waiting";
       const opts = this.mmOpts;
       this.mmOpts = null;
       this.mmDeadline = 0;
-      this.roomWatcher?.stop();
-      this.closeRoomBrowser();
       this.hud.setMatchmaking(false, live, this.roomSize, 0);
       this.hud.toast("No live pilots found — racing the AI flock (practice)", "info");
       this.telemetry.track("matchmaking_ai_fallback", { window: Game.MM_WINDOW });
@@ -5769,6 +5807,25 @@ export class Game {
   }
 
   /** Rewarded continue never succeeds unless the platform explicitly grants it. */
+  private async multiplyCoinsWithPortalReward(): Promise<void> {
+    const platform = this.platform;
+    if (!platform || platform.name === "none") return;
+    if (this.multiplierClaimed || this.runCoins <= 0) return;
+    this.telemetry.track("portal_break_request", { portal: platform.name, placement: "coin_multiplier" });
+    const earned = await platform.rewardedBreak();
+    if (this.disposed) return;
+    if (earned) {
+      const bonus = this.runCoins * 2;
+      this.multiplierClaimed = true;
+      this.save.addCoins(bonus);
+      this.audio.chapterFanfare();
+      this.hud.toast(`🎬 3× flight bonus unlocked — +● ${bonus} coins`, "gold");
+      this.bump();
+    } else {
+      this.hud.toast("No reward this time — bonus not applied", "warn");
+    }
+  }
+
   private async continueWithPortalReward(): Promise<void> {
     const platform = this.platform;
     if (!platform || platform.name === "none") return;

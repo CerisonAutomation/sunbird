@@ -30,7 +30,7 @@
     "botsim": "node scripts/botsim.mjs",
     "botsim:40": "node scripts/botsim.mjs --players 40 --seconds 15",
     "build:web": "vite build",
-    "build:poki": "pnpm gen-icons && VITE_PORTAL_TARGET=poki VITE_MULTIPLAYER_URL= VITE_LEADERBOARD_URL= VITE_STRIPE_STARTER_LINK= VITE_SOCIAL_URL= vite build --outDir dist-poki && node scripts/package-portal.mjs poki",
+    "build:poki": "pnpm gen-icons && VITE_PORTAL_TARGET=poki VITE_POKI_GAME_ID=7a58628a-e5de-42eb-8978-244276f68366 VITE_MULTIPLAYER_URL= VITE_LEADERBOARD_URL= VITE_STRIPE_STARTER_LINK= VITE_STRIPE_GOLD_LINK= VITE_STRIPE_VIP_LINK= VITE_SOCIAL_URL= vite build --outDir dist-poki && node scripts/package-portal.mjs poki",
     "poki:upload": "pnpm build:poki && poki upload --name \"$(git rev-parse --short HEAD)\" --notes \"$(git log -1 --pretty=%B)\"",
     "build:crazy": "VITE_PORTAL_TARGET=crazy VITE_CRAZY_BANNER_ID=ad-container-1 VITE_MULTIPLAYER_URL= VITE_LEADERBOARD_URL= VITE_STRIPE_STARTER_LINK= VITE_SOCIAL_URL= vite build --outDir dist-crazy && node scripts/package-portal.mjs crazy",
     "build:portals": "pnpm build:poki && pnpm build:crazy && pnpm build:generic",
