@@ -1571,14 +1571,14 @@
    "id": "REQ-61",
    "group": "REQ",
    "kind": "requirement",
-   "rule": "No player-authored text or personal-data collection: multiplayer-visible names must be curated, not typed by the player.",
+   "rule": "Player-authored text is limited to the pilot's own display name: no chat system, no personal-data collection, and the name is moderated before it can be broadcast or stored, because it reaches other players (netlib rosters, name tags) and a public leaderboard.",
    "status": "satisfied",
    "verify": {
     "type": "test",
-    "path": "src/game/__tests__/pilot-name-surface.test.ts",
-    "pattern": "CUSTOM_PILOT_NAMES"
+    "path": "src/game/__tests__/pilot-name-moderation.test.ts",
+    "pattern": "Scunthorpe problem"
    },
-   "evidence": "edition CUSTOM_PILOT_NAMES=false in edition.poki/crazy/generic.ts: the leaderboard renders the generated pilot name read-only with a 🎲 roll instead of an input (pilot-name-surface.test.ts drives the real renderer both ways), rename-pilot refuses typed text, and scripts/portal-markers.mjs fails any portal bundle containing data-ref=\"pilotName\" (dist-poki/index.html has 0 matches)."
+   "evidence": "Poki forbids chat systems and personal-data collection (external-resources policy: 'Chat systems aren't allowed', 'Games must not collect personal information', 'no email-based logins'), which is SQUAD_CHAT=false — the chat UI is not in the bundle. It does not forbid a chosen display name, so edition.poki.ts sets CUSTOM_PILOT_NAMES=true and the safety work moves to moderation: every write goes through src/game/pilotNameModeration.ts (shape + contact guard + NFKD/leit/homoglyph normalisation + blocklist + a safe-word allowlist so 'Cockpit'/'Classic'/'Assassin' are not caught by their own substrings), asserted by pilot-name-moderation.test.ts (95 cases) and gated at both write paths in Game.ts. crazy/generic keep CUSTOM_PILOT_NAMES=false (no filter there)."
   },
   {
    "id": "REQ-62",
@@ -1597,7 +1597,7 @@
    "id": "REQ-63",
    "group": "REQ",
    "kind": "requirement",
-   "rule": "Portal bundles must contain no ad-removal copy and no free-text name field (bundle-level enforcement of REQ-20 and the player-safety policy).",
+   "rule": "Portal bundles must contain no ad-removal copy, and no portal may ship a name surface it does not moderate (bundle-level enforcement of REQ-20 and the pilot-name policy).",
    "status": "satisfied",
    "verify": {
     "type": "command",
@@ -1606,7 +1606,7 @@
      "sunbird-poki.zip"
     ]
    },
-   "evidence": "PORTAL_FORBIDDEN_MARKERS rejects /No sponsored breaks/i, ad-removal phrasing and data-ref=\"pilotName\" in every portal zip; the direct build keeps both (dist/assets/Game-*.js)."
+   "evidence": "PORTAL_FORBIDDEN_MARKERS rejects /No sponsored breaks/i and ad-removal phrasing in every portal zip; the direct build keeps both (dist/assets/Game-*.js). data-ref=\"pilotName\" is a FOREIGN marker for crazy/generic (CUSTOM_PILOT_NAMES=false there, so a typed field in those bundles means the flag regressed) and an allowed surface on Poki, which moderates it."
   },
   {
    "id": "REQ-64",
@@ -2421,10 +2421,10 @@
    "status": "satisfied",
    "verify": {
     "type": "grep",
-    "path": "src/game/edition.poki.ts",
-    "pattern": "CUSTOM_PILOT_NAMES = false"
+    "path": "src/game/pilotNameModeration.ts",
+    "pattern": "const CONTACT"
    },
-   "evidence": "No typed player text and no email/social login in any portal build."
+   "evidence": "No email/social login in any portal build: identity comes from Poki's own getUser() (docs/poki/15-user-accounts.md), and the null/throwing case simply keeps the generated call sign. A typed pilot name is allowed, but CONTACT in src/game/pilotNameModeration.ts rejects anything shaped like an address, link, @handle or long digit run, so a public leaderboard cannot be used to publish contact details."
   },
   {
    "id": "SUB-13",

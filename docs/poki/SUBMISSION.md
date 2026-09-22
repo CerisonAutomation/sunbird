@@ -63,7 +63,7 @@ No other external request exists in the build — fonts, images and audio are bu
 
 | Step | Where |
 |---|---|
-| Content moderation | automatic on upload (no chat, no typed player text, no IAP, family-friendly content) |
+| Content moderation | automatic on upload (no chat, no IAP, family-friendly content). Typed call signs **are** allowed and go through the moderation pipeline in `src/game/pilotNameModeration.ts` — say this if the reviewer asks, since "no typed player text" would be inaccurate. |
 | Playtest | needs 10 recordings watched to unlock the player fit test |
 | Player fit test | target: average playtime 3 min+, ≥ 25 % of plays over 3 min |
 | Web fit test | weights CTR, average time on page and C2P (first `gameplayStart()`) equally |

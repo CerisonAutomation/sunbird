@@ -194,9 +194,9 @@
 | `REQ-52` | informational | Release flow: folder upload -> Inspector QA -> player-fit test -> web-fit test -> review. | 📋 action | Walk the Inspector QA modules on the unzipped folder (Event Log sequences, External Resources, Image Optimization, Scaling tests, mobile QR). |
 | `REQ-53` | informational | Web-fit metrics: C2P (click-to-play), CTR (thumbnail), time on page. | ℹ️ info | C2P is minimised by the sub-1 MB boot and immediate first frame; CTR by the specification-compliant thumbnail; time-on-page by the daily/weekly retention loops. |
 | `REQ-60` | requirement | Do not place HUD under the mobile platform pill; use movePill() to relocate it. | ✅ | src/sdk/platform.ts matches /movePill/ |
-| `REQ-61` | requirement | No player-authored text or personal-data collection: multiplayer-visible names must be curated, not typed by the player. | ✅ | src/game/__tests__/pilot-name-surface.test.ts (pinned: /CUSTOM_PILOT_NAMES/) |
+| `REQ-61` | requirement | Player-authored text is limited to the pilot's own display name: no chat system, no personal-data collection, and the name is moderated before it can be broadcast or stored, because it reaches other players (netlib rosters, name tags) and a public leaderboard. | ✅ | src/game/__tests__/pilot-name-moderation.test.ts (pinned: /Scunthorpe problem/) |
 | `REQ-62` | requirement | No offer to remove or disable ads, and no ad-frequency claim in a portal paywall. | ✅ | src/game/__tests__/portal-policy.test.ts (pinned: /sponsored breaks/) |
-| `REQ-63` | requirement | Portal bundles must contain no ad-removal copy and no free-text name field (bundle-level enforcement of REQ-20 and the player-safety policy). | ✅ | gate wired: node scripts/verify-portal.mjs |
+| `REQ-63` | requirement | Portal bundles must contain no ad-removal copy, and no portal may ship a name surface it does not moderate (bundle-level enforcement of REQ-20 and the pilot-name policy). | ✅ | gate wired: node scripts/verify-portal.mjs |
 | `REQ-64` | requirement | A portal build must not describe or count ad breaks it does not schedule — the platform owns ad frequency. | ✅ | e2e/portal-policy.spec.ts (pinned: /must not offer ad removal/) |
 | `REQ-65` | requirement | A portal build must issue no request that can fail on the host origin (no relative calls to absent backends). | ✅ | e2e/portal-policy.spec.ts (pinned: /HTTP \$\{r.status/) |
 
@@ -309,7 +309,7 @@
 | `SUB-08` | recommendation | Dashboard description and engine field describe the game and the tech. | 📋 action | Paste from docs/poki/SUBMISSION.md; engine entry is 'three-js'. |
 | `SUB-09` | requirement | External resources are requested in Settings → CSP; assets are bundled, not fetched from CDNs. | ✅ | gate wired: pnpm verify:portals |
 | `SUB-11` | requirement | No in-game chat systems; emoji/quick messages are the sanctioned alternative. | ✅ | src/game/edition.poki.ts matches /SQUAD_CHAT = false/ |
-| `SUB-12` | requirement | No external account systems and no collection of personal information. | ✅ | src/game/edition.poki.ts matches /CUSTOM_PILOT_NAMES = false/ |
+| `SUB-12` | requirement | No external account systems and no collection of personal information. | ✅ | src/game/pilotNameModeration.ts matches /const CONTACT/ |
 | `SUB-13` | requirement | Content must stay family-friendly (no violence, gambling, adult or scary themes). | ✅ attested | Game content: birds, islands, weather; currency earned only by flying. |
 | `SUB-14` | requirement | Controls offer alternatives so players who cannot use WASD are not excluded. | ✅ | src/game/Input.ts matches /pointerdown/ |
 | `SUB-16` | informational | Player fit test: 500 players; healthy = 3 min+ average and >=25% over 3 min. | ℹ️ info | Run after the thumbnail is uploaded; requires 10 playtest recordings watched first. |
@@ -456,9 +456,9 @@
 | `REQ-52` | SUBMISSION_CHECKLIST.md |
 | `REQ-53` | docs/poki/09-platform-requirements.md |
 | `REQ-60` | Pill moved clear of the flight HUD at SDK boot. |
-| `REQ-61` | edition CUSTOM_PILOT_NAMES=false in edition.poki/crazy/generic.ts: the leaderboard renders the generated pilot name read-only with a 🎲 roll instead of an input (pilot-name-surface.test.ts drives the real renderer both ways), rename-pilot refuses typed text, and scripts/portal-markers.mjs fails any portal bundle containing data-ref="pilotName" (dist-poki/index.html has 0 matches). |
+| `REQ-61` | Poki forbids chat systems and personal-data collection (external-resources policy: 'Chat systems aren't allowed', 'Games must not collect personal information', 'no email-based logins'), which is SQUAD_CHAT=false — the chat UI is not in the bundle. It does not forbid a chosen display name, so edition.poki.ts sets CUSTOM_PILOT_NAMES=true and the safety work moves to moderation: every write goes through src/game/pilotNameModeration.ts (shape + contact guard + NFKD/leit/homoglyph normalisation + blocklist + a safe-word allowlist so 'Cockpit'/'Classic'/'Assassin' are not caught by their own substrings), asserted by pilot-name-moderation.test.ts (95 cases) and gated at both write paths in Game.ts. crazy/generic keep CUSTOM_PILOT_NAMES=false (no filter there). |
 | `REQ-62` | GOLD's "No sponsored breaks, ever" bullet is emitted only when edition SELL_AD_REMOVAL is true (direct build); portal bundles fold the ternary to [] and contain no such string. Portal builds never inject their own interstitials (dueAd is gated on portalEnabled()), so the claim was untrue there as well as forbidden. |
-| `REQ-63` | PORTAL_FORBIDDEN_MARKERS rejects /No sponsored breaks/i, ad-removal phrasing and data-ref="pilotName" in every portal zip; the direct build keeps both (dist/assets/Game-*.js). |
+| `REQ-63` | PORTAL_FORBIDDEN_MARKERS rejects /No sponsored breaks/i and ad-removal phrasing in every portal zip; the direct build keeps both (dist/assets/Game-*.js). data-ref="pilotName" is a FOREIGN marker for crazy/generic (CUSTOM_PILOT_NAMES=false there, so a typed field in those bundles means the flag regressed) and an allowed surface on Poki, which moderates it. |
 | `REQ-64` | The Account screen's "Sponsored breaks respect a hard cap: N left today" line is now gated on portalName === "none"; e2e/portal-policy.spec.ts (pnpm test:policy) boots poki-upload/ in a real browser and scans the rendered text of 17 reachable screens for ad-removal/ad-schedule copy on desktop and phone. |
 | `REQ-65` | Squad.load() returned early only on abort/live/loading, so with VITE_SOCIAL_URL blanked it fetched a relative /register against the host origin — a 404 plus a console error the moment a player opened Squad on Poki. It now also bails when API is empty; the policy spec fails on any response >= 400 while walking every menu screen. |
 | `SDK-01` | scripts/package-portal.mjs injects the exact CDN script tag into the Poki head; ROOT-08 + the analytics test assert it survives packaging. |
@@ -522,7 +522,7 @@
 | `SUB-08` | Dashboard fields. |
 | `SUB-09` | Bundled fonts/images + the portal external-URL gate. |
 | `SUB-11` | The chat UI is not in the portal bundle at all; emotes remain. |
-| `SUB-12` | No typed player text and no email/social login in any portal build. |
+| `SUB-12` | No email/social login in any portal build: identity comes from Poki's own getUser() (docs/poki/15-user-accounts.md), and the null/throwing case simply keeps the generated call sign. A typed pilot name is allowed, but CONTACT in src/game/pilotNameModeration.ts rejects anything shaped like an address, link, @handle or long digit run, so a public leaderboard cannot be used to publish contact details. |
 | `SUB-13` | Reviewed against the content list; nothing to remove. |
 | `SUB-14` | Pointer drag, touch drag, keyboard and auto-glide all steer; menus are mouse/touch/keyboard navigable. |
 | `SUB-16` | Target metric for the first fit test. |

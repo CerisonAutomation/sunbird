@@ -27,7 +27,7 @@ import { photoFinishMessage } from "./RacePolish";
 import { SlopeChain } from "./SlopeChain";
 import { RoomWatcher, ROOM_POLL_MS, roomSummaryLine, summarizeRooms, type LiveRoom } from "./RoomBrowser";
 import { Leaderboard, loadPilotName, savePilotName, isLeaderboardOnline, type BoardMetric, type BoardPage, type BoardScope } from "./Leaderboard";
-import { generatePilotName, isPilotNameClean } from "./pilotNameGenerator";
+import { generatePilotName, isPilotNameClean, moderatePilotName, pilotNameRejection } from "./pilotNameGenerator";
 import { adoptPortalLocale, setLocale, whenLocaleReady, type SupportedLocale } from "../i18n";
 import { Tournaments, TRAILS, weekKey, type PrizeGrant } from "./Tournaments";
 import {
@@ -3644,15 +3644,18 @@ export class Game {
         break;
       }
       case "rename-pilot": {
-        // Portal builds with CUSTOM_PILOT_NAMES allow free text, but all
-        // player-typed names must pass the profanity filter before being
-        // broadcast to other players. Direct/web builds own their surfaces
-        // and keep free rename without filtering.
+        // Portal builds with CUSTOM_PILOT_NAMES allow free text, but the name is
+        // broadcast to other players (netlib rosters, name tags) and persisted on
+        // a public leaderboard, so every write passes the moderation pipeline in
+        // ./pilotNameModeration. Direct/web builds own their surfaces.
         const freeText = CUSTOM_PILOT_NAMES;
         const requested = (this.hud.readValue("pilotName") || this.pilotName).trim();
-        if (freeText && !isPilotNameClean(requested)) {
-          this.hud.toast("That call sign isn't allowed — try a different one", "warn");
-          break;
+        if (freeText) {
+          const verdict = moderatePilotName(requested);
+          if (!verdict.ok) {
+            this.hud.toast(pilotNameRejection(verdict.reason), "warn");
+            break;
+          }
         }
         const chosen = freeText ? requested : generatePilotName();
         const next = savePilotName(chosen);
@@ -3723,7 +3726,8 @@ export class Game {
           break;
         }
         if (!isPilotNameClean(nameInput.trim())) {
-          this.hud.toast("That call sign isn't allowed — try a different one", "warn");
+          const verdict = moderatePilotName(nameInput.trim());
+          this.hud.toast(verdict.ok ? "That call sign isn't allowed — try a different one" : pilotNameRejection(verdict.reason), "warn");
           break;
         }
         const next = savePilotName(nameInput);
