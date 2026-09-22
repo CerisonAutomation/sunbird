@@ -24,6 +24,7 @@ const artwork = {
   scores: '<path d="M14 8h31l9 10v39H14Z" fill="#ead3a4"/><path d="M9 5h30l10 10v38H9Z" fill="#fff1cf"/><path d="M39 5v11h10" fill="#d5c4a0"/><path d="M17 43V32h6v11m4 0V24h6v19m4 0V30h6v13" fill="#87b59f" stroke-width="1.5"/><path d="M17 16h13" fill="none" stroke="#b39c7b"/>',
   board: '<path d="M5 33h18v23H5Zm18-15h18v38H23Zm18 23h18v15H41Z" fill="#a1bdb5"/><path d="M23 18h18v38H23Z" fill="#efc278"/><path d="m32 2 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1Z" fill="#ffdf90"/><path d="M30 30h3v13" fill="none" stroke="#9b743c" stroke-width="3"/>',
   account: '<rect x="7" y="12" width="50" height="41" rx="8" fill="#f2d7a9"/><path d="M10 17h44" fill="none" stroke="#fff2d2"/><circle cx="25" cy="28" r="7" fill="#a2bfa8"/><path d="M13 45q1-11 12-11t12 11" fill="#78a992"/><path d="M41 28h8m-8 7h8m-8 7h5" fill="none" stroke="#b4966e"/>',
+  daily: '<circle cx="32" cy="32" r="13" fill="#ffd86b"/><path d="M32 8v7m0 34v7M8 32h7m34 0h7m-10-17-5 5M19 45l-5 5m0-34 5 5m17 17 5 5" fill="none" stroke="#f5a623" stroke-width="4" stroke-linecap="round"/><path d="M5 52h54" fill="none" stroke="#ed974a" stroke-width="3" stroke-linecap="round"/>',
 } as const;
 
 export type MenuIconName = keyof typeof artwork;

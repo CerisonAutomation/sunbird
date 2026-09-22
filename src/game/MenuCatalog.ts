@@ -9,6 +9,7 @@ import { SQUAD_CHAT } from "./edition";
  * against the neural flock is its own destination, "AI PvP". */
 export type MenuDestination = { action: string; title: string; detail: string; icon: MenuIconName };
 export const PLAY_DESTINATIONS: MenuDestination[] = [
+  { action: "play-daily", icon: "daily", title: "Long Light", detail: "Today's shared course · daily challenge" },
   { action: "open-live", icon: "online", title: "PvP", detail: "Online races, rooms & options" },
   { action: "open-practice", icon: "versus", title: "AI PvP", detail: "Offline race vs the AI flock" },
   { action: "versus", icon: "flight", title: "Same-screen 1v1", detail: "Space / Enter · or touch your half" },
