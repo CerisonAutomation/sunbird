@@ -5,15 +5,19 @@ type Entry = { name: string; props: Props; t: number };
 
 const ENV = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
 
-/** Backend telemetry endpoint, derived from the multiplayer base URL.
- * Empty string = no backend configured = network telemetry is a no-op.
- * In portal builds (CrazyGames/Poki/generic), external network telemetry is
- * strictly disabled per portal compliance rules. */
-function endpoint(): string {
+/** Backend telemetry endpoint. Empty string = no sink configured = network
+ * telemetry is a no-op. In portal builds (CrazyGames/Poki/generic), external
+ * network telemetry is strictly disabled per portal compliance rules.
+ *
+ * The sink is the social server's aggregate counter (POST /telemetry — see
+ * server/src/telemetry/TelemetryService.ts). The old derivation from
+ * VITE_MULTIPLAYER_URL was removed: the Rust room server has no such route,
+ * and beacons aimed at it would die invisibly. */
+export function endpointUrl(): string {
   if (isPortalBuild()) return "";
-  const base = ENV.VITE_MULTIPLAYER_URL ?? "";
-  if (!base) return "";
-  return `${base.replace(/\/$/, "").replace(/^ws/, "http")}/telemetry`;
+  const social = ENV.VITE_SOCIAL_URL ?? "";
+  if (social) return `${social.replace(/\/$/, "")}/telemetry`;
+  return "";
 }
 
 /**
@@ -51,7 +55,7 @@ export class Telemetry {
     if (!isPortalBuild()) w.dataLayer?.push({ event: name, ...props });
     if (this.debug) console.debug("[telemetry]", name, props);
     // Queue a coarse copy for the aggregate backend counter (hard-capped).
-    if (endpoint() && this.outbox.length < 64) {
+    if (endpointUrl() && this.outbox.length < 64) {
       const out: { k: string; mode?: string; km?: number } = { k: name };
       if (typeof props.mode === "string") out.mode = props.mode;
       if (typeof props.distance === "number") out.km = Math.floor(props.distance / 1000);
@@ -65,7 +69,7 @@ export class Telemetry {
 
   /** Drain the outbox to the backend. Never throws, never retries. */
   flush(): void {
-    const url = endpoint();
+    const url = endpointUrl();
     if (!url || this.outbox.length === 0 || !this.deviceId) return;
     const body = JSON.stringify({ deviceId: this.deviceId, events: this.outbox.splice(0) });
     try {

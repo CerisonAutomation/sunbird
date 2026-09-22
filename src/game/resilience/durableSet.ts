@@ -36,17 +36,19 @@ const CONVENIENCE_KEYS = [
   "sunbird.flags", // experiment assignments — re-rolled safely
 ] as const;
 
-/** Keys durableSetItem will never evict, whatever the pressure. */
-export const PROTECTED_KEYS = new Set<string>([
-  "sunbird.save.v2",
-  "sunbird.save.v1",
-  "sunbird.save.corrupt",
-  "sunbird.receipts",
-  "sunbird.pilotname",
-  "sunbird.i18n.locale",
-  "sunbird.outbox.v1",
-  "sunbird.outbox.score.v1",
-]);
+/**
+ * Base protected set: local-only literals that are safe in EVERY edition.
+ * Web-only storage (payment receipts, upload outboxes) is NOT listed here —
+ * portal bundles must not contain backend-storage markers at all (the portal
+ * gate enforces this), and protection belongs to the module that owns the
+ * key: callers extend the set via `protectedKeys` with their own constants.
+ */
+export const BASE_PROTECTED_KEYS: readonly string[] = ["sunbird.pilotname", "sunbird.i18n.locale"];
+
+export interface DurableOptions {
+  /** Caller-owned keys the eviction plan must never touch. */
+  protectedKeys?: readonly string[];
+}
 
 export interface DurableWriteResult {
   ok: boolean;
@@ -64,10 +66,11 @@ export const CLEAN_WRITE: DurableWriteResult = { ok: true, evicted: [], degraded
  * (Bytes-saved ordering would need a sync length probe per key; key order is
  * deterministic and good enough — caches are the big blobs in this app.)
  */
-export function evictionPlan(present: string[]): string[] {
+export function evictionPlan(present: string[], protectedKeys: readonly string[] = BASE_PROTECTED_KEYS): string[] {
   const plan: string[] = [];
+  const deny = new Set(protectedKeys);
   for (const key of present) {
-    if (PROTECTED_KEYS.has(key)) continue;
+    if (deny.has(key)) continue;
     if (CACHE_PREFIXES.some((p) => key.startsWith(p)) || (CACHE_KEYS as readonly string[]).includes(key)) plan.push(key);
   }
   for (const key of present) {
@@ -94,14 +97,15 @@ function presentKeys(): string[] {
  * Write through quota pressure. Synchronous (the storage facade is sync by
  * contract); safe to call from any persist path.
  */
-export function durableSetItem(key: string, value: string): DurableWriteResult {
+export function durableSetItem(key: string, value: string, opts: DurableOptions = {}): DurableWriteResult {
+  const protectedKeys = opts.protectedKeys ?? BASE_PROTECTED_KEYS;
   try {
     storage.setItem(key, value);
     return CLEAN_WRITE;
   } catch {
     // Stage 1+2: free regenerable space, retry once.
     const evicted: string[] = [];
-    for (const candidate of evictionPlan(presentKeys())) {
+    for (const candidate of evictionPlan(presentKeys(), protectedKeys)) {
       if (candidate === key) continue;
       try {
         storage.removeItem(candidate);

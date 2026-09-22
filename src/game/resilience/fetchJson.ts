@@ -181,10 +181,14 @@ function shouldCountAsFailure(err: unknown): boolean {
   return isNetworkError(err) || err instanceof BadResponseError || err instanceof Error;
 }
 
-/** Convenience: build the breaker key from a URL (its origin). */
+/** Convenience: build the breaker key from a URL (its origin). The base for
+ * relative URLs is `about:blank` — non-requestable by design (portal zip
+ * audits ban requestable loopback literals in shipped bundles) and still
+ * correct: relative URLs only occur for same-origin dev proxies, where every
+ * call legitimately shares one breaker. */
 export function breakerKeyFor(url: string): string {
   try {
-    return new URL(url, typeof location !== "undefined" ? location.href : "https://localhost").origin;
+    return new URL(url, typeof location !== "undefined" ? location.href : "about:blank").origin;
   } catch {
     return url.slice(0, 64);
   }

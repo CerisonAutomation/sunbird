@@ -1854,19 +1854,16 @@ function renderLive(s: HudSnapshot): string {
         <h3>Fly with your flock</h3>
         ${s.multiplayerConfigured
           ? `<p>Create a private room with a custom code and link. Race your squad on any course!</p>
-        <button class="primary-btn" data-ui data-action="host-room">Create Private Room</button>
-        <label class="field-label" for="race-room-code">Or enter a friend's room code</label>
-        <div class="redeem">
-          <input id="race-room-code" data-ui data-ref="roomCode" data-enter-action="join-room" aria-label="Room code" maxlength="2048" placeholder="Code or invite link" autocomplete="off" autocapitalize="characters" spellcheck="false" />
-          <button class="mini-btn" data-ui data-action="join-room">Join</button>
-        </div>`
+        <button class="primary-btn" data-ui data-action="host-room">Create Private Room</button>`
           : `<p class="pilot-note island" role="note">Live rooms are not available in this edition. AI practice and same-screen 1v1 below still race.</p>
-        <button class="primary-btn" data-ui data-action="host-room" disabled>Create Private Room</button>
+        <button class="primary-btn" data-ui data-action="host-room" disabled>Create Private Room</button>`}
+        <!-- Room-code entry is shared markup: the id must exist exactly once
+             in the document (duplicate ids break label/for and getElementById). -->
         <label class="field-label" for="race-room-code">Or enter a friend's room code</label>
         <div class="redeem">
           <input id="race-room-code" data-ui data-ref="roomCode" data-enter-action="join-room" aria-label="Room code" maxlength="2048" placeholder="Code or invite link" autocomplete="off" autocapitalize="characters" spellcheck="false" />
-          <button class="mini-btn" data-ui data-action="join-room" disabled>Join</button>
-        </div>`}
+          <button class="mini-btn" data-ui data-action="join-room" ${s.multiplayerConfigured ? "" : "disabled"}>Join</button>
+        </div>
       </section>
       <nav class="destination-grid" aria-label="More ways to race">
         <button class="destination" data-ui data-action="open-practice"><span class="destination-art">${menuIcon("compass")}</span><span class="destination-copy"><b>AI Practice</b><span>Custom opponent count &amp; skill</span></span></button>

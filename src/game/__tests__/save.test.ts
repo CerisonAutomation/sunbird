@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SAVE_KEY, SAVE_KEY_CORRUPT, SAVE_KEY_V1 } from "../constants";
+import { openPayload } from "../resilience/crc";
 import { SaveData } from "../SaveData";
 
 /**
@@ -37,7 +38,7 @@ describe("local-first persistence", () => {
     // A subsequent persist writes fresh state but must leave the backup alone.
     sd.addCoins(100);
     expect(localStorage.getItem(SAVE_KEY_CORRUPT)).toContain("5000");
-    expect(JSON.parse(localStorage.getItem(SAVE_KEY)!).wallet).toBe(100);
+    expect(JSON.parse(openPayload(localStorage.getItem(SAVE_KEY)!).data).wallet).toBe(100);
   });
 
   it("migrates a v1 save forward to v2", () => {
@@ -46,7 +47,7 @@ describe("local-first persistence", () => {
     expect(sd.recoveredFromCorruption).toBe(false);
     expect(sd.state.bestDistance).toBe(777);
     sd.persist();
-    expect(JSON.parse(localStorage.getItem(SAVE_KEY)!).bestDistance).toBe(777);
+    expect(JSON.parse(openPayload(localStorage.getItem(SAVE_KEY)!).data).bestDistance).toBe(777);
   });
 
   it("observes write failures (throttled) instead of swallowing them", () => {
@@ -108,7 +109,7 @@ describe("local-first persistence", () => {
     expect(sd.state.wingmanBundle).toBe(true);
     // A fresh persist keeps them in the on-disk blob.
     sd.persist();
-    const onDisk = JSON.parse(localStorage.getItem(SAVE_KEY)!);
+    const onDisk = JSON.parse(openPayload(localStorage.getItem(SAVE_KEY)!).data);
     expect(onDisk.lastStipendClaimed).toBe("2026-09-16");
     expect(onDisk.wingmanBundle).toBe(true);
   });

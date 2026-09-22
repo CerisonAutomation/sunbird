@@ -6,7 +6,7 @@
  * All routes are rate-limited per IP (reads/writes/guest buckets).
  */
 import type { Ctx } from "../core/ctx.js";
-import type { Route } from "./router.js";
+import type { Params, Route } from "./router.js";
 import { HttpError, cleanText } from "../util/http.js";
 import { seasonId } from "../util/id.js";
 import type { BoardMetric, BoardScope, PrivacySettings } from "../types.js";
@@ -30,6 +30,13 @@ function hostSeatCheck(ctx: Ctx, code: string, actor: string): string {
   const host = session.hostSeat;
   if (!host || host.playerId !== actor) throw new HttpError(403, "host only", "notHost");
   return host.seatId;
+}
+
+/** Shared handler for the aggregate telemetry beacon (three path aliases:
+ * root for prod bases, /mp/v1 for the versioned namespace, /social for the
+ * dev proxy base). */
+function telemetryIngest(ctx: Ctx, _p: Params, _q: URLSearchParams, body: Record<string, unknown>): unknown {
+  return ctx.telemetry.ingest(body);
 }
 
 export const V1_ROUTES: Route[] = [
@@ -56,6 +63,46 @@ export const V1_ROUTES: Route[] = [
         players: Object.keys(ctx.db.state.profiles).length,
       };
     },
+  },
+
+  /* ------------------------------------------------------------- telemetry */
+
+  {
+    // Aggregate client telemetry beacon (sendBeacon on tab-hide). Privacy by
+    // construction: whitelisted counter names + coarse numbers, validated and
+    // capped server-side. Counters are per-process by design — this endpoint
+    // is a trend signal, never a tracking record.
+    method: "POST",
+    re: /^\/telemetry$/,
+    rl: "write",
+    auth: "optional",
+    bodyMaxBytes: 4096,
+    handler: telemetryIngest,
+  },
+  {
+    method: "POST",
+    re: /^\/mp\/v1\/telemetry$/,
+    rl: "write",
+    auth: "optional",
+    bodyMaxBytes: 4096,
+    handler: telemetryIngest,
+  },
+  {
+    // Dev base alias: the vite /social proxy forwards the full path.
+    method: "POST",
+    re: /^\/social\/telemetry$/,
+    rl: "write",
+    auth: "optional",
+    bodyMaxBytes: 4096,
+    handler: telemetryIngest,
+  },
+  {
+    // Ops view: top aggregate counters. Contains only counts — no identities.
+    method: "GET",
+    re: /^\/mp\/v1\/telemetry\/summary$/,
+    rl: "read",
+    auth: "optional",
+    handler: (ctx) => ctx.telemetry.snapshot(),
   },
 
   /* -------------------------------------------------------------- identity */

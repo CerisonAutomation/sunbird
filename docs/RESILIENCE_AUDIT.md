@@ -33,6 +33,9 @@ failures were reported but never healed, and main-thread stalls were pure anecdo
 - `Leaderboard.ts` — board GET + score POST through `fetchJson` (breaker = API origin); failed uploads queue in `sunbird.outbox.score.v1` and drain on `online`/board-open. The server keeps best-row-per-pilot, so idempotent replay cannot regress the board.
 - `GhostNet.ts` — ghost publish/fetch through `fetchJson` (breaker + 4 s timeout + 2 attempts).
 - `SaveData.ts` — `persistNow` writes through `durableSetItem`; quota pressure now evicts caches before failing; `onEviction` observer added.
+- `SaveData.ts` (round 2) — the save is now a **CRC32-sealed envelope** (`resilience/crc.ts`): writes are sealed (localStorage + portal cloud adapter receive the same sealed string), loads verify the checksum, legacy bare-JSON saves load untouched and upgrade on the next persist, and a checksum mismatch quarantines the blob exactly like unparseable JSON did. A silently bit-flipped save can no longer restore wrong numbers.
+- HUD room entry — both ternary branches carried `id="race-room-code"` (duplicate DOM id, caught by `audit:ui`); deduplicated into shared markup. UI audit now passes.
+- Telemetry sink (round 2) — `POST /telemetry` on the social server (`server/src/telemetry/TelemetryService.ts`): validated, capped aggregate counters (no PII by construction, per-process by design, 8 route tests). The client beacon now targets `VITE_SOCIAL_URL + /telemetry`; the dead Rust-server derivation was removed. Portal builds still blank the URL → no beacon (compliance preserved).
 
 ---
 
@@ -57,8 +60,8 @@ Legend: **C**ompleteness · **Q**uality · **W**orking (verified) · **U**sabili
 | Social (directory/lookup/friends) | 4 | 4 | 4 | 4 | 4 | `pilot-directory`, `pilot-lookup` tests; honest offline empty-states (ROADMAP §"no fabricated fallback") | needs the live social service to verify |
 | Payments / entitlements | 4 | 4 | 5 | 4 | 4 | `entitlements`, `payments.portal`; receipt list local; Stripe web worker documented (LEGAL_SECURITY) | restore-purchases UX on web |
 | Settings / accessibility / i18n | 5 | 4 | 5 | 5 | 5 | reduce-motion/colorblind/large-text persisted via `<html>` classes; `i18n` e2e incl. RTL baselines; `input-standards` e2e | full WCAG 2.2 AA third-party audit |
-| Persistence (SaveData) | 5 | 5 | 5 | 4 | **5↑** | `save` + `persistence` e2e; corrupt-payload quarantine existed; quota self-heal + CRC sealing added this pass | CRC seal not yet applied to the save envelope itself (see §4) |
-| Telemetry / experiments / anti-cheat | 4 | 4 | 5 | n/a | **5↑** | `telemetry`, `experiments/flags`, `anticheat` tests; crash capture + journal added | no Rust `/telemetry` route yet — beacons no-op (harmless, honest) |
+| Persistence (SaveData) | 5 | 5 | 5 | 4 | 5 | `save` + `persistence` e2e; corrupt-payload quarantine; quota self-heal + **CRC32-sealed save envelope with legacy migration** (save-seal tests) | — |
+| Telemetry / experiments / anti-cheat | 5 | 4 | 5 | n/a | 5 | `telemetry`, `experiments/flags`, `anticheat` tests; crash capture + journal; **server aggregate sink live** (`POST /telemetry` + `/mp/v1/telemetry/summary`, 8 tests) | — |
 | Portal builds (Poki/Crazy/generic) | 5 | 5 | 5 | 4 | 5 | `poki-pvp`, `portal-policy` e2e, `poki:preflight` gates, zip audits, compliance matrix in `POKI_COMPLIANCE_AUDIT.md` | portal live-multiplayer deferred by decision |
 | **Resilience kernel (new)** | 5 | 5 | 5 | n/a | 5 | 98 tests; wired end-to-end; zero console changes (portal-safe) | journal export UI (support flow) |
 
@@ -73,10 +76,10 @@ Where the competition still leads: cloud save/account ecosystems (CrazyGames Dat
 
 ## 4. Known gaps register (honest)
 
-1. **CRC sealing exists but is not yet wrapped around the live save envelope** — `sealPayload`/`openPayload` are tested and ready; `SaveData` still loads bare JSON (backward compat). Wrapping requires one migration pass (write sealed, read both) — deliberately left out of this change to keep the diff reviewable.
-2. **Rust server has no `/telemetry` route** — client beacons target it and silently no-op. Add the route (or empty the endpoint) before relying on aggregate counters.
+1. ~~CRC sealing not yet on the live save envelope~~ **Closed**: saves are sealed end-to-end (write sealed, read sealed+legacy, quarantine on mismatch; 6 dedicated tests + full save/persistence suites green). Remaining slice: `exportCode` envelopes stay plain (by design — they are share codes, not storage).
+2. ~~Rust server has no `/telemetry` route~~ **Closed differently**: the sink is the social server (`POST /telemetry`, `/mp/v1/telemetry`, `/social/telemetry` aliases + `GET /mp/v1/telemetry/summary`), and the client beacon now targets `VITE_SOCIAL_URL` exclusively. The dead Rust derivation was removed, so no beacon aims at a route that does not exist. (Rust got no route — cargo is unavailable in this workspace, and shipping uncompilable Rust would break CI; the social server is the tested, deployed sink.)
 3. **Deployment gates remain**: WSS hostname for the Rust server, Upstash KV in production env, portal Inspector QA — all tracked in `PRODUCTION_READINESS_PLAN.md`, unchanged by this work.
-4. **Bundle**: `Game` chunk 572 kB (177 kB gzip) — pre-existing; Three.js dominates. The kernel adds ~6 kB pre-gzip across lazy chunks.
+4. **Bundle**: `Game` chunk 572 kB (177 kB gzip) — pre-existing; Three.js dominates. The kernel adds ~6 kB pre-gzip across lazy chunks. `verify:prod` budgets: JS total 1.49 MB / 2.50 MB — **PRODUCTION READY** per the gate. The kernel initially leaked two literals past the portal gates (`sunbird.receipts` marker via the hardcoded protected-key list; `https://localhost` via the breaker-key fallback) — both fixed (`BASE_PROTECTED_KEYS` + caller-owned protection; `about:blank` base), full `build:portals` → portal gate → zip audit → Poki rules → `verify:prod` chain green.
 5. **Ranked-season replay validation** (server re-simulating input traces) remains deferred per the production plan — the movement envelope + HMAC + rate limits are the current anti-abuse stack.
 
 ## 5. Release-gate scorecard (user framework → repo state)

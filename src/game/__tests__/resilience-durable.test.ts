@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { crc32, crc32Hex, isSealed, openPayload, sealPayload } from "../resilience/crc";
-import { CLEAN_WRITE, durableSetItem, evictionPlan, PROTECTED_KEYS } from "../resilience/durableSet";
+import { BASE_PROTECTED_KEYS, CLEAN_WRITE, durableSetItem, evictionPlan } from "../resilience/durableSet";
 
 describe("crc32", () => {
   it("matches known vectors", () => {
@@ -57,20 +57,23 @@ describe("seal/open payload", () => {
 
 describe("evictionPlan", () => {
   it("orders caches before convenience and filters protected keys", () => {
-    const plan = evictionPlan([
-      "sunbird.pilots.flew_with",
-      "sunbird.save.v2", // protected — must never appear
-      "sunbird.ghost.seed123",
-      "sunbird.board.v1",
-      "sunbird.receipts", // protected
-      "sunbird.flags",
-      "random.other.app.key", // foreign key — not ours to evict
-    ]);
+    const plan = evictionPlan(
+      [
+        "sunbird.pilots.flew_with",
+        "sunbird.save.v2", // caller-protected — must never appear
+        "sunbird.ghost.seed123",
+        "sunbird.board.v1",
+        "sunbird.pilotname", // base-protected
+        "sunbird.flags",
+        "random.other.app.key", // foreign key — not ours to evict
+      ],
+      ["sunbird.save.v2", "sunbird.save.v1"],
+    );
     expect(plan).toEqual(["sunbird.ghost.seed123", "sunbird.board.v1", "sunbird.pilots.flew_with", "sunbird.flags"]);
   });
 
-  it("never plans eviction of the save, receipts or outbox", () => {
-    const plan = evictionPlan([...PROTECTED_KEYS]);
+  it("never plans eviction of the caller's protected keys", () => {
+    const plan = evictionPlan([...BASE_PROTECTED_KEYS, "sunbird.save.v2"], [...BASE_PROTECTED_KEYS, "sunbird.save.v2"]);
     expect(plan).toEqual([]);
   });
 });
