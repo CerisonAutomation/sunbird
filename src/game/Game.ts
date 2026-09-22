@@ -3067,6 +3067,11 @@ export class Game {
     const newTrophies = this.achievements.checkNew();
     this.checkPrizeSkins();
 
+    // Poki game-events: the rewarded bonus card is on the recap — measure its
+    // exposure once so the dashboard can pair it with the tap's `interact`.
+    if (this.portalEnabled() && this.runCoins > 0 && !this.multiplierClaimed) {
+      this.platform?.measure("button", "results-coin-multiplier", "visible");
+    }
     this.telemetry.track("run_end", {
       distance: Math.round(stats.distance),
       score: Math.round(score),
@@ -3335,13 +3340,23 @@ export class Game {
         // One claim per run. The old handler tripled runCoins on every click
         // and the card re-armed from the live snapshot — an infinite 3× coin
         // loop. Now it pays the bonus once and the card flips to a claimed
-        // chip (renderCoinMultiplierCard). No ad is shown, so no ad wording.
+        // chip (renderCoinMultiplierCard). On portals the bonus is the
+        // results-screen REWARDED placement (optional value, reward stated on
+        // the card); a declined ad leaves the card armed, never punishes.
         if (this.state === "gameover" && !this.multiplierClaimed && this.runCoins > 0) {
-          const bonus = this.runCoins * 2;
-          this.multiplierClaimed = true;
-          this.save.addCoins(bonus);
-          this.audio.chapterFanfare();
-          this.hud.toast(`3× flight bonus — +● ${bonus} coins`, "gold");
+          const platform = this.platform;
+          if (this.portalEnabled() && platform && platform.name !== "none") {
+            platform.measure("button", "results-coin-multiplier", "interact");
+            this.setState("ad");
+            this.telemetry.track("portal_break_request", { portal: platform.name, placement: "results-multiplier" });
+            void this.multiplierWithPortalReward();
+          } else {
+            const bonus = this.runCoins * 2;
+            this.multiplierClaimed = true;
+            this.save.addCoins(bonus);
+            this.audio.chapterFanfare();
+            this.hud.toast(`3× flight bonus — +● ${bonus} coins`, "gold");
+          }
         }
         this.bump();
         break;
@@ -3426,6 +3441,14 @@ export class Game {
         // the confirmation flow (goToMenu returns to menu state) starts clean.
         if (this.state === "paused") this.closePauseScreen();
         this.exitVersus();
+        if (this.state === "gameover" && this.portalEnabled() && this.platform && this.platform.name !== "none") {
+          // Leaving the recap for the menu is one of Poki's documented
+          // commercial-break points ("back to the main menu"); the SDK
+          // frequency-caps how often a real ad actually serves.
+          this.telemetry.track("portal_break_request", { portal: this.platform.name, placement: "to-menu" });
+          void this.menuAfterPortalBreak();
+          break;
+        }
         this.goToMenu();
         break;
       case "pause-to": {
@@ -5794,6 +5817,49 @@ export class Game {
       this.endPortalAd();
     }
     if (this.state === "paused" || this.state === "ad") this.setState("playing");
+  }
+
+  /**
+   * The "back to the main menu" commercial break (results → menu on portal
+   * builds). A rejected or absent break resolves straight into the menu —
+   * leaving a results screen can never wedge in the ad state.
+   */
+  private async menuAfterPortalBreak(): Promise<void> {
+    const platform = this.platform;
+    if (!platform || platform.name === "none") return;
+    this.setState("ad");
+    await platform.commercialBreak();
+    if (this.disposed) return;
+    this.endPortalAd();
+    this.goToMenu();
+    this.bump();
+  }
+
+  /**
+   * Results-screen 3× coin bonus via the platform's rewarded ad. The card
+   * states the reward before the tap; the payout happens only on a true
+   * grant, and a declined/failed ad just returns the player to the recap
+   * with the card still armed (Poki rewarded rules: optional, honest, no
+   * penalty on decline).
+   */
+  private async multiplierWithPortalReward(): Promise<void> {
+    const platform = this.platform;
+    if (!platform || platform.name === "none") return;
+    const earned = await platform.rewardedBreak();
+    if (this.disposed) return;
+    this.endPortalAd();
+    if (earned) {
+      const bonus = this.runCoins * 2;
+      this.multiplierClaimed = true;
+      this.save.addCoins(bonus);
+      this.audio.chapterFanfare();
+      this.hud.toast(`3× flight bonus — +● ${bonus} coins`, "gold");
+      platform.measure("reward", "results-coin-multiplier", "granted");
+    } else {
+      this.hud.toast("No reward this time — the 3× bonus is still on the card", "warn");
+    }
+    if (this.state === "ad") this.setState("gameover");
+    this.bump();
   }
 
   /** Rewarded continue never succeeds unless the platform explicitly grants it. */

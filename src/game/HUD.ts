@@ -3150,10 +3150,22 @@ export function renderFlightRecap(path: [number, number][]): string {
  * card carries no ad icon — it is a bonus, not an ad placement — and the
  * title never wraps (nowrap) so narrow phones don't get a four-line header.
  */
-export function renderCoinMultiplierCard(coins: number, claimed: boolean): string {
+export function renderCoinMultiplierCard(coins: number, claimed: boolean, rewarded = false): string {
   if (coins <= 0) return "";
   if (claimed) {
     return `<div class="multiplier-cta-card claimed">✓ 3× bonus applied &nbsp;+● ${coins * 2} extra coins</div>`;
+  }
+  if (rewarded) {
+    // Portal editions route the bonus through the platform's rewarded ad: the
+    // reward is stated BEFORE the tap (Poki's rewarded-copy rule), the icon
+    // marks it as an ad, and a declined ad never steals the card away.
+    return `<div class="multiplier-cta-card">
+      <div class="multiplier-cta-text">
+        <b>3× Flight Coin Bonus</b>
+        <span>Watch a short ad · triple ● ${coins} → ● ${coins * 3}</span>
+      </div>
+      <button class="primary-btn gold wide" data-ui data-action="multiply-run-coins">🎬 Watch → 3× &nbsp;+● ${coins * 2}</button>
+    </div>`;
   }
   return `<div class="multiplier-cta-card">
       <div class="multiplier-cta-text">
@@ -3252,7 +3264,7 @@ function renderGameOver(s: HudSnapshot): string {
       <div><span>${t("hud.stat.coins", undefined, "Coins")}</span><b>${s.coins}</b></div>
     </div>
 
-    ${renderCoinMultiplierCard(s.coins, s.multiplierClaimed)}
+    ${renderCoinMultiplierCard(s.coins, s.multiplierClaimed, s.portalName !== "none")}
 
     ${renderNextFlight(s)}
     <details class="result-details" data-ref="flightDetails"><summary>Flight details <span>Landmarks &amp; skill</span></summary><div class="over-stats">

@@ -135,3 +135,33 @@ describe("Poki analytics coverage (SDK event surface)", () => {
     expect(emit.mock.calls.map((c) => c[0])).toEqual(["start", "stop"]);
   });
 });
+
+describe("Poki ad-placement canon (guideline: breaks only at natural break points)", () => {
+  // Reads the live source so a new call site can never ship unreviewed: every
+  // commercial break must sit in a named placement method, and the placement
+  // set must match Poki's documented break points exactly — restart, resume
+  // from pause, back-to-menu for commercial breaks; Second-Wind continue and
+  // the results 3× bonus for rewarded breaks. Mid-gameplay breaks are banned.
+  it("routes every break through exactly the canonical placement methods", async () => {
+    const fs = await import("node:fs");
+    const join = (await import("node:path")).join;
+    const src = fs.readFileSync(join(process.cwd(), "src", "game", "Game.ts"), "utf8");
+
+    const commercial = [...src.matchAll(/await platform\.commercialBreak\(\)/g)].length
+      + [...src.matchAll(/await this\.platform\?\.commercialBreak\(\)/g)].length;
+    const rewarded = [...src.matchAll(/await platform\.rewardedBreak\(\)/g)].length;
+    expect(commercial).toBe(3); // restartWithPortalBreak, resumeFromPause, menuAfterPortalBreak
+    expect(rewarded).toBe(2); // multiplierWithPortalReward, continueWithPortalReward
+
+    for (const fn of ["restartWithPortalBreak", "resumeFromPause", "menuAfterPortalBreak"]) {
+      expect(src).toContain(`private async ${fn}`);
+    }
+    for (const fn of ["continueWithPortalReward", "multiplierWithPortalReward"]) {
+      expect(src).toContain(`private async ${fn}`);
+    }
+    // Every break request carries a placement label for the dashboard.
+    for (const placement of ['"restart"', '"resume"', '"to-menu"', '"continue"', '"results-multiplier"']) {
+      expect(src).toContain(`placement: ${placement}`);
+    }
+  });
+});

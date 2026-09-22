@@ -1,4 +1,4 @@
-# 🐦 Sunbird — Tiny Glide
+# 🐦 Sunbird
 
 > A one-button, side-scrolling arcade glider. Hold to dive, release to soar, chase the daylight across procedurally generated islands.
 

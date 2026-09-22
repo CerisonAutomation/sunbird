@@ -21,7 +21,7 @@
 | `GK-01` | recommendation | Choose a web game engine deliberately (2D/3D + multiplayer needs) and understand player-hardware insights so the build stays compatible and performant. | ✅ | docs/poki/01-web-game-engines.md |
 | `GK-02` | recommendation | Success on web depends on fast onboarding, high engagement strategies, and localization. | ✅ | src/game/__tests__/firstflight.test.ts |
 | `GK-03` | recommendation | Integrate monetization early so rewarded placements land at natural moments. | ✅ | src/game/Game.ts matches /rewardedBreak\|continue-ad/ |
-| `GK-04` | recommendation | Thumbnails are the primary acquisition surface; make them impactful. | ✅ verified (executed) | executed: node scripts/verify-thumbnail.mjs |
+| `GK-04` | recommendation | Thumbnails are the primary acquisition surface; make them impactful. | ✅ | gate wired: node scripts/verify-thumbnail.mjs |
 | `GK-05` | informational | The guide is the starting point for optimising games for the web environment. | ℹ️ info | docs/poki/README.md |
 
 ## ENG — Choosing your web game engine
@@ -43,7 +43,7 @@
 | Rule | Kind | Requirement | Status | Verification |
 |---|---|---|---|---|
 | `EA-01` | requirement | Mobile first: prioritise mobile compatibility early, not as a late port. | ✅ | src/game/Game.ts matches /isCoarsePointer\(\)/ |
-| `EA-02` | requirement | Keep it small: target an 8–10 MB game file for older hardware and slow connections. | ✅ verified (executed) | executed: node scripts/verify-portal.mjs |
+| `EA-02` | requirement | Keep it small: target an 8–10 MB game file for older hardware and slow connections. | ✅ | gate wired: node scripts/verify-portal.mjs |
 | `EA-03` | recommendation | Skip the menu: let first-time players reach gameplay without splash/title/level-select detours. | ✅ | src/game/HUD.ts matches /home-launch/ |
 | `EA-04` | requirement | Loading screens must be visually engaging and include a progress bar. | ✅ | index.html matches /role="progressbar"/ |
 | `EA-05` | recommendation | Progressive loading: ship essential initial assets first, load the rest in the background. | ✅ | src/game/__tests__/boot-progress.test.ts |
@@ -113,16 +113,16 @@
 
 | Rule | Kind | Requirement | Status | Verification |
 |---|---|---|---|---|
-| `THB-01` | requirement | A high-quality thumbnail is essential for attracting players. | ✅ verified (executed) | executed: node scripts/verify-thumbnail.mjs |
+| `THB-01` | requirement | A high-quality thumbnail is essential for attracting players. | ✅ | gate wired: node scripts/verify-thumbnail.mjs |
 | `THB-02` | requirement | The thumbnail must accurately reflect the game's content. | ✅ attested | Thumbnail uses the game's sky/sun/ridge palette and the player's bird in the pose seen in the first five seconds. |
 | `THB-03` | recommendation | Embrace simplicity: one clear foreground object. | ✅ attested | Single hero subject (bird) over a two-layer background; no clutter or screenshot chrome. |
 | `THB-04` | recommendation | Keep a series visually consistent across thumbnails. | ✅ attested | One palette and hero pose reused across icon sizes, store card and video frame. |
-| `THB-05` | requirement | Full-bleed square, minimum 628 x 628 px. | ✅ verified (executed) | executed: node scripts/verify-thumbnail.mjs |
-| `THB-06` | requirement | Do not cut corners: rounded corners are applied by the platform mask. | ✅ verified (executed) | executed: node scripts/verify-thumbnail.mjs |
-| `THB-07` | requirement | Details and typography must stay legible when scaled down. | ✅ verified (executed) | executed: node scripts/verify-thumbnail.mjs |
-| `THB-08` | requirement | High contrast; avoid colours close to the Poki Playground background #83FFE7. | ✅ verified (executed) | executed: node scripts/verify-thumbnail.mjs |
+| `THB-05` | requirement | Full-bleed square, minimum 628 x 628 px. | ✅ | gate wired: node scripts/verify-thumbnail.mjs |
+| `THB-06` | requirement | Do not cut corners: rounded corners are applied by the platform mask. | ✅ | gate wired: node scripts/verify-thumbnail.mjs |
+| `THB-07` | requirement | Details and typography must stay legible when scaled down. | ✅ | gate wired: node scripts/verify-thumbnail.mjs |
+| `THB-08` | requirement | High contrast; avoid colours close to the Poki Playground background #83FFE7. | ✅ | gate wired: node scripts/verify-thumbnail.mjs |
 | `THB-09` | requirement | Static thumbnail for the player-fit test; animated 3-5 s gameplay loop before global release. | 📋 action | Record the 3-5 s capture from a real play session on a GPU machine: node scripts/capture-animated-thumbnail.mjs (serves poki-upload/, plays a scripted dive-glide loop, writes assets/submission/sunbird-thumbnail-animated.gif). Sandboxed/CI renderers read back WebGL too slowly for a smooth capture. |
-| `THB-10` | recommendation | Keep delivered image weight sane (Inspector warns on heavy images). | ✅ verified (executed) | executed: node scripts/verify-thumbnail.mjs |
+| `THB-10` | recommendation | Keep delivered image weight sane (Inspector warns on heavy images). | ✅ | gate wired: node scripts/verify-thumbnail.mjs |
 
 ## DEV — Poki Player Device Report
 
@@ -148,8 +148,8 @@
 | Rule | Kind | Requirement | Status | Verification |
 |---|---|---|---|---|
 | `TOOL-01` | informational | The Inspector evaluates a web build against the platform's success factors. | ℹ️ info | Submission-time tool run. |
-| `TOOL-02` | requirement | The build must survive the Inspector's mobile and technical-optimisation passes (no external resources, no console errors, sane image weights). | ✅ verified (executed) | executed: node scripts/audit-zips.mjs |
-| `TOOL-03` | requirement | Uploadable as a folder with index.html at the root, working from any sub-path. | ✅ verified (executed) | executed: node scripts/verify-upload.mjs |
+| `TOOL-02` | requirement | The build must survive the Inspector's mobile and technical-optimisation passes (no external resources, no console errors, sane image weights). | ✅ | gate wired: node scripts/audit-zips.mjs |
+| `TOOL-03` | requirement | Uploadable as a folder with index.html at the root, working from any sub-path. | ✅ | gate wired: node scripts/verify-upload.mjs |
 | `TOOL-04` | informational | Netlib is a WebRTC-datachannel P2P library for web games. | ℹ️ info | src/game/PokiNetlib.ts |
 | `TOOL-05` | informational | Netlib is usable whether or not the game is hosted on Poki. | ℹ️ info | Availability note. |
 | `TOOL-06` | requirement | Feature-detect WebRTC and keep a non-P2P path when using Netlib. | ✅ | src/game/PokiMpUtils.ts matches /RTCPeerConnection/ |
@@ -165,8 +165,8 @@
 | `REQ-01` | requirement | Scale to 640x360, 836x470 and 1031x580 (plus real devices) with no crop or scroll. | ✅ | e2e/scaling.spec.ts (pinned: /640\|836\|1031/) |
 | `REQ-02` | requirement | Run inside a cross-origin iframe: no top-level navigation, window.open, dialogs, or console errors. | ✅ | src/rejection-guard.ts matches /unhandledrejection\|rejection/ |
 | `REQ-03` | requirement | Fully playable in incognito / with storage blocked. | ✅ | src/game/__tests__/storage.test.ts |
-| `REQ-04` | requirement | Initial download under ~5 MB, total under ~8 MB. | ✅ verified (executed) | executed: node scripts/verify-portal.mjs |
-| `REQ-05` | requirement | No service worker or manifest inside portal builds. | ✅ verified (executed) | executed: node scripts/verify-portal.mjs |
+| `REQ-04` | requirement | Initial download under ~5 MB, total under ~8 MB. | ✅ | gate wired: node scripts/verify-portal.mjs |
+| `REQ-05` | requirement | No service worker or manifest inside portal builds. | ✅ | gate wired: node scripts/verify-portal.mjs |
 | `REQ-06` | requirement | Fixed non-scrolling page with the canvas filling the viewport; portrait and landscape supported. | ✅ | src/index.css matches /position: fixed/ |
 | `REQ-10` | requirement | Lifecycle order init -> gameLoadingStart -> gameLoadingFinished, each phase marker once. | ✅ | src/sdk/__tests__/platform-failsafe.test.ts |
 | `REQ-11` | requirement | gameplayStart on real play start, gameplayStop on stop; never duplicated or inverted. | ✅ | e2e/poki-artifact.spec.ts |
@@ -175,28 +175,28 @@
 | `REQ-14` | requirement | Rewarded placements emit visible when shown and interact when chosen. | ✅ | src/game/Game.ts matches /continue-ad/ |
 | `REQ-15` | requirement | Mute audio and disable input for the whole ad break. | ✅ | src/game/Game.ts matches /beginPortalAd/ |
 | `REQ-16` | requirement | Work when the SDK is unavailable: boot anyway, never block on the portal. | ✅ | src/game/__tests__/journey-reliability.test.ts |
-| `REQ-20` | requirement | No in-app purchases on the platform and no UI implying them. | ✅ verified (executed) | executed: node scripts/verify-portal.mjs |
+| `REQ-20` | requirement | No in-app purchases on the platform and no UI implying them. | ✅ | gate wired: node scripts/verify-portal.mjs |
 | `REQ-21` | requirement | No secondary spendable currencies. | ✅ | src/game/__tests__/economy.test.ts |
-| `REQ-22` | requirement | No third-party ad systems. | ✅ verified (executed) | executed: node scripts/audit-zips.mjs |
+| `REQ-22` | requirement | No third-party ad systems. | ✅ | gate wired: node scripts/audit-zips.mjs |
 | `REQ-23` | requirement | No ad-timer or cooldown manipulation. | ✅ | src/game/Game.ts matches /portalEnabled\(\)/ |
-| `REQ-24` | requirement | External links only through the platform API; portal builds should have none. | ✅ verified (executed) | executed: node scripts/verify-portal.mjs |
+| `REQ-24` | requirement | External links only through the platform API; portal builds should have none. | ✅ | gate wired: node scripts/verify-portal.mjs |
 | `REQ-30` | requirement | All-ages content: no violence, sexual content, gambling, substances, fear or bullying. | ✅ attested | Family-friendly bird flight; no combat, no gore, no casino framing (the lucky wheel is a free daily gift, not a paid spin), no substances, no chat. |
-| `REQ-31` | requirement | No chat in multiplayer surfaces; emotes are the recommended alternative. | ✅ verified (executed) | executed: node scripts/verify-portal.mjs |
+| `REQ-31` | requirement | No chat in multiplayer surfaces; emotes are the recommended alternative. | ✅ | gate wired: node scripts/verify-portal.mjs (needs sunbird-crazy.zip, sunbird-generic.zip — run with --run after build:portals) |
 | `REQ-32` | requirement | No PII collection; platform identity is display-only. | ✅ | src/sdk/poki.ts matches /getIdentity/ |
 | `REQ-33` | requirement | Originality: art, UI, mechanics, characters, audio and name must be the developer's own. | ✅ attested | Procedural biomes, custom UI, original bird/characters, procedural score; no third-party art or audio. |
 | `REQ-34` | requirement | AI-assisted production: no watermarks or prompt text; process documentable on request. | ✅ attested | No AI-generated asset files ship (art is procedural, audio is synthesized); production history is the git log. |
-| `REQ-35` | recommendation | External resources policy: prefer zero external requests; bundle assets and avoid CDNs. | ✅ verified (executed) | executed: node scripts/audit-zips.mjs |
+| `REQ-35` | recommendation | External resources policy: prefer zero external requests; bundle assets and avoid CDNs. | ✅ | gate wired: node scripts/audit-zips.mjs |
 | `REQ-40` | requirement | Identity is passive: never force a login at boot. | ✅ attested | login() is deliberately not called at boot (Poki's login reloads the page on first use); getUser() is passive with a local fallback name. |
 | `REQ-41` | recommendation | Platform tokens are short-lived and must be verified server-side immediately, never stored. | ✅ | src/sdk/poki.ts matches /getToken/ |
 | `REQ-42` | requirement | A player who is not signed in must still play the full game. | ✅ | src/game/__tests__/save.test.ts |
 | `REQ-50` | informational | Revenue split: 100% on search/owned traffic, 50/50 on platform-driven traffic. | ℹ️ info | Business term; nothing to implement. |
-| `REQ-51` | requirement | The submitted build is web-exclusive: no store build that double-serves the Poki artifact. | ✅ verified (executed) | executed: node scripts/audit-zips.mjs |
+| `REQ-51` | requirement | The submitted build is web-exclusive: no store build that double-serves the Poki artifact. | ✅ | gate wired: node scripts/audit-zips.mjs |
 | `REQ-52` | informational | Release flow: folder upload -> Inspector QA -> player-fit test -> web-fit test -> review. | 📋 action | Walk the Inspector QA modules on the unzipped folder (Event Log sequences, External Resources, Image Optimization, Scaling tests, mobile QR). |
 | `REQ-53` | informational | Web-fit metrics: C2P (click-to-play), CTR (thumbnail), time on page. | ℹ️ info | C2P is minimised by the sub-1 MB boot and immediate first frame; CTR by the specification-compliant thumbnail; time-on-page by the daily/weekly retention loops. |
 | `REQ-60` | requirement | Do not place HUD under the mobile platform pill; use movePill() to relocate it. | ✅ | src/sdk/platform.ts matches /movePill/ |
 | `REQ-61` | requirement | No player-authored text or personal-data collection: multiplayer-visible names must be curated, not typed by the player. | ✅ | src/game/__tests__/pilot-name-surface.test.ts (pinned: /CUSTOM_PILOT_NAMES/) |
 | `REQ-62` | requirement | No offer to remove or disable ads, and no ad-frequency claim in a portal paywall. | ✅ | src/game/__tests__/portal-policy.test.ts (pinned: /sponsored breaks/) |
-| `REQ-63` | requirement | Portal bundles must contain no ad-removal copy and no free-text name field (bundle-level enforcement of REQ-20 and the player-safety policy). | ✅ verified (executed) | executed: node scripts/verify-portal.mjs |
+| `REQ-63` | requirement | Portal bundles must contain no ad-removal copy and no free-text name field (bundle-level enforcement of REQ-20 and the player-safety policy). | ✅ | gate wired: node scripts/verify-portal.mjs |
 | `REQ-64` | requirement | A portal build must not describe or count ad breaks it does not schedule — the platform owns ad frequency. | ✅ | e2e/portal-policy.spec.ts (pinned: /must not offer ad removal/) |
 | `REQ-65` | requirement | A portal build must issue no request that can fail on the host origin (no relative calls to absent backends). | ✅ | e2e/portal-policy.spec.ts (pinned: /HTTP \$\{r.status/) |
 
