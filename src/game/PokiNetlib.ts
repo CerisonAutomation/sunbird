@@ -219,12 +219,6 @@ export class PokiNetlibClient implements NetTransport {
   private open(): void {
     try {
       const network = new Network(NETLIB_GAME_ID);
-      // Add the 'control' channel so netlib's built-in Latency (ping/pong)
-      // activates per-peer RTT measurement that the lobby browser can display.
-      network.dataChannels = {
-        ...network.dataChannels,
-        control: { ordered: false },
-      };
       this.net = network;
 
       const onReady = async () => {
