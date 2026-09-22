@@ -2474,8 +2474,11 @@ function renderAtlas(s: HudSnapshot): string {
   `;
 }
 
-function menuLinks(items: MenuDestination[]): string {
-  return items.map(item => `<button class="destination" data-ui data-action="${item.action}" data-icon="${item.icon}"><span class="destination-art">${menuIcon(item.icon)}</span><span class="destination-copy"><b>${item.title}</b><span>${item.detail}</span></span><span class="destination-arrow" aria-hidden="true">${arrowUpRightSvg()}</span></button>`).join("");
+function menuLinks(items: (MenuDestination & { featured?: boolean })[]): string {
+  return items.map(item => {
+    const cls = item.featured ? "destination destination--featured" : "destination";
+    return `<button class="${cls}" data-ui data-action="${item.action}" data-icon="${item.icon}"><span class="destination-art">${menuIcon(item.icon)}</span><span class="destination-copy"><b>${item.title}</b><span>${item.detail}</span></span><span class="destination-arrow" aria-hidden="true">${arrowUpRightSvg()}</span></button>`;
+  }).join("");
 }
 
 function renderNameEntry(s: HudSnapshot): string {
@@ -2609,7 +2612,7 @@ function renderMain(s: HudSnapshot): string {
     <nav class="destination-grid play-destinations solo-destinations" aria-label="Play solo">${menuLinks(PLAY_DESTINATIONS.filter((d) => d.action === "mode-select" || d.action === "start-endless"))}</nav>
     <div class="home-section-title"><span>${t("hud.menu.makeItYours", undefined, "Make it yours")}</span><small>02 — HANGAR</small></div>
     <nav class="destination-grid utility-destinations" aria-label="Your hangar">${menuLinks(COLLECTION_DESTINATIONS)}</nav>
-    <div class="home-section-title"><span>${t("hud.menu.everyFlightCounts", undefined, "Progress")}</span><small>trophies, board &amp; pass</small></div>
+    <div class="home-section-title"><span>${t("hud.menu.everyFlightCounts", undefined, "Every flight counts")}</span><small>03 — PROGRESS</small></div>
     <nav class="destination-grid progress-destinations" aria-label="Challenges and progress">${menuLinks(
       PROGRESS_DESTINATIONS.map(item => {
         if (item.action === "open-challenges") {
@@ -2620,12 +2623,12 @@ function renderMain(s: HudSnapshot): string {
         }
         if (item.action === "open-board") {
           const liveDetail = s.board && s.board.yourRank > 0
-            ? `You're #${s.board.yourRank} of ${s.board.total} · #1 ${s.board.entries[0] ? escapeHtml(s.board.entries[0].name) : ""}`
-            : `${s.bestDistance > 0 ? `Your best: ${formatDistance(s.bestDistance)}` : "See top pilot scores"}`;
-          return { ...item, detail: liveDetail };
+            ? `🏆 You · #${s.board.yourRank} of ${s.board.total} · Leader: ${s.board.entries[0] ? escapeHtml(s.board.entries[0].name) : "—"}`
+            : `${s.bestDistance > 0 ? `Your best: ${formatDistance(s.bestDistance)} · Global standings` : "All-time · weekly · today · you"}`;
+          return { ...item, detail: liveDetail, featured: true };
         }
         return item;
-      })
+      }) as (typeof PROGRESS_DESTINATIONS[number] & { featured?: boolean })[]
     )}</nav>
     <div class="home-record"><span class="record-art">${menuIcon("medal")}</span><span>${t("hud.menu.personalBest", undefined, "Personal best")} <b>${formatDistance(s.bestDistance)}</b></span><span class="record-pass" data-ui data-action="open-pass">Nest Pass Lv.${s.season.tier}/${s.season.maxTier}</span><span class="record-wallet">● ${s.wallet.toLocaleString()} <small>${t("hud.menu.coinBalance", undefined, "coins")}</small></span></div>
   `;

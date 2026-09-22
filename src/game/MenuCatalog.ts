@@ -12,7 +12,6 @@ export const PLAY_DESTINATIONS: MenuDestination[] = [
   { action: "play-daily", icon: "daily", title: "Long Light", detail: "Today's shared course · daily challenge" },
   { action: "open-live", icon: "online", title: "PvP", detail: "Online races, rooms & options" },
   { action: "open-practice", icon: "versus", title: "AI PvP", detail: "Offline race vs the AI flock" },
-  { action: "versus", icon: "flight", title: "Same-screen 1v1", detail: "Space / Enter · or touch your half" },
   { action: "mode-select", icon: "compass", title: "Solo modes", detail: "Time Trial · Skyline · Coin Rush" },
   { action: "start-endless", icon: "endless", title: "Endless", detail: "No clock · growing challenge" },
 ];
@@ -22,10 +21,9 @@ export const COLLECTION_DESTINATIONS: MenuDestination[] = [
   { action: "open-settings", icon: "settings", title: "Settings", detail: "Sound, controls & display" },
 ];
 export const PROGRESS_DESTINATIONS: MenuDestination[] = [
-  // Leaderboard leads the section: it is the page competitive players open
-  // between runs, and it used to sit tenth — below the Atlas.
   { action: "open-board", icon: "board", title: "Leaderboards", detail: "All-time · weekly · today · you" },
   { action: "open-challenges", icon: "challenge", title: "Challenges", detail: "Daily & weekly goals" },
+  { action: "versus", icon: "flight", title: "Same-screen 1v1", detail: "Space / Enter · or touch your half" },
   { action: "open-progress", icon: "progress", title: "Your progress", detail: "Missions, gifts & events" },
   { action: "open-cups", icon: "trophy", title: "Tournaments", detail: "Weekly score challenges" },
   { action: "open-campaign", icon: "story", title: "Story", detail: "The Long Migration" },

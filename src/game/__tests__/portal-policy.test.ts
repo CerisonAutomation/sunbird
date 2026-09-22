@@ -33,8 +33,14 @@ describe("edition policy flags", () => {
     expect(directEdition.SELL_AD_REMOVAL).toBe(true);
   });
 
+  // Poki now allows free-text pilot names with profanity filtering (isPilotNameClean).
+  // crazy/generic still forbid them (no filter shipped there).
+  it("poki edition allows free-text names (profanity-filtered) but forbids ad-removal sales", () => {
+    expect(pokiEdition.CUSTOM_PILOT_NAMES).toBe(true);
+    expect(pokiEdition.SELL_AD_REMOVAL).toBe(false);
+  });
+
   it.each([
-    ["poki", pokiEdition],
     ["crazy", crazyEdition],
     ["generic", genericEdition],
   ] as const)("%s edition forbids free-text names and ad-removal sales", (_portal, edition) => {

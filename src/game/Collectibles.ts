@@ -96,6 +96,9 @@ export class Collectibles {
   private readonly seedStr: string;
   private spawnedUntil = -1;
   private layer = 0;
+  /** X position of the most-recently spawned ring course, used to enforce a
+   *  minimum gap between courses so they never visually overlap. */
+  private lastRingCourseX = -Infinity;
 
   constructor(seedN: number, seedStr = String(seedN)) {
     this.seedN = seedN;
@@ -152,6 +155,7 @@ export class Collectibles {
 
   reset(): void {
     this.spawnedUntil = -1;
+    this.lastRingCourseX = -Infinity;
     this.coinMesh.count = this.gemMesh.count = this.ringMesh.count = 0;
     for (const c of this.activeCoins) {
       c.taken = true;
@@ -403,7 +407,13 @@ export class Collectibles {
       // a row — and one who doesn't can see exactly how to fix it. A third of
       // the courses rise, a third descend, the rest stay level, so the sky
       // asks for a decision instead of a straight line.
-      if (rng.next() < 0.34) {
+      //
+      // Probability is 18% per 26-unit cell (was 34%): a course spans ~120 m
+      // and we want ~1 per 150 m on average. The gap guard (130 units) prevents
+      // two courses from ever starting inside each other's span.
+      const courseGap = x - this.lastRingCourseX > 130;
+      if (courseGap && rng.next() < 0.18) {
+        this.lastRingCourseX = x;
         const count = 4 + Math.floor(rng.next() * 3); // 4–6 hoops
         const shape = rng.next();
         // Slope is per hoop along a line in WORLD space, not a height above the

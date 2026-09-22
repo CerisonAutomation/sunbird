@@ -3892,3 +3892,31 @@ hr.divider {
   border-radius: 12px !important;
   padding: 11px !important;
 }
+
+/* ── Featured / full-width leaderboard card ─────────────────────────── */
+.destination--featured {
+  grid-column: 1 / -1;
+  min-height: 78px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, #fffbef 0%, #fff5d8 100%);
+  border: 1.5px solid rgba(201,148,60,.55);
+  box-shadow: 0 2px 0 rgba(201,148,60,.25), 0 6px 20px rgba(139,112,66,.12);
+  border-radius: 16px;
+}
+.destination--featured .destination-copy b {
+  font-size: 17px;
+}
+.destination--featured .destination-copy > span {
+  font-size: 12px;
+  margin-top: 4px;
+}
+.destination--featured .destination-art {
+  flex: 0 0 54px;
+  width: 54px;
+  height: 54px;
+}
+.destination--featured:hover {
+  border-color: rgba(185,135,50,.8);
+  box-shadow: 0 2px 0 rgba(185,135,50,.4), 0 8px 24px rgba(139,112,66,.2);
+  transform: translateY(-1px);
+}

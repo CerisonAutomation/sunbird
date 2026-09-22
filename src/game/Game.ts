@@ -26,7 +26,7 @@ import { photoFinishMessage } from "./RacePolish";
 import { SlopeChain } from "./SlopeChain";
 import { RoomWatcher, ROOM_POLL_MS, roomSummaryLine, summarizeRooms, type LiveRoom } from "./RoomBrowser";
 import { Leaderboard, loadPilotName, savePilotName, isLeaderboardOnline, type BoardMetric, type BoardPage, type BoardScope } from "./Leaderboard";
-import { generatePilotName } from "./pilotNameGenerator";
+import { generatePilotName, isPilotNameClean } from "./pilotNameGenerator";
 import { setLocale, whenLocaleReady, type SupportedLocale } from "../i18n";
 import { Tournaments, TRAILS, weekKey, type PrizeGrant } from "./Tournaments";
 import {
@@ -1980,7 +1980,10 @@ export class Game {
     }
     const surfaceY = this.terrain.isOcean(this.bird.x) ? WATER_Y : this.terrain.heightAt(this.bird.x);
     const settleAlt = this.bird.y - surfaceY;
-    const settled = (this.bird.grounded || this.bird.inWater || settleAlt < 6) && this.bird.speed() < 6;
+    // Threshold is deliberately below MIN_KEEP_SPEED (6) so the speed-bleed
+    // that keeps a grounded AFK bird slow doesn't resonate with Bird.step()'s
+    // MIN_KEEP_SPEED floor and falsely trigger the settle timer mid-play.
+    const settled = (this.bird.grounded || this.bird.inWater || settleAlt < 6) && this.bird.speed() < 4;
     if (!this.bird.asleep && !this.input.diving && settled) {
       this.settleAcc += dt;
     } else {
@@ -3589,7 +3592,11 @@ export class Game {
         // player-typed text. The direct/web build owns its own surfaces and
         // keeps free rename.
         const freeText = CUSTOM_PILOT_NAMES;
-        const requested = this.hud.readValue("pilotName") || this.pilotName;
+        const requested = (this.hud.readValue("pilotName") || this.pilotName).trim();
+        if (freeText && !isPilotNameClean(requested)) {
+          this.hud.toast("That call sign isn't allowed — try a different one", "warn");
+          break;
+        }
         const chosen = freeText ? requested : generatePilotName();
         const next = savePilotName(chosen);
         this.pilotName = next;
