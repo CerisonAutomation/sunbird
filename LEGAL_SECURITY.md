@@ -50,6 +50,67 @@ no device fingerprinting beyond the client-generated id.
 - Retention: the store is file-based and bounded; there is no scheduled
   purging. Documented here so it is a conscious choice, not an accident.
 
+#### 1.2.1 EU data-protection register (GDPR/ePrivacy) — roles
+
+| Role | Who | Scope |
+|---|---|---|
+| Controller (game build) | CerisonAutomation | Device-local storage only; no personal data leaves the device (§1.2 evidence). |
+| Controller (optional social/leaderboard backend) | CerisonAutomation | Once `VITE_SOCIAL_URL` / `VITE_MULTIPLAYER_URL` / `VITE_LEADERBOARD_URL` are configured for a deploy. Until then the shipped builds make no such requests. |
+| Controller (own analytics) | The portal (e.g. Poki) | Portal builds run in the host's frame; the host's own telemetry is under its policy, not ours. Our code sends nothing to it. |
+| Controller (payments) | Stripe (see §1.2.4) | Card data never touches this codebase; the game stores only a local receipt list for entitlement restore. |
+| Processor (hosting) | Deploy-time choice (Vercel / GCP) | Acts on backend data under the hosting agreement; DPA to be on file before social launch (item L-4). |
+
+Pseudonymous online identifiers (the client-generated `deviceId`, the
+server-random `playerId`) are personal data under GDPR (Recital 30). The
+register below treats them accordingly even though they contain no name,
+email, or location.
+
+#### 1.2.2 Data inventory — purpose, basis, location, retention
+
+| Data | Purpose | Lawful basis | Where it lives | Retention |
+|---|---|---|---|---|
+| Save (progress, settings, inventory) | Provide the game | Contract (service delivery) | Device `localStorage` only | Until the player resets it (Settings → Manage saved progress) or browser storage is cleared |
+| `deviceId` (client-generated, 64-char random) | Pseudonymous identity for scores/rooms | Contract; storage access is strictly functional | Device; sent only to endpoints this deploy configures | Backend: bounded file store; purge scheduled via item S-1 |
+| Pilot name (self-chosen or generated) | Display in boards/rooms | Contract | Device + backend (length-capped, server-cleaned) | As above |
+| Scores, ghost flight samples, friend/squad relations | Leaderboards, async PvP, social features | Contract | Backend (only when configured) | Ghosts capped per player (`ghostMaxPerPlayer`); rows bounded; S-1 for full purge |
+| Telemetry aggregates (event name + coarse mode/km) | Aggregate service-quality trends | Legitimate interest (service improvement); anonymous by design | Server memory only — never persisted, never per-player (`server/src/telemetry/TelemetryService.ts`) | Process lifetime |
+| Crash journal | Diagnose client failures | Legitimate interest; stays on device, PII-redacted at capture | Device `localStorage` (5-entry cap); only event *names* + fingerprint hashes would reach the backend, and only when a sink is configured | Until evicted (quota self-healing may evict it first — it is classified regenerable) |
+| Payment receipt references | Entitlement restore | Contract | Device `localStorage`; card data with Stripe | Until reset |
+
+#### 1.2.3 ePrivacy — storage and access to the player's device
+
+| Access | Used for | Consent requirement |
+|---|---|---|
+| `localStorage` | Strictly functional: save, preferences, crash journal, entitlement references | None required — strictly necessary for the service the player requested |
+| `sessionStorage` / in-memory | Sandbox fallback when `localStorage` is blocked | Same |
+| Network telemetry beacon | Off unless a social endpoint is configured; always off in portal builds | Configured deploys should disclose it in the public policy (item L-1) |
+| Cookies, pixels, third-party scripts | **None** (verified: no cookies set anywhere in `src/`) | n/a |
+
+#### 1.2.4 Rights mapping (GDPR Part III) — current state
+
+| Right | Mechanism | State |
+|---|---|---|
+| Access & portability (Art. 15/20) | Settings → Account → **save-code export** (`data-ref="cloudExport"` — a complete copy of the device save as text) | PASS (device data). Backend profile export: see L-5. |
+| Erasure (Art. 17) | Settings → Manage saved progress → **reset** (device). Backend profile: operator-only via the store | GAP L-2 — self-service backend erasure not implemented; open, blocking for EU social launch |
+| Rectification (Art. 16) | Pilot name editable in Settings | PASS (where custom names are enabled; portal editions render it read-only per platform policy) |
+| Objection/profiling (Art. 21/22) | No profiling, no automated decisions with legal effect, no advertising inside the game build | PASS (n/a) |
+| Children | All-ages content, no behavioral data, no contact capture; portals run their own age-gate policy | PASS for the game build |
+
+#### 1.2.5 EU pre-launch checklist (paid SKUs + social backend)
+
+These are product/deployment decisions, not code gaps, and are listed so they
+cannot be mistaken for done:
+
+1. **L-1** — publish the privacy policy + ToS at a stable URL; link from Settings. Blocking for social launch and for any portal exception request.
+2. **L-2** — self-service erasure API for backend profiles (GDPR Art. 17).
+3. **L-3** — Stripe Payment Links: enable EU VAT/VAT-IOSS handling, correct seller entity, and consumer-right-of-withdrawal wording (14-day withdrawal for digital content, with the waiver-on-consent mechanism) before selling to EU consumers. Stripe is the payment agent — the seller of record is the entity that owns the Stripe account.
+4. **L-4** — hosting DPA + transfer mechanism (SCCs if processed outside the EEA) on file for the chosen backend host.
+5. **L-5** — backend profile export endpoint (GDPR Art. 15/20 for server-side data), pairing with L-2.
+
+> This section is a technical compliance register that maps code and data flows
+> to EU legal concepts. It is not legal advice; counsel review is required
+> before commercial launch in the EU.
+
 ### 1.3 All-ages (COPPA-class) posture — PASS for the game build
 
 No data collection of any kind happens inside the game build, no ads, no
@@ -119,3 +180,6 @@ grep -rn "innerHTML" src --include="*.ts"    # eyeball: every one escapes extern
 | L-2 | Self-service profile erasure API | Medium | eng | OPEN |
 | S-1 | Scheduled data retention purge | Low | eng | OPEN |
 | S-2 | Security headers (CSP, X-Content-Type-Options, frame-ancestors) on the *host* that serves the built game | Medium (platforms like Poki set their own; a self-hosted deploy must) | ops | OPEN for self-hosted deploys |
+| L-3 | Stripe EU consumer config (VAT/IOSS, withdrawal wording, seller entity) | Blocking for EU paid SKU launch | ops | OPEN |
+| L-4 | Hosting DPA + international-transfer mechanism for the backend host | Blocking for social launch | ops | OPEN |
+| L-5 | Backend profile export endpoint (Art. 15/20) | Medium | eng | OPEN |
