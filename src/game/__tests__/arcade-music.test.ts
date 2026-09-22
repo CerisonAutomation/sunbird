@@ -65,12 +65,12 @@ afterEach(() => { vi.useRealTimers(); });
 
 describe("arcade chiptune family", () => {
   it("the six bangers lead the track list, and every entry is schedulable", () => {
-    expect(TRACKS.length).toBe(26);
+    expect(TRACKS.length).toBe(30);
     const chipCount = TRACKS.filter((t) => t.chip).length;
-    expect(chipCount).toBe(6);
+    expect(chipCount).toBe(10);
     // Front and center: the whole chip family sits at the top of the picker.
-    for (let i = 0; i < 6; i++) expect(TRACKS[i]!.chip, TRACK_NAMES[i]).toBe(true);
-    for (let i = 6; i < TRACKS.length; i++) expect(TRACKS[i]!.chip).toBeFalsy();
+    for (let i = 0; i < 10; i++) expect(TRACKS[i]!.chip, TRACK_NAMES[i]).toBe(true);
+    for (let i = 10; i < TRACKS.length; i++) expect(TRACKS[i]!.chip).toBeFalsy();
     // A typo'd chord name would crash at runtime (UKE[chord] is a
     // non-null assertion) — pin the data contract.
     const knownChords = new Set(["C", "G", "Am", "F", "Em", "Dm", "Gm"]);
@@ -114,7 +114,7 @@ describe("arcade chiptune family", () => {
     const { music } = fixture();
     music.setLevel(0.8);
     music.setMode("menu");
-    music.setTrack(6); // Ascent — first island track after the arcade six
+    music.setTrack(10); // Ascent — first island track after the arcade ten
 
     const s = internals(music);
     expect(s.isChipTrack).toBe(false);

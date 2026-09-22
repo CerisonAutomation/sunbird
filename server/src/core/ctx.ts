@@ -19,6 +19,7 @@ import type { SquadService } from "../squads/SquadService.js";
 import type { AchievementService } from "../achievements/AchievementService.js";
 import type { SaveService } from "../saves/SaveService.js";
 import type { ModerationService } from "../moderation/ModerationService.js";
+import type { TelemetryService } from "../telemetry/TelemetryService.js";
 
 export type Ctx = {
   cfg: Config;
@@ -42,4 +43,6 @@ export type Ctx = {
   achievements: AchievementService;
   saves: SaveService;
   moderation: ModerationService;
+  /** Aggregate anonymous client counters (privacy by construction). */
+  telemetry: TelemetryService;
 };

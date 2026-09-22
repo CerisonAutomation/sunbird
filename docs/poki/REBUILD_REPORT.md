@@ -184,7 +184,7 @@ Re-check with `pnpm verify:thumbnail`.
 | `pnpm build` | clean — 1.76 MB single-file portal bundle, 557 KB gzipped |
 | `pnpm verify:prod` | PASS — debug artifacts clean (the device summary moved to the telemetry surface), 1.41 MB JS total of a 2.50 MB budget, largest chunk 0.57 MB of 1.50 MB, coverage floors met |
 | `pnpm build:portals` + `pnpm verify:portals` | poki 829 KB · crazy 820 KB · generic 819 KB — gate PASSED |
-| `pnpm audit:zips` | BRUTAL AUDIT PASSED (after reconciling the anatomy/pattern rules with the packaging script — see §8) |
+| `pnpm audit:zips` | ZIP AUDIT PASSED (after reconciling the anatomy/pattern rules with the packaging script — see §8) |
 | `pnpm poki:audit --run` | **99/113 verified**, 0 failures, `COMPLIANCE.md` rewritten, gates executed |
 | `pnpm verify:thumbnail` | THB gate passed |
 | `pnpm verify:upload` | **UPLOAD READY** — `ROOT-01`…`ROOT-07` (folder root, no wrapper, freshness, junk-free, zip ≡ folder, references resolve, Poki-only markers) |
@@ -340,7 +340,7 @@ The invariant is now **machine-checked** rather than audited by hand:
 `scripts/portal-markers.mjs` holds the table, `verify-portal.mjs` fails a zip
 that carries a foreign marker (it used to *note* the foreign SDK literal as
 expected — that allowance is gone), `audit-zips.mjs` does the same for the
-brutal audit (verifier of `REQ-51`, web exclusivity), and `verify-upload.mjs`
+deep zip audit (verifier of `REQ-51`, web exclusivity), and `verify-upload.mjs`
 adds `ROOT-07` for the Inspector folder. CI's portals job runs all of them, and
 each gate was negative-tested (injecting `sdk.crazygames.com` into the generic
 zip fails the audit with a named finding; removing the net registration fails
@@ -568,7 +568,7 @@ generator for *simulated* opponents in local duels and the AI flock.
 | `pnpm lint` / `pnpm typecheck` / `pnpm typecheck:server` | ✅ clean |
 | `npx vitest run` (whole suite) | ✅ 1080 passed / 8 skipped (83 files + 1 skipped) — +25 over the round-5 baseline (auds 8, shared-run 11, netlib-id 3, lobby-truth 3) |
 | `pnpm isolation:check` | ✅, and both sabotage directions fail it (a "netlib" mention in `rust/`, a runtime use of the Poki client in `Realtime.ts`) |
-| `pnpm build:portals` → `verify:portals` → `isolation:check` → `audit:zips` → `verify:upload` | ✅ PORTAL GATE PASSED · BRUTAL AUDIT PASSED · UPLOAD READY (1.70 MB) with the new `ROOT-08` |
+| `pnpm build:portals` → `verify:portals` → `isolation:check` → `audit:zips` → `verify:upload` | ✅ PORTAL GATE PASSED · ZIP AUDIT PASSED · UPLOAD READY (1.70 MB) with the new `ROOT-08` |
 | `pnpm verify:thumbnail`, `pnpm poki:audit -- --run` | ✅ every satisfied rule verified; `COMPLIANCE.md` rewritten (TOOL-08 is now an *action*, not *deferred*) |
 | `pnpm pvp:check` | ✅ live suite 7/7 + protocol smoke + pilot directory against a real server |
 | CI on the same commit | ✅ all three workflows: `CI` (6 jobs incl. PvP-live, portal zips + source isolation, Inspector artifact), `rust-backend` (fmt · clippy `-D warnings` · test · release build), `botsim` (40 bots vs Node reference **and** vs the Rust authoritative server, 0 cheat leaks) |

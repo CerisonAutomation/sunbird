@@ -18,7 +18,9 @@ export type SurpriseKind =
   | "sneeze" // the bird sneezes mid-air. That's it. That's the feature.
   | "coin-comet" // a comet of coins streaks overhead
   | "photobomb" // a giant fish photobombs a jump over water
-  | "encore"; // the music flips to fever mode for 8s, free
+  | "encore" // the music flips to fever mode for 8s, free
+  | "moonbow" // a moonbow arcs over the islands — pure delight, no strings
+  | "flock-chorus"; // a V-formation of birds honks past and tips you
 
 export type Surprise = {
   kind: SurpriseKind;
@@ -35,6 +37,28 @@ const POOL: { kind: SurpriseKind; weight: number; toasts: string[]; coins: numbe
     weight: 3,
     toasts: ["🦢 A golden goose honks past — it's raining coins!", "🦢 The golden goose approves of your form!"],
     coins: 25,
+    fever: 0,
+  },
+  {
+    kind: "moonbow",
+    weight: 2,
+    toasts: [
+      "🌈 A moonbow arcs over the islands. The sky is showing off",
+      "🌈 Seven colours, zero explanation. Fly through it anyway",
+      "🌈 The islands hired a lighting designer. It was the sky",
+    ],
+    coins: 0,
+    fever: 0,
+  },
+  {
+    kind: "flock-chorus",
+    weight: 2,
+    toasts: [
+      "🪿 A flock flies past in perfect V — they tip you for the show",
+      "🪿 The formation team requests you keep the window seat",
+      "🪿 Squad of geese salutes you with one honk each",
+    ],
+    coins: 10,
     fever: 0,
   },
   {
@@ -174,6 +198,16 @@ export const SPLASH_QUIPS = [
   "The bird will not be signing autographs today",
   "Physics said no. The ocean said yes",
   "That splash echoed all the way to the leaderboard (downward)",
+  "The ocean rates this flight 'wet'",
+  "A whale just asked for your insurance details",
+  "You have been promoted to submarine",
+  "That landing came with a free fish",
+  "The water was here first, honestly",
+  "Seagulls are filing this under 'content'",
+  "10 for entry, 0 for exit, 10 for confidence",
+  "The fish formed a committee about you",
+  "Splashdown confirmed. Dignity pending",
+  "The pond will remember this",
 ];
 
 export const SLEEP_QUIPS = [
@@ -198,6 +232,16 @@ export const SLEEP_QUIPS = [
   "The darkness is just the sky's way of saying 'okay that's enough'",
   "Wings folded. Dreams commencing. Do not disturb",
   "The owls have taken over. You are not prepared",
+  "The sun signed off. Management sends regards",
+  "Bedtime: enforced by gravity",
+  "The bird is buffering. Please hold",
+  "Dreaming of flying. Doing it horizontally",
+  "Moon: on duty. Bird: not so much",
+  "The night shift begins without you",
+  "You have been tucked in by physics",
+  "Stars: 5. Altitude: dropping. Snoring: likely",
+  "Shutdown sequence complete. See you at dawn",
+  "The horizon asked you to stay. You declined, sideways",
 ];
 
 export const BIG_LAUNCH_QUIPS = [
@@ -236,6 +280,16 @@ export const BIG_LAUNCH_QUIPS = [
   "The clouds took a step back. Respect",
   "You just graduated from bird to spacecraft",
   "Control room: all nominal. All extremely nominal",
+  "The hill just gave you a scholarship to the sky",
+  "Tower: cleared for shenanigans",
+  "Your flight path is now a rumor",
+  "The birds up here are taking notes",
+  "Altitude so unreasonable the clouds filed it",
+  "Launch reviewed: 'unnecessary, magnificent'",
+  "Gravity called. It's fine. It's used to it",
+  "The horizon filed a missing-bird report",
+  "That was less a jump, more a resignation from the ground",
+  "The moon has you on its calendar now",
 ];
 
 /** Fresh pool: fever ignites. */
@@ -257,6 +311,16 @@ export const FEVER_QUIPS = [
   "At this speed, the wind owes YOU an apology",
   "The government is watching. Jealously",
   "Feathers on fire. No notes",
+  "The bird is now considered weather",
+  "Heat shield? No. This IS the heat shield",
+  "Local temperature: yes",
+  "The sun called. It wants its act back",
+  "This is not a fever. This is a lifestyle",
+  "Fireflies are taking photos",
+  "Speedometer just retired, happily",
+  "The wind gave up and started following",
+  "Combustion is temporary. Glory is forever",
+  "The thermometer melted into a sundial",
 ];
 
 /** Fresh pool: sky-gem pickups. */
@@ -304,6 +368,11 @@ export const THUD_QUIPS = [
   "KAPLOP!",
   "WHOOPS!",
   "THE GROUND WINS!",
+  "THWAP!",
+  "KRUNCH!",
+  "DOINK!",
+  "POMF!",
+  "THUD, BUT PERSONAL!",
 ];
 
 /** Rotating bop words for bounces (water, sunflower, balloon). */
@@ -322,6 +391,11 @@ export const BOP_QUIPS = [
   "WHEEE!",
   "TWANG!",
   "PLIP!",
+  "BOINK!",
+  "PIP!",
+  "BAP!",
+  "BWOMP!",
+  "BLIP!",
 ];
 
 /** Fresh pool: giving up mid-run. */

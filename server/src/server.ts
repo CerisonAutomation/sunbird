@@ -33,6 +33,7 @@ import { ModerationService } from "./moderation/ModerationService.js";
 import { buildHandler } from "./http/router.js";
 import { V1_ROUTES } from "./http/api.js";
 import { LEGACY_ROUTES } from "./http/legacy.js";
+import { TelemetryService } from "./telemetry/TelemetryService.js";
 import { attachGateways } from "./realtime/gateways.js";
 
 /**
@@ -65,6 +66,8 @@ export function buildCtx(overrides: { cfg?: Partial<Config>; now?: () => number 
     rlRead: new RateLimiter(Math.max(5, cfg.rlReadPerSec * 2), cfg.rlReadPerSec),
     rlWrite: new RateLimiter(Math.max(5, cfg.rlWritePerSec * 2), cfg.rlWritePerSec),
     rlGuest: new RateLimiter(Math.max(4, cfg.rlGuestPerSec * 2), cfg.rlGuestPerSec),
+    // Stateless aggregate sink — no peers, constructed inline.
+    telemetry: new TelemetryService(),
     // Service placeholders — assigned below (services resolve peers lazily).
     identity: null as never,
     friends: null as never,

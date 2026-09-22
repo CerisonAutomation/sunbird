@@ -751,7 +751,9 @@
   padding-block: 7px;
   min-height: 0;
   margin-bottom: 2px;
-  background: linear-gradient(135deg, rgba(255, 248, 220, 0.90), rgba(255, 235, 170, 0.80)) !important;
+  background: linear-gradient(135deg, rgba(255, 248, 220, 0.68), rgba(255, 235, 170, 0.52)) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  backdrop-filter: blur(10px) !important;
   border: 1px solid rgba(255, 255, 255, 0.7) !important;
 }
 

@@ -801,9 +801,10 @@ export class HUD {
         return;
       }
       if (e.target === this.overEl) {
-        // Tap-anywhere on the results screen flies again — same action, same
-        // conditions as the card's own primary button (see resultsPrimaryAction).
-        handler(this.currentSnapshot ? resultsPrimaryAction(this.currentSnapshot) : "retry", "");
+        // The results backdrop is deliberately inert. A stray tap (or a drag
+        // that ends on the backdrop while scrolling the recap) must never
+        // launch another race — the recap is for reading, and restarting is
+        // an explicit choice on the card's own buttons.
         return;
       }
       if (e.target === this.menuEl && this.currentSnapshot && this.currentSnapshot.screen !== "main") {
@@ -1854,19 +1855,16 @@ function renderLive(s: HudSnapshot): string {
         <h3>Fly with your flock</h3>
         ${s.multiplayerConfigured
           ? `<p>Create a private room with a custom code and link. Race your squad on any course!</p>
-        <button class="primary-btn" data-ui data-action="host-room">Create Private Room</button>
-        <label class="field-label" for="race-room-code">Or enter a friend's room code</label>
-        <div class="redeem">
-          <input id="race-room-code" data-ui data-ref="roomCode" data-enter-action="join-room" aria-label="Room code" maxlength="2048" placeholder="Code or invite link" autocomplete="off" autocapitalize="characters" spellcheck="false" />
-          <button class="mini-btn" data-ui data-action="join-room">Join</button>
-        </div>`
+        <button class="primary-btn" data-ui data-action="host-room">Create Private Room</button>`
           : `<p class="pilot-note island" role="note">Live rooms are not available in this edition. AI practice and same-screen 1v1 below still race.</p>
-        <button class="primary-btn" data-ui data-action="host-room" disabled>Create Private Room</button>
+        <button class="primary-btn" data-ui data-action="host-room" disabled>Create Private Room</button>`}
+        <!-- Room-code entry is shared markup: the id must exist exactly once
+             in the document (duplicate ids break label/for and getElementById). -->
         <label class="field-label" for="race-room-code">Or enter a friend's room code</label>
         <div class="redeem">
           <input id="race-room-code" data-ui data-ref="roomCode" data-enter-action="join-room" aria-label="Room code" maxlength="2048" placeholder="Code or invite link" autocomplete="off" autocapitalize="characters" spellcheck="false" />
-          <button class="mini-btn" data-ui data-action="join-room" disabled>Join</button>
-        </div>`}
+          <button class="mini-btn" data-ui data-action="join-room" ${s.multiplayerConfigured ? "" : "disabled"}>Join</button>
+        </div>
       </section>
       <nav class="destination-grid" aria-label="More ways to race">
         <button class="destination" data-ui data-action="open-practice"><span class="destination-art">${menuIcon("compass")}</span><span class="destination-copy"><b>AI Practice</b><span>Custom opponent count &amp; skill</span></span></button>
@@ -3217,20 +3215,29 @@ export function renderFlightRecap(path: [number, number][]): string {
  * On portal builds the button triggers a rewarded ad (🎬 icon); on direct
  * builds it is a free bonus (MON-09: clapperboard only on rewarded placements).
  */
-export function renderCoinMultiplierCard(coins: number, claimed: boolean, portal = false): string {
+export function renderCoinMultiplierCard(coins: number, claimed: boolean, rewarded = false): string {
   if (coins <= 0) return "";
   if (claimed) {
     return `<div class="multiplier-cta-card claimed">✓ 3× bonus applied &nbsp;+● ${coins * 2} extra coins</div>`;
   }
-  const btnLabel = portal
-    ? `🎬 Watch to triple · +● ${coins * 2}`
-    : `Claim 3× &nbsp;+● ${coins * 2}`;
+  if (rewarded) {
+    // Portal editions route the bonus through the platform's rewarded ad: the
+    // reward is stated BEFORE the tap (Poki's rewarded-copy rule), the icon
+    // marks it as an ad, and a declined ad never steals the card away.
+    return `<div class="multiplier-cta-card">
+      <div class="multiplier-cta-text">
+        <b>3× Flight Coin Bonus</b>
+        <span>Watch a short ad · triple ● ${coins} → ● ${coins * 3}</span>
+      </div>
+      <button class="primary-btn gold wide" data-ui data-action="multiply-run-coins">🎬 Watch → 3× &nbsp;+● ${coins * 2}</button>
+    </div>`;
+  }
   return `<div class="multiplier-cta-card">
       <div class="multiplier-cta-text">
         <b>3× Flight Coin Bonus</b>
         <span>Triple ● ${coins} → ● ${coins * 3}</span>
       </div>
-      <button class="primary-btn gold wide" data-ui data-action="multiply-run-coins">${btnLabel}</button>
+      <button class="primary-btn gold wide" data-ui data-action="multiply-run-coins">Claim 3× &nbsp;+● ${coins * 2}</button>
     </div>`;
 }
 
@@ -3406,7 +3413,7 @@ function renderAd(s: HudSnapshot): string {
     <div class="ad-bar"><i data-live="adBar"></i></div>
     <div class="ad-actions">
       <button class="mini-btn" data-ui data-action="ad-skip" data-live="adSkip" disabled>Skip in ${Math.ceil(s.adTimer)}</button>
-      ${!(import.meta.env.VITE_SELL_AD_REMOVAL as any) || s.gold ? "" : `<button class="mini-btn gold" data-ui data-action="ad-gold">✦ Remove breaks</button>`}
+      ${!(import.meta.env.VITE_SELL_AD_REMOVAL as any /* eslint-disable-line @typescript-eslint/no-explicit-any */) || s.gold ? "" : `<button class="mini-btn gold" data-ui data-action="ad-gold">✦ Remove breaks</button>`}
     </div>
   `;
 }

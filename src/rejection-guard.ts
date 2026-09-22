@@ -16,15 +16,24 @@
  * shipped client code), while developers debugging with verbose logs
  * still see the reason.
  *
+ * Since the resilience kernel landed, suppression is no longer lossy: every
+ * rejection is ALSO captured by the CrashReporter (deduped, redacted,
+ * journaled for the next boot), so "the console is clean" no longer means
+ * "the failure never happened".
+ *
  * Install once at boot; `uninstallRejectionGuard` is provided for teardown
  * (and tests) so re-mounts never stack duplicate listeners.
  */
+import { crashReporter } from "./game/resilience/CrashReporter";
+
 let installed = false;
 let lastEmitAt = 0;
 
 function onRejection(event: PromiseRejectionEvent): void {
   // Stop the browser's red "Uncaught (in promise)" error frame.
   event.preventDefault();
+  // Evidence first: deduped + redacted inside the reporter.
+  crashReporter.capture("unhandledrejection", event.reason);
   const now = Date.now();
   if (now - lastEmitAt < 10_000) return;
   lastEmitAt = now;

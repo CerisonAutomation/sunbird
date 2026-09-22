@@ -1,4 +1,3 @@
-import { SELL_AD_REMOVAL } from "./edition";
 
 export type SkinRarity = "starter" | "common" | "rare" | "epic" | "legendary" | "mythic";
 export type CollectionId = "starter" | "nature" | "elements" | "cosmic" | "seasonal" | "premium" | "tournament" | "achievement";

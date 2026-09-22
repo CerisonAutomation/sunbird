@@ -1,10 +1,10 @@
-import type { BarrelEntry, BarrelRoot } from "./barrel.types";
-// The import attribute is required: Node (which is what Playwright uses to
-// load the e2e specs) refuses a bare JSON import in an ES module, and the
-// failure mode was silent — `e2e/i18n.spec.ts` loaded as "0 tests" instead
-// of erroring, so the locale coverage assertions never ran.
-import translationsBarrel from "./translations.barrel.json" with { type: "json" };
 import { storage } from "../game/Storage";
+// Runtime translation source: per-locale packs projected from the barrel
+// (see scripts/gen-i18n-packs.mjs). Only English — the universal fallback —
+// is imported statically; every other locale is a separate small chunk
+// fetched once, on demand. The barrel JSON itself stays the source of truth
+// for reviewers/tooling but is no longer bundled into the game.
+import enPack from "./packs/en.json";
 
 /**
  * Locale set, ordered and grouped the way the Poki localization guide
@@ -122,16 +122,26 @@ export function getLocale(): SupportedLocale {
   return currentLocale;
 }
 
-export function setLocale(locale: SupportedLocale): void {
-  if (SUPPORTED_LOCALES.some((l) => l.code === locale)) {
-    currentLocale = locale;
-    try {
-      storage.setItem(LOCALE_STORAGE_KEY, locale);
-    } catch {
-      /* private mode */
-    }
-    updateDocumentDirection();
+/**
+ * Switch locale. Loads the target pack FIRST, then flips the active locale —
+ * callers re-render after the returned promise resolves, so UI never paints
+ * half-switched text. On pack failure the switch still proceeds (English
+ * text renders; direction and persistence stay correct).
+ */
+export async function setLocale(locale: SupportedLocale): Promise<void> {
+  if (!SUPPORTED_LOCALES.some((l) => l.code === locale)) return;
+  await loadPack(locale);
+  currentLocale = locale;
+  try {
+    storage.setItem(LOCALE_STORAGE_KEY, locale);
+  } catch {
+    /* private mode */
   }
+  updateDocumentDirection();
+  // Notify even when the pack was already resident (cached switch): React
+  // bindings key on this version, and imperative UIs re-render on it.
+  packVersion += 1;
+  for (const fn of packListeners) fn();
 }
 
 // Initial document direction set
@@ -139,37 +149,83 @@ if (typeof window !== "undefined") {
   updateDocumentDirection();
 }
 
-export function getBarrel(): BarrelRoot {
-  return translationsBarrel as BarrelRoot;
+/* --------------------------------------------------------- pack registry */
+
+type Pack = Record<string, string>;
+
+/** Eager fallback pack (English). Generated from the barrel; total by the
+ * coverage contract (every shipped locale, every key — locales.test.ts). */
+const EN = enPack as Pack;
+
+const packs = new Map<string, Pack>([["en", EN]]);
+
+/** Vite-native per-file dynamic imports: each pack becomes its own chunk. */
+const PACK_MODULES = import.meta.glob("./packs/*.json") as Record<
+  string,
+  () => Promise<{ default: Pack }>
+>;
+
+let packVersion = 0;
+const packListeners = new Set<() => void>();
+
+/** Resolves when `locale`'s pack is resident (immediately when already
+ * loaded, e.g. English or a repeat switch). False when the pack cannot be
+ * fetched — callers keep English text rather than raw keys. */
+export async function loadPack(locale: string): Promise<boolean> {
+  if (packs.has(locale)) return true;
+  const load = PACK_MODULES[`./packs/${locale}.json`];
+  if (!load) return false;
+  try {
+    const mod = await load();
+    packs.set(locale, mod.default);
+    packVersion += 1;
+    for (const fn of packListeners) fn();
+    return true;
+  } catch {
+    return false; // offline + not yet cached: English fallback stays honest
+  }
+}
+
+/** Internal: current pack for `t()`, falling back to English per key. */
+function packFor(locale: string): Pack {
+  return packs.get(locale) ?? EN;
 }
 
 /**
- * Enterprise-grade universal translation function.
- * Translates a key into currentLocale using the barrel source of truth.
- * Supports token substitution for {{var}} or {var}.
+ * Resolves once the STARTUP locale's pack has loaded. Fired at boot before
+ * the game mounts; a no-op await for English (already resident).
+ */
+export function whenLocaleReady(): Promise<void> {
+  return loadPack(currentLocale).then(() => undefined);
+}
+
+/** Subscribe to pack arrivals (locale switches / late loads). */
+export function subscribePacks(fn: () => void): () => void {
+  packListeners.add(fn);
+  return () => packListeners.delete(fn);
+}
+
+/** Monotonic pack-registry version — React sync knob (useTranslations). */
+export function getPackVersion(): number {
+  return packVersion;
+}
+
+/**
+ * Translate `key` into the current locale.
+ * Precedence (matches the barrel-era behavior): current-pack text →
+ * English pack text → defaultText → key. Supports {{var}} / {var}.
  */
 export function t(key: string, params?: Record<string, string | number>, defaultText?: string): string {
   try {
-    const barrel = (translationsBarrel as BarrelRoot).barrel;
-    const entry: BarrelEntry | undefined = barrel[key];
-
-    let rawText = defaultText;
-    if (entry) {
-      rawText = entry.translations[currentLocale] || entry.translations["en"] || entry.sourceText;
-    }
-
-    if (!rawText) {
-      return defaultText ?? key;
-    }
-
+    const pack = packFor(currentLocale);
+    const rawText = pack[key] ?? EN[key] ?? defaultText;
+    if (!rawText) return defaultText ?? key;
     if (!params) return rawText;
-
     let result = rawText;
     for (const [k, v] of Object.entries(params)) {
       const strVal = String(v);
       result = result.split(`{{${k}}}`).join(strVal).split(`{${k}}`).join(strVal);
     }
-
     return result;
   } catch {
     return defaultText ?? key;

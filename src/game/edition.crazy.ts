@@ -20,6 +20,7 @@ export const SQUAD_CHAT = false;
 export const CUSTOM_PILOT_NAMES = false;
 
 /** Portal ad scheduling belongs to the platform; no ad-removal purchase.
- * Read from Vite define so Rollup/Terser can DCE IAP UI from this bundle. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const SELL_AD_REMOVAL: boolean = !!(import.meta.env.VITE_SELL_AD_REMOVAL as any);
+ * Unconditionally false: this is the edition's policy, not a build toggle.
+ * DCE of the IAP UI comes from vite.config's VITE_SELL_AD_REMOVAL define being
+ * folded at the use sites, not from this export. */
+export const SELL_AD_REMOVAL = false;

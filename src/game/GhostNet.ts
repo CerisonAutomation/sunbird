@@ -11,6 +11,8 @@
  * personal ghost carries the experience, exactly as before.
  */
 
+import { breakerKeyFor, fetchJson } from "./resilience/fetchJson";
+
 const ENV = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
 
 function apiBase(): string {
@@ -33,7 +35,8 @@ export async function publishGhost(opts: {
   const base = apiBase();
   if (!base || opts.samples.length < 5 || opts.distance <= 0) return;
   try {
-    await fetch(`${base}/ghost`, {
+    // Same ghost is re-published with newer data — idempotent server-side.
+    await fetchJson(`${base}/ghost`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -45,6 +48,9 @@ export async function publishGhost(opts: {
         samples: thin(opts.samples, 1500),
       }),
       keepalive: true,
+      breaker: breakerKeyFor(base),
+      idempotent: true,
+      attempts: 2,
     });
   } catch {
     // Async PvP is a bonus layer — publishing must never surface an error.
@@ -56,15 +62,10 @@ export async function fetchRivalGhost(seed: string, deviceId: string, nearDistan
   const base = apiBase();
   if (!base) return null;
   try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 4000);
-    const res = await fetch(
+    const { data } = await fetchJson<{ ghost?: { name?: unknown; distance?: unknown; samples?: unknown } | null }>(
       `${base}/ghost?seed=${encodeURIComponent(seed)}&device=${encodeURIComponent(deviceId)}&near=${Math.round(nearDistance)}`,
-      { signal: ctrl.signal },
+      { breaker: breakerKeyFor(base), timeoutMs: 4000, attempts: 2 },
     );
-    clearTimeout(timer);
-    if (!res.ok) return null;
-    const data = (await res.json()) as { ghost?: { name?: unknown; distance?: unknown; samples?: unknown } | null };
     const g = data.ghost;
     if (!g || !Array.isArray(g.samples) || g.samples.length < 5) return null;
     const samples = (g.samples as unknown[]).filter(

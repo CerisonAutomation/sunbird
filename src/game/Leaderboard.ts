@@ -2,6 +2,8 @@ import { dateSeed, truncate } from "./math";
 import { generatePilotName } from "./pilotNameGenerator";
 import { storage } from "./Storage";
 import { createAudsIfConfigured, type PokiAuds } from "../sdk/auds";
+import { breakerKeyFor, fetchJson } from "./resilience/fetchJson";
+import { OfflineOutbox } from "./resilience/OfflineOutbox";
 
 /**
  * Global leaderboard.
@@ -205,6 +207,9 @@ export class Leaderboard {
   private cache = new Map<string, BoardPage>();
   private inflight = new Map<string, Promise<BoardPage>>();
   private lastError = "";
+  /** Score uploads that failed while offline queue here (deduped per
+   * run/metric, capped, 7-day TTL) and drain on the next online moment. */
+  private readonly outbox = new OfflineOutbox({ storeKey: "sunbird.outbox.score.v1" });
   private readonly onOnline = () => this.uploadBest();
 
   constructor(private readonly deviceId: string) {
@@ -238,9 +243,10 @@ export class Leaderboard {
         this.uploadBest();
         try {
           const url = `${API}/board?scope=${scope}&metric=${metric}&device=${encodeURIComponent(this.deviceId)}`;
-          const res = await fetch(url, { headers: { accept: "application/json" } });
-          if (!res.ok) throw new Error(`board ${res.status}`);
-          const data = (await res.json()) as { entries?: unknown; rank?: unknown; total?: unknown };
+          const { data } = await fetchJson<{ entries?: unknown; rank?: unknown; total?: unknown }>(url, {
+            headers: { accept: "application/json" },
+            breaker: breakerKeyFor(url),
+          });
           const entries = Array.isArray(data.entries) ? data.entries.map((e) => this.normalize(e, metric)) : [];
           this.lastError = "";
           const page: BoardPage = {
@@ -330,17 +336,28 @@ export class Leaderboard {
     const bestLocal = localBestByDevice();
 
     if (API) {
-      void signScore(row.deviceId, row.distance, row.score).then((sig) =>
-        fetch(`${API}/score`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(sig ? { ...row, sig } : row),
-          keepalive: true,
-        }),
-      ).catch(() => {
-        // Submission is best-effort; the local row already persisted so the
-        // player never loses credit for the run.
-      });
+      void signScore(row.deviceId, row.distance, row.score)
+        .then(async (sig) => {
+          const body = JSON.stringify(sig ? { ...row, sig } : row);
+          try {
+            // Idempotent by contract: the server keeps the best row per
+            // pilot, so a retried POST cannot regress the board.
+            await fetchJson(`${API}/score`, {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body,
+              keepalive: true,
+              breaker: breakerKeyFor(API),
+              idempotent: true,
+              attempts: 2,
+            });
+          } catch {
+            // The local row already persisted; queue the upload for the next
+            // online moment instead of dropping it.
+            this.outbox.enqueue(`score:${row.date}:${row.deviceId}`, body);
+          }
+        })
+        .catch(() => undefined); // signing failed — nothing more to do
     }
 
     if (AUDS) {
@@ -376,19 +393,45 @@ export class Leaderboard {
    * board is opened, so a run finished offline still reaches the global ladder.
    */
   private uploadBest(): void {
+    // Deliver anything that queued while offline, newest first. Idempotent
+    // endpoint, so replays are harmless; a failure keeps the entry queued.
+    void this.outbox.drain(async (entry) => {
+      try {
+        await fetchJson(`${API}/score`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: entry.payload,
+          keepalive: true,
+          breaker: breakerKeyFor(API),
+          idempotent: true,
+          attempts: 2,
+        });
+        return true;
+      } catch {
+        return false;
+      }
+    });
     const rows = readLocal().filter((r) => r.deviceId === this.deviceId);
     if (rows.length === 0) return;
     const best = rows.reduce((a, b) => (b.distance > a.distance ? b : a), rows[0]!);
-    void signScore(best.deviceId, best.distance, best.score).then((sig) =>
-      fetch(`${API}/score`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(sig ? { ...best, sig } : best),
-        keepalive: true,
-      }),
-    ).catch(() => {
-      /* best-effort — the next online event or board open retries */
-    });
+    void signScore(best.deviceId, best.distance, best.score)
+      .then(async (sig) => {
+        const body = JSON.stringify(sig ? { ...best, sig } : best);
+        try {
+          await fetchJson(`${API}/score`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body,
+            keepalive: true,
+            breaker: breakerKeyFor(API),
+            idempotent: true,
+            attempts: 2,
+          });
+        } catch {
+          this.outbox.enqueue(`score:best:${best.date}:${best.deviceId}`, body);
+        }
+      })
+      .catch(() => undefined);
   }
 
   private normalize(raw: unknown, metric: BoardMetric): BoardEntry {
