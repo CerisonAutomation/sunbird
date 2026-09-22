@@ -10,6 +10,7 @@ for (const viewport of [{ width: 320, height: 568 }, { width: 568, height: 320 }
     await expect(page.locator(".versus-bar")).toBeVisible();
     await expect(page.locator(".versus-guide")).toContainText(viewport.width / viewport.height >= 1.25 ? "left" : "top");
     await expect(page.locator(".versus-guide")).toContainText("A / Space");
+    await app.awaitSettledLanes();
     await app.expectNoOverlaps([".versus-bar", ".hud-controls"], ".hud-root");
     await app.expectNoOverlaps([".hud-header", ".flight-messages", ".flight-footer"], ".hud-root");
     await page.screenshot({ path: info.outputPath(`split-${viewport.width}.png`) });
@@ -31,6 +32,7 @@ test("AI race social controls are optional, keyboard-dismissible and never steal
   await expect(toggle).toBeVisible();
   await expect(page.locator(".emote-options")).toBeHidden();
   await toggle.click(); await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await app.awaitSettledLanes();
   await app.expectNoOverlaps([".hud-header", ".flight-messages", ".flight-footer", ".alt-gauge"], ".hud-root");
   await page.getByRole("button", { name: "Send Wave", exact: true }).focus();
   await page.keyboard.press("Escape");

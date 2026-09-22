@@ -218,7 +218,10 @@ export class Sky {
     );
     this.group.add(this.sun);
 
-    this.sunGlow = makeGlow(0xffc86a, 76);
+    // A halo, not a whiteout. At 76 units with the sprite at its default
+    // opacity of 1 and additive blending, the sun's glare washed out the sky
+    // and the terrain silhouettes under it. Smaller, and dimmed per-frame below.
+    this.sunGlow = makeGlow(0xffc86a, 54);
     this.group.add(this.sunGlow);
 
     this.moon = new THREE.Mesh(
@@ -460,6 +463,9 @@ export class Sky {
     this.sunGlow.position.copy(this.sun.position);
     (this.sun.material as THREE.SpriteMaterial).color.copy(this.mixHex(a.sun, b.sun, u));
     this.sun.scale.setScalar((0.7 + t * 0.3) * 20);
+    // The glow sprite's opacity was never set, so it sat at 1.0 all day. Half
+    // strength keeps a warm halo while letting the sky and terrain stay legible.
+    (this.sunGlow.material as THREE.SpriteMaterial).opacity = 0.45 + t * 0.12;
 
     this.moon.position.set(-8, 20 + (1 - t) * 68, -120);
     this.moonGlow.position.copy(this.moon.position);

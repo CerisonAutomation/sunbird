@@ -41,7 +41,6 @@ describe("portal loading failsafe", () => {
       },
       gameLoadingStart: () => calls.push("gameLoadingStart"),
       gameLoadingFinished: () => calls.push("gameLoadingFinished"),
-      signalGameReady: () => calls.push("signalGameReady"),
       movePill: () => {},
     };
   });
@@ -70,7 +69,6 @@ describe("portal loading failsafe", () => {
     await vi.advanceTimersByTimeAsync(10_000);
 
     expect(calls.filter((c) => c === "gameLoadingFinished")).toHaveLength(1);
-    expect(calls.filter((c) => c === "signalGameReady")).toHaveLength(0);
   });
 
   it("still releases the loading screen when no game ever mounted", async () => {
@@ -81,6 +79,5 @@ describe("portal loading failsafe", () => {
     await vi.advanceTimersByTimeAsync(10_000);
 
     expect(calls.filter((c) => c === "gameLoadingFinished")).toHaveLength(1);
-    expect(calls).toContain("signalGameReady");
   });
 });

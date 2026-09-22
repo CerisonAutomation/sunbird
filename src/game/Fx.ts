@@ -33,7 +33,11 @@ export class Fx {
   ) {
     this.composer = new EffectComposer(renderer);
     this.composer.addPass(new RenderPass(scene, camera));
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0, 0.6, 0.65);
+    // threshold 0.82 (was 0.65) reserves bloom for genuinely hot pixels — the
+    // sun's core, coins, fever bursts — instead of lifting the whole bright sky,
+    // which read as glare rather than polish. The tighter radius (0.45, was 0.6)
+    // keeps what does bloom a glow rather than a wash.
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0, 0.45, 0.82);
     this.composer.addPass(this.bloom);
     // OutputPass re-applies the renderer's ACES tone mapping + sRGB so the
     // composed frame matches the plain render path when glow is at rest.

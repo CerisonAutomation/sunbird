@@ -61,6 +61,35 @@ export const COMBO_GRACE = 9;
 export const ALT_SKY = 30;
 export const ALT_CLOUDS = 72;
 export const ALT_HIGH = 135;
+/**
+ * Soft ceiling on how high a run can climb, and the band over which the climb is
+ * damped away.
+ *
+ * Nothing used to bound altitude. Thermals add vertical speed directly
+ * (Weather: `vy += 24 * dt`) and the Zenith mode's ascent super-lift adds more,
+ * while glide lift cuts gravity to ~2.7 m/s² at full lift — so a single strong
+ * column could arc the bird thousands of units up: past the cloud deck, past
+ * everything the camera is framed for (its pull-back saturates at
+ * ALT_HIGH * 2.2 = 297 at CAMERA_REVEAL_MAX), and into empty sky with no ground
+ * in sight. That is the "it flies way too high" report.
+ *
+ * 260 with a 50-unit fade keeps the whole Star Wish band reachable untouched
+ * (stars sit at ALT_HIGH + 18..72, i.e. 153..207 — damping starts at 210, above
+ * every star), then bleeds the remaining climb so the bird arcs over inside the
+ * camera's range instead of leaving the world. Damping rather than a hard wall:
+ * a hard clamp at the ceiling reads as an invisible lid.
+ */
+export const ALT_CEILING = 260;
+export const ALT_CEILING_FADE = 50;
+/**
+ * Upward speed the Zenith mode's ascent thermal may reach, in m/s.
+ *
+ * This was hardcoded to 180 — 1.5x the bird's own top speed (~122 m/s) and
+ * roughly 65x its normal climb — which is what turned a warm column into a
+ * launch to orbit. Still a deliberate super-lift at 110, but inside the
+ * envelope the rest of the world is tuned to.
+ */
+export const ZENITH_THERMAL_VY = 110;
 export const ALT_STRATO = 230;
 
 export const ISLAND_PERIOD = 1100;
@@ -92,6 +121,24 @@ export const MAGNET_RADIUS = 15;
 export const MAGNET_RADIUS_NORMAL = 1.7;
 
 export const CAMERA_BASE_Z = 24;
+/**
+ * Base visual scale of the bird. It is the subject of the whole game and the
+ * only thing the player tracks, so it reads generously rather than realistically
+ * small. Visual only — collision uses BIRD_RADIUS.
+ *
+ * At 1.4 it still read as small against the terrain at ground level, where the
+ * camera is closest and the silhouette is least compensated. 1.65 is the
+ * subject-forward size; the camera-distance term in Bird.syncVisual keeps the
+ * altitude case readable on top of it.
+ */
+export const BIRD_BASE_SCALE = 1.65;
+/**
+ * Highest camera distance the altitude pull reaches: the base dolly plus the
+ * speed term plus the four altitude tiers summed in CameraRig.update
+ * (24 + 14 + 12 + 22 + 34 + 46). It normalises the bird's readability
+ * compensation, so retune it if the framing curve moves.
+ */
+export const CAMERA_REVEAL_MAX = 152;
 export const CAMERA_LOOKAHEAD = 0.22;
 
 export const SAVE_KEY_V1 = "sunbird.save.v1";
@@ -104,6 +151,17 @@ export const DAYLIGHT_MAX_GOLD = 62;
 export const CONTINUE_COST = 80;
 export const CONTINUE_DAYLIGHT = 16;
 export const CONTINUE_TIMEOUT = 15;
+/**
+ * Longest a sponsored break may hold the game before the game abandons it.
+ *
+ * The ad state is unskippable by design, which is only safe if it can never be
+ * permanent. Real breaks — interstitial or rewarded — resolve well inside this,
+ * so the valve never fires in normal play; it exists so a platform SDK that
+ * never settles cannot leave the player on a dead screen with inert controls.
+ * Abandoning a break grants nothing: the reward still comes only from the SDK's
+ * own callback.
+ */
+export const AD_SAFETY_SECONDS = 60;
 export const AD_DURATION = 4;
 // Poki controls ad frequency on the portal; this applies only to dev/standalone builds.
 export const INTERSTITIAL_EVERY = 3;

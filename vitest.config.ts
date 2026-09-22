@@ -21,8 +21,13 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "json-summary"],
-      include: ["src/**"],
-      exclude: ["src/vite-env.d.ts"],
+      // Instrumentable SOURCE only. The bare `src/**` glob also matched the Vite
+      // entry `src/index.html`, and the v8 provider then tried to remap coverage
+      // for it — Rollup threw "Expression expected" on the HTML and the coverage
+      // run exited non-zero. That made `verify:prod` fail, and therefore made
+      // `pnpm gate` red on every run, whatever the code did.
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: ["src/**/*.d.ts"],
     },
   },
   resolve: {

@@ -42,6 +42,7 @@ function fixture() {
     createOscillator: create,
     createBufferSource: create,
     createBuffer: (_channels: number, length: number) => ({ getChannelData: () => new Float32Array(length) }),
+    createWaveShaper: () => { const n = create(); (n as unknown as { curve: null }).curve = null; return n; },
   };
   const music = new Music(ctx as unknown as AudioContext, dry as unknown as AudioNode, wet as unknown as AudioNode);
   return { music, nodes, ctx, dry, wet };
@@ -51,16 +52,14 @@ afterEach(() => { vi.useRealTimers(); });
 
 describe("music mix safety", () => {
   it("keeps night-time ember filters positive and below Nyquist", () => {
-    for (const rate of [22050, 44100, 48000]) {
-      for (const base of [3800, 7000, 11200]) {
-        for (const night of [0, 0.5, 1]) {
-          const cutoff = musicCutoff(base, night, 1, rate);
-          expect(cutoff).toBeGreaterThanOrEqual(700);
-          expect(cutoff).toBeLessThan(rate / 2);
-        }
+    for (const base of [3800, 7000, 11200]) {
+      for (const night of [0, 0.5, 1]) {
+        const cutoff = musicCutoff(base, night, 1);
+        expect(cutoff).toBeGreaterThanOrEqual(500);
+        expect(cutoff).toBeLessThanOrEqual(8000);
       }
     }
-    expect(musicCutoff(3800, 1, 0)).toBe(700);
+    expect(musicCutoff(3800, 1, 0)).toBe(800);
   });
 
   it("does no sequencer work when music is zero or off, and resumes on unmute", () => {

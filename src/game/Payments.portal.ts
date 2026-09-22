@@ -4,27 +4,13 @@
  * separate build-time adapter means payment-provider code and URLs never ship
  * in Poki/CrazyGames bundles at all.
  */
+import { AD_DURATION } from "./constants";
+
 export type Sku = "sunbird_gold" | "sunbird_vip" | "sunbird_starter";
 export type PurchaseResult = { ok: true; receipt: string } | { ok: false; error: string };
 
-export function ensureStripeJs(): Promise<unknown> | null {
-  return null;
-}
-
-export function stripeConfigured(_sku: Sku): boolean {
-  return false;
-}
-
 export async function fetchServerEntitlements(_deviceId: string): Promise<Sku[]> {
   return [];
-}
-
-export function stripeLinkFor(_sku: Sku, _clientRef: string): string | null {
-  return null;
-}
-
-export function consumeStripeReturn(): Sku | null {
-  return null;
 }
 
 export class CoinPaymentProvider {
@@ -41,8 +27,9 @@ export class CoinPaymentProvider {
   }
 }
 
-export class MockAdProvider {
-  readonly duration = 4;
+export class PlaceholderAdProvider {
+  /** Same break length as the direct build — one constant, not two copies. */
+  readonly duration = AD_DURATION;
 
   isAvailable(): boolean {
     return true;

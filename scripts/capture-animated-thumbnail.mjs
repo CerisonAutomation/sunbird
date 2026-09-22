@@ -24,8 +24,13 @@ const OUT = path.join(import.meta.dirname, "..", "assets", "submission");
 const VIEW = { width: 1280, height: 720 };
 const TILE = 628;
 const CLIP = { x: (VIEW.width - TILE) / 2, y: (VIEW.height - TILE) / 2, width: TILE, height: TILE };
-const CAPTURE_MS = 34000;
-const FRAME_MS = 120;
+/** Frames to aim for: 36 at ~12 fps is a 3 s loop that reads as movement. */
+const TARGET_FRAMES = 36;
+/** The loop's playback length. THB-09 asks for 3-5 s. */
+const TARGET_MS = 4000;
+/** Hard cap: the renderer can be slow (or the machine loaded), and a capture
+ *  that cannot finish must fail rather than hang the gate. */
+const MAX_CAPTURE_MS = 180000;
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -124,10 +129,13 @@ async function main() {
     await page.mouse.up();
   };
   const frames = [];
-  const stopAt = Date.now() + CAPTURE_MS;
   const started = Date.now();
   let i = 0;
-  while (Date.now() < stopAt) {
+  // Capture a fixed number of frames rather than for a fixed wall-clock window.
+  // The window made the OUTPUT machine-dependent: a loaded renderer managed only
+  // 11 frames, which at the old fixed 120 ms delay played for 0.9 s — under the
+  // 3-5 s this asset is required to be.
+  while (frames.length < TARGET_FRAMES && Date.now() - started < MAX_CAPTURE_MS) {
     // One flight gesture between frames keeps the bird arcing naturally.
     await flap(i % 2 === 0 ? 420 : 200);
     const buf = await page.screenshot({ type: "png", clip: CLIP, animations: "disabled" });
@@ -145,19 +153,27 @@ async function main() {
     process.exit(1);
   }
 
-  // Encode the frames into a quantized 256-colour animated GIF.
+  // Encode the frames into a quantized 256-colour animated GIF. The delay is
+  // solved from the target length, so the loop is 3-5 s whatever the capture
+  // rate was; GIF delays are centiseconds, hence the rounding to 10 ms.
   const gif = GIFEncoder();
+  const delay = Math.max(20, Math.round(TARGET_MS / frames.length / 10) * 10);
   for (const png of frames) {
     const { width, height, data } = decodePng(png);
     const palette = quantize(data, 256);
     const index = applyPalette(data, palette);
-    gif.writeFrame(index, width, height, { palette, delay: FRAME_MS });
+    gif.writeFrame(index, width, height, { palette, delay });
   }
   gif.finish();
   mkdirSync(OUT, { recursive: true });
   const gifPath = path.join(OUT, "sunbird-thumbnail-animated.gif");
   await writeFile(gifPath, Buffer.from(gif.bytes()));
-  console.log(`✓ ${frames.length} frames → ${path.relative(process.cwd(), gifPath)} (${(statSync(gifPath).size / 1024).toFixed(0)} KB)`);
+  const seconds = (frames.length * delay) / 1000;
+  console.log(`✓ ${frames.length} frames · ${seconds.toFixed(1)}s · ${delay} ms/frame → ${path.relative(process.cwd(), gifPath)} (${(statSync(gifPath).size / 1024).toFixed(0)} KB)`);
+  if (seconds < 3 || seconds > 5) {
+    console.error(`✗ the loop plays for ${seconds.toFixed(1)}s — THB-09 requires 3-5 s`);
+    process.exit(1);
+  }
 }
 
 /** Minimal PNG decode via the canvas-free route: reuse Playwright's own chromium

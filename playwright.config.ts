@@ -22,7 +22,13 @@ export default defineConfig({
   webServer: {
     command: "npm run build && npm run preview -- --host 0.0.0.0 --port 4173",
     url: "http://127.0.0.1:4173",
-    reuseExistingServer: !process.env.CI,
+    // Never reuse: Playwright cannot tell whose server is on the port, and a
+    // squatting `vite preview` from another checkout (or an earlier build of
+    // this one) silently runs the whole suite against a stale bundle — every
+    // assertion then describes code that isn't the code under test. With this
+    // false, an occupied port is a loud startup error instead. The build is a
+    // couple of seconds; correctness is worth more than that.
+    reuseExistingServer: false,
     timeout: 120000,
   },
 });

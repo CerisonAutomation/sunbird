@@ -1,5 +1,6 @@
 import { dateSeed, truncate } from "./math";
-import { generatePilotName } from "./pilotNameGenerator";
+import { verifyRunSubmission } from "./AntiCheat";
+import { generatePilotName, isPilotNameClean } from "./pilotNameGenerator";
 import { storage } from "./Storage";
 import { createAudsIfConfigured, type PokiAuds } from "../sdk/auds";
 import { breakerKeyFor, fetchJson } from "./resilience/fetchJson";
@@ -24,10 +25,12 @@ import { OfflineOutbox } from "./resilience/OfflineOutbox";
  * `board-badge` in renderBoard).
  */
 
-// Dev uses the social server root (vite proxies /board & /score to the local
-// Node social server). Production portal builds default to "" (offline local
-// board) unless VITE_LEADERBOARD_URL or AUDS is configured.
-const API = (import.meta.env.VITE_LEADERBOARD_URL ?? (import.meta.env.DEV ? "" : "")).replace(/\/$/, "");
+// Portal builds have no cloud board configured, so they default to "" and read
+// the on-device ladder unless VITE_LEADERBOARD_URL or AUDS is set. The old
+// expression was `?? (import.meta.env.DEV ? "" : "")` — both arms identical, so
+// the comment above it ("dev uses the social server root") described behaviour
+// the code did not have. It does not: dev reads the local board too.
+const API = (import.meta.env.VITE_LEADERBOARD_URL ?? "").replace(/\/$/, "");
 const SALT = import.meta.env.VITE_LEADERBOARD_SALT ?? "";
 const AUDS: PokiAuds | null =
   (import.meta.env.VITE_PORTAL_TARGET as string | undefined) === "poki"
@@ -86,6 +89,17 @@ export type ScoreSubmission = {
   score: number;
   seed: string;
   mode: string;
+  /**
+   * How long the run actually took, in milliseconds.
+   *
+   * Load-bearing for anti-cheat on BOTH sides, and the client used to omit it.
+   * The server's plausibility gate reads `durationMs`, and `boundedNum(undefined)`
+   * coerces to 0 — so a payload with no duration failed
+   * `distance > 0 && durationMs < minRunDurationMs` and every honest run was
+   * filed as `quarantined` instead of reaching the board. Sending the real
+   * duration is what makes the distance/speed limits enforce anything at all.
+   */
+  durationMs: number;
 };
 
 type StoredRow = ScoreSubmission & { date: string };
@@ -104,7 +118,10 @@ export function leaderboardBackend(): "http" | "auds" | "local" {
 export function loadPilotName(_fallbackId: string): string {
   try {
     const v = storage.getItem(NAME_KEY);
-    if (v && v.trim()) return truncate(v.trim(), 14);
+    // A stored name is not automatically a publishable one: it can predate this
+    // filter, or have been edited in devtools. Re-checking on read is what makes
+    // the guard hold for anything that never went through `savePilotName`.
+    if (v && v.trim() && isPilotNameClean(v.trim())) return truncate(v.trim(), 14);
   } catch {
     /* private mode */
   }
@@ -117,8 +134,23 @@ export function loadPilotName(_fallbackId: string): string {
   return auto;
 }
 
+/**
+ * Persist the pilot name — and make sure what is persisted is publishable.
+ *
+ * This is the choke point. Every path that sets a name comes through here: the
+ * typed field, the dice, the portal account, and anything added later. Filtering
+ * only at the two typing surfaces left the others open, and the portal username
+ * in particular arrives from someone else's account and was being adopted,
+ * stored and broadcast unchecked.
+ *
+ * A name that fails moderation is REPLACED by a generated call sign rather than
+ * refused, because the callers that are not a text field have no player to show
+ * a rejection to — and a dirty name reaching a public leaderboard or another
+ * player's roster is the failure that actually matters.
+ */
 export function savePilotName(name: string): string {
-  const clean = truncate(name.replace(/[^\p{L}\p{N} _.-]/gu, "").trim(), 14) || "Pilot";
+  const shaped = truncate(name.replace(/[^\p{L}\p{N} _.-]/gu, "").trim(), 14);
+  const clean = shaped && isPilotNameClean(shaped) ? shaped : generatePilotName();
   try {
     storage.setItem(NAME_KEY, clean);
   } catch {
@@ -172,9 +204,13 @@ function writeLocal(rows: StoredRow[]): void {
 }
 
 /**
- * Rival pilots for the offline board. These are generated once per device from
- * a fixed table so the local ladder has texture, and every generated row is
- * flagged so the UI can mark it as a practice benchmark rather than a person.
+ * Practice benchmarks for the offline board.
+ *
+ * They are generated once per device from a fixed table so the local ladder has
+ * texture instead of a single row. They are NOT people, and the row says so:
+ * the name carries the word "Practice" rather than the ⟡ glyph that used to
+ * mark them — a character no player could read, which left the board implying
+ * twenty named humans were beating them.
  */
 const BENCH_NAMES = [
   "Aria", "Kestrel", "Nomi", "Tavi", "Wren", "Bex", "Juno", "Pike", "Sable", "Fen",
@@ -189,7 +225,7 @@ function benchmarkRows(): StoredRow[] {
     const distance = Math.round(380 + Math.pow(t, 1.7) * 4200);
     return {
       deviceId: `bench-${i}`,
-      name: `${name} ⟡`,
+      name: `${name} · Practice`,
       skin: "sunbird",
       distance,
       altitude: Math.round(38 + t * 240),
@@ -199,6 +235,10 @@ function benchmarkRows(): StoredRow[] {
       seed: today,
       mode: "daytrip",
       date: today,
+      // A benchmark row never entered a submission path, but the row type is
+      // shared with real runs, so it carries the same plausible duration those
+      // runs would: its distance at the game's typical ~15 m/s cruise.
+      durationMs: Math.round((distance / 15) * 1000),
     };
   });
 }
@@ -323,8 +363,18 @@ export class Leaderboard {
     }
   }
 
-  /** Records a finished run. Always stored locally; POSTed when online. */
+  /**
+   * Records a finished run. Always stored locally; POSTed when online.
+   *
+   * A run that cannot physically have happened is dropped before either
+   * happens. The server repeats these checks and owns the verdict — this gate
+   * exists so impossible telemetry is never *published as a claim*, and so a
+   * tampered client does not get to write a rank on someone else's board even
+   * for the moment before the server answers.
+   */
   submit(sub: ScoreSubmission): void {
+    const verdict = verifyRunSubmission(sub);
+    if (!verdict.valid) return;
     const row: StoredRow = { ...sub, date: dateSeed() };
     const rows = readLocal().filter((r) => r.deviceId !== sub.deviceId || r.date !== row.date);
     rows.push(row);
@@ -379,6 +429,7 @@ export class Leaderboard {
           altitude: row.altitude,
           perfects: row.perfects,
           coins: row.coins,
+          durationMs: row.durationMs,
           mode: row.mode,
           seed: row.seed,
           date: row.date,

@@ -17,9 +17,11 @@ Automated deployments to Poki using [poki-cli](https://github.com/poki/poki-cli)
 pnpm build:poki
 
 # Upload via poki-cli
-POKI_UPLOAD_TOKEN=<your-token> npx poki-cli upload \
-  --game-id 3625e78b-0b3d-4f62-8224-ac1c4b2a9ab2 \
+POKI_UPLOAD_TOKEN=<your-token> poki upload \
+  --game 3625e78b-0b3d-4f62-8224-ac1c4b2a9ab2 \
   sunbird-poki.zip
+
+> **Note:** `poki` resolves from `node_modules/.bin` (via pnpm or your IDE). From a plain shell use `pnpm exec poki upload ...`. The canonical project command is `pnpm poki:upload`, which builds the portal bundle first.
 ```
 
 ## GitHub Actions
@@ -59,8 +61,8 @@ jobs:
         env:
           POKI_UPLOAD_TOKEN: ${{ secrets.POKI_UPLOAD_TOKEN }}
         run: |
-          npx poki-cli upload \
-            --game-id 3625e78b-0b3d-4f62-8224-ac1c4b2a9ab2 \
+          poki upload \
+            --game 3625e78b-0b3d-4f62-8224-ac1c4b2a9ab2 \
             sunbird-poki.zip
 ```
 
@@ -71,8 +73,11 @@ jobs:
 pnpm build:poki
 pnpm verify:upload
 
-# Preview locally
-pnpm preview:poki
+# Preview locally — serves the exact upload artifact (poki-upload/) on :4174
+# with the framing headers the Inspector needs, so what you fly is the shipped
+# single file rather than a dev-server view. (`pnpm preview` is Vite's preview
+# of dist/, which is NOT the portal artifact.)
+pnpm serve:upload
 ```
 
 ## Manual Upload

@@ -5,58 +5,13 @@ import { storage } from "../game/Storage";
 // fetched once, on demand. The barrel JSON itself stays the source of truth
 // for reviewers/tooling but is no longer bundled into the game.
 import enPack from "./packs/en.json";
+import { SUPPORTED_LOCALES, type SupportedLocale } from "./locales";
 
-/**
- * Locale set, ordered and grouped the way the Poki localization guide
- * recommends (LOC-04): EFIGS + Turkish first, CJK second (zh-CN, ja, ko), then
- * Brazilian Portuguese and Russian. The remaining Poki locales — Arabic (RTL),
- * Dutch, Polish, Swedish, Hindi, Indonesian, Vietnamese and Thai — follow, with
- * Maltese last so the two long-tail scripts close the list.
- */
-export type SupportedLocale =
-  | "en"
-  | "es"
-  | "de"
-  | "fr"
-  | "it"
-  | "tr"
-  | "pt-BR"
-  | "ru"
-  | "ar"
-  | "zh-CN"
-  | "ja"
-  | "ko"
-  | "nl"
-  | "pl"
-  | "sv"
-  | "hi"
-  | "id"
-  | "vi"
-  | "th"
-  | "mt";
-
-export const SUPPORTED_LOCALES: { code: SupportedLocale; name: string; flag: string; rtl?: boolean }[] = [
-  { code: "en", name: "English", flag: "🇺🇸" },
-  { code: "es", name: "Español", flag: "🇪🇸" },
-  { code: "de", name: "Deutsch", flag: "🇩🇪" },
-  { code: "fr", name: "Français", flag: "🇫🇷" },
-  { code: "it", name: "Italiano", flag: "🇮🇹" },
-  { code: "tr", name: "Türkçe", flag: "🇹🇷" },
-  { code: "pt-BR", name: "Português (Brasil)", flag: "🇧🇷" },
-  { code: "ru", name: "Русский", flag: "🇷🇺" },
-  { code: "ar", name: "العربية", flag: "🇸🇦", rtl: true },
-  { code: "zh-CN", name: "简体中文", flag: "🇨🇳" },
-  { code: "ja", name: "日本語", flag: "🇯🇵" },
-  { code: "ko", name: "한국어", flag: "🇰🇷" },
-  { code: "nl", name: "Nederlands", flag: "🇳🇱" },
-  { code: "pl", name: "Polski", flag: "🇵🇱" },
-  { code: "sv", name: "Svenska", flag: "🇸🇪" },
-  { code: "hi", name: "हिन्दी", flag: "🇮🇳" },
-  { code: "id", name: "Indonesia", flag: "🇮🇩" },
-  { code: "vi", name: "Tiếng Việt", flag: "🇻🇳" },
-  { code: "th", name: "ไทย", flag: "🇹🇭" },
-  { code: "mt", name: "Malti", flag: "🇲🇹" },
-];
+// Re-exported so every existing `from "./i18n"` import keeps working. The data
+// itself lives in ./locales, which has no imports and so is safe to load in
+// Node (the e2e specs and tooling read it without a bundler).
+export { SUPPORTED_LOCALES };
+export type { SupportedLocale };
 
 const LOCALE_STORAGE_KEY = "sunbird.i18n.locale";
 
@@ -256,7 +211,15 @@ export function t(key: string, params?: Record<string, string | number>, default
 }
 
 /**
- * International Number Formatting
+ * International number formatting — the currency readouts (coin counter, wallet
+ * totals, run bonuses) go through this so grouping and the decimal separator
+ * follow the player's chosen language rather than the browser's.
+ *
+ * A `formatDistanceLocalized` used to sit beside this one with a *different*
+ * contract from `formatDistance` in `./math` (one fraction digit instead of
+ * two) and no callers. Distance formatting now lives in `formatDistance(m,
+ * locale)`, which keeps its English output byte-identical for the layout
+ * fixtures and localises only the digits. There is one distance formatter.
  */
 export function formatNumberLocalized(num: number, locale = currentLocale): string {
   try {
@@ -264,16 +227,4 @@ export function formatNumberLocalized(num: number, locale = currentLocale): stri
   } catch {
     return String(Math.round(num));
   }
-}
-
-/**
- * International Distance Formatting (meters / kilometers)
- */
-export function formatDistanceLocalized(meters: number, locale = currentLocale): string {
-  const rounded = Math.max(0, Math.round(meters));
-  if (rounded >= 1000) {
-    const km = (rounded / 1000).toFixed(1);
-    return `${formatNumberLocalized(Number(km), locale)} km`;
-  }
-  return `${formatNumberLocalized(rounded, locale)} m`;
 }

@@ -25,9 +25,8 @@
 .hud-root[data-flying="false"] .toast { font-size: 12px; padding: 8px 14px; box-shadow: 0 3px 10px #142c2926; }
 .hud-root[data-flying="false"] .toast:not(:last-child) { display: none; }
 .overlay .paper-card .screen-head {
-  position: sticky; top: 0; z-index: 3;
   grid-template-columns: 44px minmax(0,1fr) auto;
-  background: #fff7e9; padding: 10px 0 12px; margin: -10px 0 12px;
+  background: #fff7e9; padding: 10px 0 12px; margin: 0 0 12px;
   border-bottom: 1px solid #decfbd;
 }
 .overlay .screen-head h2 { font-size: clamp(19px, 5vw, 25px); letter-spacing: -.025em; }
@@ -57,14 +56,9 @@
 .menu-hero .hero-kicker { color: #8d4f2c; font-size: 10px; letter-spacing: .18em; }
 .menu-hero h1 { font-size: clamp(36px, 10vw, 48px); line-height: 1.05; margin: 4px 0 8px; }
 .menu-hero .hero-sub { font-size: 12px; max-width: 290px; margin: 0 auto; line-height: 1.5; }
-.menu-hero .hero-play { grid-template-columns: minmax(0,1.3fr) minmax(0,1fr); gap: 10px; margin: 8px 0 12px; }
-.paper-card.menu-hero .hero-play .mode-card-main { min-height: 128px; padding: 12px 10px; border-radius: 18px; gap: 7px; }
-.menu-hero .hero-play .mode-name { font-size: 17px; }
-.menu-hero .hero-play .mode-desc { font-size: 11px; line-height: 1.45; }
-.menu-hero .hero-play .mode-icon-lg .mi { width: 28px; height: 28px; }
-.menu-hero .hero-play .mode-icon-lg { width: 42px; height: 42px; padding: 6px; }
-.menu-hero .hero-play .primary { background: #ffe6a4; border: 1px solid #e3b757; }
-.menu-hero .hero-play .endless { background: #eee9fb; border: 1px solid #c9bde1; }
+/* Eight .menu-hero .hero-play rules used to sit here. .hero-play is not emitted
+   in any markup — the launch grid it describes was replaced by the destination
+   grid and quick actions below — so every one of them was inert. */
 .menu-hero .menu-quick-actions { gap: 10px; margin: 0 0 12px; }
 .menu-hero .quick-action { min-height: 48px; padding: 8px 12px; background: #fffaf2; border: 1px solid #dfcfbc; box-shadow: none; }
 .menu-hero .quick-action b { font-size: 11px; letter-spacing: .06em; }
@@ -164,10 +158,6 @@
   .hud-root .overlay > .paper-card { padding: 16px; border-radius: 20px; }
   .overlay .paper-card .screen-head { top: -16px; }
   .menu-hero .hero-sub { font-size: 11px; }
-  .menu-hero .hero-play .mode-name { font-size: 14px; }
-  .menu-hero .hero-play .mode-desc { font-size: 10px; }
-  .menu-hero .hero-play .mode-icon-lg { display: none; }
-  .paper-card.menu-hero .hero-play .mode-card-main { min-height: 98px; }
   .overlay .collection .skin-grid { grid-template-columns: minmax(0,1fr); }
 }
 @media (max-height: 500px) and (min-width: 550px) {
@@ -175,8 +165,6 @@
   .menu-hero .hero { margin: 0; }
   .menu-hero h1 { font-size: 30px; margin: 0 0 4px; }
   .menu-hero .hero-sub { display: none; }
-  .menu-hero .hero-play .mode-icon-lg { display: none; }
-  .paper-card.menu-hero .hero-play .mode-card-main { min-height: 72px; }
   .menu-hero .menu-quick-actions { margin-bottom: 8px; }
 }
 .overlay .room-ctl .seg button { min-width: 44px; padding-inline: 8px; }
@@ -649,7 +637,11 @@
     padding-bottom: max(10px, env(safe-area-inset-bottom));
   }
   .hud-root .overlay > .paper-card {
-    max-height: calc(100dvh - max(16px, env(safe-area-inset-top) + env(safe-area-inset-bottom)));
+    /* Cap on the space the overlay actually leaves. The card rests at a top
+       offset inside the overlay (34px at 844x390), so a cap of 100dvh - 16px
+       let the Settings card reach 396px in a 390px viewport — 6px of it below
+       the fold. 48px covers that offset with margin. */
+    max-height: calc(100dvh - max(48px, env(safe-area-inset-top) + env(safe-area-inset-bottom)));
   }
   .screen-head {
     padding: 6px 0 8px;
@@ -770,16 +762,10 @@
 }
 
 /* Leaderboard & high scores */
-.board-podium .podium-spot,
-.board-table,
 .score-table {
   background: rgba(255, 255, 255, 0.72) !important;
   border: 1px solid rgba(255, 255, 255, 0.70) !important;
   border-radius: 16px;
-}
-
-.board-row.me {
-  background: rgba(255, 245, 200, 0.80) !important;
 }
 
 /* Nest pass */
@@ -1375,45 +1361,19 @@ button,
   outline: none !important;
 }
 
-/* ── Leaderboard: richer podium + row treatments ───────────────────────────── */
-.board-podium .podium-spot {
-  background: linear-gradient(155deg, #fffcf0, #f8edcf) !important;
-  border: 1px solid #dac899 !important;
-  border-top-color: #fffbe8 !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.9),
-    0 3px 0 rgba(160,130,60,0.2),
-    0 6px 16px rgba(80,60,20,0.08) !important;
-}
-.board-podium .podium-spot:first-child {
-  background: linear-gradient(145deg, #fff9dc, #ffecaa) !important;
-  border-color: #cfa82a !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,210,0.95),
-    0 4px 0 rgba(160,120,20,0.3),
-    0 8px 22px rgba(180,130,20,0.14) !important;
-}
-.board-table {
-  background: linear-gradient(to bottom, #fffef9, #fff8ec) !important;
-  border: 1px solid #dccead !important;
-  border-radius: 16px !important;
-  overflow: hidden;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.9),
-    0 3px 0 rgba(160,130,60,0.12),
-    0 6px 18px rgba(80,60,20,0.07) !important;
-}
+/* ── Leaderboard ─────────────────────────────────────────────────────────────
+   The podium is marked up as .pod.p1/.p2/.p3 inside .board-podium and styled in
+   ui.css; .podium-spot and .board-table (a container class for a markup shape
+   that no longer exists — the list container is .board-list) were never
+   emitted, so their treatments here never painted. Row treatments are below. */
+
+/* Row dividers only. The visible row treatment — flex layout, padding, radius,
+   zebra and the "this is you" highlight — lives in one block further down
+   ("Board list rows"); duplicates here were shadowed by it, so they are gone. */
 .board-row {
   border-bottom: 1px solid #ede3cc !important;
 }
-.board-row:nth-child(even) {
-  background: rgba(255,245,220,0.35) !important;
-}
 .board-row:last-child { border-bottom: none !important; }
-.board-row.me {
-  background: linear-gradient(135deg, rgba(255,240,160,0.5), rgba(255,220,100,0.3)) !important;
-  border-color: #d4b84a !important;
-}
 
 /* ── Board filter tabs: pill group, not raw buttons ───────────────────────── */
 .board-scopes,
@@ -2350,10 +2310,16 @@ button,
   align-items: center !important;
   justify-content: space-between !important;
   padding: 10px 0 !important;
-  border-bottom: 1px solid rgba(200,170,100,0.12) !important;
+  background: none !important;
+  border: none !important;
+  border-bottom: 1px solid rgba(200,170,100,0.15) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
   gap: 12px;
 }
 .setting-row:last-child { border-bottom: none !important; }
+.setting-row > label, .setting-row > span { white-space: nowrap; }
+.pilot-name-row input { text-transform: none !important; letter-spacing: normal !important; }
 .section-title {
   font: 700 9px/1.5 var(--body) !important;
   letter-spacing: .16em !important;
@@ -3295,13 +3261,17 @@ button.upsell:active,
   border: 1px solid rgba(200,160,40,0.25) !important;
   border-radius: 10px !important;
 }
-.board-row .rank {
+/* The row's three cells are .bp (position) / .bn (name) / .bv (value) — see the
+   board-row emitter in HUD.ts. This block targeted .rank / .name / .score,
+   which nothing emits, so the row typography never applied and the cells fell
+   back to the bare ui.css defaults. Renamed to the real classes. */
+.board-row .bp {
   font: 700 12px/1 var(--display) !important;
   color: #9a7b4e !important;
   min-width: 22px !important;
   text-align: right !important;
 }
-.board-row .name {
+.board-row .bn {
   flex: 1 !important;
   font: 600 13px/1.4 var(--body) !important;
   color: #2c1f14 !important;
@@ -3309,17 +3279,10 @@ button.upsell:active,
   text-overflow: ellipsis !important;
   white-space: nowrap !important;
 }
-.board-row .score {
+.board-row .bv {
   font: 700 13px/1 var(--display) !important;
   color: #4a3010 !important;
 }
-/* Podium top 3 */
-.board-row.rank-1 .name,
-.board-row.rank-1 .score { color: #7a4800 !important; }
-.board-row.rank-2 .name,
-.board-row.rank-2 .score { color: #4a5060 !important; }
-.board-row.rank-3 .name,
-.board-row.rank-3 .score { color: #6a4020 !important; }
 
 /* ── Board rank / "Your rank" strip ─────────────────────────────────────────── */
 .board-rank {
@@ -3712,12 +3675,22 @@ button.upsell:active,
   text-shadow: 0 2px 0 rgba(42, 28, 40, 0.25), 0 8px 18px rgba(20, 20, 40, 0.4) !important;
 }
 .stat-value.coin {
-  background: linear-gradient(135deg, #ffd54a 0%, #ffb84d 40%, #fff8dd 100%) !important;
-  -webkit-background-clip: text !important;
-  background-clip: text !important;
-  color: transparent !important;
-  text-shadow: 0 0 6px rgba(255, 195, 75, 0.6), 0 0 12px rgba(255, 165, 0, 0.4) !important;
-  filter: drop-shadow(0 0 4px rgba(255, 195, 75, 0.5)) !important;
+  /* A solid, saturated gold with a tight dark rim — deliberately NOT a
+     gradient clipped to the text.
+
+     The clipped version had two problems the player sees. It required
+     `color: transparent`, so the coin count had no fill of its own and would
+     render invisible outright wherever background-clip: text is unsupported.
+     And its light end (#fff8dd) sat within a couple of percent of the sky it is
+     drawn over, which is what made the number look smeared and grubby rather
+     than crisply gold. #ffd24a against a 1px dark edge reads at both ends of
+     the sky's brightness range, and the inline SVG coin beside it supplies the
+     gold-gradient shading, in the same art the menus use. */
+  color: #ffd24a !important;
+  text-shadow:
+    0 1px 0 rgba(92, 54, 8, 0.75),
+    0 1px 2px rgba(24, 16, 40, 0.6) !important;
+  background: none !important;
 }
 .stat-label {
   font: 700 8px/1.4 var(--body) !important;
@@ -3725,6 +3698,20 @@ button.upsell:active,
   text-transform: uppercase !important;
   color: #9a7b4e !important;
   margin-bottom: 2px !important;
+}
+
+/* ── Short-screen compaction for the flight HUD numbers ────────────────────────
+   index.css already compacts .hud-header .stat-value to 20px on narrow phones
+   (max-width: 640px) and on short landscape (max-height: 500px), but this
+   sheet's `font: …/22px… !important` above wins by cascade, so those rules were
+   silently inert — the HUD kept 22px numbers on exactly the screens with the
+   least room for them. Restated here, where the !important lives, so the
+   intended responsive step actually reaches the pixel. */
+@media (max-width: 640px) {
+  .stat-value { font-size: 20px !important; }
+}
+@media (max-height: 500px) {
+  .stat-value { font-size: 20px !important; }
 }
 
 /* ── Form divider line ───────────────────────────────────────────────────────── */

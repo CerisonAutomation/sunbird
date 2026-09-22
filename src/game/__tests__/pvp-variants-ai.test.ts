@@ -72,8 +72,13 @@ describe("PvP Variants and Offline Neural AI Engine", () => {
     expect(client.state).toBe("lobby");
     expect(client.connected).toBe(true);
     expect(client.info().code).toBe("TEST5");
-    expect(client.info().count).toBeGreaterThan(1); // host + autonomous wingmates
-    expect(client.roster().length).toBeGreaterThan(0);
+    // It seats YOU and no one else. This transport used to invent four named
+    // "wingmates" (Zephyr Wing, Echo Falcon, …) so the room looked busy, and the
+    // lobby then showed them as live pilots. An empty room is the honest state;
+    // `aiFallback` stays false because nothing here is an AI pilot.
+    expect(client.info().count).toBe(1);
+    expect(client.roster()).toHaveLength(0);
+    expect(client.info().aiFallback).toBe(false);
 
     // Readying up initiates local flock response
     const sent = client.sendReady(true);

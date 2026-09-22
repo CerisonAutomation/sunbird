@@ -104,12 +104,32 @@ export function formatDatePretty(iso: string): string {
   return `${months[m - 1]} ${d}, ${y}`;
 }
 
-export function formatDistance(m: number): string {
+/**
+ * Format a distance for the HUD, in the player's locale.
+ *
+ * `locale` defaults to "en" so the default output is byte-identical to what
+ * every pinned assertion and the frozen layout fixture expect ("999 m",
+ * "1.00 km"). Passing the active locale changes only the digits and the
+ * separators — km keeps exactly two fraction digits, and grouping is off for
+ * the km form so a long flight never grows a thousands separator that the
+ * layout tests did not measure. Metres are floored, as before.
+ *
+ * This stays in the pure math module (no i18n import) on purpose: it is a leaf
+ * that the server and the specs both load without a bundler.
+ */
+export function formatDistance(m: number, locale = "en"): string {
   // A corrupted/negative distance must never render as "-123 m" or "NaN m"
   // in the HUD — clamp to a non-negative, finite value first.
   const d = Number.isFinite(m) ? Math.max(0, m) : 0;
-  if (d >= 1000) return `${(d / 1000).toFixed(2)} km`;
-  return `${Math.floor(d)} m`;
+  if (d >= 1000) {
+    const km = new Intl.NumberFormat(locale, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+      useGrouping: false,
+    }).format(d / 1000);
+    return `${km} km`;
+  }
+  return `${new Intl.NumberFormat(locale).format(Math.floor(d))} m`;
 }
 
 /**

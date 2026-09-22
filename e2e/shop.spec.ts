@@ -1,6 +1,5 @@
 import { test, expect } from "@playwright/test";
 import { SunbirdPage } from "./SunbirdPage";
-import { SKINS } from "../src/game/Economy";
 
 const save = (page: import("@playwright/test").Page) => page.evaluate(() => JSON.parse(localStorage.getItem("sunbird.save.v2")!));
 
@@ -49,10 +48,19 @@ test("a coin purchase equips once and survives reload without resetting shop sea
   const search = page.getByRole("searchbox", { name: "Find a bird" });
   await search.fill("Bluejay");
   await page.getByRole("button", { name: "Preview Bluejay", exact: true }).click();
-  await page.locator('.shop-preview-action [data-action="buy-skin"]').dblclick();
+  // Read the price the shop is actually asking for instead of importing the
+  // economy module: this spec asserts what the player is shown, and Economy.ts
+  // reads import.meta.env at module scope so plain Node cannot load it (same
+  // reason e2e/i18n.spec.ts and e2e/visual-locale.spec.ts import
+  // ../src/i18n/locales rather than ../src/i18n).
+  const buy = page.locator('.shop-preview-action [data-action="buy-skin"]');
+  const priceLabel = await buy.getAttribute("aria-label");
+  const price = Number(/for (\d+) coins/.exec(priceLabel ?? "")?.[1]);
+  expect(Number.isFinite(price), `buy button exposes no price: ${priceLabel}`).toBe(true);
+  await buy.dblclick();
   await expect(page.locator(".shop-preview-action")).toHaveText("✓ In use");
   const bought = await save(page);
-  expect(bought.wallet).toBe(before.wallet - SKINS.find(s => s.id === "bluejay")!.price);
+  expect(bought.wallet).toBe(before.wallet - price);
   expect(bought.activeSkin).toBe("bluejay");
   expect(bought.ownedSkins.filter((id: string) => id === "bluejay")).toHaveLength(1);
   await expect(search).toHaveValue("Bluejay");

@@ -98,8 +98,13 @@ const RIVAL_NAMES = [
  */
 export function lobbyRivals(
   peers: { name: string; ready: boolean; skin: string }[],
+  aiFallback = false,
 ): { name: string; tag: string; ready: boolean; skin: string }[] {
-  return peers.slice(0, 39).map((p) => ({ name: p.name, tag: "in room · live", ready: p.ready, skin: p.skin }));
+  // The AI fallback populates the same roster as networked pilots, so the tag
+  // has to come from the transport's own disclosure — otherwise a generated
+  // pilot is advertised to the player as a live human in the room.
+  const tag = aiFallback ? "in room · AI pilot" : "in room · live";
+  return peers.slice(0, 39).map((p) => ({ name: p.name, tag, ready: p.ready, skin: p.skin }));
 }
 
 /**

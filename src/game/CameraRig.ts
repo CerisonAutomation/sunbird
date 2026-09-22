@@ -25,6 +25,12 @@ export class CameraRig {
   private punchZ = 0;
   private reduceMotion = false;
   private baseFov = 50;
+  /**
+   * Distance actually used for this frame's framing. The bird reads it for its
+   * readability compensation, so the two cannot drift apart the way a second
+   * copy of the altitude-pull formula would.
+   */
+  viewDistance = CAMERA_BASE_Z;
   /** Cinematic layer: dolly-zoom on launches + settling roll. */
   private dolly = 0;
   private dollyVel = 0;
@@ -123,6 +129,8 @@ export class CameraRig {
     const horizontalFit = clamp(bird.vx * 0.8, 28, 72) / (2 * Math.tan(this.baseFov * Math.PI / 360) * this.camera.aspect * 0.6);
     const fitZoom = (flightHeight + 16) / (2 * Math.tan(this.baseFov * Math.PI / 360) * 0.70);
     const zoom = Math.max(attract ? 0 : Math.max(fitZoom, horizontalFit) * groundFrame + portraitPull, CAMERA_BASE_Z + sNorm * 14 + altPull + portraitPull - this.punchZ + this.dolly * 5 + (attract ? 12 : 0));
+    // Published for the bird's readability compensation (see Bird.syncVisual).
+    this.viewDistance = zoom;
 
     // A touch more lookahead keeps the bird in the left third of the frame so
     // the player reads the hills ahead, not the bird's back. In attract the

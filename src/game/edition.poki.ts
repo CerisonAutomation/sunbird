@@ -34,3 +34,12 @@ export const CUSTOM_PILOT_NAMES = true;
  * DCE of the IAP UI comes from vite.config's VITE_SELL_AD_REMOVAL define being
  * folded at the use sites, not from this export. */
 export const SELL_AD_REMOVAL = false;
+
+/**
+ * Call-sign names that would read as a claim to be the platform or the game
+ * itself (the Poki build). Kept HERE, per edition, rather than in the moderation module:
+ * that module is shared by every build, so a literal platform name in it ships
+ * a foreign portal marker into the other portal bundles — which is a real gate
+ * failure, not a hypothetical one.
+ */
+export const RESERVED_PILOT_NAMES: readonly string[] = ["poki", "sunbird"];

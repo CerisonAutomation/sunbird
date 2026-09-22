@@ -46,11 +46,25 @@ import { createAudsIfConfigured, AUDSPREFIX, PokiAuds } from "./auds";
 type PokiUser = { username: string; avatarUrl?: string | null } | null;
 
 /**
+ * How long `commercialBreak()` / `rewardedBreak()` wait for the portal
+ * SDK to settle before resolving on their own. Poki's documentation is
+ * explicit that `commercialBreak(cb).then(() => { ... proceed ... })`
+ * must always fire — including when Poki decides not to serve an ad —
+ * so the game can never be wedged waiting on a promise that never
+ * settles. Real breaks resolve well inside this window; the window
+ * exists only so a broken or absent portal SDK cannot leave the player
+ * on a dead screen with inert controls. The game's `AD_SAFETY_SECONDS`
+ * valve remains a hard second layer of defense at the tick level.
+ */
+const BREAK_LOAD_TIMEOUT_MS = 30_000;
+
+/**
  * Display-ad format for this game, or "" to leave the slot empty. Poki's
  * `displayAd(container, size)` needs a size the game cannot infer (the format
  * is chosen per game on the Poki side), so it is configuration, not code.
  */
 const POKI_DISPLAY_AD_SIZE = (import.meta.env.VITE_POKI_DISPLAY_AD_SIZE as string | undefined)?.trim() ?? "";
+
 type PokiShareableData = Record<string, string | number | boolean>;
 
 /**
@@ -74,7 +88,13 @@ type PokiSdk = {
   gameLoadingFinished?: () => void;
   gameplayStart?: () => void;
   gameplayStop?: () => void;
-  signalGameReady?: () => void;
+  /**
+   * Poki's milestone celebration overlay. NOTE the capital T: the SDK exposes
+   * `happyTime`, and this file previously called `happytime()`, which does not
+   * exist on it — so the overlay (and its analytics) never fired once. Verified
+   * against the live SDK: `typeof PokiSDK.happytime === "undefined"`.
+   */
+  happyTime?: () => Promise<void>;
   commercialBreak?: (onStart?: () => void) => Promise<void>;
   rewardedBreak?: (onStart?: (() => void) | { onStart?: () => void; size?: "small" | "medium" | "large" }) => Promise<boolean>;
 
@@ -87,13 +107,15 @@ type PokiSdk = {
   ) => void;
   destroyAd?: (container?: HTMLElement) => void;
   /** Celebratory overlay (personal best, level complete). */
-  happytime?: () => Promise<void>;
   /** Mute / unmute gameplay audio on portal request. */
   mute?: (muted?: boolean) => void;
-  isMuted?: () => boolean;
   /** Detect ad blockers so the game can avoid gating content behind ads. */
-  setAdBlockActive?: (active: boolean) => void;
-  hasAdBlock?: () => boolean;
+  /**
+   * The SDK's own ad-block report. Named `isAdBlocked` on the live SDK; the
+   * `hasAdBlock` this used to call does not exist, so the probe always answered
+   * "no" and the short-circuit it exists for could never fire.
+   */
+  isAdBlocked?: () => boolean;
   /** Language tag for the current player (e.g. "en", "es-MX"). */
   getLanguage?: () => string;
   /** Device class as the portal sees it — tablets report "tablet", not "mobile". */
@@ -212,8 +234,9 @@ function shareDismissed(error: unknown): boolean {
  */
 setLoadingNet(() => {
   const sdk = (window as unknown as { PokiSDK?: PokiSdk }).PokiSDK;
+  // `gameLoadingFinished` is the documented release; there is no
+  // `signalGameReady` on Poki, and asking for one hid the real call in noise.
   sdk?.gameLoadingFinished?.();
-  sdk?.signalGameReady?.();
 });
 
 export class PokiAdapter implements PlatformAdapter {
@@ -315,6 +338,8 @@ export class PokiAdapter implements PlatformAdapter {
   }
 
   signalGameReady(): void {
+    // Poki has no `signalGameReady`; `gameLoadingFinished` is the release the
+    // platform documents, and it is one-shot.
     this.loadingFinished();
   }
 
@@ -330,13 +355,13 @@ export class PokiAdapter implements PlatformAdapter {
     /* no portal pause hook on Poki — visibility handling covers it. */
   }
 
-  happytime(): void {
-    // PokiSDK.happytime() triggers a celebratory confetti overlay for
+  happyTime(): void {
+    // PokiSDK.happyTime() triggers a celebratory confetti overlay for
     // personal bests and other milestone moments. Fire-and-forget so it
     // never blocks gameplay even when the SDK is unavailable in an
     // off-portal preview.
     try {
-      void this.sdk?.happytime?.();
+      void this.sdk?.happyTime?.();
     } catch {
       /* celebrate locally — the game already emits its own confetti */
     }
@@ -348,10 +373,25 @@ export class PokiAdapter implements PlatformAdapter {
     if (!sdk?.commercialBreak) return;
     let opened = false;
     try {
-      await sdk.commercialBreak(() => {
-        opened = true;
-        this.events.onAdOpened?.();
-      });
+      // Exactly the documented shape: the callback pauses audio and input, and
+      // the promise settles when the platform says the break is over. Nothing
+      // here may end it earlier — the game's `AD_SAFETY_SECONDS` valve at
+      // the tick level is the hard second layer; this race is the first.
+      // The Poki docs are explicit: `PokiSDK.commercialBreak(cb).then(() => {
+      // ... proceed with gameplay })` — the `.then()` must always fire,
+      // including when Poki decides not to serve an ad. If the SDK promise
+      // never settles (a broken or blocked CDN, an Inspector with no ad
+      // service behind it), this race wins and the break resolves as declined
+      // rather than trapping the game forever.
+      await Promise.race([
+        sdk.commercialBreak(() => {
+          opened = true;
+          this.events.onAdOpened?.();
+        }),
+        new Promise<void>((resolve) => {
+          window.setTimeout(resolve, BREAK_LOAD_TIMEOUT_MS);
+        }),
+      ]);
     } catch {
       // The portal decides whether an ad is available. A rejected opportunity
       // is not a game error and must never block a restart.
@@ -365,10 +405,19 @@ export class PokiAdapter implements PlatformAdapter {
     if (!sdk?.rewardedBreak) return false;
     let opened = false;
     try {
-      const rewarded = await sdk.rewardedBreak(() => {
-        opened = true;
-        this.events.onAdOpened?.();
-      });
+      // Documented shape again: the SDK's own verdict decides the reward, and a
+      // declined or failed break resolves false rather than throwing.
+      // Same timeout as commercialBreak — a rewarded break that never
+      // settles must still let the player continue, just without coins.
+      const rewarded = await Promise.race([
+        sdk.rewardedBreak(() => {
+          opened = true;
+          this.events.onAdOpened?.();
+        }),
+        new Promise<void>((resolve) => {
+          window.setTimeout(resolve, BREAK_LOAD_TIMEOUT_MS);
+        }),
+      ]);
       return Boolean(rewarded);
     } catch {
       return false;
@@ -448,7 +497,7 @@ export class PokiAdapter implements PlatformAdapter {
     if (this.adBlockProbed) return;
     this.adBlockProbed = true;
     try {
-      if (this.sdk?.hasAdBlock) this.cachedAdBlock = Boolean(this.sdk.hasAdBlock());
+      if (this.sdk?.isAdBlocked) this.cachedAdBlock = Boolean(this.sdk.isAdBlocked());
     } catch { /* ignore */ }
   }
 
@@ -699,34 +748,18 @@ export class PokiAdapter implements PlatformAdapter {
     return this.cachedAdBlock;
   }
 
-  setAdBlockActive(active: boolean): void {
-    // Called by the SDK's ad-block-detection probe; remember the value so
-    // later ad-breaks can short-circuit gracefully instead of hanging.
-    this.cachedAdBlock = Boolean(active);
-    this.adBlockProbed = true;
-    try { this.sdk?.setAdBlockActive?.(active); } catch { /* ignore */ }
-  }
-
   /* settings */
   syncSettings(): void {
-    // On Poki the game must respect the portal's mute preference. There is
-    // no settings change event, so poll once at boot and relay the current
-    // state to the event sink so audio starts muted when the player muted
-    // the site through Poki.
+    // Poki exposes no "is the site muted" API — its volume controls are for ads,
+    // not for the player's preference — so the game's own mute setting is the
+    // single source of truth and there is nothing to poll. The ad-block probe is
+    // still worth taking once at boot, because it is what stops a break being
+    // requested that could never serve (MON-12).
     this.probeAdBlock();
-    try {
-      this.sdk?.setAdBlockActive?.(this.cachedAdBlock);
-    } catch { /* ignore */ }
-    try {
-      const muted = Boolean(this.sdk?.isMuted?.());
-      this.events.onPortalMute?.(muted);
-    } catch { /* ignore */ }
   }
-  isMuted(): boolean {
-    try { return Boolean(this.sdk?.isMuted?.()); } catch { return false; }
-  }
+
   getSettings(): { muteAudio: boolean; disableChat: boolean } {
-    return { muteAudio: this.isMuted(), disableChat: false };
+    return { muteAudio: false, disableChat: false };
   }
 
   /* error reporting */

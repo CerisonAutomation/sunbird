@@ -1,6 +1,19 @@
 @import "tailwindcss";
 @import "./game/ui.css";
 
+/* Tailwind auto-detects sources by walking the project, which includes the
+   vendored git submodules under vendor/ (nats-dashboard, netlib, …). Those are
+   third-party dashboards that are not part of the game, but their markup was
+   generating utilities into the shipped bundle: 44 kB raw / ~5.8 kB gzip of CSS
+   for classes this game never uses. Exclude them, and the non-shipped tooling
+   directories, so the utility layer is built only from what actually ships. */
+@source not "../vendor";
+@source not "../docs";
+@source not "../e2e";
+@source not "../scripts";
+@source not "../server";
+@source not "../api";
+
 /* Self-hosted fonts — latin subsets, font-display: swap. */
 /* Fonts are imported as resolved asset URLs so Vite/Rollup processes them through
    the asset pipeline — in SINGLEFILE builds (Poki/Crazy/itch portals) this inlines
@@ -61,8 +74,8 @@ html,
   --shadow-md: 0 4px 8px rgba(0,0,0,0.12);
   --shadow-lg: 0 8px 16px rgba(0,0,0,0.15);
   --shadow-xl: 0 12px 24px rgba(0,0,0,0.2);
-  --transition-fast: 0.12s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-normal: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: 0.06s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.10s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 body,
@@ -260,23 +273,14 @@ textarea {
   line-height: 1.1;
 }
 
-.stat-value.coin::before {
-  /* Coins counter in the flight HUD — use the same inline-SVG coin glyph
-     as the menus so the bullet-● blob never appears there either. */
-  content: "";
-  display: inline-block;
-  width: 0.8em;
-  height: 0.8em;
-  vertical-align: -0.08em;
-  margin-right: 0.18em;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 35% 32%, rgba(255,255,255,0.75) 0%, rgba(255,255,255,0.1) 38%, transparent 50%),
-    radial-gradient(circle at center, #ffd76a 0%, #ffb020 70%, #c98a10 100%);
-  box-shadow:
-    inset 0 0 0 1px rgba(0,0,0,0.25),
-    0 1px 0 rgba(0,0,0,0.15);
-  color: var(--gold);
+/* The coin counter's glyph is the SAME inline SVG the menus use, injected in
+   HUD.ts. It used to be a ::before radial-gradient dot built here, which made
+   the flight counter the one coin in the game drawn with different art. No
+   ::before rule any more — see .coin-glyph above for its size and alignment. */
+.stat-value.coin {
+  /* Inline flow, not flex: .coin-glyph is aligned with vertical-align, and
+     the pair must never break mid-number on a narrow screen. */
+  white-space: nowrap;
 }
 
 .stat-sub {
@@ -901,28 +905,26 @@ h2,
 .screen-head {
   display: flex;
   align-items: center;
-  position: sticky;
-  top: 0;
-  z-index: 2;
   background: linear-gradient(135deg, #fff7e9, #ffefd8);
   border-radius: 14px;
   border: 1.5px solid rgba(160, 120, 80, 0.15);
   box-shadow: 0 2px 8px rgba(120, 80, 40, 0.08);
   padding: 10px 12px 12px;
-  margin: -10px -2px 12px;
+  margin: 0 0 12px;
 }
 .screen-head h2 {
-  /* Truly centered regardless of side element widths */
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  flex: 1;
+  text-align: center;
   font-size: 20px;
   margin: 0;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   white-space: nowrap;
-  pointer-events: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 .heading-art {
   display: inline-flex;
@@ -1819,8 +1821,22 @@ fieldset.squad-fields {
      this band is centred like they are, so at H+24 the coaching line printed
      straight across both — most visibly as text on top of "FLOW". 72px clears
      the lower pill's box with margin at every viewport. Measured with all five
-     surfaces visible: hint 148..232 vs slope-chain 162..190 before the fix. */
-  top: calc(var(--hud-header-height, 110px) + 82px + env(safe-area-inset-top));
+     surfaces visible: hint 148..232 vs slope-chain 162..190 before the fix.
+
+     The clamp is what keeps that offset from putting the band inside the footer
+     on a short screen. Neither --hud-header-height (+82px) nor this band's own
+     height is known to CSS, so the band is pulled up just far enough to clear
+     the footer, with a floor at H+4 so it can never ride back into the header.
+     At 568x320 that lands it at 181.5..205.5 in a 178..226 gap; at 320x568 at
+     330.5..381.5 in a 320..390.5 gap. On a tall screen the min() is not the
+     smaller term and the original offset applies unchanged. */
+  top: max(
+    calc(var(--hud-header-height, 110px) + 4px + env(safe-area-inset-top)),
+    min(
+      calc(var(--hud-header-height, 110px) + 82px + env(safe-area-inset-top)),
+      calc(100% - var(--hud-footer-height, 90px) - 60px)
+    )
+  );
   left: 50%; transform: translateX(-50%);
   width: min(520px, calc(100% - 100px));
   text-align: center;
@@ -1901,18 +1917,38 @@ fieldset.squad-fields {
   font-size: clamp(32px, 7vh, 60px); line-height: 1.1;
 }
 .hud-root:not([data-feedback="countdown"]) .countdown { display: none; }
+/* The combo multiplier is a top-right CONTROL, not a floating overlay: it sits
+   in the top bar beside mute and pause. As an absolutely positioned child of
+   .mid-meta it hung 21px into the next row, and on narrow screens the roster
+   strip is that row, so the ×N landed on the roster (45x15 at 360x740, 45x22
+   at 568x320). In the control row it cannot reach the roster at all — the
+   roster is a later row of the column — and the header loses the floating
+   element that made its measured height awkward. */
 .hud-header .combo {
-  position: absolute;
-  right: calc(12px + env(safe-area-inset-right, 0px));
-  top: 100%;
-  transform: translateX(0);
-  margin-top: 6px;
-  font-size: 16px; line-height: 1.1; padding: 2px 8px;
+  position: static;
+  transform: none;
+  margin: 0;
+  font: 700 14px/1 var(--body);
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: rgba(20, 16, 32, 0.42);
+  border: 1px solid rgba(255, 214, 106, 0.45);
+  text-shadow: 0 1px 0 #7a4200;
   pointer-events: none;
 }
 .hud-header .combo:not(.show) { display: none; }
 .play-hud .alt-gauge {
-  top: calc(var(--hud-header-height, 110px) + 28px + env(safe-area-inset-top));
+  /* The footer-aware clamp, for the same reason as .flight-messages. This
+     gauge's height is floored at 44px because a gauge shorter than that is not
+     worth showing, and on a 320x568 screen the free band under the header is
+     347.75..390.5 — 42.75px, which is 1.25px short of the floor. Without the
+     clamp the floor wins and the gauge overflows downward into the footer (it
+     measured as a 1.25px overlap). Clamping the top lets the fixed floor land
+     clear instead. On a tall screen the min() is not the smaller term. */
+  top: min(
+    calc(var(--hud-header-height, 110px) + 28px + env(safe-area-inset-top)),
+    calc(100% - var(--hud-footer-height, 65px) - 46px)
+  );
   height: clamp(44px, calc(100% - var(--hud-header-height, 110px) - var(--hud-footer-height, 65px) - 72px - env(safe-area-inset-top) - env(safe-area-inset-bottom)), 240px);
 }
 .play-hud .hand { top: calc(var(--hud-header-height, 110px) + 92px + env(safe-area-inset-top)); font-size: 38px; }
@@ -1954,17 +1990,32 @@ fieldset.squad-fields {
      is not worth covering the landing corridor on short embedded players. */
   .hud-root[data-flying="true"] .toasts { display: none; }
 }
-@media (max-height: 480px) {
-  /* Race mode on a 320-tall screen has no room for the coaching line. Measured
-     at 568x320 with the race fixture: the header ends at 144, the two chain
-     pills run 149..220, and the footer (draft meter + emote wheel + goal strip)
-     starts at 226 — about 6px between them. Something has to yield, and the
-     coaching pill is the transient, lowest-value element, which is the same
-     call the toast rule above already makes. The countdown/finish widgets stay:
-     they are the race itself, and they only render in their own states. */
-  .hud-root[data-flying="true"] .flight-messages > .hint,
-  .hud-root[data-flying="true"] .flight-messages > .launch-banner,
-  .hud-root[data-flying="true"] .flight-messages > .goal-pop { display: none; }
+  /* Short windows, and small portrait phones that are also short. The width
+     clause carries a height cap on purpose: a 360x740 phone is narrow but has
+     room to spare (layout.spec.ts expects the coaching line visible there).
+
+     The coaching line is NOT hidden at any size. Hiding it was the old answer to
+     the cramped cases, but layout.spec.ts requires it visible at all five of its
+     viewports, and the collision it was avoiding is fixed at its source by the
+     footer-aware clamp on .flight-messages below. */
+@media (max-height: 480px), (max-width: 380px) and (max-height: 640px) {
+  /* The two chain pills share ONE row here: 48px fits the ring pill (35px) but
+     not a second row, which is why FLOW was landing 27px inside the footer.
+     Scoped to .hud-root because the base .slope-chain rule sits later in this
+     file and would otherwise win on source order. The ring pill is 94px wide at
+     this size, so +100px centres FLOW just past its right edge. */
+  .hud-root .slope-chain {
+    top: calc(var(--hud-header-height, 90px) + 4px + env(safe-area-inset-top));
+    left: 50%;
+    transform: translateX(calc(-50% + 100px));
+  }
+}
+
+@media (max-height: 520px) {
+  /* Short-landscape menus. The card sits at a top offset inside the overlay, so
+     a cap written only as 100dvh - 16px let the Settings card reach 396px in a
+     390px viewport (measured 844x390). Cap on the space that actually remains. */
+  .paper-card { max-height: calc(100dvh - 44px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
 }
 @media (max-height: 360px) {
   .flight-footer .fever-wrap { display: flex; align-items: center; gap: 8px; }
@@ -2265,6 +2316,24 @@ fieldset.squad-fields {
   font-style: italic;
 }
 
+/* Short-height first run. The card is capped to the viewport, so on a
+   ~305px-tall embedded player the decorative hero pushed "Let's Fly ›" 73px
+   below the fold and nothing scrolls (measured at 773x305: confirm CTA at
+   y322..378, page scrollHeight == viewport height). A new player simply could
+   not start. The hero is decoration; the first flight is not.
+
+   This block MUST stay after the .name-entry-* rules above: at equal
+   specificity the later rule wins, and an earlier copy of this sat at line
+   ~2038 where every declaration was silently overridden. */
+@media (max-height: 360px) {
+  .name-entry-hero { display: none; }
+  .name-entry-headline { margin: 2px 0 8px; }
+  .name-entry-title { font-size: 19px; }
+  .name-entry-sub { font-size: 12px; }
+  .name-entry-form { gap: 10px; }
+  .name-entry-footer { display: none; }
+}
+
 /* ============ Mobile performance optimization (< 640px) ============
    What actually costs a phone GPU is filters, backdrop blur, large shadows and
    repaint-heavy gradient sweeps — all removed below. Animation *duration* is
@@ -2368,32 +2437,12 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: #ff7a45
 
 label { font-size: 12px; font-weight: 600; color: #666; margin-bottom: 6px; }
 
-.badge { padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 600; }
-.badge.success { background: #e8f5e9; color: #2e7d32; }
-.badge.error { background: #ffebee; color: #c62828; }
-
-.list-item { padding: 12px 16px; border-bottom: 1px solid #f0f0f0; cursor: pointer; }
-.list-item:hover { background: #fafafa; }
-
-@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-.modal-content { animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-/* .toast is already fully defined above (lines ~1069+); do not redefine here */
-
-.error-message { color: #d32f2f; font-size: 12px; margin-top: 4px; }
-.spinner { width: 16px; height: 16px; border: 2px solid #f3f3f3; border-top: 2px solid #ff7a45; border-radius: 50%; animation: spin 1s linear infinite; }
-
-.tab { padding: 12px 16px; border-bottom: 2px solid transparent; color: #666; font-weight: 600; cursor: pointer; }
-.tab:hover { color: #333; }
-.tab.active { color: #ff7a45; border-bottom-color: #ff7a45; }
-
-.dropdown-menu { background: white; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; }
-.dropdown-item { padding: 10px 16px; cursor: pointer; color: #333; display: flex; align-items: center; gap: 8px; }
-.dropdown-item:hover { background: #f5f5f5; color: #ff7a45; }
-
-.progress { height: 4px; background: #e0e0e0; border-radius: 2px; margin: 8px 0; }
-.progress-fill { height: 100%; background: linear-gradient(90deg, #ff7a45, #ff5a36); transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+/* A generic component scaffold used to sit here (.badge, .list-item,
+   .modal-content, .error-message, .tab, .dropdown-*, .progress and the
+   slideUp/fadeIn keyframes). None of those class names is emitted anywhere in
+   src, and its .spinner only won by load order — index.css is imported after
+   ui.css — so it was overriding the game's own amber spinner by accident.
+   The game sheets own all of this now. */
 
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: #f1f1f1; }

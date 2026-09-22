@@ -163,6 +163,9 @@ export class PokiAuds {
     altitude: number;
     perfects: number;
     coins: number;
+    /** Real run length in ms. Poki validates submitted scores against a
+     *  plausible duration, so it travels with every metric we publish. */
+    durationMs: number;
     mode: string;
     seed: string;
     date: string;

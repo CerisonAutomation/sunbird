@@ -34,7 +34,7 @@ vi.mock("@poki/netlib", async () => {
 type Client = {
   connect(code: string, seed: string, remote?: boolean): void;
   disconnect(): void;
-  info(): { code: string; seed: string; count: number; state: string; ready: boolean; capacity: number };
+  info(): { code: string; seed: string; count: number; state: string; ready: boolean; capacity: number; aiFallback: boolean };
   roster(): {
     id: string;
     name: string;
@@ -376,6 +376,11 @@ describe("a browser with no WebRTC", () => {
     expect(solo.isAutonomous).toBe(true);
     expect(solo.state).toBe("lobby");
     expect(solo.roster().length).toBeGreaterThan(0); // local AI flock, clearly not live pilots
+    // "Clearly" is the transport's job to say, not the reader's to infer: these
+    // pilots are generated locally, and the lobby tags them "AI pilot" only
+    // because this flag travels with the room info. Without it they reached the
+    // player dressed as live humans.
+    expect(solo.info().aiFallback).toBe(true);
     expect(await listPublicLobbies("test-game", 200)).toEqual([]);
   });
 });

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { generatePilotName, isPilotNameClean, moderatePilotName } from "../pilotNameGenerator";
 import { normalizePilotName, squashPilotName } from "../pilotNameModeration";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 /**
  * The pilot name is the one surface where a player authors text that other real
@@ -22,6 +24,11 @@ describe("pilot-name moderation — evasions", () => {
     "n1gger", "nıgger", "nigger", "n i g g e r",
     "b!tch", "b1tch", "cünt", "tw4t", "wh0re", "p0rn", "r4pe",
     "n4zi", "h1tler", "f4ggot", "faggot",
+    // Sounds-like rather than leetspeak: caught by the phonetic key, not by a
+    // blocklist entry per spelling. ("shyt" is the exception — it needs a vowel
+    // substitution that would refuse the game's own vocabulary, so it is
+    // listed instead.)
+    "fuxk", "fuq", "phuk", "fukk", "phaggot", "shyt", "fukka",
   ];
 
   it.each(evasions)("rejects %j", (name) => {
@@ -40,6 +47,52 @@ describe("pilot-name moderation — evasions", () => {
   });
 });
 
+describe("pilot-name moderation — the categories a platform actions", () => {
+  const harmful = [
+    // self-harm
+    "suicide", "selfharm", "proana", "thinspo", "anorexic",
+    // sexual
+    "blowjob", "loli", "shota", "milf", "bdsm", "orgasm", "sexcam", "dildo",
+    // slurs
+    "spic", "towelhead", "beaner", "jigaboo", "shemale",
+    // drugs
+    "marijuana", "fentanyl", "ketamine", "xanax", "weed", "crack",
+    // violence
+    "rapist", "incest", "bestiality",
+  ];
+
+  it.each(harmful)("rejects %j", (name) => {
+    expect(isPilotNameClean(name), `${name} must be rejected`).toBe(false);
+  });
+
+  it("refuses a name that claims to be staff", () => {
+    // Impersonation is the harm here, not enthusiasm: "Pokifan" is a player.
+    for (const claim of ["admin", "Admin", "administrator", "moderator", "official", "staff", "support", "developer"]) {
+      expect(isPilotNameClean(claim), `${claim} must be refused`).toBe(false);
+    }
+    // …and the game's own name, whichever edition is loaded here.
+    expect(isPilotNameClean("Sunbird")).toBe(false);
+    expect(isPilotNameClean("Pokifan")).toBe(true);
+  });
+
+  it("reserves the platform's name per edition, so no bundle carries another's", () => {
+    // The platform name cannot live in this shared module: a literal "poki" in a
+    // module every build imports ships a Poki marker into the CrazyGames and
+    // generic bundles, and the portal gate fails on exactly that. It is checked
+    // here by injecting the list, which is also the proof the mechanism works.
+    expect(moderatePilotName("Poki42", ["poki"]).ok, "the injected platform name must be refused").toBe(false);
+    expect(moderatePilotName("Poki42", []).ok, "with no platform reserved, it is only a word").toBe(true);
+    // And the editions declare their own.
+    const fs = readFileSync;
+    const joinPath = join;
+    const read = (file: string): string => fs(joinPath(process.cwd(), "src", "game", file), "utf8");
+    expect(read("edition.poki.ts")).toMatch(/RESERVED_PILOT_NAMES: readonly string\[\] = \["poki", "sunbird"\]/);
+    // The neutral build has no platform to impersonate, so it reserves only the
+    // game's own name — and one portal means one bundle that must stay clean.
+    expect(read("edition.ts")).toMatch(/RESERVED_PILOT_NAMES: readonly string\[\] = \["sunbird"\]/);
+  });
+});
+
 describe("pilot-name moderation — the Scunthorpe problem", () => {
   // Every one of these contains a blocked substring. All are names a player
   // would legitimately want, and several are the game's own vocabulary.
@@ -54,6 +107,20 @@ describe("pilot-name moderation — the Scunthorpe problem", () => {
     "Raccoon", "Tycoon", "Cocoon", "Crisp", "Prissy",
     "Kestrel", "Skimmer", "Plover", "Osprey", "Harrier", "Merlin",
     "Peregrine", "Phoenix", "SkyFalcon42", "StormOsprey77", "ApexNova10",
+    // …and the same trap for every term added later: each of these contains a
+    // blocked substring, and each is a name this game would happily generate or
+    // a player would plausibly pick. "SkySwift" is the one that matters most —
+    // a self-harm abbreviation once lived in that list and fired on the game's
+    // own sky vocabulary.
+    "SkySwift60", "Swoop", "Whoop", "Raccoon", "Seaweed", "Essex", "Sussex",
+    "Spice", "Spicy", "Heroine", "Pakistan", "Milford", "Basement", "Therapist",
+    "Crackle", "Nutcracker", "Wisecrack", "Auspicious", "Conspicuous",
+    "Fox", "Quail", "Taxi", "Boxer",
+    // The one that actually bit: folding "y" to "i" is the obvious vowel
+    // substitution, and it turns "SkyKestrel" into "skikestrel", which contains
+    // "kike" — refusing the game's own sky vocabulary. The fold is gone; these
+    // names are why it must not come back.
+    "SkyKestrel13", "SkyKeeper", "SkyKing", "SkySkimmer",
   ];
 
   it.each(legitimate)("allows %j", (name) => {

@@ -1,10 +1,13 @@
-import { glideLiftScale } from "./FlightPhysics";
+import { dampClimbAtCeiling, glideLiftScale } from "./FlightPhysics";
 import * as THREE from "three";
 import {
   AIR_DRAG_DIVE,
   AIR_DRAG_GLIDE,
   BIRD_RADIUS,
   BOOST_EXTRA_SPEED,
+  CAMERA_BASE_Z,
+  CAMERA_REVEAL_MAX,
+  BIRD_BASE_SCALE,
   GLIDE_LIFT_MAX,
   GLIDE_LIFT_SPEED,
   GRAVITY_DIVE,
@@ -107,23 +110,23 @@ export class Bird {
   private squashAmt = 1;
   private stretchAmt = 1;
   private wingTuck = 0;
+  /**
+   * This frame's camera distance, pushed in by the game after the camera
+   * settles. Drives the readability compensation in syncVisual so the bird
+   * stays legible when the camera dollies back at altitude.
+   */
+  private viewDistance = CAMERA_BASE_Z;
   private blink = 0;
   private glowPulse = 0;
-  private currentSkin: BirdSkinColors = {
-    body: 0xff7a45,
-    wing: 0xff9a62,
-    belly: 0xffe6c4,
-    beak: 0xffc447,
-  };
 
   constructor() {
-    this.bodyMat = new THREE.MeshLambertMaterial({ color: 0xff7a45, emissive: 0xff7a45, emissiveIntensity: 0.08 });
+    this.bodyMat = new THREE.MeshLambertMaterial({ color: 0xff7a45, emissiveIntensity: 0 });
     this.wingMat = new THREE.MeshLambertMaterial({ color: 0xff9a62 });
     this.bellyMat = new THREE.MeshLambertMaterial({ color: 0xffe6c4 });
     this.beakMat = new THREE.MeshLambertMaterial({ color: 0xffc447 });
     const eyeW = new THREE.MeshBasicMaterial({ color: 0xfffaf2 });
     const eyeP = new THREE.MeshBasicMaterial({ color: 0x2a1c28 });
-    this.lidMat = new THREE.MeshLambertMaterial({ color: 0xff7a45, emissive: 0xff7a45, emissiveIntensity: 0.08 });
+    this.lidMat = new THREE.MeshLambertMaterial({ color: 0xff7a45, emissiveIntensity: 0 });
 
     this.squash.add(this.makeBody());
 
@@ -180,7 +183,7 @@ export class Bird {
     this.glow = new THREE.PointLight(0xffe08a, 0, 18, 2);
     this.glow.position.set(0, 0.4, 1);
     this.root.add(this.glow);
-    this.root.scale.setScalar(1.18);
+    this.root.scale.setScalar(BIRD_BASE_SCALE);
 
     const shadowGeo = Bird.makeShadowGeometry();
     const shadowMat = new THREE.MeshBasicMaterial({
@@ -237,6 +240,11 @@ export class Bird {
     scene.add(this.shadow);
   }
 
+  /** The camera's settled distance for this frame (see syncVisual). */
+  setViewDistance(distance: number): void {
+    this.viewDistance = distance;
+  }
+
   reset(x: number, y: number): void {
     this.x = x;
     this.y = y;
@@ -271,13 +279,12 @@ export class Bird {
   }
 
   applySkin(skin: BirdSkinColors): void {
-    this.currentSkin = skin;
     this.bodyMat.color.setHex(skin.body);
-    this.bodyMat.emissive.setHex(skin.body);
+    this.bodyMat.emissive.set(0, 0, 0);
     this.wingMat.color.setHex(skin.wing);
     this.bellyMat.color.setHex(skin.belly);
     this.lidMat.color.setHex(skin.body);
-    this.lidMat.emissive.setHex(skin.body);
+    this.lidMat.emissive.set(0, 0, 0);
     this.beakMat.color.setHex(skin.beak);
   }
 
@@ -370,6 +377,13 @@ export class Bird {
         this.vx *= cap / s2;
         this.vy *= cap / s2;
       }
+
+      // The one place altitude is bounded. Every lift source (thermals, the
+      // Zenith ascent super-lift, sunflowers) writes vertical speed directly, so
+      // clamping the climb here — rather than at each of those sites — is what
+      // keeps the bird inside the world the camera is framed for. See
+      // ALT_CEILING.
+      this.vy = dampClimbAtCeiling(this.vy, this.y - terrain.heightAt(this.x) - BIRD_RADIUS);
 
       this.x += this.vx * dt;
       this.y += this.vy * dt;
@@ -514,29 +528,46 @@ export class Bird {
     }
 
     this.glowPulse += dt * 6;
-    this.glow.intensity = fever ? 2.6 + Math.sin(this.glowPulse) * 0.9 : 0.55;
-    this.glow.color.setHex(fever ? 0xffe08a : 0xfff4dc);
+    this.glow.intensity = fever ? 2.6 + Math.sin(this.glowPulse) * 0.9 : 0;
+    this.glow.color.setHex(0xffe08a);
     if (fever) {
       this.bodyMat.emissive.set(0x552200);
+      this.bodyMat.emissiveIntensity = 1;
       this.wingMat.emissive.set(0x441800);
+      this.wingMat.emissiveIntensity = 1;
       this.bellyMat.emissive.set(0x332200);
+      this.bellyMat.emissiveIntensity = 1;
     } else {
-      this.bodyMat.emissive.setHex(this.currentSkin.body);
-      this.wingMat.emissive.set(0x000000);
-      this.bellyMat.emissive.set(0x000000);
+      this.bodyMat.emissive.set(0, 0, 0);
+      this.bodyMat.emissiveIntensity = 0;
+      this.wingMat.emissive.set(0, 0, 0);
+      this.wingMat.emissiveIntensity = 0;
+      this.bellyMat.emissive.set(0, 0, 0);
+      this.bellyMat.emissiveIntensity = 0;
     }
 
     const h = terrain.heightAt(px);
     const alt = Math.max(0, py - h);
     this.shadow.position.set(px, h + 0.08, 0);
-    const s = clamp(1.3 - alt * 0.045, 0.25, 1.3);
+    const s = clamp(1.3 - alt * 0.045, 0.42, 1.3);
     // The silhouette breathes with the wings: span narrows at the top of each
     // stroke and folds to a dart when tucked (dive/sleep). Local y maps to
     // world wingspan after the flat rotation, so only y is modulated.
     const span = s * (1 - 0.45 * this.wingTuck) * (1 - 0.14 * (flap / 0.55));
     this.shadow.scale.set(s, span, 1);
     this.shadow.rotation.z = Math.atan(terrain.slopeAt(px));
-    (this.shadow.material as THREE.MeshBasicMaterial).opacity = 0.28 * s * (this.inWater ? 0.15 : 1);
+    // The ground shadow is the "where am I" cue, so its fade has to stop before
+    // it stops being one. It used to bottom out at 0.25 scale and 0.07 opacity
+    // — invisible precisely when the bird is smallest, i.e. high up.
+    (this.shadow.material as THREE.MeshBasicMaterial).opacity = (0.17 + 0.11 * s) * (this.inWater ? 0.15 : 1);
+
+    // Readability. The base is deliberately generous: the bird is the subject
+    // and the only thing the player is tracking, and at 1.18 it read as small
+    // even at ground level. The camera-distance term then keeps it legible as
+    // the camera dollies back at altitude. Both are visual only — position and
+    // collision use BIRD_RADIUS, so this cannot affect flight physics.
+    const behind = clamp((this.viewDistance - CAMERA_BASE_Z) / (CAMERA_REVEAL_MAX - CAMERA_BASE_Z), 0, 1);
+    this.root.scale.setScalar(BIRD_BASE_SCALE * (1 + behind * 0.95));
   }
 
   dispose(): void {

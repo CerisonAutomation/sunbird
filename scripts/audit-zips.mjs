@@ -20,7 +20,7 @@ import { fileURLToPath } from "node:url";
 import { foreignMarkersIn, missingMarkersIn } from "./portal-markers.mjs";
 
 const root = join(fileURLToPath(import.meta.url), "..", "..");
-const PORTALS = ["poki", "crazy", "generic"];
+const PORTALS = ["poki"];
 const MAX_ZIP_BYTES = 8_000_000; // Poki initial-download target
 
 const failures = [];

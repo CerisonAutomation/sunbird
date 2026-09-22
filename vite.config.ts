@@ -11,10 +11,11 @@ const __dirname = path.dirname(__filename);
 
 // Build modes:
 //   VITE_SINGLEFILE=true   → inline all JS/CSS into index.html (itch.io + portal zips)
-//   VITE_PORTAL_TARGET=*   → portal build (always single-file: zips must be self-contained)
+//   VITE_PORTAL_TARGET=poki → the portal build (single-file: the zip must be
+//                              self-contained); "none" is the direct/web build.
 //   default                → chunked output (Vercel CDN, HTTP caching, PWA)
 const PORTAL = (process.env.VITE_PORTAL_TARGET ?? "none").toLowerCase() || "none";
-const VALID_PORTALS = ["none", "poki", "crazy", "crazygames", "generic"];
+const VALID_PORTALS = ["none", "poki"];
 if (!VALID_PORTALS.includes(PORTAL)) {
   // Fail the build loudly — a typo'd portal target would silently ship a
   // build with the wrong SDK/monetization profile.
@@ -49,15 +50,9 @@ function portalShimPlugin(): Plugin {
       // competitor's name even in dead code. Each build gets exactly one file.
       if (base === "edition" || base === "edition.ts") {
         if (dir !== "game") return null;
-        const edition =
-          PORTAL === "poki"
-            ? path.resolve(__dirname, "src/game/edition.poki.ts")
-            : PORTAL === "crazy" || PORTAL === "crazygames"
-              ? path.resolve(__dirname, "src/game/edition.crazy.ts")
-              : PORTAL === "generic"
-                ? path.resolve(__dirname, "src/game/edition.generic.ts")
-                : null;
-        return edition; // null => the neutral src/game/edition.ts
+        // One portal now: the Poki build gets the Poki strings, and the
+        // direct/web build gets the neutral ones.
+        return PORTAL === "poki" ? path.resolve(__dirname, "src/game/edition.poki.ts") : null;
       }
       // Per-target realtime transport. The Poki build must build a Netlib
       // (WebRTC P2P) client and every other edition must build the WebSocket
@@ -70,9 +65,6 @@ function portalShimPlugin(): Plugin {
       if (dir !== "sdk") return null;
       if (base === "poki" || base === "poki.ts") {
         if (PORTAL !== "poki") return shim;
-      }
-      if (base === "crazygames" || base === "crazygames.ts") {
-        if (PORTAL !== "crazy" && PORTAL !== "crazygames") return shim;
       }
       return null;
     },

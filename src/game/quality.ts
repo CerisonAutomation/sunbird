@@ -10,6 +10,14 @@
 export const STEP_DOWN_FRAME_SECONDS = 1 / 40;
 /** Frame time below this means there is real headroom: step up. */
 export const STEP_UP_FRAME_SECONDS = 1 / 57;
+/**
+ * Stricter headroom bar for the optional expensive effects — bloom and soft
+ * shadows. Deliberately tighter than STEP_UP_FRAME_SECONDS, and not a typo of
+ * it: nudging the resolution up costs a fraction of a millisecond, while
+ * re-arming bloom or shadow maps costs several, so those are only worth
+ * switching on when the frame sits comfortably inside budget.
+ */
+export const EFFECT_UP_FRAME_SECONDS = 1 / 58;
 /** Size of one resolution step, in devicePixelRatio units. */
 export const DPR_STEP = 0.25;
 /** Lowest resolution we will ever drop to — below 1 is blurry and pointless. */
@@ -50,6 +58,6 @@ export function nextBloomBudget(state: BloomBudget, frameSeconds: number, eligib
   if (!eligible) return { enabled: false, goodWindows: 0, cooldown: 0 };
   const cooldown = Math.max(0, state.cooldown - QUALITY_WINDOW_SECONDS);
   if (frameSeconds > STEP_DOWN_FRAME_SECONDS) return { enabled: false, goodWindows: 0, cooldown: state.enabled ? 10 : cooldown };
-  const goodWindows = frameSeconds < 1 / 58 ? Math.min(3, state.goodWindows + 1) : 0;
+  const goodWindows = frameSeconds < EFFECT_UP_FRAME_SECONDS ? Math.min(3, state.goodWindows + 1) : 0;
   return { enabled: state.enabled || (goodWindows >= 3 && cooldown === 0), goodWindows, cooldown };
 }

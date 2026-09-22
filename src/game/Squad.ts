@@ -786,26 +786,14 @@ export class SquadClient {
       }
       this.onChange();
 
-      // Wingmate simulated AI banter
-      setTimeout(() => {
-        if (!this.state.myClubId || this.state.myClubId !== clubId) return;
-        const WINGMATES = ["Echo Falcon", "Zephyr Sky", "Shadow Swift", "Aurora Wing"];
-        const REPLIES = [
-          "Let's fly formation in the next mass race! 🦅",
-          "Great aerodynamic carving on those downslopes!",
-          "Pro tip: dive right on the crest slope for maximum launch speed 🚀",
-          "Drafting behind the pack gives a huge boost on Tempest Draft!",
-          "See you on the podium! 👑",
-          "Clean wings, clear skies! Let's get that victory.",
-        ];
-        const wingmate = WINGMATES[Math.floor(Math.random() * WINGMATES.length)]!;
-        const replyText = REPLIES[Math.floor(Math.random() * REPLIES.length)]!;
-        const replyMsg: ChatMessage = { id: Date.now() + 1, name: wingmate, text: replyText, at: "just now" };
-        this.state.chat.push(replyMsg);
-        if (this.state.chat.length > 50) this.state.chat.shift();
-        try { localStorage.setItem(`sunbird.squad.local_chat.${clubId}`, JSON.stringify(this.state.chat)); } catch {}
-        this.onChange();
-      }, 700);
+      // No replies are invented. This used to schedule a "wingmate" answer
+      // drawn at random from a canned list, filed into the same message array
+      // as the player's own and rendered under their name — a fabricated club
+      // member answering a message no one received. It contradicted the rule
+      // stated at the top of this module ("Wingmen are only ever real pilots
+      // this device verified"), and a chat pane that invents the other side is
+      // worse than one that stays quiet. The offline hub stores what you said
+      // and nothing else.
 
       return true;
     }

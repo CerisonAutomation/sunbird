@@ -1,6 +1,28 @@
 const COIN_SCALE = [1046.5, 1174.66, 1318.51, 1567.98, 1760.0, 2093.0, 2349.32, 2637.02, 3135.96, 3520.0];
 
-import { Music, type BiomeMusicStyle, type MusicMode } from "./Music";
+import { GLOCK_PARTIALS, Music, type BiomeMusicStyle, type MusicMode } from "./Music";
+import { SongbookPlayer } from "./SongbookPlayer";
+import type { BiomeId } from "./Songbook";
+
+/**
+ * Background music is silenced at the source, independent of the `musicOn`
+ * setting and Music.ts's own content — direct player feedback on a live
+ * build was strongly negative and asked for it gone outright. SFX are
+ * unaffected. The `Music` engine below still runs (mode/track/biome keep
+ * being tracked) so re-enabling later is a one-line flip, not a rebuild.
+ */
+const MUSIC_DISABLED = true;
+
+/**
+ * The authored songs in `Songbook.ts` ARE the game's music, and they are what
+ * `musicOn` switches. They are gated separately from `MUSIC_DISABLED` on
+ * purpose: what players asked to be rid of was the *generated* score — one
+ * tempo, one meter, one drum feel for thirty tracks — not the idea of music.
+ * The songbook is hand-written, so it answers the complaint rather than
+ * repeating it, and the two players are never audible at once (the generated
+ * engine stays at zero).
+ */
+const SONGBOOK_ENABLED = true;
 
 /**
  * Master audio graph:
@@ -18,6 +40,7 @@ export class GameAudio {
   private whooshFilter: BiquadFilterNode | null = null;
   private windGain: GainNode | null = null;
   private music: Music | null = null;
+  private songbook: SongbookPlayer | null = null;
   private muted = false;
   private musicOn = true;
   private musicVol = 0.8;
@@ -129,12 +152,23 @@ export class GameAudio {
     convolver.connect(wet);
     wet.connect(this.master);
 
-    this.music = new Music(this.ctx, this.master, this.reverbSend);
-    this.music.setLevel(this.musicOn && !this.muted ? 0.5 * this.musicVol : 0);
-    this.music.setBiome(this.pendingBiome);
-    this.music.setMode(this.pendingMode);
-    this.music.setTrack(this.pendingTrack);
-    if (this.onTrackChange) this.music.onTrackChange = this.onTrackChange;
+    if (SONGBOOK_ENABLED) {
+      this.songbook = new SongbookPlayer(this.ctx, this.master, this.reverbSend);
+      this.songbook.setMode(this.pendingMode);
+      this.songbook.setLevel(this.songbookLevel());
+      if (this.onTrackChange) this.songbook.onTrackChange = this.onTrackChange;
+    }
+
+    if (!MUSIC_DISABLED) {
+      this.music = new Music(this.ctx, this.master, this.reverbSend);
+      this.music.setLevel(this.musicOn && !this.muted ? 0.5 * this.musicVol : 0);
+      this.music.setBiome(this.pendingBiome);
+      this.music.setMode(this.pendingMode);
+      this.music.setTrack(this.pendingTrack);
+      if (this.onTrackChange) this.music.onTrackChange = this.onTrackChange;
+    } else {
+      this.music = null;
+    }
 
     this.buildWhoosh();
     this.buildWind();
@@ -178,6 +212,7 @@ export class GameAudio {
   dispose(): void {
     this.removeUnlockListeners();
     this.music?.dispose();
+    this.songbook?.dispose();
     if (this.ctx) void this.ctx.close();
     this.ctx = null;
     this.noiseBuffer = null;
@@ -188,15 +223,26 @@ export class GameAudio {
     this.whooshFilter = null;
     this.windGain = null;
     this.music = null;
+    this.songbook = null;
     this.activeOneShots = 0;
   }
 
   /* ---------- volume & state ---------- */
 
+  /**
+   * The songbook's level, in one place. Portal/ad/hidden mutes are not here:
+   * those act on the master bus, which the songbook is routed through, so they
+   * silence it exactly as they silence SFX.
+   */
+  private songbookLevel(): number {
+    return SONGBOOK_ENABLED && this.musicOn && !this.muted ? 0.5 * this.musicVol : 0;
+  }
+
   setVolumes(musicVol: number, sfxVol: number): void {
     this.musicVol = Math.max(0, Math.min(1, musicVol));
     this.sfxVol = Math.max(0, Math.min(1, sfxVol));
-    if (this.music) this.music.setLevel(this.musicOn && !this.muted ? 0.5 * this.musicVol : 0);
+    if (this.music) this.music.setLevel(MUSIC_DISABLED ? 0 : this.musicOn && !this.muted ? 0.5 * this.musicVol : 0);
+    this.songbook?.setLevel(this.songbookLevel());
     if (this.sfxBus && this.ctx) {
       this.sfxBus.gain.setTargetAtTime(this.muted ? 0 : 0.5 * this.sfxVol, this.ctx.currentTime, 0.05);
     }
@@ -204,7 +250,8 @@ export class GameAudio {
 
   setMuted(m: boolean): void {
     this.muted = m;
-    this.music?.setLevel(this.musicOn && !m ? 0.5 * this.musicVol : 0);
+    this.music?.setLevel(MUSIC_DISABLED ? 0 : this.musicOn && !m ? 0.5 * this.musicVol : 0);
+    this.songbook?.setLevel(this.songbookLevel());
     if (this.sfxBus && this.ctx) {
       this.sfxBus.gain.setTargetAtTime(m ? 0 : 0.5 * this.sfxVol, this.ctx.currentTime, 0.05);
     }
@@ -212,7 +259,8 @@ export class GameAudio {
 
   setMusicEnabled(on: boolean): void {
     this.musicOn = on;
-    this.music?.setLevel(on && !this.muted ? 0.5 * this.musicVol : 0);
+    this.music?.setLevel(MUSIC_DISABLED ? 0 : on && !this.muted ? 0.5 * this.musicVol : 0);
+    this.songbook?.setLevel(this.songbookLevel());
   }
 
   /** Portal SDKs require that audio is silent while an ad has focus. */
@@ -246,12 +294,16 @@ export class GameAudio {
   setMusicMode(mode: MusicMode): void {
     this.pendingMode = mode;
     this.music?.setMode(mode);
+    this.songbook?.setMode(mode);
   }
 
-  setBiome(style: BiomeMusicStyle): void {
-    if (style === this.pendingBiome) return;
+  setBiome(style: BiomeMusicStyle, biomeId?: string): void {
+    if (style === this.pendingBiome && !biomeId) return;
     this.pendingBiome = style;
     this.music?.setBiome(style);
+    // The songbook keys off the island, not the style: two worlds that share a
+    // musical colour are still two different places to fly.
+    if (biomeId) this.songbook?.setBiome(biomeId as BiomeId);
   }
 
   /** Pin a track (0..9) or "shuffle" — persists via Settings. */
@@ -263,15 +315,18 @@ export class GameAudio {
   setOnTrackChange(cb: (name: string) => void): void {
     this.onTrackChange = cb;
     if (this.music) this.music.onTrackChange = cb;
+    if (this.songbook) this.songbook.onTrackChange = cb;
   }
 
   /** 0..1 — adaptive music intensity (speed/altitude/fever/danger/combos). */
   setMusicIntensity(v: number): void {
     this.music?.setIntensity(v);
+    this.songbook?.setIntensity(v);
   }
 
   duckMusic(amount = 0.4, release = 0.5): void {
     this.music?.duck(amount, release);
+    this.songbook?.ducked(amount, release);
   }
 
   update(
@@ -315,6 +370,7 @@ export class GameAudio {
     this.lastWindGain = this.smoothParam(this.windGain.gain, wind, 0.12, this.lastWindGain, 0.0015);
 
     this.music?.setNight(1 - daylight);
+    this.songbook?.setNight(1 - daylight);
     void dt;
   }
 
@@ -385,13 +441,84 @@ export class GameAudio {
     this.music?.sidechainPump(0.3, 0.15);
   }
 
+  /**
+   * Moon Prism Power — Sailor Moon transformation sequence.
+   *
+   * Three acts, timed like the anime:
+   *   0.00s  Sparkle run: chromatic ascending glitter (the ribbon-spin sound)
+   *   0.18s  Power chord stab: sawtooth triad hit with reverb swell
+   *   0.38s  Choir swell: detuned sines fade in on the held chord (the "ahhhh")
+   *   0.55s  Beat drop + glissando: music snaps to fever mode triumphantly
+   *
+   * All synthesized — no samples, no files.
+   */
   feverOn(): void {
-    this.tone(392, 0.12, "square", 0.05, 523.25);
-    this.tone(523.25, 0.14, "square", 0.05, 659.25);
-    this.tone(783.99, 0.2, "square", 0.06, 1046.5);
-    this.tone(1046.5, 0.25, "triangle", 0.08, 1318.5);
-    this.music?.triggerBeatDrop(1.2);
-    this.music?.triggerViralGlissando();
+    const ctx = this.ctx;
+    if (!ctx || !this.sfxBus) return;
+    const now = ctx.currentTime;
+    const bus = this.sfxBus;
+
+    // ── Act 1: dreamy sparkle ribbon ──────────────────────────────────────
+    // Slow, floaty ascending shimmer — not a fast zip, a gentle magical bloom
+    const sparkNotes = [784, 880, 1047, 1175, 1319, 1568, 1760, 2093, 2349, 2637, 3136, 3520];
+    sparkNotes.forEach((freq, i) => {
+      const t = now + i * 0.030; // slower spacing = dreamier
+      const o = ctx.createOscillator();
+      const lfo = ctx.createOscillator();
+      const lfoG = ctx.createGain();
+      const g = ctx.createGain();
+      o.type = "sine";
+      o.frequency.value = freq;
+      // gentle pitch wobble on each sparkle — like a music box key
+      lfo.frequency.value = 4.5 + i * 0.3;
+      lfoG.gain.value = freq * 0.006;
+      lfo.connect(lfoG); lfoG.connect(o.frequency);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.07, t + 0.025);  // soft attack
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18); // long tail
+      o.connect(g); g.connect(bus);
+      o.start(t); lfo.start(t); o.stop(t + 0.22); lfo.stop(t + 0.22);
+    });
+
+    // ── Act 2: magical harp chord ──────────────────────────────────────────
+    // Triangle waves arpeggiated slowly up — like a harp sweep in a dream
+    const harp = now + 0.30;
+    [392, 523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((freq, i) => {
+      const t = harp + i * 0.045;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = "triangle";
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.09, t + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+      o.connect(g); g.connect(bus);
+      o.start(t); o.stop(t + 0.6);
+    });
+
+    // ── Act 3: dreamy choir swell "ahhhhh" ────────────────────────────────
+    // 8 very gently detuned sines with a very slow attack — floats in like mist
+    const choir = now + 0.55;
+    [261.63, 329.63, 392, 523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((freq, i) => {
+      const detune = (i % 4 - 1.5) * 0.005;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = "sine";
+      o.frequency.value = freq * (1 + detune);
+      const peak = 0.055 - i * 0.004;
+      g.gain.setValueAtTime(0.0001, choir);
+      g.gain.exponentialRampToValueAtTime(peak, choir + 0.40); // very slow bloom
+      g.gain.setValueAtTime(peak, choir + 0.80);
+      g.gain.exponentialRampToValueAtTime(0.0001, choir + 1.40);
+      o.connect(g); g.connect(bus);
+      o.start(choir); o.stop(choir + 1.5);
+    });
+
+    // ── Final glow: gentle glissando, no hard drop ────────────────────────
+    setTimeout(() => {
+      this.music?.triggerViralGlissando();
+      this.music?.sidechainPump(0.18, 0.30); // soft pump, not a slam
+    }, 800);
   }
 
   triggerBeatDrop(intensityMult?: number): void {
@@ -596,10 +723,18 @@ export class GameAudio {
 
   countdownBeep(isGo = false): void {
     if (isGo) {
-      this.tone(880, 0.24, "sine", 0.16, 1174.66);
-      this.tone(1320, 0.22, "triangle", 0.08);
+      // "GO!" — bright ascending major triad + sub-bass punch + sidechain
+      this.tone(523.25, 0.06, "square",   0.07, 1046.5);   // C5 → C6
+      this.tone(659.25, 0.09, "square",   0.07, 1318.5);   // E5 → E6
+      this.tone(783.99, 0.12, "square",   0.07, 1567.98);  // G5 → G6
+      this.tone(1046.5, 0.45, "sine",     0.18, 1046.5);   // C6 ring
+      this.tone(1567.98, 0.35, "triangle", 0.10);          // G6 shimmer
+      this.music?.triggerBeatDrop(0.65);
+      this.music?.sidechainPump(0.48, 0.18);
     } else {
-      this.tone(440, 0.12, "sine", 0.12);
+      // Tick — punchy staccato double-tone, much more audible than a plain beep
+      this.tone(880,  0.07, "square",   0.11);
+      this.tone(1320, 0.05, "triangle", 0.055);
     }
   }
 
@@ -633,7 +768,39 @@ export class GameAudio {
     this.tone(1174.66, 0.28, "sine", 0.12);
   }
 
+  /** Achievement/trophy unlock: a rising triad into a real glockenspiel bell
+   *  strike (same bar-partial synthesis as the score's lead, see `bell()`) —
+   *  a distinct timbre so a trophy never gets mistaken for a generic fanfare. */
+  trophy(): void {
+    this.tone(523.25, 0.1, "triangle", 0.07, 659.25);
+    this.tone(659.25, 0.12, "triangle", 0.07, 783.99);
+    this.bell(1046.5, 0.55, 0.6);
+  }
+
+  /** New personal best: a rising major run into a shimmering bell top —
+   *  bigger than milestone(), brighter than fanfare(), reserved for a
+   *  genuine record so the moment actually lands. */
+  personalBest(): void {
+    this.tone(587.33, 0.12, "triangle", 0.08, 698.46);
+    this.tone(739.99, 0.14, "triangle", 0.08, 880);
+    this.tone(987.77, 0.18, "sine", 0.09, 1174.66);
+    this.bell(1567.98, 0.45, 0.5);
+    this.noiseBurst(0.12, 4200, 0.03);
+  }
+
   /* ---------- synth primitives ---------- */
+
+  /**
+   * Triangular-distributed jitter centered on 0 (two averaged draws land near
+   * the middle far more often than the edges, per standard game-audio
+   * humanization practice — a single uniform draw feels twitchier). Used to
+   * give repeated one-shots a few cents of natural detune instead of firing
+   * bit-identical oscillators on every repeat, which is what makes a rapid
+   * pickup streak read as a machine gun instead of a chime.
+   */
+  private humanize(spread: number): number {
+    return (Math.random() + Math.random() - 1) * spread;
+  }
 
   private tone(freq: number, dur: number, type: OscillatorType, gain: number, slideTo?: number): void {
     if (!this.ctx || !this.sfxBus || !this.reverbSend || this.muted || this.sfxVol <= 0 || this.adMuted || this.hiddenMuted || this.portalMuted || !this.started) return;
@@ -641,8 +808,9 @@ export class GameAudio {
     this.activeOneShots++;
     const t = this.ctx.currentTime;
     const g = this.ctx.createGain();
-    // Click-free envelope: a ~5 ms rise, then exponential decay.
-    const effGain = Math.max(0.0001, gain * this.sfxVol * 0.78);
+    // Click-free envelope: a ~5 ms rise, then exponential decay. A touch of
+    // gain humanization (±6%) alongside the detune above — same rationale.
+    const effGain = Math.max(0.0001, gain * this.sfxVol * 0.78 * (1 + this.humanize(0.06)));
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(effGain, t + 0.005);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
@@ -657,7 +825,10 @@ export class GameAudio {
     const voice = (detune: number, vol: number): void => {
       const o = this.ctx!.createOscillator();
       o.type = type;
-      o.detune.value = detune;
+      // A few cents of humanized detune on top of the chorus offset — see
+      // `humanize()` — so the same cue fired twice in a row isn't bit-for-bit
+      // identical. Imperceptible as mistuning, audible as "not a loop".
+      o.detune.value = detune + this.humanize(5);
       const vg = this.ctx!.createGain();
       vg.gain.value = vol;
       o.frequency.setValueAtTime(freq, t);
@@ -699,10 +870,12 @@ export class GameAudio {
     src.buffer = buffer;
     const filter = this.ctx.createBiquadFilter();
     filter.type = "lowpass";
-    filter.frequency.value = freq;
+    // Same humanization as tone(): a few percent of filter/gain jitter keeps
+    // repeated bursts (coin lands, wing flaps) from sounding stamped-out.
+    filter.frequency.value = freq * (1 + this.humanize(0.05));
     const g = this.ctx.createGain();
     const t = this.ctx.currentTime;
-    const effGain = Math.max(0.0001, gain * this.sfxVol * 0.72);
+    const effGain = Math.max(0.0001, gain * this.sfxVol * 0.72 * (1 + this.humanize(0.06)));
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(effGain, t + 0.004);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
@@ -717,6 +890,57 @@ export class GameAudio {
       g.disconnect();
       this.activeOneShots = Math.max(0, this.activeOneShots - 1);
     });
+  }
+
+  /**
+   * A real glockenspiel bell strike for one-shot stingers (trophy, personal
+   * best): additive synthesis over the same inharmonic bar-partial ratio set
+   * (`GLOCK_PARTIALS`) the music engine's lead voice uses, instead of one more
+   * plain oscillator tone. `decayScale` shrinks the partials' natural ring
+   * (1.9s at 1.0) to a one-shot-appropriate length.
+   */
+  private bell(freq: number, gain: number, decayScale = 1): void {
+    if (!this.ctx || !this.sfxBus || !this.reverbSend || this.muted || this.sfxVol <= 0 || this.adMuted || this.hiddenMuted || this.portalMuted || !this.started) return;
+    if (this.activeOneShots >= this.maxOneShots) return;
+    this.activeOneShots++;
+    const t = this.ctx.currentTime;
+    const out = this.ctx.createGain();
+    out.gain.value = 1;
+    out.connect(this.sfxBus);
+    const send = this.ctx.createGain();
+    send.gain.value = 0.4;
+    out.connect(send);
+    send.connect(this.reverbSend);
+
+    const peak = gain * this.sfxVol;
+    let ended = 0;
+    for (const p of GLOCK_PARTIALS) {
+      const o = this.ctx.createOscillator();
+      const og = this.ctx.createGain();
+      o.type = "sine";
+      o.frequency.value = freq * p.ratio;
+      o.detune.value = this.humanize(4);
+      const decay = Math.max(0.05, p.decay * decayScale);
+      const amp = Math.max(0.0001, peak * p.amp);
+      og.gain.setValueAtTime(0.0001, t);
+      og.gain.exponentialRampToValueAtTime(amp, t + 0.0025);
+      og.gain.exponentialRampToValueAtTime(amp * 0.35, t + decay * 0.35);
+      og.gain.exponentialRampToValueAtTime(0.0001, t + decay);
+      o.connect(og);
+      og.connect(out);
+      o.start(t);
+      o.stop(t + decay + 0.05);
+      o.addEventListener("ended", () => {
+        o.disconnect();
+        og.disconnect();
+        ended++;
+        if (ended === GLOCK_PARTIALS.length) {
+          out.disconnect();
+          send.disconnect();
+          this.activeOneShots = Math.max(0, this.activeOneShots - 1);
+        }
+      });
+    }
   }
 
   private makeImpulse(seconds: number, decay: number): AudioBuffer {

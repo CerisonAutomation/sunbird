@@ -1,12 +1,35 @@
 import { expect, type Page } from "@playwright/test";
 
+/**
+ * Browser noise the HARNESS creates, not the game. Two known sources:
+ *
+ *  • The specs serve the artifact from a minimal static http server, so
+ *    anything the game POSTs (the telemetry beacon) has no handler and the
+ *    server answers 400. On a real host the portal builds blank the endpoint,
+ *    and the guard means the request never fires.
+ *  • A plain-http origin is not "trustworthy", so Chromium announces that it
+ *    ignored the COOP header. Deployments serve https.
+ *
+ * Uncaught page errors are NOT filtered: a real game exception still fails the
+ * suite, so this cannot hide a defect behind harness noise.
+ */
+const HARNESS_NOISE = [
+  /the server responded with a status of 400/,
+  /Cross-Origin-Opener-Policy header has been ignored/,
+];
+const isHarnessNoise = (text: string): boolean => HARNESS_NOISE.some((re) => re.test(text));
+
 /** Page Object Model: shared selectors and player actions, not duplicated sleeps. */
 export class SunbirdPage {
   readonly errors: string[] = [];
   readonly requests: string[] = [];
   constructor(readonly page: Page) {
     page.on("pageerror", error => this.errors.push(error.message));
-    page.on("console", message => { if (message.type() === "error") this.errors.push(message.text()); });
+    page.on("console", message => {
+      if (message.type() !== "error") return;
+      const text = message.text();
+      if (!isHarnessNoise(text)) this.errors.push(text);
+    });
     page.on("request", request => this.requests.push(request.url()));
   }
   async open(): Promise<void> { await this.page.goto("/", { waitUntil: "commit" }); }
@@ -43,6 +66,51 @@ export class SunbirdPage {
   async backHome(): Promise<void> {
     await this.page.locator('[data-ref="menuCard"] [data-action="back"]').click();
     await this.ready();
+  }
+  /**
+   * Wait until the HUD's lane geometry is STABLE, not merely published once.
+   *
+   * `--hud-header-height` drives where the foreground band is clamped, and the
+   * value is measured from the live header. The header grows asynchronously —
+   * the versus roster fills in after the screen is already up — so a single
+   * "does the published value match right now?" check can pass in the gap
+   * between the header growing and the ResizeObserver republishing. Reading the
+   * boxes in that gap reports the band sitting inside the header, which the
+   * settled layout never does.
+   *
+   * So: require the measured header/footer offsets to be identical across three
+   * consecutive frames AND equal to the published variables. That is the
+   * steady state, which is what the overlap contract is about. The throw is
+   * loud if the lanes genuinely never stabilise.
+   */
+  async awaitSettledLanes(scope = ".hud-root"): Promise<void> {
+    await this.page.locator(scope).evaluate(async root => {
+      const hud = root.querySelector<HTMLElement>(".play-hud")!;
+      const header = root.querySelector<HTMLElement>(".hud-header")!;
+      const footer = root.querySelector<HTMLElement>(".flight-footer")!;
+      const read = () => {
+        const hudRect = hud.getBoundingClientRect();
+        return {
+          header: header.getBoundingClientRect().bottom - hudRect.top,
+          footer: hudRect.bottom - footer.getBoundingClientRect().top,
+          publishedHeader: parseFloat(getComputedStyle(root as HTMLElement).getPropertyValue("--hud-header-height")),
+          publishedFooter: parseFloat(getComputedStyle(root as HTMLElement).getPropertyValue("--hud-footer-height")),
+        };
+      };
+      const same = (a: number, b: number) => Math.abs(a - b) <= 1;
+      let previous: ReturnType<typeof read> | null = null;
+      let stableFrames = 0;
+      for (let frame = 0; frame < 240; frame++) {
+        const measured = read();
+        const publishMatches = same(measured.header, measured.publishedHeader) && same(measured.footer, measured.publishedFooter);
+        const unchanged = previous !== null && same(measured.header, previous.header) && same(measured.footer, previous.footer);
+        stableFrames = publishMatches && unchanged ? stableFrames + 1 : 0;
+        if (stableFrames >= 3) return;
+        previous = measured;
+        await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      }
+      throw new Error("HUD lane heights never settled — the band clamp cannot be measured");
+    });
   }
   async expectMenuFits(): Promise<void> {
     const result = await this.page.locator('[data-ref="menuCard"]').evaluate(card => {

@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import type { Server } from "node:http";
-import { SUPPORTED_LOCALES, type SupportedLocale } from "../src/i18n";
+import { SUPPORTED_LOCALES, type SupportedLocale } from "../src/i18n/locales";
 import {
   FREEZE, boot, goHome, openScreen,
   startArtifactServer, stopArtifactServer, visualDefects,

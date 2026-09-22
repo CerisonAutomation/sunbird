@@ -50,6 +50,23 @@ describe("readable HUD feedback", () => {
     expect(disconnect).toHaveBeenCalledOnce();
   });
 
+  it("draws the flight coin counter with the same glyph as the menus", () => {
+    const { hud, root } = fixture();
+    const coin = root.querySelector<HTMLElement>(".play-hud .stat-value.coin");
+    expect(coin).not.toBeNull();
+    // The shared inline SVG. This counter used to be drawn by a ::before
+    // radial-gradient dot in index.css, which made it the one coin in the game
+    // rendered with different art from every menu price and reward pill.
+    expect(coin!.querySelector("svg.coin-glyph")).not.toBeNull();
+    // The amount is its own node, so a per-frame text update cannot wipe the
+    // glyph and the layout fixture can replace the number alone.
+    const amount = coin!.querySelector<HTMLElement>('[data-ref="coins"]');
+    expect(amount).not.toBeNull();
+    expect(amount!.tagName).toBe("SPAN");
+    expect(amount!.textContent).toBe("0");
+    hud.dispose();
+  });
+
   it("bounds notifications, deduplicates without layout reads and cancels disposal timers", () => {
     vi.useFakeTimers();
     const { hud, root } = fixture();

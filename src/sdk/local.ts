@@ -3,7 +3,7 @@
  * matters: cloud saves persist to localStorage (the "local fallback" the
  * save pipeline requires) and share() uses the Web Share API when present.
  *
- * Serves: local dev ("none"), generic portal builds ("generic"), and portal
+ * Serves: local dev and the direct/web build ("none"), and a portal
  * builds that boot outside their portal (CrazyGames environment "disabled").
  */
 import type {
@@ -88,10 +88,10 @@ const EMPTY_INFO: PlatformSystemInfo = {
 };
 
 export class LocalAdapter implements PlatformAdapter {
-  readonly name: "none" | "generic";
+  readonly name: "none";
   readonly ready = true;
 
-  constructor(kind: "none" | "generic" = "none") {
+  constructor(kind: "none" = "none") {
     this.name = kind;
   }
 
@@ -110,7 +110,7 @@ export class LocalAdapter implements PlatformAdapter {
   gameplayStart(): void {}
   gameplayStop(): void {}
   pause(): void {}
-  happytime(): void {}
+  happyTime(): void {}
 
   /* ads — none */
   async commercialBreak(): Promise<void> {}

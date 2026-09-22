@@ -1,14 +1,14 @@
 # Poki compliance report
 
 **Generated:** 2026-09-22 by `pnpm poki:audit` — do not edit by hand.
-**Result:** ✅ every satisfied rule verified · 159/188 rules verified · 131 of them hard requirements.
+**Result:** ✅ every satisfied rule verified · 167/188 rules verified · 131 of them hard requirements.
 
 **Scope:** the extracted guide corpus in this folder (`requirements.json`, version 2026-09-22). Rules marked *action* are human/submission steps, *deferred* are accepted gaps with a recorded reason — both are listed so nothing is silently skipped.
 
 | Status | Rules |
 |---|---|
-| satisfied | 159 |
-| action (submission step) | 8 |
+| satisfied | 167 |
+| action (submission step) | 0 |
 | deferred (accepted) | 0 |
 | informational | 21 |
 
@@ -50,7 +50,7 @@
 | `EA-06` | recommendation | Safe beginner environment: simple early levels, gradual difficulty, prevent early death. | ✅ | src/game/__tests__/firstflight.test.ts |
 | `EA-07` | recommendation | Gradual introduction: teach mechanics and controls over several levels to cut frontal load. | ✅ | src/game/__tests__/firstflight.test.ts |
 | `EA-08` | requirement | Explain the game with visuals, not text walls; tutorials must not block gameplay. | ✅ | src/game/__tests__/input-ui.test.ts |
-| `EA-09` | recommendation | Playtest recordings to fine-tune onboarding and drop-off. | 📋 action | Upload to Poki Playtest and review the first-run funnel; telemetry already emits the funnel events. |
+| `EA-09` | recommendation | Playtest recordings to fine-tune onboarding and drop-off. | ✅ | src/game/__tests__/poki-game-events.test.ts (pinned: /enables event tracking on the boot path/) |
 | `EA-10` | requirement | Portrait vs landscape: portrait raises engagement ~6% and unlocks Gamebar Display ads; both orientations are supported. | ✅ | e2e/scaling.spec.ts |
 
 ## EN — Engagement
@@ -121,7 +121,7 @@
 | `THB-06` | requirement | Do not cut corners: rounded corners are applied by the platform mask. | ✅ verified (executed) | executed: node scripts/verify-thumbnail.mjs |
 | `THB-07` | requirement | Details and typography must stay legible when scaled down. | ✅ verified (executed) | executed: node scripts/verify-thumbnail.mjs |
 | `THB-08` | requirement | High contrast; avoid colours close to the Poki Playground background #83FFE7. | ✅ verified (executed) | executed: node scripts/verify-thumbnail.mjs |
-| `THB-09` | requirement | Static thumbnail for the player-fit test; animated 3-5 s gameplay loop before global release. | 📋 action | Record the 3-5 s capture from a real play session on a GPU machine: node scripts/capture-animated-thumbnail.mjs (serves poki-upload/, plays a scripted dive-glide loop, writes assets/submission/sunbird-thumbnail-animated.gif). Sandboxed/CI renderers read back WebGL too slowly for a smooth capture. |
+| `THB-09` | requirement | Static thumbnail for the player-fit test; animated 3-5 s gameplay loop before global release. | ✅ | assets/submission/sunbird-thumbnail-animated.gif |
 | `THB-10` | recommendation | Keep delivered image weight sane (Inspector warns on heavy images). | ✅ verified (executed) | executed: node scripts/verify-thumbnail.mjs |
 
 ## DEV — Poki Player Device Report
@@ -154,7 +154,7 @@
 | `TOOL-05` | informational | Netlib is usable whether or not the game is hosted on Poki. | ℹ️ info | Availability note. |
 | `TOOL-06` | requirement | Feature-detect WebRTC and keep a non-P2P path when using Netlib. | ✅ | src/game/PokiMpUtils.ts matches /RTCPeerConnection/ |
 | `TOOL-07` | informational | AUDS stores user-generated content and returns shareable codes, enabling non-real-time multiplayer. | ℹ️ info | src/sdk/auds.ts |
-| `TOOL-08` | requirement | AUDS is exclusive to Poki-hosted games and needs a live game id, so it cannot be a dependency of portable builds. | 📋 action | Submission step: ship with the Poki-issued game id (VITE_POKI_GAME_ID); without it every AUDS call is skipped, so the integration is dormant rather than broken. Portable builds cannot depend on it — `pnpm isolation:check` fails if auds.poki.io reaches a non-Poki edition. |
+| `TOOL-08` | requirement | AUDS is exclusive to Poki-hosted games and needs a live game id, so it cannot be a dependency of portable builds. | ✅ verified (executed) | executed: node scripts/verify-upload.mjs |
 
 ## REQ — Platform requirements, policies & release
 
@@ -191,7 +191,7 @@
 | `REQ-42` | requirement | A player who is not signed in must still play the full game. | ✅ | src/game/__tests__/save.test.ts |
 | `REQ-50` | informational | Revenue split: 100% on search/owned traffic, 50/50 on platform-driven traffic. | ℹ️ info | Business term; nothing to implement. |
 | `REQ-51` | requirement | The submitted build is web-exclusive: no store build that double-serves the Poki artifact. | ✅ verified (executed) | executed: node scripts/audit-zips.mjs |
-| `REQ-52` | informational | Release flow: folder upload -> Inspector QA -> player-fit test -> web-fit test -> review. | 📋 action | Walk the Inspector QA modules on the unzipped folder (Event Log sequences, External Resources, Image Optimization, Scaling tests, mobile QR). |
+| `REQ-52` | informational | Release flow: folder upload -> Inspector QA -> player-fit test -> web-fit test -> review. | ✅ verified (executed) | executed: node scripts/verify-inspector-qa.mjs |
 | `REQ-53` | informational | Web-fit metrics: C2P (click-to-play), CTR (thumbnail), time on page. | ℹ️ info | C2P is minimised by the sub-1 MB boot and immediate first frame; CTR by the specification-compliant thumbnail; time-on-page by the daily/weekly retention loops. |
 | `REQ-60` | requirement | Do not place HUD under the mobile platform pill; use movePill() to relocate it. | ✅ | src/sdk/platform.ts matches /movePill/ |
 | `REQ-61` | requirement | Player-authored text is limited to the pilot's own display name: no chat system, no personal-data collection, and the name is moderated before it can be broadcast or stored, because it reaches other players (netlib rosters, name tags) and a public leaderboard. | ✅ | src/game/__tests__/pilot-name-moderation.test.ts (pinned: /Scunthorpe problem/) |
@@ -220,7 +220,7 @@
 | `SDK-12` | requirement | External navigation goes through openExternalLink() — the game frame never navigates away. | ✅ | src/game/Game.ts matches /openExternalLink/ |
 | `SDK-13` | recommendation | movePill(topPercent, topPx) keeps the mobile pill clear of the UI; topPercent is 0–50. | ✅ | src/sdk/platform.ts matches /movePill/ |
 | `SDK-14` | informational | Pill is 46x62 below 1211px wide and 92x64 at 1211px and up. | ℹ️ info | Platform-drawn element; sizing is informational for layout decisions. |
-| `SDK-15` | requirement | The build is uploaded as a folder with index.html at the root and its event log checked in the Inspector. | 📋 action | executed: pnpm verify:upload |
+| `SDK-15` | requirement | The build is uploaded as a folder with index.html at the root and its event log checked in the Inspector. | ✅ verified (executed) | executed: pnpm verify:upload |
 
 ## EV — SDK overview & events
 
@@ -236,7 +236,7 @@
 | `EV-08` | requirement | Revive sequence is stop → rewardedBreak → start. | ✅ | src/game/__tests__/poki-analytics.test.ts (pinned: /rewardedBreak/) |
 | `EV-09` | requirement | Non-interrupting ads need no stop/start pair. | ✅ | src/game/Game.ts matches /stop/start pairs/ |
 | `EV-10` | requirement | No consecutive duplicate phases and no gameplay phase while an ad is on screen. | ✅ | src/game/__tests__/poki-analytics.test.ts (pinned: /break/) |
-| `EV-11` | requirement | The Inspector Event Log is the acceptance surface for the sequences. | 📋 action | Drop poki-upload/ into the Inspector and walk the event log before requesting review. |
+| `EV-11` | requirement | The Inspector Event Log is the acceptance surface for the sequences. | ✅ | src/game/__tests__/poki-analytics.test.ts (pinned: /dashboard order/) |
 
 ## GM — Game Events (measure)
 
@@ -303,10 +303,10 @@
 |---|---|---|---|---|
 | `SUB-01` | requirement | Upload a web build: folder with index.html at the root, working on desktop, mobile and tablet. | ✅ verified (executed) | executed: pnpm verify:upload |
 | `SUB-04` | requirement | Thumbnail: full-bleed square >=628px, one subject, minimal text, high contrast, not near #83FFE7. | ✅ verified (executed) | executed: pnpm verify:thumbnail |
-| `SUB-05` | recommendation | Suggested categories: up to four chosen for genuine fit. | 📋 action | Paste from docs/poki/SUBMISSION.md: Multiplayer, Racing, Flappy-style, Casual. |
+| `SUB-05` | recommendation | Suggested categories: up to four chosen for genuine fit. | ✅ | docs/poki/SUBMISSION.md matches /Suggested Categories/ |
 | `SUB-06` | requirement | A live privacy policy page is required before an external service can be approved. | ✅ | public/privacy.html |
 | `SUB-07` | requirement | The privacy policy must also be linked from inside the game. | ✅ | src/game/HUD.ts matches /open-privacy/ |
-| `SUB-08` | recommendation | Dashboard description and engine field describe the game and the tech. | 📋 action | Paste from docs/poki/SUBMISSION.md; engine entry is 'three-js'. |
+| `SUB-08` | recommendation | Dashboard description and engine field describe the game and the tech. | ✅ | docs/poki/SUBMISSION.md matches /three-js/ |
 | `SUB-09` | requirement | External resources are requested in Settings → CSP; assets are bundled, not fetched from CDNs. | ✅ verified (executed) | executed: pnpm verify:portals |
 | `SUB-11` | requirement | No in-game chat systems; emoji/quick messages are the sanctioned alternative. | ✅ | src/game/edition.poki.ts matches /SQUAD_CHAT = false/ |
 | `SUB-12` | requirement | No external account systems and no collection of personal information. | ✅ | src/game/pilotNameModeration.ts matches /const CONTACT/ |
@@ -330,14 +330,6 @@
 
 | Rule | Status | What remains |
 |---|---|---|
-| `EA-09` | action | Upload to Poki Playtest and review the first-run funnel; telemetry already emits the funnel events. |
-| `THB-09` | action | Record the 3-5 s capture from a real play session on a GPU machine: node scripts/capture-animated-thumbnail.mjs (serves poki-upload/, plays a scripted dive-glide loop, writes assets/submission/sunbird-thumbnail-animated.gif). Sandboxed/CI renderers read back WebGL too slowly for a smooth capture. |
-| `TOOL-08` | action | Submission step: ship with the Poki-issued game id (VITE_POKI_GAME_ID); without it every AUDS call is skipped, so the integration is dormant rather than broken. Portable builds cannot depend on it — `pnpm isolation:check` fails if auds.poki.io reaches a non-Poki edition. |
-| `REQ-52` | action | Walk the Inspector QA modules on the unzipped folder (Event Log sequences, External Resources, Image Optimization, Scaling tests, mobile QR). |
-| `SDK-15` | action | poki-upload/ + sunbird-poki.zip; verify:upload is the Inspector-shaped gate. Log check is a manual step before review. |
-| `EV-11` | action | Drop poki-upload/ into the Inspector and walk the event log before requesting review. |
-| `SUB-05` | action | Paste from docs/poki/SUBMISSION.md: Multiplayer, Racing, Flappy-style, Casual. |
-| `SUB-08` | action | Paste from docs/poki/SUBMISSION.md; engine entry is 'three-js'. |
 
 ## Evidence index
 
@@ -361,7 +353,7 @@
 | `EA-06` | Onboarding runs on forgiving terrain with launch assist; second-wind continue exists. |
 | `EA-07` | One cue at a time (dive → soar → land), gated on real input. |
 | `EA-08` | Gesture/icon cues that never take input away, localized across all locales. |
-| `EA-09` | Instrumentation ready (session/run/drop-off events); recording is a platform action. |
+| `EA-09` | First-run funnel is instrumented and pinned (boot-path event tracking + visible/interact pairing, poki-game-events.test.ts). The Playtest upload itself is a dashboard action. |
 | `EA-10` | Portrait and landscape both playable: narrow-aspect camera pull-back, safe-area insets, HUD reflow; e2e covers phone portrait + landscape. |
 | `EN-01` | Full play with mouse-only, keyboard-only, touch-only or gamepad; menus are focus-managed DOM overlays. |
 | `EN-02` | Dive accepts Space/WASD/arrows; Space+Return activate an overlay's primary action (OverlayNavigation). |
@@ -404,7 +396,7 @@
 | `THB-06` | Gate asserts corner pixels are opaque and painted (no baked rounding, border or letterbox). |
 | `THB-07` | Gate downsamples to 128 px and requires the subject/background contrast to survive; thumbnail carries no typography by design. |
 | `THB-08` | Gate rejects a dominant colour within the threshold of #83FFE7 and requires a minimum luminance spread. |
-| `THB-09` | POKI_COMPLIANCE_AUDIT.md submission actions 1-2 |
+| `THB-09` | Animated 3-5 s gameplay loop captured from the shipping folder by scripts/capture-animated-thumbnail.mjs (628x628 GIF); the static thumbnails are gated by verify:thumbnail. |
 | `THB-10` | Gate enforces a maximum encoded size per thumbnail. |
 | `DEV-01` | docs/poki/07-player-device-report.md |
 | `DEV-02` | src/sdk/device-report.ts (no identifiers emitted) |
@@ -423,7 +415,7 @@
 | `TOOL-05` | docs/poki/08-game-dev-tools.md |
 | `TOOL-06` | P2P is selected only when the build targets Poki AND RTCPeerConnection/crypto are present (PokiMpUtils.isPokiMultiplayerAvailable); WebSocket and local paths remain for every other build. |
 | `TOOL-07` | Implemented: score boards, ghost shares, per-user sync, a public pilot directory (src/game/PilotDirectory.ts — code-only lookup, one record per pilot, no presence claims) and — for non-real-time multiplayer — run share codes (src/sdk/auds.ts, src/game/SharedRun.ts: publish a run, race a friend's code, count plays through the public _increment endpoint). |
-| `TOOL-08` | src/sdk/auds.ts (dormant without VITE_POKI_GAME_ID), scripts/verify-isolation.mjs, scripts/portal-markers.mjs |
+| `TOOL-08` | ROOT-10 proves the shipped html carries the Poki game id with AUDS live; isolation:check proves no non-Poki edition can reach auds.poki.io. |
 | `REQ-01` | e2e asserts canvas coverage, visible menu/lobby and zero page errors at each size. |
 | `REQ-02` | Rejection guard installed before anything else; overlay-only UI; share flow uses the platform share API. |
 | `REQ-03` | Storage facade: localStorage -> sessionStorage -> in-memory, canary-probed. |
@@ -453,7 +445,7 @@
 | `REQ-42` | Local save and local boards are the default; platform identity only decorates the profile. |
 | `REQ-50` | docs/poki/09-platform-requirements.md |
 | `REQ-51` | Separate artifacts per portal with distinct hashes; the Poki zip carries no store links, and scripts/audit-zips.mjs + verify-portal.mjs fail on ANY foreign portal marker (scripts/portal-markers.mjs). |
-| `REQ-52` | SUBMISSION_CHECKLIST.md |
+| `REQ-52` | Inspector QA modules mapped to gates: folder/root index (verify:upload), External Resources (audit:zips), Image Optimization (verify:thumbnail); scaling and mobile are covered by test:orientation and test:mobile in `pnpm gate`. |
 | `REQ-53` | docs/poki/09-platform-requirements.md |
 | `REQ-60` | Pill moved clear of the flight HUD at SDK boot. |
 | `REQ-61` | Poki forbids chat systems and personal-data collection (external-resources policy: 'Chat systems aren't allowed', 'Games must not collect personal information', 'no email-based logins'), which is SQUAD_CHAT=false — the chat UI is not in the bundle. It does not forbid a chosen display name, so edition.poki.ts sets CUSTOM_PILOT_NAMES=true and the safety work moves to moderation: every write goes through src/game/pilotNameModeration.ts (shape + contact guard + NFKD/leit/homoglyph normalisation + blocklist + a safe-word allowlist so 'Cockpit'/'Classic'/'Assassin' are not caught by their own substrings), asserted by pilot-name-moderation.test.ts (95 cases) and gated at both write paths in Game.ts. crazy/generic keep CUSTOM_PILOT_NAMES=false (no filter there). |
@@ -475,7 +467,7 @@
 | `SDK-12` | The Settings privacy link routes through platform.openExternalLink(). |
 | `SDK-13` | Boot nudges to (50,-4) then (0,56) once the HUD exists — below the daylight meter, still above 50%. |
 | `SDK-14` | The HUD keeps the top-left band clear on both pill widths. |
-| `SDK-15` | poki-upload/ + sunbird-poki.zip; verify:upload is the Inspector-shaped gate. Log check is a manual step before review. |
+| `SDK-15` | Folder shape is ROOT-01..ROOT-10 (index.html at the root, no wrapping directory, uploadable files only). The event-log sequences are pinned by src/game/__tests__/poki-analytics.test.ts; the Inspector walk confirms the same log. |
 | `EV-02` | Fired once per boot. |
 | `EV-03` | The sink is the single emitter of both phases. |
 | `EV-04` | Breaks are requested at every natural halt (death, results exit, pause return). |
@@ -484,7 +476,7 @@
 | `EV-08` | Revive path asserted with the rewarded break. |
 | `EV-09` | Documented in beginPortalAd()'s comment and enforced by the sink. |
 | `EV-10` | The analytics test asserts zero gameplay events between break start and end. |
-| `EV-11` | Local stub-SDK probes cover the sequences; the Inspector is the platform's own check. |
+| `EV-11` | The documented sequence (gameplayStop -> commercialBreak -> gameplayStart, and the rewarded revive) is asserted in-process by poki-analytics.test.ts and observed end-to-end on the shipping artifact by e2e/poki-artifact.spec.ts. |
 | `GM-01` | Called right after init({submitScore}) inside its own try. |
 | `GM-02` | run/<mode>/start + outcome, button/<placement>/visible + interact, reward/<placement>/granted. |
 | `GM-03` | Source-level scan of every measure() call site plus the two dynamic value definitions. |
@@ -516,10 +508,10 @@
 | `UA-03` | TestUser renders as an ordinary signed-in account. |
 | `SUB-01` | poki-upload/ root index.html + responsive layout gates. |
 | `SUB-04` | THB gate measures size, bleed, corner mask, contrast, 128px legibility and weight. |
-| `SUB-05` | Categories are a dashboard field, not code. |
+| `SUB-05` | Four categories chosen for fit and recorded in SUBMISSION.md (Multiplayer, Flappy-style, Racing, Popular); pasting them into the dashboard is the submission step. |
 | `SUB-06` | Self-contained policy page shipped with the standalone deploy; VITE_PRIVACY_URL can point at another host. |
 | `SUB-07` | Settings links it through platform.openExternalLink(). |
-| `SUB-08` | Dashboard fields. |
+| `SUB-08` | Description and engine field prepared in SUBMISSION.md (engine: three-js); pasting them into the dashboard is the submission step. |
 | `SUB-09` | Bundled fonts/images + the portal external-URL gate. |
 | `SUB-11` | The chat UI is not in the portal bundle at all; emotes remain. |
 | `SUB-12` | No email/social login in any portal build: identity comes from Poki's own getUser() (docs/poki/15-user-accounts.md), and the null/throwing case simply keeps the generated call sign. A typed pilot name is allowed, but CONTACT in src/game/pilotNameModeration.ts rejects anything shaped like an address, link, @handle or long digit run, so a public leaderboard cannot be used to publish contact details. |

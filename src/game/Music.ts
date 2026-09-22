@@ -29,6 +29,16 @@ export type BiomeMusicStyle = "bright" | "warm" | "airy" | "wide" | "night" | "c
 type Voicing = number[];
 
 const BEAT_BPM = 132;
+/**
+ * How many times a section's 8-bar progression plays before the next section.
+ *
+ * At 132 BPM one pass is ~14.5s. Switching sections every pass meant a new tune
+ * every 14 seconds, so nothing ever settled — the ear read it as repetitive
+ * even though the underlying tracks are twenty distinct melodies. Three passes
+ * (~44s) lets a tune land, and `pass` drives the arrangement change below so a
+ * longer stay develops instead of looping.
+ */
+const PASSES_PER_SECTION = 3;
 const LOOKAHEAD = 0.16;
 const TICK_MS = 25;
 /** Hard ceiling on steps scheduled in one timer tick. */
@@ -46,11 +56,18 @@ const MAX_LAG = 0.28;
  * The old voice was a DX7-style FM bell (mod ratio 3.5, index 4.5) which is
  * where the harsh, gong-like edge came from.
  */
+/**
+ * Marimba/xylophone bar partials — Yoshi's Island warmth, not bell ringing.
+ * Short decays (0.45s fundamental vs 1.9s for a glock) give the bouncy
+ * "tok tok tok" of a wooden marimba instead of sustained metallic shimmer.
+ * The inharmonic ratio set stays (1 : 2.76 : 5.40 : 8.93) but everything
+ * dies much faster so notes pop and breathe instead of bleeding together.
+ */
 export const GLOCK_PARTIALS: { ratio: number; amp: number; decay: number }[] = [
-  { ratio: 1.0, amp: 1.0, decay: 1.9 },
-  { ratio: 2.756, amp: 0.42, decay: 0.9 },
-  { ratio: 5.404, amp: 0.17, decay: 0.42 },
-  { ratio: 8.933, amp: 0.07, decay: 0.22 },
+  { ratio: 1.0,   amp: 1.0,  decay: 0.45 },
+  { ratio: 2.756, amp: 0.30, decay: 0.20 },
+  { ratio: 5.404, amp: 0.10, decay: 0.10 },
+  { ratio: 8.933, amp: 0.03, decay: 0.05 },
 ];
 
 
@@ -89,7 +106,7 @@ const UKE: Record<string, Voicing> = {
 const BASS_ROOT: Record<string, number> = { C: 48, G: 43, Am: 45, F: 41, Em: 40, Dm: 38, Gm: 43 };
 
 const PROG_A = ["C", "G", "Am", "F", "C", "G", "F", "G"];
-// PROG_K: Zimmer-style cinematic minor. Am → F → C → G mirrors "Time" / Inception.
+// PROG_K: cinematic minor. Am → F → C → G — a slow-building, emotive climb.
 const PROG_K = ["Am", "F", "C", "G", "Am", "F", "C", "G"];
 const PROG_B = ["Am", "F", "C", "G", "Am", "F", "C", "G"];
 const PROG_C = ["F", "G", "Em", "Am", "F", "G", "C", "C"];
@@ -100,8 +117,8 @@ const PROG_G = ["C", "G", "Dm", "Am", "C", "G", "Dm", "Am"];
 const PROG_H = ["G", "C", "Am", "F", "G", "C", "Am", "F"];
 const PROG_I = ["F", "C", "Dm", "G", "F", "C", "Dm", "G"];
 const PROG_J = ["Am", "C", "G", "F", "Am", "C", "G", "F"];
-// PROG_TRON: Daft Punk / Tron Legacy dark electronic. Am → Dm → Gm → Em — all minor,
-// no major relief. Creates the claustrophobic Grid tension.
+// PROG_TRON: dark electronic. Am → Dm → Gm → Em — all minor,
+// no major relief. Creates a tense, circuit-board claustrophobia.
 const PROG_TRON = ["Am", "Dm", "Am", "Em", "Am", "Dm", "Gm", "Em"];
 
 /* Melodies: one entry per eighth note (0 = rest, -1 = hold previous).
@@ -174,7 +191,7 @@ const MEL_D = [
   86, -1, 84, 0, 79, -1, -1, 0,
 ];
 
-// Track 5 — The Grid: neon synth line. Punchy, on-the-grid, lifted ending.
+// Track 5 — Night Circuit: neon synth line. Punchy, on-the-grid, lifted ending.
 const MEL_E = [
   69, 0, 69, 0, 72, -1, 76, 0,
   74, 0, 74, 0, 77, -1, 81, 0,
@@ -246,7 +263,7 @@ const MEL_J = [
   81, -1, -1, 0, 77, -1, -1, 0,
 ];
 
-// Track 11 — Derezzed: neon riff with a real hook over the Grid progression.
+// Track 11 — Live Wire: neon riff with a real hook over the dark-electronic progression.
 const MEL_K = [
   69, 0, 72, 0, 69, 0, 72, 0,
   74, 0, 72, 0, 74, 0, 77, 0,
@@ -318,7 +335,7 @@ const MEL_P = [
   86, -1, 84, 0, 83, -1, -1, 0,
 ];
 
-// Track 17 — Inception Drop: hypnotic build that never sits still — rising pairs.
+// Track 17 — Skybound Rise: hypnotic build that never sits still — rising pairs.
 const MEL_Q = [
   69, -1, -1, 0, 72, 0, 76, -1,
   77, -1, -1, 0, 81, 0, 84, -1,
@@ -330,7 +347,7 @@ const MEL_Q = [
   83, -1, -1, -1, 0, 0, 0, 0,
 ];
 
-// Track 18 — Dunkirk Clock: ticking eighths with a tune inside the pulse.
+// Track 18 — Clockwork Wing: ticking eighths with a tune inside the pulse.
 const MEL_R = [
   81, 0, 81, 0, 84, 0, 81, 0,
   79, 0, 79, 0, 83, 0, 79, 0,
@@ -342,7 +359,7 @@ const MEL_R = [
   77, -1, -1, 0, 72, -1, -1, 0,
 ];
 
-// Track 19 — End of Line: anthemic Grid outro. Big, slow-blooming, heroic.
+// Track 19 — Last Light: anthemic outro. Big, slow-blooming, heroic.
 const MEL_S = [
   69, 0, 76, 0, 72, -1, 69, 0,
   74, 0, 77, 0, 81, -1, 77, 0,
@@ -354,7 +371,7 @@ const MEL_S = [
   71, -1, -1, 0, 67, -1, -1, 0,
 ];
 
-// Track 20 — Rinzler: the chase riff. Doubled sixteenths, no let-up.
+// Track 20 — Pursuit: the chase riff. Doubled sixteenths, no let-up.
 const MEL_T = [
   69, 69, 0, 72, 0, 69, 72, 0,
   74, 74, 0, 77, 0, 74, 77, 0,
@@ -528,36 +545,38 @@ const PROG_CHIP_7 = ["Am", "F", "C", "G", "Am", "F", "C", "G"]; // vi–IV–I�
  * cinematic originals follow unchanged.
  */
 export const TRACKS: Track[] = [
+  // ── ARCADE CHIP FAMILY ── bouncy, hook-first 8-bit-style bangers
   { name: "Flappy Rush",     prog: PROG_CHIP_1, mel: MEL_CHIP_1, mood: "bright", chip: true },
   { name: "Coin Pop",        prog: PROG_CHIP_2, mel: MEL_CHIP_2, mood: "bright", chip: true },
   { name: "Hyper Glide",     prog: PROG_CHIP_3, mel: MEL_CHIP_3, mood: "airy",   chip: true },
   { name: "Bouncy Bird",     prog: PROG_K,      mel: MEL_CHIP_4, mood: "warm",   chip: true },
   { name: "Sunset Sprint",   prog: PROG_CHIP_5, mel: MEL_CHIP_5, mood: "wide",   chip: true },
   { name: "Pixel Coast",     prog: PROG_CHIP_6, mel: MEL_CHIP_6, mood: "night",  chip: true },
-  { name: "Sugar Rush",      prog: PROG_CHIP_1, mel: MEL_CHIP_7,  mood: "bright", chip: true },
-  { name: "Neon Tail",       prog: PROG_CHIP_6, mel: MEL_CHIP_8,  mood: "night",  chip: true },
-  { name: "Turbo Finch",     prog: PROG_CHIP_5, mel: MEL_CHIP_9,  mood: "warm",   chip: true },
-  { name: "Moon Arcade",     prog: PROG_CHIP_7, mel: MEL_CHIP_10, mood: "ember",  chip: true },
+  { name: "Sugar Rush",      prog: PROG_CHIP_1, mel: MEL_CHIP_7, mood: "bright", chip: true },
+  { name: "Neon Tail",       prog: PROG_CHIP_6, mel: MEL_CHIP_8, mood: "night",  chip: true },
+  { name: "Turbo Finch",     prog: PROG_CHIP_5, mel: MEL_CHIP_9, mood: "warm",   chip: true },
+  { name: "Moon Arcade",     prog: PROG_CHIP_7, mel: MEL_CHIP_10,mood: "ember",  chip: true },
+  // ── ISLAND FOLK FAMILY ── ukulele, glockenspiel lead, whistle, upright bass
   { name: "Ascent",            prog: PROG_A, mel: MEL_A, mood: "bright"  },
   { name: "Voyage",            prog: PROG_B, mel: MEL_B, mood: "airy"    },
   { name: "Cathedral",         prog: PROG_C, mel: MEL_C, mood: "bright"  },
   { name: "Pendulum",          prog: PROG_D, mel: MEL_D, mood: "wide"    },
-  { name: "The Grid",          prog: PROG_TRON, mel: MEL_E, mood: "night" },
+  { name: "Night Circuit",     prog: PROG_TRON, mel: MEL_E, mood: "night" },
   { name: "Eventide",          prog: PROG_F, mel: MEL_F, mood: "night"   },
   { name: "Glass & Stars",     prog: PROG_G, mel: MEL_G, mood: "crystal" },
   { name: "Trade Winds",       prog: PROG_H, mel: MEL_H, mood: "wide"    },
   { name: "Golden Hour",       prog: PROG_I, mel: MEL_I, mood: "warm"    },
   { name: "Starfall",          prog: PROG_J, mel: MEL_J, mood: "night"   },
-  { name: "Derezzed",          prog: PROG_TRON, mel: MEL_K, mood: "ember" },
+  { name: "Live Wire",         prog: PROG_TRON, mel: MEL_K, mood: "ember" },
   { name: "Magma",             prog: PROG_F, mel: MEL_L, mood: "ember"   },
   { name: "Mesa",              prog: PROG_I, mel: MEL_M, mood: "canyon"  },
   { name: "Time's Light",      prog: PROG_K, mel: MEL_N, mood: "wide"    },
   { name: "Horizon Chase",     prog: PROG_H, mel: MEL_O, mood: "bright"  },
   { name: "Fever Dream",       prog: PROG_E, mel: MEL_P, mood: "reef"    },
-  { name: "Inception Drop",    prog: PROG_K, mel: MEL_Q, mood: "night"   },
-  { name: "Dunkirk Clock",     prog: PROG_J, mel: MEL_R, mood: "ember"   },
-  { name: "End of Line",       prog: PROG_TRON, mel: MEL_S, mood: "night" },
-  { name: "Rinzler",           prog: PROG_TRON, mel: MEL_T, mood: "ember" },
+  { name: "Skybound Rise",     prog: PROG_K, mel: MEL_Q, mood: "night"   },
+  { name: "Clockwork Wing",    prog: PROG_J, mel: MEL_R, mood: "ember"   },
+  { name: "Last Light",        prog: PROG_TRON, mel: MEL_S, mood: "night" },
+  { name: "Pursuit",           prog: PROG_TRON, mel: MEL_T, mood: "ember" },
 ];
 
 /** Track titles for the settings picker — keep in lockstep with TRACKS. */
@@ -575,23 +594,23 @@ export const BIOME_MIX: Record<BiomeMusicStyle, { bpm: number; fever: number; cu
   // on the darker biomes (night/crystal/reef were 1.6–1.68) made exactly those
   // tracks read as glockenspiel solos — the score that "sometimes" sounded
   // wrong. Keep every row ≤ 1.
-  bright:  { bpm: 132, fever: 150, cutoff: 10200, uke: 0.86, glock: 0.82, bass: 0.96, perc: 1.02, whistle: 0.92, transpose: 0  },
-  warm:    { bpm: 126, fever: 146, cutoff: 8400,  uke: 1.02, glock: 0.72, bass: 1.04, perc: 1,    whistle: 0.82, transpose: -2 },
-  airy:    { bpm: 134, fever: 152, cutoff: 11000, uke: 0.76, glock: 0.88, bass: 0.86, perc: 1.18, whistle: 0.98, transpose: 2  },
-  wide:    { bpm: 128, fever: 148, cutoff: 9200,  uke: 0.76, glock: 0.78, bass: 1.14, perc: 1,    whistle: 1.0,  transpose: -3 },
-  night:   { bpm: 124, fever: 144, cutoff: 7400,  uke: 0.6,  glock: 0.6,  bass: 0.78, perc: 0.86, whistle: 0.78, transpose: -3 },
-  crystal: { bpm: 132, fever: 150, cutoff: 11600, uke: 0.7,  glock: 0.8,  bass: 0.88, perc: 1.06, whistle: 1.1,  transpose: 3  },
-  // Coral Reach: flowing, liquid — open high end, still a shimmer underneath.
-  reef:    { bpm: 136, fever: 154, cutoff: 12000, uke: 0.72, glock: 0.8,  bass: 0.82, perc: 0.92, whistle: 1.02, transpose: 3  },
-  // Cinder Forge: driving, volcanic — heavy bass, but the melody stays awake
-  ember:   { bpm: 124, fever: 142, cutoff: 6600,  uke: 0.64, glock: 1.32, bass: 1.24, perc: 1.14, whistle: 0.62, transpose: -4 },
-  // Skyreach Canyon: wide and open — full band, big dynamics
-  canyon:  { bpm: 130, fever: 148, cutoff: 9400,  uke: 0.72, glock: 1.26, bass: 1.14, perc: 1,    whistle: 1.02, transpose: -2 },
+  // Dreamy, open, magical — slower base tempos let the ocarina breathe.
+  // Fever still surges hard; the contrast is what makes it feel like a
+  // transformation instead of just a tempo bump.
+  bright:  { bpm: 130, fever: 158, cutoff: 5500,  uke: 0.88, glock: 0.60, bass: 0.92, perc: 0.96, whistle: 1.00, transpose: 0  },
+  warm:    { bpm: 124, fever: 150, cutoff: 4500,  uke: 1.04, glock: 0.52, bass: 1.00, perc: 0.92, whistle: 0.90, transpose: -2 },
+  airy:    { bpm: 132, fever: 160, cutoff: 6000,  uke: 0.72, glock: 0.62, bass: 0.80, perc: 1.06, whistle: 1.08, transpose: 2  },
+  wide:    { bpm: 126, fever: 154, cutoff: 5000,  uke: 0.78, glock: 0.54, bass: 1.10, perc: 0.94, whistle: 1.06, transpose: -3 },
+  night:   { bpm: 118, fever: 144, cutoff: 4000,  uke: 0.56, glock: 0.44, bass: 0.74, perc: 0.80, whistle: 0.88, transpose: -3 },
+  crystal: { bpm: 130, fever: 158, cutoff: 6000,  uke: 0.66, glock: 0.58, bass: 0.84, perc: 0.98, whistle: 1.18, transpose: 3  },
+  reef:    { bpm: 132, fever: 160, cutoff: 6500,  uke: 0.70, glock: 0.58, bass: 0.78, perc: 0.88, whistle: 1.10, transpose: 3  },
+  ember:   { bpm: 122, fever: 148, cutoff: 4000,  uke: 0.62, glock: 0.62, bass: 1.20, perc: 1.08, whistle: 0.88, transpose: -4 },
+  canyon:  { bpm: 128, fever: 156, cutoff: 5000,  uke: 0.70, glock: 0.64, bass: 1.10, perc: 0.96, whistle: 1.08, transpose: -2 },
 };
 
 /** Keep every biome/night combination inside WebAudio's usable filter range. */
-export function musicCutoff(base: number, night: number, intensity: number, sampleRate = 44100): number {
-  return Math.max(700, Math.min(sampleRate * 0.45, base - night * 4200 + intensity * 2400));
+export function musicCutoff(base: number, night: number, intensity: number): number {
+  return Math.max(500, Math.min(8000, base - night * 3000 + intensity * 1200));
 }
 
 function mtof(m: number): number {
@@ -605,6 +624,10 @@ export class Music {
   private nextTime = 0;
   private step = 0;
   private bar = 0;
+  /** Which pass through the current section's progression this is (0-based, up
+   *  to PASSES_PER_SECTION). Drives the arrangement variation so a longer stay
+   *  develops rather than repeating. */
+  private pass = 0;
   private section = 0;
   /** Which tracks to play: "shuffle" cycles all ten in random order, or a
    *  number pins one track. Mirrors the persisted settings value. */
@@ -617,13 +640,16 @@ export class Music {
   private night = 0;
   private biome: BiomeMusicStyle = "bright";
   private transpose = 0;
-  private lastCutoff = 9000;
+  private lastCutoff = 5000;
   /** 0..1 — continuous intensity (speed / altitude / fever / danger / combos). */
   private intensity = 0;
   private intensityTarget = 0;
 
   private readonly bus: GainNode;
   private readonly filter: BiquadFilterNode;
+  private readonly saturate: WaveShaperNode;
+  private readonly hissGain: GainNode;
+  private readonly hissFilter: BiquadFilterNode;
   private readonly duckGain: GainNode;
   private readonly wetGain: GainNode;
   private readonly ukeGain: GainNode;
@@ -641,6 +667,7 @@ export class Music {
   /** Glock shimmer / sparkle bus: octave doubling and closing runs. */
   private readonly sparkGain: GainNode;
   private readonly noise: AudioBuffer;
+  private hissSource: AudioBufferSourceNode | null = null;
   private lullabyStep = 0;
   /** Last generated counter-melody note, for stepwise voice leading. */
   private counterNote = 0;
@@ -667,10 +694,19 @@ export class Music {
     this.filter.type = "lowpass";
     this.filter.frequency.value = 9000;
     this.filter.Q.value = 0.4;
+    this.saturate = ctx.createWaveShaper();
+    const tapeCurve = new Float32Array(44100);
+    for (let i = 0; i < 44100; i++) {
+      const x = (i * 2) / 44100 - 1;
+      tapeCurve[i] = Math.tanh(x * 3) / Math.tanh(3);
+    }
+    this.saturate.curve = tapeCurve;
+    this.saturate.oversample = "4x";
     this.duckGain = ctx.createGain();
     this.duckGain.gain.value = 1;
     this.bus.connect(this.filter);
-    this.filter.connect(comp);
+    this.filter.connect(this.saturate);
+    this.saturate.connect(comp);
     comp.connect(this.duckGain);
     this.duckGain.connect(destination);
     // Post-fader send: music volume, mode and event ducking control the wet
@@ -687,7 +723,7 @@ export class Music {
       return g;
     };
     this.ukeGain = mk(0.30);
-    this.glockGain = mk(0.38);
+    this.glockGain = mk(0.06);
     this.bassGain = mk(0.44);
     this.percGain = mk(0);
     this.whistleGain = mk(0);
@@ -704,6 +740,20 @@ export class Music {
     this.noise = ctx.createBuffer(1, len, ctx.sampleRate);
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+
+    this.hissFilter = ctx.createBiquadFilter();
+    this.hissFilter.type = "highpass";
+    this.hissFilter.frequency.value = 7000;
+    this.hissGain = ctx.createGain();
+    this.hissGain.gain.value = 0.003;
+    const hiss = ctx.createBufferSource();
+    hiss.buffer = this.noise;
+    hiss.loop = true;
+    hiss.connect(this.hissFilter);
+    this.hissFilter.connect(this.hissGain);
+    this.hissGain.connect(this.bus);
+    hiss.start(0);
+    this.hissSource = hiss;
 
     this.buildOrder();
     this.section = this.order[0] ?? 0;
@@ -733,7 +783,7 @@ export class Music {
     // Arcade tracks hold their own tempo floor; intensity adds the same 10%
     // surge on top for island tracks.
     const baseBpm = this.isChipTrack
-      ? (this.mode === "fever" ? 184 : 164)
+      ? (this.mode === "fever" ? 196 : 176)
       : (this.mode === "fever" ? style.fever : style.bpm);
     this.bpm = Math.round(baseBpm * (1 + t * 0.10));
     this.tensionGain.gain.setTargetAtTime(t * 0.24 * style.perc, now, t > this.intensity ? 0.1 : 0.4);
@@ -783,7 +833,7 @@ export class Music {
   }
 
   private recomputeCutoff(ramp: number): void {
-    const cutoff = musicCutoff(BIOME_MIX[this.biome].cutoff, this.night, this.intensityTarget, this.ctx.sampleRate);
+    const cutoff = musicCutoff(BIOME_MIX[this.biome].cutoff, this.night, this.intensityTarget);
     if (Math.abs(cutoff - this.lastCutoff) < 12) return;
     this.lastCutoff = cutoff;
     this.filter.frequency.setTargetAtTime(cutoff, this.ctx.currentTime, ramp);
@@ -895,8 +945,12 @@ export class Music {
     this.timer = null;
     this.bus.disconnect();
     this.filter.disconnect();
+    this.saturate.disconnect();
     this.duckGain.disconnect();
     this.wetGain.disconnect();
+    this.hissGain.disconnect();
+    this.hissFilter.disconnect();
+    if (this.hissSource) this.hissSource.stop();
     this.tronGain.disconnect();
     this.chipGain.disconnect();
     this.sparkGain.disconnect();
@@ -912,20 +966,18 @@ export class Music {
     this.transpose = style.transpose;
     const song = m === "menu" || m === "play" || m === "fever" || m === "storm";
     // Arcade tracks run their own faster tempo; everything else follows the biome.
-    const chipBpm = this.isChipTrack ? (m === "fever" ? 184 : 164) : (m === "fever" ? style.fever : style.bpm);
+    const chipBpm = this.isChipTrack ? (m === "fever" ? 196 : 176) : (m === "fever" ? style.fever : style.bpm);
     // Fever: glock leads more prominently (it's the hook the ear remembers).
     // Island layers stay silent on arcade tracks — square lead + chip bass own
     // the mix, with the glock shimmer on top.
     // Ukulele / pad / organ are island colours: silent under the arcade chiptune.
     const island = this.isChipTrack ? 0 : 1;
     this.ukeGain.gain.setTargetAtTime(song ? (m === "menu" ? 0.30 : m === "fever" ? 0.26 : 0.32) * style.uke * island : 0, t, 0.4);
-    // Bell mix = accompaniment, never the soloist: it carries the arpeggios and
-    // the phrase-end flourishes, sitting clearly UNDER whichever voice has the
-    // tune. These numbers are the whole "sometimes the music is shit" story —
-    // at menu 0.20 × a 1.6 biome weight the bells were the loudest voice on the
-    // darker tracks. Bells are now ~a third of the lead, on every family.
+    // Marimba/xylophone accent — a subtle woody pop under the lead, not a
+    // voice of its own. Kept very low so the square lead (chip), whistle
+    // (island), or Tron synth can actually be heard.
     this.glockGain.gain.setTargetAtTime(
-      song ? (m === "menu" ? 0.11 : m === "fever" ? 0.15 : 0.13) * style.glock : 0,
+      song ? (m === "menu" ? 0.04 : m === "fever" ? 0.06 : 0.05) * style.glock : 0,
       t,
       0.4,
     );
@@ -941,8 +993,8 @@ export class Music {
     // Whistle: island lead voice *and* the counter-line, so it is the loudest
     // melodic element on those tracks. Raised as the bells came down: it is the
     // voice that should carry the tune on the island families.
-    this.whistleGain.gain.setTargetAtTime((m === "fever" ? 0.44 : m === "play" ? 0.38 : m === "menu" ? 0.26 : 0) * style.whistle * island, t, 0.3);
-    this.arpGain.gain.setTargetAtTime((m === "fever" ? 0.16 : m === "play" ? 0.08 : m === "menu" ? 0.045 : 0) * style.glock * island, t, 0.5);
+    this.whistleGain.gain.setTargetAtTime((m === "fever" ? 0.58 : m === "play" ? 0.50 : m === "menu" ? 0.36 : 0) * style.whistle * island, t, 0.3);
+    this.arpGain.gain.setTargetAtTime((m === "fever" ? 0.06 : m === "play" ? 0.03 : m === "menu" ? 0.015 : 0) * style.glock * island, t, 0.5);
     // Organ: deep pad under play and fever only — never a drone on the menu.
     this.organGain.gain.setTargetAtTime((m === "play" ? 0.10 : m === "fever" ? 0.18 : m === "menu" ? 0.05 : 0) * island, t, 1.2);
     // Warm pad bed: strongest on the menu, subtle underneath play.
@@ -958,16 +1010,15 @@ export class Music {
     // Arcade chiptune lead: carries the hook again — with a warmer voice than
     // the one that used to sound thin (see chipLead), not by handing the tune
     // to the bells.
-    this.chipGain.gain.setTargetAtTime(this.isChipTrack && song ? (m === "menu" ? 0.30 : m === "fever" ? 0.40 : 0.34) : 0, t, 0.4);
-    // Glock shimmer: octave doubling on the arcade family and the melody
-    // sparkle on everything. Quiet by construction — a shimmer, not a voice.
+    this.chipGain.gain.setTargetAtTime(this.isChipTrack && song ? (m === "menu" ? 0.38 : m === "fever" ? 0.52 : 0.44) : 0, t, 0.4);
+    // Sparkle shimmer: a tiny octave decoration. Barely audible by design.
     this.sparkGain.gain.setTargetAtTime(
-      song ? (this.isChipTrack ? (m === "fever" ? 0.20 : 0.16) : (m === "fever" ? 0.14 : 0.11) * style.glock) : 0,
+      song ? (this.isChipTrack ? (m === "fever" ? 0.06 : 0.04) : (m === "fever" ? 0.04 : 0.03) * style.glock) : 0,
       t,
       0.45,
     );
     this.lullabyGain.gain.setTargetAtTime(m === "sleep" ? 0.3 : 0, t, 0.6);
-    const cutoff = musicCutoff(style.cutoff, this.night, this.intensityTarget, this.ctx.sampleRate);
+    const cutoff = musicCutoff(style.cutoff, this.night, this.intensityTarget);
     this.filter.frequency.setTargetAtTime(cutoff, t, 0.55);
     this.lastCutoff = cutoff;
     this.bpm = chipBpm;
@@ -985,6 +1036,7 @@ export class Music {
     this.nextTime = this.ctx.currentTime + 0.05;
     this.step = 0;
     this.bar = 0;
+    this.pass = 0;
     this.buildOrder();
     this.orderPos = 0;
     this.section = this.order[0] ?? 0;
@@ -1027,22 +1079,28 @@ export class Music {
       this.bar += 1;
       if (this.bar >= 8) {
         this.bar = 0;
-        this.orderPos = (this.orderPos + 1) % this.order.length;
-        // Reshuffle when a full shuffle cycle completes, so no two passes
-        // repeat the same sequence.
-        if (this.orderPos === 0 && this.trackSel === "shuffle") this.buildOrder();
-        this.section = this.order[this.orderPos]!;
-        // Update the instrumentation family when the section changes; only
-        // adjust gains if the family (island / tron / chip) actually flipped.
-        const wasTron = this.isTronTrack;
-        const wasChip = this.isChipTrack;
-        this.syncFamilyFlags();
-        if (wasTron !== this.isTronTrack || wasChip !== this.isChipTrack) {
-          this.apply();
+        // Stay on this section for PASSES_PER_SECTION passes before moving on,
+        // so the tune is heard as a phrase instead of flickering past.
+        this.pass += 1;
+        if (this.pass >= PASSES_PER_SECTION) {
+          this.pass = 0;
+          this.orderPos = (this.orderPos + 1) % this.order.length;
+          // Reshuffle when a full shuffle cycle completes, so no two passes
+          // repeat the same sequence.
+          if (this.orderPos === 0 && this.trackSel === "shuffle") this.buildOrder();
+          this.section = this.order[this.orderPos]!;
+          // Update the instrumentation family when the section changes; only
+          // adjust gains if the family (island / tron / chip) actually flipped.
+          const wasTron = this.isTronTrack;
+          const wasChip = this.isChipTrack;
+          this.syncFamilyFlags();
+          if (wasTron !== this.isTronTrack || wasChip !== this.isChipTrack) {
+            this.apply();
+          }
+          // Sleep mode plays the lullaby, not the track — don't announce a
+          // "now playing" title for music the player can't hear.
+          if (this.mode !== "sleep") this.onTrackChange?.(TRACKS[this.section]!.name);
         }
-        // Sleep mode plays the lullaby, not the track — don't announce a
-        // "now playing" title for music the player can't hear.
-        if (this.mode !== "sleep") this.onTrackChange?.(TRACKS[this.section]!.name);
       }
     }
   }
@@ -1092,9 +1150,33 @@ export class Music {
     // Melody: the glockenspiel lead on every family (island tracks play it
     // straight; the Tron tracks hand the same line to the synth; arcade tracks
     // put the square-wave hook in front with the bells doubling it).
-    const note = sec.mel[idx] ?? 0;
+    //
+    // The line develops across the section's passes rather than repeating
+    // verbatim: pass 0 states it as written, pass 1 lifts it an octave, and the
+    // final pass thins it to the on-beat notes and drops out for the last half
+    // of the last bar. That gives the ~44s stay a shape — state, lift, breathe —
+    // and the tacet lands the phrase end before the next section, instead of a
+    // hard cut mid-melody.
+    // Whimsy: a four-note ascending twinkle closes each pass. It is built from
+    // the chord's own voicing two octaves up, so it is consonant by construction
+    // and cannot clash with a minor chord the way a fixed major arpeggio would;
+    // it plays through the shimmer voice the score already uses for bells, so it
+    // reads as the same instrument grinning rather than a new layer. On the final
+    // pass it fills exactly the half-bar the melody now leaves open, so the
+    // phrase still breathes — it just breathes upward instead of going quiet.
+    // Tiny phrase-breath marimba tick — just two notes, barely there
+    if (!this.isChipTrack && this.bar === 7 && this.step === 4) {
+      [chord[0]!, chord[2]!].forEach((m, i) =>
+        this.glock(t + i * 0.07, mtof(m + 12 + this.transpose + stormShift), 0.12, this.sparkGain),
+      );
+    }
+    const lastPass = this.pass === PASSES_PER_SECTION - 1;
+    const breath = lastPass && this.bar === 7 && this.step >= 4;
+    const authored = sec.mel[idx] ?? 0;
+    const thinned = lastPass && this.step % 2 === 1;
+    const note = breath || thinned ? 0 : authored;
     if (note > 0) {
-      const noteFreq = mtof(note + this.transpose + stormShift);
+      const noteFreq = mtof(note + (this.pass === 1 ? 12 : 0) + this.transpose + stormShift);
       const vel = this.step === 0 ? 1 : this.step % 4 === 0 ? 0.9 : 0.8;
       // The glockenspiel is a SHIMMER LAYER, never the voice carrying the tune.
       // Leading with bells on every family made the whole score read as one
@@ -1104,28 +1186,23 @@ export class Music {
       // the bell doubles it an octave up, quietly.
       if (this.isTronTrack) {
         this.tronLead(t, noteFreq, beat * 0.85, vel);
-        this.glock(t, noteFreq * 2, vel * 0.3, this.sparkGain);
+        // tiny marimba accent on downbeats only
+        if (this.step === 0) this.glock(t, noteFreq, vel * 0.10, this.sparkGain);
       } else if (this.isChipTrack) {
         let len = 1;
         while ((sec.mel[idx + len] ?? 0) === -1) len++;
         this.chipLead(t, noteFreq, Math.min(beat * 0.24 * len, beat * 0.9), vel);
-        this.glock(t, noteFreq * 2, vel * 0.3, this.sparkGain);
+        // no doubling on chip — square lead owns the hook
       } else {
-        // Island lead: the whistle, which is the one voice here with a natural
-        // singing shape (sine + vibrato + breath). Its note holds as long as
-        // the melody does, so phrases breathe instead of stuttering.
         let len = 1;
         while ((sec.mel[idx + len] ?? 0) === -1) len++;
         this.whistle(t, noteFreq, Math.min(beat * 0.5 * len * 0.95, beat * 1.9), vel);
-        this.glock(t, noteFreq * 2, vel * 0.34, this.sparkGain);
+        // tiny marimba pop on strong beats (1 and 3) only
+        if (this.step === 0 || this.step === 4) this.glock(t, noteFreq, vel * 0.09, this.sparkGain);
       }
     }
 
-    // Phrase-end flourish: a quick glock run up the chord on the last bar of
-    // each 4-bar phrase, so sections hand over with a lift instead of a gap.
-    if (this.step === 6 && this.bar % 4 === 3 && (this.mode === "menu" || this.mode === "play" || this.mode === "fever")) {
-      this.glockSparkle(t, chordName, beat, stormShift);
-    }
+    // (phrase-end glock sparkle removed — was too much bell ringing)
 
     // Percussion
     if (this.isChipTrack) {
@@ -1250,37 +1327,32 @@ export class Music {
 
   /* ---------- instruments ---------- */
 
-  /** Ensemble strings: 7 detuned sawtooth oscillators per chord note — the
-   *  same algorithm all hardware string synthesizers use. Slow attack (0.5s)
-   *  creates the characteristic swell; wide chorus detune = lushness. */
+  /**
+   * Accordion chord pad — Yoshi's Island warm harmony layer.
+   * Three detuned triangle waves per chord note (narrow chorus detune) with a
+   * fast attack and a medium-length hold, then a short release. Much lighter
+   * than the old string ensemble: it supports the melody without swamping it.
+   */
+  /** Lush string pad: slow 0.18s attack, lowpass 900 Hz — the Steven Universe warm swell. */
   private pad(t: number, chordName: string, dur: number): void {
     const root = (BASS_ROOT[chordName] ?? 48) + 12 + this.transpose;
-    const notes = [root, root + 7, root + 12];
-    const detunes = [-14, -8, -3, 0, 3, 8, 14]; // 7 oscillators = chorus ensemble
-    const g = this.ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.28, t + dur * 0.45); // slow string attack
-    g.gain.setValueAtTime(0.28, t + dur * 0.78);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur * 1.08);
-    const f = this.ctx.createBiquadFilter();
-    f.type = "lowpass";
-    f.frequency.value = 2200; // let harmonics through — real string quality
-    f.Q.value = 0.3;
-    g.connect(f);
-    f.connect(this.padGain);
-    for (const m of notes) {
-      for (const det of detunes) {
-        const o = this.ctx.createOscillator();
-        const og = this.ctx.createGain();
-        o.type = "sawtooth";
-        o.frequency.value = mtof(m) * Math.pow(2, det / 1200);
-        og.gain.value = 0.11 / detunes.length;
-        o.connect(og);
-        og.connect(g);
-        o.start(t);
-        o.stop(t + dur * 1.12);
-      }
-    }
+    const notes = [root, root + 4, root + 7, root + 12];
+    notes.forEach((m, i) => {
+      const o = this.ctx.createOscillator();
+      const fl = this.ctx.createBiquadFilter();
+      const g = this.ctx.createGain();
+      o.type = i % 2 === 0 ? "sine" : "triangle"; // alternating = silky blend
+      o.frequency.value = mtof(m);
+      fl.type = "lowpass";
+      fl.frequency.value = 900;
+      o.connect(fl); fl.connect(g); g.connect(this.padGain);
+      const vol = 0.07 / notes.length;
+      g.gain.setValueAtTime(0.00008, t);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol), t + 0.18); // slow swell
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0001, vol * 0.6), t + 0.18 + dur * 0.45);
+      g.gain.exponentialRampToValueAtTime(0.00008, t + 0.18 + dur * 0.45 + dur * 0.55);
+      o.start(t); o.stop(t + dur + 0.14);
+    });
   }
 
   /** Distant two-note bird chirp for the menu — pure decoration. */
@@ -1303,35 +1375,50 @@ export class Music {
   }
 
 
+  /**
+   * Steel drum / marimba chord pluck — Yoshi's Island signature strum sound.
+   * Three additive sine partials (1:2.756:5.4 — inharmonic steel drum ratios)
+   * with a fast decay so each "ding" pops and doesn't blur the next one.
+   * Strummed one note at a time (with the 11ms delay in the caller) = the
+   * classic Yoshi upstroke or downstroke chord hit.
+   */
   private pluck(t: number, freq: number, vel: number): void {
-    const o = this.ctx.createOscillator();
-    const o2 = this.ctx.createOscillator();
-    const f = this.ctx.createBiquadFilter();
-    const g = this.ctx.createGain();
-    o.type = "triangle";
-    o2.type = "sawtooth";
-    o.frequency.value = freq;
-    o2.frequency.value = freq * 1.003;
-    f.type = "lowpass";
-    f.frequency.setValueAtTime(freq * 6, t);
-    f.frequency.exponentialRampToValueAtTime(freq * 1.4, t + 0.25);
-    f.Q.value = 1.2;
+    const partials = [
+      { ratio: 1.0,   amp: 1.0,  decay: 0.32 },
+      { ratio: 2.756, amp: 0.35, decay: 0.14 },
+      { ratio: 5.404, amp: 0.12, decay: 0.06 },
+    ];
     const peak = 0.22 * vel;
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(peak, t + 0.004);
-    g.gain.exponentialRampToValueAtTime(peak * 0.35, t + 0.12);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
-    const mix2 = this.ctx.createGain();
-    mix2.gain.value = 0.28;
-    o.connect(f);
-    o2.connect(mix2);
-    mix2.connect(f);
-    f.connect(g);
-    g.connect(this.ukeGain);
-    o.start(t);
-    o2.start(t);
-    o.stop(t + 0.6);
-    o2.stop(t + 0.6);
+    const out = this.ctx.createGain();
+    out.gain.value = 1;
+    out.connect(this.ukeGain);
+    for (const p of partials) {
+      const o = this.ctx.createOscillator();
+      const og = this.ctx.createGain();
+      o.type = "sine";
+      o.frequency.value = freq * p.ratio;
+      const amp = peak * p.amp;
+      og.gain.setValueAtTime(0.0001, t);
+      og.gain.exponentialRampToValueAtTime(amp, t + 0.002);
+      og.gain.exponentialRampToValueAtTime(0.0001, t + p.decay);
+      o.connect(og);
+      og.connect(out);
+      o.start(t);
+      o.stop(t + p.decay + 0.03);
+    }
+    // Mallet knock — wooden attack click (bandpass noise burst)
+    const knock = this.ctx.createBufferSource();
+    knock.buffer = this.noise;
+    const kf = this.ctx.createBiquadFilter();
+    kf.type = "bandpass";
+    kf.frequency.value = Math.min(6000, freq * 3.5);
+    kf.Q.value = 0.9;
+    const kg = this.ctx.createGain();
+    kg.gain.setValueAtTime(0.0001, t);
+    kg.gain.exponentialRampToValueAtTime(0.04 * vel, t + 0.001);
+    kg.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
+    knock.connect(kf); kf.connect(kg); kg.connect(out);
+    knock.start(t); knock.stop(t + 0.05);
   }
 
   /**
@@ -1385,17 +1472,6 @@ export class Music {
     strike.stop(t + 0.09);
   }
 
-  /** Melody lead: glock note + an octave shimmer on the sparkle bus. This is
-   *  the "little bell on top of everything" that makes the tune carry. */
-  /** Closing flourish: a fast run up the chord tones, glock-only. */
-  private glockSparkle(t: number, chordName: string, beat: number, stormShift: number): void {
-    const chord = UKE[chordName] ?? UKE.C!;
-    const tones = [...chord].map((m) => m + 12 + this.transpose + stormShift).sort((a, b) => a - b);
-    const run = [...tones.slice(0, 3), tones[2]! + 5, tones[3]!, tones[3]! + 4];
-    run.forEach((m, i) => this.glock(t + i * beat * 0.16, mtof(m), 0.5 - i * 0.04, this.sparkGain));
-  }
-
-
   /**
    * One step of the generated counter-line: the chord tone nearest the last
    * counter note, placed only where the lead is silent (a hold or a rest).
@@ -1425,89 +1501,57 @@ export class Music {
     return best;
   }
 
-  /** `vel` scales the voice only — the bus gain stays a mix decision. */
+  /**
+   * Voice / flute lead — warm sine + slightly detuned triangle, lowpass 1400 Hz.
+   * Based on the Steven Universe player's "voice" instrument which sounds
+   * immediately smooth and vocal without harsh partials.
+   */
   private whistle(t: number, freq: number, dur: number, vel = 1): void {
     const o = this.ctx.createOscillator();
-    const lfo = this.ctx.createOscillator();
-    const lfoG = this.ctx.createGain();
+    const o2 = this.ctx.createOscillator();
+    const fl = this.ctx.createBiquadFilter();
     const g = this.ctx.createGain();
     o.type = "sine";
-    o.frequency.setValueAtTime(freq * 0.985, t);
-    o.frequency.exponentialRampToValueAtTime(freq, t + 0.06);
-    lfo.type = "sine";
-    lfo.frequency.value = 5.6;
-    lfoG.gain.value = freq * 0.012;
-    lfo.connect(lfoG);
-    lfoG.connect(o.frequency);
-    const peak = 0.5 * vel;
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(peak, t + 0.05);
-    g.gain.setValueAtTime(peak, t + Math.max(0.06, dur - 0.08));
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.05);
-    const breath = this.ctx.createBufferSource();
-    breath.buffer = this.noise;
-    const bf = this.ctx.createBiquadFilter();
-    bf.type = "bandpass";
-    bf.frequency.value = freq;
-    bf.Q.value = 12;
-    const bg = this.ctx.createGain();
-    bg.gain.value = 0.08;
-    breath.connect(bf);
-    bf.connect(bg);
-    bg.connect(g);
-    o.connect(g);
+    o2.type = "triangle";
+    o.frequency.setValueAtTime(freq, t);
+    o2.frequency.setValueAtTime(freq * 1.003, t); // barely detuned = vocal warmth
+    fl.type = "lowpass";
+    fl.frequency.value = 1400;
+    o.connect(fl); o2.connect(fl); fl.connect(g);
     g.connect(this.whistleGain);
-    o.start(t);
-    lfo.start(t);
-    breath.start(t);
-    o.stop(t + dur + 0.1);
-    lfo.stop(t + dur + 0.1);
-    breath.stop(t + dur + 0.1);
+    const peak = 0.5 * vel;
+    g.gain.setValueAtTime(0.00008, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.04);
+    g.gain.exponentialRampToValueAtTime(peak * 0.5, t + 0.04 + dur * 0.3);
+    g.gain.exponentialRampToValueAtTime(0.00008, t + 0.04 + dur * 0.3 + dur * 0.7);
+    o.start(t); o2.start(t);
+    o.stop(t + dur + 0.1); o2.stop(t + dur + 0.1);
   }
 
-  /** Deep bass: sub sine one octave down + fundamental sine + harmonic triangle.
-   *  The sub-octave adds the chest-punch felt in Zimmer/Tron scores. */
+  /**
+   * Warm upright bass — triangle + sub-octave sine, lowpass 360 Hz.
+   * Based on the Steven Universe player's bass which sounds full and round.
+   */
   private bass(t: number, freq: number, dur: number): void {
+    const o = this.ctx.createOscillator();
+    const o2 = this.ctx.createOscillator(); // sub octave
+    const fl = this.ctx.createBiquadFilter();
     const g = this.ctx.createGain();
-    const f = this.ctx.createBiquadFilter();
-    f.type = "lowpass";
-    f.frequency.value = 580;
-    f.Q.value = 0.6;
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.55, t + 0.014);
-    g.gain.exponentialRampToValueAtTime(0.32, t + dur * 0.5);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-
-    // Sub: one octave down (the Zimmer low-end weight)
-    const sub = this.ctx.createOscillator();
-    const subG = this.ctx.createGain();
-    sub.type = "sine";
-    sub.frequency.value = freq * 0.5;
-    subG.gain.value = 0.55;
-    sub.connect(subG);
-    subG.connect(f);
-
-    // Fundamental
-    const fund = this.ctx.createOscillator();
-    fund.type = "sine";
-    fund.frequency.value = freq;
-
-    // Harmonic layer for definition
-    const harm = this.ctx.createOscillator();
-    const harmG = this.ctx.createGain();
-    harm.type = "triangle";
-    harm.frequency.value = freq;
-    harmG.gain.value = 0.28;
-    harm.connect(harmG);
-    harmG.connect(f);
-
-    fund.connect(f);
-    f.connect(g);
+    o.type = "triangle";
+    o2.type = "sine";
+    o.frequency.value = freq;
+    o2.frequency.value = freq * 0.5; // sub octave = round body
+    fl.type = "lowpass";
+    fl.frequency.value = 360;
+    o.connect(fl); o2.connect(fl); fl.connect(g);
     g.connect(this.bassGain);
-
-    sub.start(t);   sub.stop(t + dur + 0.03);
-    fund.start(t);  fund.stop(t + dur + 0.03);
-    harm.start(t);  harm.stop(t + dur + 0.03);
+    const snapDur = Math.min(dur * 0.85, 0.7);
+    g.gain.setValueAtTime(0.00008, t);
+    g.gain.exponentialRampToValueAtTime(0.55, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.28, t + 0.012 + 0.10);
+    g.gain.exponentialRampToValueAtTime(0.00008, t + snapDur);
+    o.start(t); o2.start(t);
+    o.stop(t + snapDur + 0.05); o2.stop(t + snapDur + 0.05);
   }
 
   private shaker(t: number, vel: number): void {
@@ -1551,109 +1595,90 @@ export class Music {
     const o = this.ctx.createOscillator();
     const g = this.ctx.createGain();
     o.type = "sine";
-    // Punchier: higher start (180Hz), deeper finish (32Hz), bigger peak
-    o.frequency.setValueAtTime(180, t);
-    o.frequency.exponentialRampToValueAtTime(32, t + 0.14);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.72 * vel, t + 0.003);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
+    // Warm cartoon kick: 108→34Hz in 160ms (same as the SU demo)
+    o.frequency.setValueAtTime(108, t);
+    o.frequency.exponentialRampToValueAtTime(34, t + 0.16);
+    g.gain.setValueAtTime(vel * 0.9, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.26);
     o.connect(g);
     g.connect(this.percGain);
     o.start(t);
-    o.stop(t + 0.26);
+    o.stop(t + 0.30);
   }
 
-  /** Snare: noise burst + short tone hit (adds crack on 2&4 in fever). */
+  /** Snare: bandpass noise at 1700 Hz — warm and musical, not harsh. */
   private snare(t: number, vel: number): void {
     const src = this.ctx.createBufferSource();
     src.buffer = this.noise;
     const bp = this.ctx.createBiquadFilter();
     bp.type = "bandpass";
-    bp.frequency.value = 1800;
-    bp.Q.value = 0.7;
-    const hp = this.ctx.createBiquadFilter();
-    hp.type = "highpass";
-    hp.frequency.value = 800;
+    bp.frequency.value = 1700;
     const g = this.ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.28 * vel, t + 0.003);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
-    src.connect(bp);
-    bp.connect(hp);
-    hp.connect(g);
-    g.connect(this.percGain);
-    // Tone crack
-    const tone = this.ctx.createOscillator();
-    const tg = this.ctx.createGain();
-    tone.type = "sine";
-    tone.frequency.setValueAtTime(200, t);
-    tone.frequency.exponentialRampToValueAtTime(90, t + 0.05);
-    tg.gain.setValueAtTime(0.0001, t);
-    tg.gain.exponentialRampToValueAtTime(0.14 * vel, t + 0.002);
-    tg.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
-    tone.connect(tg);
-    tg.connect(this.percGain);
-    src.start(t);
-    src.stop(t + 0.18);
-    tone.start(t);
-    tone.stop(t + 0.1);
+    g.gain.setValueAtTime(0.08 * vel, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.11);
+    src.connect(bp); bp.connect(g); g.connect(this.percGain);
+    src.start(t); src.stop(t + 0.13);
   }
 
-  /** Short arpeggio burst: 4 quick notes up from root. Celeste-style fill. */
+  /**
+   * Marimba arp fill — Yoshi-style xylophone run.
+   * Each note is a fast sine+triangle pop (short decay, wooden attack click)
+   * so the run sounds like a xylophone glissando, not a synth bell.
+   */
   private arp(t: number, baseFreq: number, dur: number): void {
-    const intervals = [0, 4, 7, 12]; // root, third, fifth, octave
-    const stepDur = dur * 0.22;
+    const intervals = [0, 4, 7, 12];
+    const stepDur = dur * 0.20;
     for (let i = 0; i < 4; i++) {
       const freq = baseFreq * Math.pow(2, intervals[i]! / 12);
       const nt = t + i * stepDur;
       const o = this.ctx.createOscillator();
       const g = this.ctx.createGain();
-      o.type = "sine";
+      o.type = "triangle";
       o.frequency.value = freq;
       g.gain.setValueAtTime(0.0001, nt);
-      g.gain.exponentialRampToValueAtTime(0.38, nt + 0.006);
-      g.gain.exponentialRampToValueAtTime(0.0001, nt + stepDur * 0.85);
+      g.gain.exponentialRampToValueAtTime(0.32, nt + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, nt + 0.14); // short marimba decay
       o.connect(g);
       g.connect(this.arpGain);
       o.start(nt);
-      o.stop(nt + stepDur + 0.01);
+      o.stop(nt + 0.18);
     }
   }
 
-  /** Interstellar-style organ drone: 3 detuned sines + soft tremolo. */
+  /**
+   * Rhodes electric piano chord stab.
+   * Sine sustain + f×14.1 tine transient (dies in 80ms) = the electric piano
+   * "tink" that makes Steven Universe sound so warm. One note per chord tone.
+   */
   private organ(t: number, chordName: string, dur: number): void {
-    const root = (BASS_ROOT[chordName] ?? 48) + this.transpose;
-    // Root + major 2nd + fifth (open, cinematic voicing like Zimmer's pipe organ)
-    const pitches = [root, root + 7, root + 12, root + 19];
-    const g = this.ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.38, t + dur * 0.18);
-    g.gain.setValueAtTime(0.38, t + dur * 0.72);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur * 1.05);
-    // Slow tremolo (Zimmer's pipe organ breathes at ~3 Hz)
-    const lfo = this.ctx.createOscillator();
-    const lfoG = this.ctx.createGain();
-    lfo.frequency.value = 2.8;
-    lfoG.gain.value = 0.06;
-    lfo.connect(lfoG);
-    lfoG.connect(g.gain);
-    const filt = this.ctx.createBiquadFilter();
-    filt.type = "lowpass";
-    filt.frequency.value = 600;
-    g.connect(filt);
-    filt.connect(this.organGain);
-    for (const pitch of pitches) {
-      for (const det of [-2, 0, 2]) {
-        const o = this.ctx.createOscillator();
-        o.type = "sine";
-        o.frequency.value = mtof(pitch) * Math.pow(2, det / 1200);
-        o.connect(g);
-        o.start(t);
-        o.stop(t + dur + 0.15);
-      }
-    }
-    lfo.start(t);
-    lfo.stop(t + dur + 0.15);
+    const root = (BASS_ROOT[chordName] ?? 48) + 12 + this.transpose;
+    const pitches = [root, root + 7, root + 12];
+    const decayTime = Math.min(dur * 0.75, 0.80);
+    pitches.forEach((m, i) => {
+      const f = mtof(m);
+      const vol = 0.048 - i * 0.006;
+      // Sine body
+      const o = this.ctx.createOscillator();
+      const fl = this.ctx.createBiquadFilter();
+      const g = this.ctx.createGain();
+      o.type = "sine"; o.frequency.value = f;
+      fl.type = "lowpass"; fl.frequency.value = 1800;
+      o.connect(fl); fl.connect(g); g.connect(this.organGain);
+      g.gain.setValueAtTime(0.00008, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+      g.gain.exponentialRampToValueAtTime(vol * 0.42, t + 0.012 + 0.16);
+      g.gain.exponentialRampToValueAtTime(0.00008, t + decayTime);
+      o.start(t); o.stop(t + decayTime + 0.06);
+      // Tine transient — the "tink"
+      const tine = this.ctx.createOscillator();
+      const tg = this.ctx.createGain();
+      tine.type = "sine"; tine.frequency.value = f * 14.1;
+      tg.gain.setValueAtTime(0.00008, t);
+      tg.gain.exponentialRampToValueAtTime(vol * 0.14, t + 0.002);
+      tg.gain.exponentialRampToValueAtTime(0.00008, t + 0.08);
+      tine.connect(tg); tg.connect(this.organGain);
+      tine.start(t); tine.stop(t + 0.10);
+    });
   }
 
   /** Tron lead synth: Daft Punk / Tron Legacy sound.
@@ -1719,15 +1744,14 @@ export class Music {
     const g = this.ctx.createGain();
     o.type = "square";
     o2.type = "square";
-    o.frequency.value = freq;
-    o2.frequency.value = freq * 1.006; // slight detune for width
+    // Sonic-style attack zip: pitch bends up 10% then snaps to target in 18ms
+    o.frequency.setValueAtTime(freq * 1.10, t);
+    o.frequency.exponentialRampToValueAtTime(freq, t + 0.018);
+    o2.frequency.setValueAtTime(freq * 1.107, t);
+    o2.frequency.exponentialRampToValueAtTime(freq * 1.006, t + 0.018);
     f.type = "lowpass";
-    // The old voice opened the filter to 14× the note and snapped it shut in
-    // 0.16 s, leaving a bare buzzing edge with no body — the "thin" part of the
-    // sound. A gentler sweep plus a triangle an octave down (sub, added below)
-    // keeps the 8-bit character but gives the hook some weight.
-    f.frequency.setValueAtTime(freq * 9, t);           // bright attack
-    f.frequency.exponentialRampToValueAtTime(Math.max(900, freq * 3.0), t + Math.min(dur, 0.22));
+    f.frequency.setValueAtTime(freq * 10, t);
+    f.frequency.exponentialRampToValueAtTime(Math.max(900, freq * 3.2), t + Math.min(dur, 0.20));
     f.Q.value = 1.1;
     const peak = 0.34 * vel;
     const sustain = Math.max(0.04, dur - 0.035);
@@ -1780,24 +1804,25 @@ export class Music {
     o.start(t); o.stop(t + dur + 0.02);
   }
 
+  /** Crisp double-clap — Yoshi-style bright hand snap. */
   private clap(t: number): void {
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 2; i++) {
       const src = this.ctx.createBufferSource();
       src.buffer = this.noise;
       const f = this.ctx.createBiquadFilter();
       f.type = "bandpass";
-      f.frequency.value = 1500;
-      f.Q.value = 0.9;
+      f.frequency.value = 2200;
+      f.Q.value = 1.1;
       const g = this.ctx.createGain();
-      const tt = t + i * 0.012;
+      const tt = t + i * 0.010;
       g.gain.setValueAtTime(0.0001, tt);
-      g.gain.exponentialRampToValueAtTime(0.2, tt + 0.003);
-      g.gain.exponentialRampToValueAtTime(0.0001, tt + (i === 2 ? 0.16 : 0.04));
+      g.gain.exponentialRampToValueAtTime(0.22, tt + 0.002);
+      g.gain.exponentialRampToValueAtTime(0.0001, tt + 0.055);
       src.connect(f);
       f.connect(g);
       g.connect(this.percGain);
       src.start(tt);
-      src.stop(tt + 0.2);
+      src.stop(tt + 0.08);
     }
   }
 }

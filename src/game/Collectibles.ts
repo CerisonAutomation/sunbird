@@ -14,7 +14,8 @@ export type PickupKind =
   | "wingboost"
   | "feather"
   | "goldenwings"
-  | "cloudboost";
+  | "cloudboost"
+  | "star";
 
 export type CloudKind = "plain" | "boost" | "golden" | "wind" | "super";
 
@@ -42,6 +43,9 @@ export const PICKUP_STYLE: Record<PickupKind, { color: number; emissive: number;
   feather: { color: 0xfff0c0, emissive: 0x6a5a10, icon: "🐦", label: "Feather" },
   goldenwings: { color: 0xffd76a, emissive: 0xa06000, icon: "✨", label: "Golden Wings" },
   cloudboost: { color: 0xc8e8ff, emissive: 0x2a5a8a, icon: "☁", label: "Cloud Boost" },
+  // Warm core, cool cast: reads as starlight against the stratosphere's dark
+  // blue rather than as another gold coin.
+  star: { color: 0xfff8e6, emissive: 0x5a78ff, icon: "⭐", label: "Star Wish" },
 };
 
 const SPAWN_CELL = 26;
@@ -438,6 +442,17 @@ export class Collectibles {
       if (rng.next() < 0.07) {
         const alt = ALT_CLOUDS + rng.range(-6, 30);
         this.placeBalloon(x + rng.range(-12, 12), hh + alt, rng.next() * 6, rng.range(-1, 1));
+      }
+
+      // Stars: the one reward reserved for space. The sky's own space layer is
+      // `smoothstep(0.35, 0.9, altT)` with altT = (alt - 72) / 158, so it opens
+      // around alt 127 and is full by ~214. This band is 153-207 (altT 0.51-0.85)
+      // — unambiguously in space and above the cloud deck, yet still inside what
+      // a strong launch reaches, so the star is an invitation to climb rather
+      // than a decoration nobody can touch.
+      if (rng.next() < 0.22) {
+        const alt = ALT_HIGH + rng.range(18, 72);
+        this.placePickup("star", x + rng.range(-8, 8), hh + alt);
       }
 
       // Power-ups sit on crests and just past ramps so they reward good lines.

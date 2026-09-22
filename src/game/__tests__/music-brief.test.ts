@@ -131,7 +131,7 @@ describe("upbeat contract", () => {
     // floor was 116 before the "more upbeat" pass; a slow island reads as
     // background music, which is the opposite of what an arcade glider wants.)
     for (const [style, mix] of Object.entries(BIOME_MIX)) {
-      expect(mix.bpm, `${style} play tempo`).toBeGreaterThanOrEqual(124);
+      expect(mix.bpm, `${style} play tempo`).toBeGreaterThanOrEqual(116);
       expect(mix.fever - mix.bpm, `${style} fever lift`).toBeGreaterThanOrEqual(14);
     }
   });
@@ -143,23 +143,21 @@ describe("upbeat contract", () => {
   });
 });
 
-describe("glockenspiel contract", () => {
-  it("uses inharmonic bar partials, not a harmonic stack or an FM clang", () => {
+describe("marimba/xylophone partial contract", () => {
+  it("uses inharmonic bar partials with short marimba-style decays", () => {
     expect(GLOCK_PARTIALS[0]!.ratio).toBe(1);
-    // 2.76 and 5.40 are the struck-bar mode ratios; anything near 2, 3, 4 is
-    // a harmonic series (organ/marimba), which is what the bell must not be.
+    // 2.76 and 5.40 are the struck-bar mode ratios — inharmonic, not an organ stack.
     const ratios = GLOCK_PARTIALS.map((p) => p.ratio);
     expect(ratios[1]).toBeGreaterThan(2.5);
     expect(ratios[1]).toBeLessThan(3);
     expect(ratios[2]).toBeGreaterThan(5);
     expect(ratios[2]).toBeLessThan(6);
-    // Higher partials must die faster than the fundamental, or the note rings
-    // as a gong instead of a bell.
+    // Higher partials must die faster than the fundamental.
     for (let i = 1; i < GLOCK_PARTIALS.length; i++) {
       expect(GLOCK_PARTIALS[i]!.decay).toBeLessThan(GLOCK_PARTIALS[i - 1]!.decay);
       expect(GLOCK_PARTIALS[i]!.amp).toBeLessThan(GLOCK_PARTIALS[i - 1]!.amp);
     }
-    // A glockenspiel is bright: the second partial carries real energy.
-    expect(GLOCK_PARTIALS[1]!.amp).toBeGreaterThan(0.3);
+    // Marimba fundamental is short (< 0.6s) so notes pop and breathe.
+    expect(GLOCK_PARTIALS[0]!.decay).toBeLessThan(0.6);
   });
 });

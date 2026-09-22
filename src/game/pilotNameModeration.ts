@@ -1,3 +1,4 @@
+import { RESERVED_PILOT_NAMES } from "./edition";
 /**
  * Pilot-name moderation.
  *
@@ -46,15 +47,30 @@ const BLOCKED = [
   "retard", "spastic", "chink", "kike", "wetback", "gook", "coon", "raghead",
   "nazi", "hitler", "kkk", "whitepower", "heilhitler",
   // hard profanity
-  "fuck", "fuk", "fck", "phuck", "shit", "sht", "cunt", "kunt", "bitch",
+  "fuck", "fuk", "fck", "phuck", "shit", "sht", "shyt", "cunt", "kunt", "bitch",
   "bastard", "asshole", "arsehole", "dumbass", "jackass", "bollocks",
   "piss", "wank", "twat", "prick", "bellend", "dipshit", "bullshit",
   // sexual
   "pussy", "penis", "vagina", "dick", "cock", "tits", "titty", "boobs",
   "whore", "slut", "skank", "rape", "pedo", "paedo", "molest", "porn",
   "hentai", "nude", "nudes", "sexcam",
-  // drug / self-harm / violence-adjacent
-  "meth", "heroin", "cocaine",
+  // more slurs, same categories
+  // "wop" is deliberately absent: it collides with "swoop" and "whoop", which
+  // are call signs players actually pick in a flying game.
+  "spic", "beaner", "paki", "dago", "jigaboo", "shemale", "trannie",
+  "porchmonkey", "towelhead", "cameljockey", "kaffir", "gook",
+  // more sexual
+  "blowjob", "handjob", "cumming", "jizz", "semen", "dildo", "milf", "gilf",
+  "loli", "shota", "ecchi", "yiff", "bdsm", "bondage", "fetish", "orgasm",
+  "orgy", "nympho", "sex", "sexvideo",
+  // self-harm — the category a platform is most sensitive about. ("kys" and
+  // "kms" are deliberately absent: on a key with no word boundaries they fire on
+  // the game's own vocabulary — "SkySwift" contains "kys".)
+  "suicide", "selfharm", "proana", "thinspo", "anorex", "bulimi",
+  // drug / violence-adjacent
+  "meth", "heroin", "cocaine", "cannabis", "marijuana", "fentanyl", "opioid",
+  "mdma", "ecstasy", "ketamine", "xanax", "adderall", "weed", "crack",
+  "terrorist", "jihad", "rapist", "incest", "bestiality", "necrophil",
 ];
 
 /**
@@ -86,6 +102,19 @@ const SAFE_WORDS = [
   "solar", "storm", "zenith", "aero", "vortex", "thunder", "nimbus", "astra",
   "blaze", "nova", "cosmic", "hyper", "sonic", "apex", "glide", "horizon",
   "orion",
+  // …contain "sex" — English places and surnames, and a sextant is an instrument
+  "essex", "sussex", "middlesex", "sexton", "sextant", "unisex",
+  // …contain "weed" / "crack"
+  "seaweed", "tumbleweed", "duckweed", "milkweed", "ragweed",
+  "crackle", "nutcracker", "wisecrack",
+  // …contain "spic"
+  "spice", "spicy", "auspicious", "conspicuous", "perspicacious", "spicule",
+  // …contain "heroin"
+  "heroine",
+  // …contain "paki"
+  "pakistan", "pakistani",
+  // …contain "semen" / "rapist" / "milf" — the classic Scunthorpe traps
+  "basement", "debasement", "therapist", "milford",
 ];
 
 const LEET: Record<string, string> = {
@@ -110,14 +139,28 @@ const DIGRAPHS: [RegExp, string][] = [
   [/ß/g, "ss"], [/æ/g, "ae"], [/œ/g, "oe"], [/þ/g, "th"], [/ð/g, "d"],
 ];
 
+/**
+ * Names that claim to be somebody: the platform, the game, or its staff. Matched
+ * against the WHOLE squashed key (with trailing digits ignored), so "poki" and
+ * "poki42" are refused but "Pokifan" is not — impersonation is the problem, not
+ * enthusiasm.
+ */
+const RESERVED = [
+  "admin", "administrator", "moderator", "official", "staff", "support",
+  "developer",
+];
+
 /** What `savePilotName()` keeps. Anything else is stripped before storage. */
 const ALLOWED_CHARS = /^[\p{L}\p{N} _.-]+$/u;
 
 /** Contact details players must not be able to publish through a name. */
 const CONTACT = [/@/, /https?:/i, /www\./i, /\b\d{7,}\b/, /\p{L}\.\p{L}\.\p{L}/u];
 
-/** Fold a raw name into the key the blocklist is matched against. */
-export function normalizePilotName(raw: string): string {
+/** Fold a raw name into the key the blocklist is matched against.
+ *
+ *  `leet` is off for the reserved-name check: folding digits into letters turns
+ *  "Poki42" into "pokia2", which no longer looks like the name it is claiming. */
+export function normalizePilotName(raw: string, leet = true): string {
   let s = raw.normalize("NFKD");
   // Strip combining marks (é → e) and any zero-width/control characters, which
   // are the cheapest way to break a naive substring filter.
@@ -126,7 +169,7 @@ export function normalizePilotName(raw: string): string {
   for (const [re, to] of DIGRAPHS) s = s.replace(re, to);
   let out = "";
   for (const ch of s) {
-    const folded = HOMOGLYPH[ch] ?? LEET[ch] ?? ch;
+    const folded = HOMOGLYPH[ch] ?? (leet ? LEET[ch] : undefined) ?? ch;
     // NFKD already decomposed fullwidth forms to ASCII; keep the rest.
     out += folded;
   }
@@ -140,9 +183,44 @@ export function squashPilotName(normalized: string): string {
   return normalized.replace(/[^a-z0-9]/g, "");
 }
 
+/**
+ * A second key for spellings that are not leetspeak but sound the same:
+ * "ph" → "f", "q" → "k", "x" → "ck", "ck" → "k", doubled consonants collapsed.
+ * It is what catches "fuxk", "fuq" and "phuk" without a blocklist entry per
+ * spelling — and it is only ever matched against that same list, which is why
+ * the folds can be this blunt without turning into false positives.
+ */
+export function phoneticPilotName(key: string): string {
+  return key
+    .replace(/ph/g, "f")
+    .replace(/q/g, "k")
+    .replace(/x/g, "ck")
+    .replace(/ck/g, "k")
+    // "y" is deliberately NOT folded to "i": it is the obvious vowel
+    // substitution, and it turns "SkyKestrel" into "skikestrel", which contains
+    // "kike" — i.e. it refuses the game's own sky vocabulary. Spellings that need
+    // it are listed instead, which costs one line and breaks nothing.
+    .replace(/([bcdfgklmnprstvz])\1+/g, "$1");
+}
+
+/**
+ * The name reduced to letters, for reserved-name checks. Digits and separators
+ * go, and leet folding is skipped, so "Poki42", "P0ki" and "P-o-k-i" all still
+ * read as a claim to be Poki.
+ */
+export function lettersOnlyPilotName(raw: string, leet = false): string {
+  return normalizePilotName(raw, leet).replace(/[^a-z]/g, "");
+}
+
+/** Keys the blocklist is matched against, in order. */
+function keysFor(name: string): string[] {
+  const key = squashPilotName(normalizePilotName(name));
+  return [key, phoneticPilotName(key)];
+}
+
 /** True when [start,end) of `key` falls inside an allowlisted safe word. */
-function coveredBySafeWord(key: string, start: number, end: number): boolean {
-  for (const safe of SAFE_WORDS) {
+function coveredBySafeWord(key: string, start: number, end: number, list: string[] = SAFE_WORDS): boolean {
+  for (const safe of list) {
     let at = key.indexOf(safe);
     while (at !== -1) {
       if (start >= at && end <= at + safe.length) return true;
@@ -152,15 +230,40 @@ function coveredBySafeWord(key: string, start: number, end: number): boolean {
   return false;
 }
 
-function firstBlockedHit(key: string): string | null {
+function blockedHitIn(key: string, foldSafeWords: boolean): string | null {
+  const safe = foldSafeWords ? SAFE_WORDS.map(phoneticPilotName) : SAFE_WORDS;
   for (const term of BLOCKED) {
     let at = key.indexOf(term);
     while (at !== -1) {
-      if (!coveredBySafeWord(key, at, at + term.length)) return term;
+      if (!coveredBySafeWord(key, at, at + term.length, safe)) return term;
       at = key.indexOf(term, at + 1);
     }
   }
   return null;
+}
+
+/** The first blocked term any of the name's keys exposes. */
+function firstBlockedHit(name: string): string | null {
+  const keys = keysFor(name);
+  for (let i = 0; i < keys.length; i += 1) {
+    // The folded key is matched against the folded covers, so a safe word that
+    // folds into a blocked one is still recognised as safe.
+    const hit = blockedHitIn(keys[i]!, i > 0);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/** True when the name is claiming to be the platform, the game, or its staff. */
+function isReserved(raw: string, extra: readonly string[]): boolean {
+  // Both readings, because the two folds each hide a different spelling: without
+  // leet folding "Poki42" still reads as "poki", and with it "P0ki" does. Either
+  // one alone lets the other through.
+  const list = [...RESERVED, ...extra];
+  return (
+    list.includes(lettersOnlyPilotName(raw, false)) ||
+    list.includes(lettersOnlyPilotName(raw, true))
+  );
 }
 
 export type PilotNameVerdict =
@@ -171,7 +274,10 @@ export type PilotNameVerdict =
  * Full verdict, with the failing stage, so the UI can say something more useful
  * than "not allowed".
  */
-export function moderatePilotName(raw: string): PilotNameVerdict {
+export function moderatePilotName(
+  raw: string,
+  reserved: readonly string[] = RESERVED_PILOT_NAMES,
+): PilotNameVerdict {
   const name = raw.trim();
   if (name.length < PILOT_NAME_MIN || name.length > 14) return { ok: false, reason: "shape" };
   // Contact details first, so an "@handle" or a URL reports the honest reason
@@ -180,7 +286,8 @@ export function moderatePilotName(raw: string): PilotNameVerdict {
   if (!ALLOWED_CHARS.test(name)) return { ok: false, reason: "shape" };
   // At least two letters: digits-and-punctuation-only names are not call signs.
   if ((name.match(/\p{L}/gu) ?? []).length < 2) return { ok: false, reason: "shape" };
-  if (firstBlockedHit(squashPilotName(normalizePilotName(name)))) return { ok: false, reason: "language" };
+  if (firstBlockedHit(name)) return { ok: false, reason: "language" };
+  if (isReserved(name, reserved)) return { ok: false, reason: "language" };
   return { ok: true };
 }
 

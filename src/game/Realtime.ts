@@ -70,6 +70,8 @@ export type RoomInfo = {
   error: string;
   /** Optimistic local ready state. The server only lists other peers. */
   ready: boolean;
+  /** This transport has no AI fallback: every peer here is networked. */
+  aiFallback: boolean;
 };
 
 /** A live multiplayer signal, surfaced as an in-flight toast by the game. */
@@ -147,7 +149,7 @@ export async function fetchPublicRooms(base: string = URL_BASE, limit = 40): Pro
 
 /** Multiplayer is available when either:
  *   • a WebSocket relay URL is configured (VITE_MULTIPLAYER_URL, the
- *     Rust-authoritative server used by direct/crazy builds), OR
+ *     Rust-authoritative server used by the direct build), OR
  *   • we're building for Poki and the browser supports WebRTC (Netlib P2P).
  *
  * The Poki build ships with VITE_MULTIPLAYER_URL emptied, so without Netlib
@@ -230,6 +232,11 @@ export class RealtimeClient implements NetTransport {
   }
 
   activateAutonomousRoom(code?: string, seed?: string): void {
+    // Deliberately empty of peers. This method had no caller and its only job
+    // was to fill the roster with four hardcoded "pilots" (Zephyr Wing, Echo
+    // Falcon, …) that the lobby then presented as live players. The AI fallback
+    // that actually runs lives in the Poki transport, and it discloses itself
+    // through RoomInfo.aiFallback.
     this.clearConnectTimer();
     if (this.retryTimer !== null) {
       window.clearTimeout(this.retryTimer);
@@ -241,21 +248,6 @@ export class RealtimeClient implements NetTransport {
     this.state = "lobby";
     this.errorText = "";
     this.tracks.clear();
-
-    const mockPeers: { id: string; name: string; skin: string; hue: number }[] = [
-      { id: "auto_1", name: "Zephyr Wing", skin: "phoenix", hue: 0.12 },
-      { id: "auto_2", name: "Echo Falcon", skin: "aurora", hue: 0.55 },
-      { id: "auto_3", name: "Solaris Ace", skin: "solstice", hue: 0.82 },
-      { id: "auto_4", name: "Cloud Swift", skin: "stormcrow", hue: 0.38 },
-    ];
-
-    for (const p of mockPeers) {
-      const t = this.track(p.id);
-      t.name = p.name;
-      t.skin = p.skin;
-      t.hue = p.hue;
-      t.ready = false;
-    }
   }
 
   /** Joins (or creates) a room. `code` empty = matchmake into a public room.
@@ -818,6 +810,7 @@ export class RealtimeClient implements NetTransport {
       startsInMs: this.startsAt > 0 ? Math.max(0, this.startsAt - Date.now()) : 0,
       error: this.errorText,
       ready: this.localReady,
+      aiFallback: false,
     };
   }
 }

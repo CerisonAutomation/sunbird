@@ -58,9 +58,9 @@ node -e 'console.log(Object.keys(require(process.env.HOME+"/.config/poki/auth.js
 
 | Artifact | Produced by | Use it for |
 |---|---|---|
-| `poki-upload/` | `pnpm build:poki` (every build) | **The Inspector.** Select this folder: `index.html`, `icons/`, `fonts/`, `i18n/` and nothing else. |
+| `poki-upload/` | `pnpm build:poki` (every build) | **The Inspector, and the CLI.** Select this folder: `index.html`, `icons/`, `fonts/`, `i18n/` and nothing else. `poki.json`'s `build_dir` names it, so `pnpm poki:upload` ships exactly this tree. |
 | `sunbird-poki.zip` | `pnpm build:poki` | The archive equivalent — identical `index.html`, no wrapping directory. Use it for CDN/review pipelines that take an archive. |
-| `dist-poki/` | vite (before packaging) | The raw build output. Not an upload artifact (it is the tree the packaging step tightens up). |
+| `dist-poki/` | vite (before packaging) | The raw build output. **Not an upload artifact** — it is the tree the packaging step tightens up, and it lacks the `SDK-01` head tag. Never point `build_dir` at it (`ROOT-09`). |
 | `sunbird-crazy.zip`, `sunbird-generic.zip` | `pnpm build:portals` | Other portals. Never upload these to Poki (web exclusivity, `REQ-51`). |
 
 `poki-upload/` and the zips are **generated** (git-ignored). There is no
@@ -112,10 +112,22 @@ part of `pnpm poki:preflight`, and enforced in CI by the `portals` job:
 | `ROOT-04` | only uploadable files are present — no `sw.js`, `manifest.webmanifest`, sourcemaps or dotfiles, in folder or zip |
 | `ROOT-05` | zip and folder ship the same `index.html` (sha256) |
 | `ROOT-06` | every local reference in the shipped html resolves inside the folder |
+| `ROOT-07` | no other portal's markers (SDK global, CDN URL, edition string) leaked into the folder |
+| `ROOT-08` | the folder keeps Poki's own integrations — Netlib, AUDS and the SDK |
+| `ROOT-09` | `poki.json` points the CLI at `poki-upload/`, so **the tree that gets uploaded is the tree that was verified** |
 
-All six were **negative-tested** on 2026-09-17: editing the folder's tail,
-renaming `index.html` away, and re-zipping with a wrapping directory each make
-the gate exit non-zero with the matching message.
+`ROOT-01`–`ROOT-06` were **negative-tested** on 2026-09-17: editing the folder's
+tail, renaming `index.html` away, and re-zipping with a wrapping directory each
+make the gate exit non-zero with the matching message. `ROOT-09` was
+negative-tested on 2026-09-22 by setting `poki.json`'s `build_dir` back to
+`dist-poki`, which fails it with that exact message.
+
+`ROOT-09` exists because the two paths can silently diverge. `poki.json`'s
+`build_dir` is what `poki upload` ships, and it once named `dist-poki` (vite's
+raw output) while every other check looked at `poki-upload/`. The gate stayed
+green and the CLI pushed a tree that carried no `SDK-01` head script tag and a
+dangling `manifest.webmanifest` link. Keep the two in step: if `build_dir` ever
+has to move, move this gate with it.
 
 ## After the upload
 

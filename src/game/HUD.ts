@@ -18,7 +18,7 @@ import { leaderboardBackend } from "./Leaderboard";
 import type { BoardMetric, BoardPage, BoardScope } from "./Leaderboard";
 import type { TournamentView } from "./Tournaments";
 import type { RosterBird, Standing, RivalNameTag } from "./MassRace";
-import { SUPPORTED_LOCALES, getLocale, t } from "../i18n";
+import { formatNumberLocalized, SUPPORTED_LOCALES, getLocale, t } from "../i18n";
 import * as THREE from "three";
 import { DAILY_STIPEND, PIGGY_BANK_CAP, PIGGY_BANK_MIN_SMASH, SHOP_AD_COINS, SHOP_AD_SESSION_CAP, VIP_DAILY_GIFT } from "./constants";
 import { COLLECTIONS, dailyFlashBird, GOLD, skinById, STARTER_PACK, VIP, type BoostView, type ShopTrailView, type SkinView } from "./Economy";
@@ -89,7 +89,7 @@ export type AtlasEntry = {
 export type UiState = "menu" | "playing" | "paused" | "continue" | "ad" | "gameover";
 export type SeedMode = "today" | "yesterday" | "random";
 export type CheckoutMode = "demo";
-export type PortalName = "none" | "poki" | "crazy" | "generic";
+export type PortalName = "none" | "poki";
 
 export type HudSnapshot = {
   state: UiState;
@@ -140,6 +140,14 @@ export type HudSnapshot = {
   adTimer: number;
   adTotal: number;
   adReason: "continue" | "interstitial";
+  /**
+   * Whether the GAME may end this break. Only the non-portal placeholder ad is
+   * game-driven (it runs a local countdown and the player waits it out). A
+   * portal-served break is owned by the SDK: it ends when the platform's ad
+   * promise resolves, so the game must not render or enable a skip that would
+   * cut it short and still award the reward.
+   */
+  adSkippable: boolean;
   seedLabel: string;
   /** Career wings: lifetime-distance rank shown on the title screen. */
   wings: { icon: string; name: string; progress: number; nextName: string; nextNeeded: number; lifetime: number };
@@ -269,6 +277,8 @@ export type HudSnapshot = {
   roomCapacity: number;
   roomReady: boolean;
   roomReadyCount: number;
+  /** True when the room is the local AI fallback, not networked pilots. */
+  roomAiFallback: boolean;
   roomSize: number;
   roomSkill: string;
   roomMuted: boolean;
@@ -580,7 +590,7 @@ export class HUD {
           </div>
           <div class="stat-block right">
             <div class="stat-label">${t("hud.stat.coins", undefined, "Coins")}</div>
-            <div class="stat-value coin" data-ref="coins">0</div>
+            <div class="stat-value coin">${COIN_SVG}<span data-ref="coins">0</span></div>
           </div>
         </div>
         <div class="speedlines" data-ref="speedlines"></div>
@@ -644,7 +654,7 @@ export class HUD {
           <div class="pause-kicker">FLIGHT ON HOLD</div>
           <h2>Take a breath</h2>
           <p class="tagline">Your run is safe. Adjust settings, grab boosts, or rally your flock — ready when you are.</p>
-          <div class="pause-run-stats" data-ref="pauseStats">
+          <div class="pause-run-stats">
             <span class="prs"><em>Distance</em><b data-ref="pauseDistance">0 m</b></span>
             <span class="prs"><em>Altitude</em><b data-ref="pauseAltitude">0 m</b></span>
             <span class="prs"><em>Combo</em><b data-ref="pauseCombo">×1</b></span>
@@ -724,8 +734,10 @@ export class HUD {
       return el;
     };
     const top = this.root.querySelector<HTMLElement>(".top-bar")!;
-    lane("hud-controls", ['[data-ref="muteBtn"]', '[data-ref="pauseBtn"]'], top);
-    this.root.querySelector(".mid-meta")!.appendChild(this.root.querySelector(".combo")!);
+    // The top-right corner is one cluster: the combo multiplier with the mute
+    // and pause buttons. It used to be appended into .mid-meta and pinned
+    // absolutely, which put it in the roster strip's row on narrow screens.
+    lane("hud-controls", ['[data-ref="muteBtn"]', '[data-ref="pauseBtn"]', '.combo'], top);
     // The top bar owns the top-right corner (mute/pause, and the ring counter),
     // so the active-booster pills sit directly under it — the lane order is what
     // puts them there, in normal flow, rather than an absolute offset that has
@@ -906,13 +918,23 @@ export class HUD {
       const field = e.target;
       if (field instanceof HTMLInputElement && field.dataset.ref === "shopSearch") {
         this.shopBrowse.query = field.value.slice(0, 80);
-        if (this.shopSnapshot) this.renderStatic(this.shopSnapshot);
+        // Coalesce the repaint. This used to re-render the ENTIRE shop screen on
+        // every keystroke, and each skin card builds its own inline SVG bird — so
+        // typing an eight-character query queued eight full screens of work, on
+        // the frame the player is watching. The query itself still updates
+        // immediately (the field keeps its native responsiveness, and a filter
+        // read is trivial); only the paint is debounced. The timer is registered
+        // through after(), so dispose() clears it.
+        if (this.searchRenderTimer !== null) this.cancelTimer(this.searchRenderTimer);
+        this.searchRenderTimer = this.after(() => {
+          this.searchRenderTimer = null;
+          if (this.shopSnapshot) this.renderStatic(this.shopSnapshot);
+        }, 120);
       }
       if (field instanceof HTMLInputElement && field.dataset.ref === "pilotNameInput") {
         // The counter is decorative, but it must not lie: it rendered a hardcoded
         // "0/14" and never moved while the player typed.
-        const count = field.closest(".name-input-wrapper")?.querySelector(".name-char-count span");
-        if (count) count.textContent = String(field.value.length);
+        this.syncNameCount(field);
       }
       if (field instanceof HTMLInputElement && field.type === "range") {
         const output = field.parentElement?.querySelector("output");
@@ -975,7 +997,21 @@ export class HUD {
 
   setValue(ref: string, val: string): void {
     const el = this.root.querySelector(`[data-ref="${CSS.escape(ref)}"]`) as HTMLInputElement | HTMLTextAreaElement | null;
-    if (el) el.value = val;
+    if (!el) return;
+    el.value = val;
+    // Keep the character counter truthful for programmatic writes too. The live
+    // path updates it from the `input` event, but assigning `.value` fires no
+    // such event — so a name written by boot or by the dice left the counter
+    // showing the length of whatever the last RENDER produced. Measured on the
+    // first-run screen: field 10 characters, counter 12. The counter exists so
+    // it cannot lie; this is what made it lie.
+    this.syncNameCount(el);
+  }
+
+  /** Mirror a name field's current length into its character counter. */
+  private syncNameCount(field: HTMLInputElement | HTMLTextAreaElement): void {
+    const count = field.closest(".name-input-wrapper")?.querySelector(".name-char-count span");
+    if (count) count.textContent = String(field.value.length);
   }
 
   updateNameTags(tags: RivalNameTag[], camera: THREE.Camera, width: number, height: number): void {
@@ -1110,9 +1146,9 @@ export class HUD {
     this.overEl.classList.toggle("hidden", !(s.state === "gameover" && s.screen === "main"));
 
     if (inPlay) {
-      this.setText(this.distanceEl, "dist", formatDistance(s.distance));
-      this.setText(this.coinsEl, "coins", String(s.coins));
-      this.setText(this.bestEl, "best", formatDistance(s.bestDistance));
+      this.setText(this.distanceEl, "dist", distanceText(s.distance));
+      this.setText(this.coinsEl, "coins", formatNumberLocalized(s.coins));
+      this.setText(this.bestEl, "best", distanceText(s.bestDistance));
       this.setText(this.islandEl, "island", `Island ${s.island + 1}`);
       this.setText(this.multEl, "mult", `×${s.multiplier.toFixed(1)}`);
       this.goldChip.classList.toggle("hidden", !s.gold);
@@ -1209,9 +1245,24 @@ export class HUD {
 
       const cd = s.countdown > 0 ? String(Math.ceil(s.countdown)) : "";
       if (cd !== this.lastCountdown) {
+        const wasLive = this.lastCountdown !== "" && this.lastCountdown !== "GO!";
         this.lastCountdown = cd;
-        this.countdownEl.textContent = cd;
-        this.countdownEl.className = `countdown ${cd ? "show" : ""} ${cd === "FLY!" ? "go" : ""}`;
+        if (cd) {
+          this.countdownEl.textContent = cd;
+          this.countdownEl.className = "countdown show";
+        } else if (wasLive) {
+          this.countdownEl.textContent = "GO!";
+          this.countdownEl.className = "countdown show go";
+          setTimeout(() => {
+            if (this.countdownEl.textContent === "GO!") {
+              this.countdownEl.textContent = "";
+              this.countdownEl.className = "countdown";
+            }
+          }, 700);
+        } else {
+          this.countdownEl.textContent = "";
+          this.countdownEl.className = "countdown";
+        }
       }
 
       // Surface only the goal nearest completion — a single, always-open loop.
@@ -1366,12 +1417,13 @@ export class HUD {
       if (this.contTimerEl.textContent !== txt) this.contTimerEl.textContent = txt;
     }
     if (s.state === "ad") {
-      const p = 1 - Math.max(0, s.adTimer) / Math.max(0.01, s.adTotal);
+      const running = s.adTimer > 0;
+      const p = running ? 1 - Math.max(0, s.adTimer) / Math.max(0.01, s.adTotal) : 0;
       if (this.adBarEl) this.adBarEl.style.width = `${p * 100}%`;
-      if (this.adSkipEl) {
+      if (this.adSkipEl && s.adSkippable) {
         const done = s.adTimer <= 0;
         this.adSkipEl.disabled = !done;
-        const txt = done ? (s.adReason === "continue" ? "Wake up ▶" : "Continue ▶") : `Skip in ${Math.ceil(s.adTimer)}`;
+        const txt = done ? (s.adReason === "continue" ? "Wake up ▶" : "Continue ▶") : `Continues in ${Math.ceil(s.adTimer)}`;
         if (this.adSkipEl.textContent !== txt) this.adSkipEl.textContent = txt;
       }
     }
@@ -1434,6 +1486,8 @@ export class HUD {
   }
 
   private readonly timers = new Set<number>();
+  /** Pending coalesced repaint for the shop search (see the input handler). */
+  private searchRenderTimer: number | null = null;
   private after(callback: () => void, ms: number): number {
     const timer = window.setTimeout(() => { this.timers.delete(timer); callback(); }, ms);
     this.timers.add(timer);
@@ -1673,12 +1727,25 @@ function renderQuests(list: QuestView[]): string {
     .join("")}</div>`;
 }
 
+/**
+ * Distance, formatted for the player's chosen language.
+ *
+ * One place so a locale switch reaches every readout that shows a distance —
+ * the flight HUD, the board, the recap, the results strip — instead of each
+ * call site having to remember the second argument. The "m"/"km" units are
+ * locale-neutral by convention in this game (they match the metric toggle in
+ * Settings) and are left as-is; only the digits follow the locale.
+ */
+function distanceText(meters: number): string {
+  return formatDistance(meters, getLocale());
+}
+
 function renderScoreTable(rows: HighScore[]): string {
   if (!rows.length) return `<div class="score-table"><div class="row empty">No flights yet</div></div>`;
   return `<div class="score-table">${rows
     .map(
       (h, i) =>
-        `<div class="row ${h.vip ? "vip" : ""}"><span>${i + 1}${h.vip ? "<i class='spark'>✦</i>" : ""}</span><span>${formatDistance(h.distance)}</span><span>${h.coins}c</span><span>${Math.floor(h.score).toLocaleString()}</span></div>`,
+        `<div class="row ${h.vip ? "vip" : ""}"><span>${i + 1}${h.vip ? "<i class='spark'>✦</i>" : ""}</span><span>${distanceText(h.distance)}</span><span>${h.coins}c</span><span>${Math.floor(h.score).toLocaleString()}</span></div>`,
     )
     .join("")}</div>`;
 }
@@ -1734,10 +1801,13 @@ function boardSource(_s: HudSnapshot): { chip: string; sentence: string } {
   // Portal builds name the portal: a Poki player reading "Local" on a Poki page
   // concludes the board is broken, when what is true is narrower — this build
   // has no cloud board configured, so the standings are the ones on this
-  // device. Say that, in the portal's own words.
+  // device. Say that, in the portal's own words. The rows named "· Practice"
+  // are the device's generated benchmarks, and the sentence says so rather than
+  // letting a new player infer that twenty named humans are ahead of them.
+  const offlineBench = "Rungs marked “Practice” are this device's benchmarks, not pilots.";
   return POKI_EDITION
-    ? { chip: `${PORTAL_DISPLAY_NAME} · on-device`, sentence: "This build keeps scores on your device." }
-    : { chip: "💾 local", sentence: "Rankings are stored on this device. Fly well to climb!" };
+    ? { chip: `${PORTAL_DISPLAY_NAME} · on-device`, sentence: `This build keeps scores on your device. ${offlineBench}` }
+    : { chip: "💾 local", sentence: `Rankings are stored on this device. Fly well to climb! ${offlineBench}` };
 }
 
 function renderBoard(s: HudSnapshot): string {
@@ -1848,8 +1918,13 @@ function renderBoard(s: HudSnapshot): string {
 /** Compact top-wings leaderboard embedded on the main menu. */
 function renderLive(s: HudSnapshot): string {
   const connected = s.netState === "lobby" || s.netState === "racing";
-  const status = connected ? "Connected" : s.netState === "connecting" ? "Flock Ready" : "Local Flock";
-  const live = s.lobbyRivals.filter((r) => r.tag.includes("live"));
+  // The AI fallback seats four generated pilots in the same roster as real
+  // ones, so "Connected" and "live" would both be claims about people who are
+  // not there. The badge, the presence line and every peer row say AI instead.
+  const status = s.roomAiFallback
+    ? "AI flock · offline"
+    : connected ? "Connected" : s.netState === "connecting" ? "Flock Ready" : "Local Flock";
+  const live = s.lobbyRivals.filter((r) => r.tag.includes("live") || r.tag.includes("AI"));
 
   const modePills = (s.pvpModes || []).map((m) => `
     <button class="pvp-pill ${s.selectedPvpMode === m.id ? "on" : ""}" data-ui data-action="select-pvp-mode" data-id="${m.id}" title="${m.blurb}">
@@ -1889,7 +1964,7 @@ function renderLive(s: HudSnapshot): string {
           <div class="pills-scroll">${worldPills}</div>
         </div>
 
-        <p class="room-presence" role="status">${Math.max(1, s.roomCount)} connected · ${s.roomReadyCount} ready</p>
+        <p class="room-presence" role="status">${Math.max(1, s.roomCount)} ${s.roomAiFallback ? "in room · AI pilots" : "connected"} · ${s.roomReadyCount} ready</p>
 
         <div class="room-actions-bar">
           <button class="primary-btn gold large-btn" data-ui data-action="start-room-now">⚡ Start Race Now (${s.roomCount > 1 ? "Launch Room" : "Fill with AI flock"})</button>
@@ -1906,12 +1981,12 @@ function renderLive(s: HudSnapshot): string {
             <div class="room-bird ${p.ready ? "is-ready" : ""}">
               ${sunbirdSVG({ width: 48, palette: s.skins.some((v) => v.def.id === p.skin) ? skinPalette(s.skins.find((v) => v.def.id === p.skin)!.def) : rivalPalette(i + 1) })}
               <b>${escapeHtml(p.name)}</b>
-              <small>${p.ready ? "Ready ✓" : "In room"}</small>
+              <small>${p.ready ? "Ready ✓" : s.roomAiFallback ? "AI pilot" : "In room"}</small>
             </div>
           `).join("")}
         </div>
         ${live.length === 0 ? `<p class="fineprint">Just you so far — share the code above and the room fills with real pilots.</p>` : ""}
-        ${s.roomCount > 8 ? `<p class="fineprint">And ${s.roomCount - 8} more connected pilots</p>` : ""}
+        ${s.roomCount > 8 ? `<p class="fineprint">And ${s.roomCount - 8} more ${s.roomAiFallback ? "AI pilots" : "connected pilots"}</p>` : ""}
 
         <button class="ghost-btn" data-ui data-action="room-close">Leave room</button>
       </section>` : `
@@ -2235,13 +2310,13 @@ export function renderSquad(s: HudSnapshot): string {
   const clubChat = SQUAD_CHAT && myClub
     ? `
     <div class="club-chat">
-      <div class="chat-box" data-ref="chatBox" data-scroll-memory="squad-chat" data-stick-bottom role="log" aria-label="Club chat history">
+      <div class="chat-box" data-scroll-memory="squad-chat" data-stick-bottom role="log" aria-label="Club chat history">
         ${sq.chat.length
           ? sq.chat.map((m) => `<div class="chat-line"><b>${escapeHtml(m.name)}</b><span>${escapeHtml(m.text)}</span></div>`).join("")
           : `<div class="empty-note">Say hello to your club — messages stay between members.</div>`}
       </div>
       <div class="redeem">
-        <input data-ui data-ref="chatText" data-enter-action="squad-chat" aria-label="Club message" placeholder="Message your club" maxlength="140" autocomplete="off" />
+        <input data-ui data-enter-action="squad-chat" aria-label="Club message" placeholder="Message your club" maxlength="140" autocomplete="off" />
         <button class="mini-btn" data-ui data-action="squad-chat">Send</button>
       </div>
     </div>`
@@ -2265,7 +2340,7 @@ export function renderSquad(s: HudSnapshot): string {
         : `<div class="empty-note">No clubs yet — found the first one.</div>`
     }
     ${pages("clubs", clubPage)}
-    <div class="redeem"><input data-ui data-ref="clubName" data-enter-action="squad-create-club" aria-label="Club name" placeholder="Club name" maxlength="24" autocomplete="off" /><button class="mini-btn gold" data-ui data-action="squad-create-club">Found club</button></div>`;
+    <div class="redeem"><input data-ui data-enter-action="squad-create-club" aria-label="Club name" placeholder="Club name" maxlength="24" autocomplete="off" /><button class="mini-btn gold" data-ui data-action="squad-create-club">Found club</button></div>`;
 
   const hubBanner = sq.isAutonomous
     ? `<div class="reward-strip" style="background:linear-gradient(135deg,#fff8e1,#ffe082); color:#5d4037; border:1px solid #ffcc80; margin-bottom:12px;">📴 Offline build · wingman requests and pilot lookup need the online service. Pilots you actually raced with still work.</div>`
@@ -2278,7 +2353,7 @@ export function renderSquad(s: HudSnapshot): string {
     ? `<section class="squad-recovery" role="region" aria-label="Squad profile recovery">
         <div class="section-title">Squad profile recovery <small>key missing</small></div>
         <p>${escapeHtml(sq.error || "This browser cannot unlock the saved Squad profile.")} Your flight progress, coins and birds are untouched — only the Squad identity is locked.</p>
-        <label class="recovery-consent"><input type="checkbox" data-ui data-ref="squadRecoveryConsent" /> I understand this creates a separate Squad profile.</label>
+        <label class="recovery-consent"><input type="checkbox" data-ui /> I understand this creates a separate Squad profile.</label>
         <div class="room-actions-bar">
           <button class="primary-btn" data-ui data-action="squad-new-profile" ${sq.busy || sq.loading ? "disabled" : ""}>Create a new Squad profile</button>
           <button class="soft-btn" data-ui data-action="squad-refresh" ${sq.loading ? "disabled" : ""}>Try reconnecting</button>
@@ -2654,7 +2729,7 @@ function renderMain(s: HudSnapshot): string {
         return item;
       }) as typeof PROGRESS_DESTINATIONS[number][]
     )}</nav>
-    <div class="home-record"><span class="record-art">${menuIcon("medal")}</span><span>${t("hud.menu.personalBest", undefined, "Personal best")} <b>${formatDistance(s.bestDistance)}</b></span><span class="record-pass" data-ui data-action="open-pass">Nest Pass Lv.${s.season.tier}/${s.season.maxTier}</span><span class="record-wallet">● ${s.wallet.toLocaleString()} <small>${t("hud.menu.coinBalance", undefined, "coins")}</small></span></div>
+    <div class="home-record"><span class="record-art">${menuIcon("medal")}</span><span>${t("hud.menu.personalBest", undefined, "Personal best")} <b>${distanceText(s.bestDistance)}</b></span><span class="record-pass" data-ui data-action="open-pass">Nest Pass Lv.${s.season.tier}/${s.season.maxTier}</span><span class="record-wallet">● ${s.wallet.toLocaleString()} <small>${t("hud.menu.coinBalance", undefined, "coins")}</small></span></div>
   `;
 }
 
@@ -2672,15 +2747,21 @@ function renderProgress(s: HudSnapshot): string {
     : portal
       ? `<p class="portal-note">${PORTAL_EDITION_NOTE}</p>`
       : SELL_AD_REMOVAL ? `<button class="lock-chip" data-ui data-action="open-paywall">✦ Pick your hills with Gold</button>` : "";
+  // The subtitle below is deliberately NOT wrapped in t(). It had a t() call
+  // whose key was never added to the barrel, so it read as translated in the
+  // source while rendering the English fallback for all 20 locales. The
+  // source→barrel coverage test (i18n/__tests__/locales.test.ts) fails on
+  // exactly that now; until a real translation exists for every shipped
+  // locale, a plain literal is the honest representation of its state.
   return `${head(t("hud.progress.title", undefined, "Your progress"))}
-    <p class="tagline">${t("hud.progress.tagline", undefined, "Missions and rewards from all your flights, in one place.")}</p>
+    <p class="tagline">Missions and rewards from all your flights, in one place.</p>
     <div class="hero-meta">
       <span class="pill seed-pill">${s.seedLabel}</span>
-      <span class="pill wings-pill" title="${formatDistance(s.wings.lifetime)} lifetime">${s.wings.icon} ${s.wings.name}</span>
+      <span class="pill wings-pill" title="${distanceText(s.wings.lifetime)} lifetime">${s.wings.icon} ${s.wings.name}</span>
     </div>
     ${
       s.wings.nextNeeded > 0
-        ? `<div class="wings-track" aria-label="Career progress"><i style="width:${Math.round(s.wings.progress * 100)}%"></i><span>${formatDistance(s.wings.nextNeeded)} to ${s.wings.nextName}</span></div>`
+        ? `<div class="wings-track" aria-label="Career progress"><i style="width:${Math.round(s.wings.progress * 100)}%"></i><span>${distanceText(s.wings.nextNeeded)} to ${s.wings.nextName}</span></div>`
         : ""
     }
     ${s.rivalBanner ? renderRivalBanner(s.rivalBanner) : ""}
@@ -2750,7 +2831,7 @@ function renderProgress(s: HudSnapshot): string {
     ${renderGoalList(s.sessionGoals)}
     ${renderQuests(s.quests)}
     ${renderMissions(s.missions)}
-    <div class="menu-stats"><div>Best <b>${formatDistance(s.bestDistance)}</b></div><div>Today <b>${formatDistance(s.todayBest)}</b></div></div>
+    <div class="menu-stats"><div>Best <b>${distanceText(s.bestDistance)}</b></div><div>Today <b>${distanceText(s.todayBest)}</b></div></div>
 `;
 }
 
@@ -2910,7 +2991,7 @@ function renderShop(s: HudSnapshot, browse: ShopBrowse): string {
         : `<button class="primary-btn gold" data-ui data-action="claim-daily-stipend">Claim +● ${DAILY_STIPEND}</button>`
       }
     </div>
-    ${s.portalName !== "none" ? `
+    ${s.adAvailable ? `
     <div class="pc pc--gold pc-row">
       <span class="pc-icon">📺</span>
       <div class="pc-body">
@@ -2993,7 +3074,7 @@ function renderShop(s: HudSnapshot, browse: ShopBrowse): string {
 
     <nav class="shop-jumps" aria-label="Shop sections">${[["shopBirds", "bird", "Birds"], ["shopBoosts", "boost", "Boosts"], ["shopTrails", "trail", "Trails"]].map(([id, icon, label]) => `<button class="soft-btn" data-ui data-action="shop-section" data-id="${id}">${menuIcon(icon as "bird" | "boost" | "trail")}<span>${label}</span></button>`).join("")}</nav>
 
-    <section class="shop-browser" data-ref="shopBirds" aria-label="Browse birds">
+    <section class="shop-browser" aria-label="Browse birds">
       <div class="section-title shop-section-birds">Bird collection <small>${owned}/${s.skins.length} owned</small></div>
       <label class="field-label" for="shop-search">Find a bird</label>
       <input id="shop-search" type="search" data-ui data-ref="shopSearch" value="${escapeHtml(browse.query)}" placeholder="Name, collection or perk" maxlength="80" autocomplete="off" />
@@ -3002,7 +3083,7 @@ function renderShop(s: HudSnapshot, browse: ShopBrowse): string {
       ${renderSkinCollections(s, browse)}
     </section>
 
-    <details class="shop-section" data-ref="shopBoosts"><summary><span class="section-art">${menuIcon("boost")}</span>Boosts &amp; upgrades <span>${armedBoosts.length} armed</span></summary>
+    <details class="shop-section"><summary><span class="section-art">${menuIcon("boost")}</span>Boosts &amp; upgrades <span>${armedBoosts.length} armed</span></summary>
       <p class="fineprint">One-flight boosts are used in solo or casual AI flights. Live races and ranked practice use equal flight equipment and keep these boosts for later. Permanent upgrades stay with you.</p>
       <div class="boost-list">${s.boosts.map((b) => renderBoostRow(b, s.wallet)).join("")}</div>
       <div class="section-title">Nest <small>permanent score multiplier</small></div>
@@ -3020,7 +3101,7 @@ function renderShop(s: HudSnapshot, browse: ShopBrowse): string {
       </div></div>
     </details>
 
-    <details class="shop-section" data-ref="shopTrails"><summary><span class="section-art">${menuIcon("trail")}</span>Trails <span>Cosmetic · yours forever</span></summary>
+    <details class="shop-section"><summary><span class="section-art">${menuIcon("trail")}</span>Trails <span>Cosmetic · yours forever</span></summary>
       <div class="trail-list">${s.shopTrails.map((t) => renderTrailCard(t, s.wallet)).join("")}</div>
     </details>
 
@@ -3068,7 +3149,7 @@ function renderPaywall(s: HudSnapshot): string {
           ? `<button class="primary-btn vip" data-ui data-action="vip-buy">Unlock VIP · ${VIP.price}</button>`
           : `<button class="primary-btn vip off" data-ui data-action="vip-buy">Need ● ${VIP.coinPrice - s.wallet} more coins</button>`
     }
-    <div class="redeem"><input data-ui data-ref="redeem" aria-label="Promo code" placeholder="Promo code" maxlength="16" autocomplete="off" /><button class="mini-btn" data-ui data-action="redeem">Redeem</button></div>
+    <div class="redeem"><input data-ui aria-label="Promo code" placeholder="Promo code" maxlength="16" autocomplete="off" /><button class="mini-btn" data-ui data-action="redeem">Redeem</button></div>
     <button class="ghost-btn" data-ui data-action="restore">Restore passes</button>
     ${s.restoreMessage ? `<p class="note">${s.restoreMessage}</p>` : ""}
     <p class="fineprint">All passes &amp; packs are earnable 100% through in-game flight coins!</p>
@@ -3152,7 +3233,7 @@ function renderSettings(s: HudSnapshot): string {
          identically in every edition. -->
     <button class="soft-btn wide" data-ui data-action="open-privacy">🔒 Privacy policy</button>
     ${s.canInstall ? `<button class="soft-btn wide" data-ui data-action="install-app">⬇ Install Sunbird</button>` : ""}
-    <details class="danger-zone" data-ref="resetOptions"><summary>Manage saved progress</summary><p class="fineprint">Reset deletes progress saved on this device. Export a save code from Account first.</p>
+    <details class="danger-zone"><summary>Manage saved progress</summary><p class="fineprint">Reset deletes progress saved on this device. Export a save code from Account first.</p>
     <button class="ghost-btn danger" data-ui data-action="reset-progress">${s.resetArmed ? "Confirm: erase saved progress" : "Reset progress"}</button></details>
     <p class="fineprint">Sunbird 1.0 · ${s.seedLabel}</p>
   `;
@@ -3163,7 +3244,7 @@ function renderScores(s: HudSnapshot): string {
     ${head("High glides")}
     ${renderScoreTable(s.highScores)}
     ${!s.highScores.length ? `<p class="tagline">Your first flight starts your story. Fly a little farther each time.</p><button class="primary-btn" data-ui data-action="pvp-practice">Take your first flight</button>` : ""}
-    <div class="menu-stats"><div>Today's best <b>${formatDistance(s.todayBest)}</b></div><div>Flights <b>${s.runsPlayed}</b></div></div>
+    <div class="menu-stats"><div>Today's best <b>${distanceText(s.todayBest)}</b></div><div>Flights <b>${s.runsPlayed}</b></div></div>
   `;
 }
 
@@ -3282,11 +3363,11 @@ function renderAccount(s: HudSnapshot): string {
     <div class="section-title">Transfer saved progress</div>
     <div class="sheet">
       <p class="tagline">Copy this code to move your progress to another device.</p>
-      <textarea class="cloud-box" data-ui data-ref="cloudExport" aria-label="Your exportable save code" readonly rows="3">${s.cloudCode}</textarea>
+      <textarea class="cloud-box" data-ui aria-label="Your exportable save code" readonly rows="3">${s.cloudCode}</textarea>
       <button class="mini-btn" data-ui data-action="copy-cloud">Copy code</button>
       <p class="tagline" style="margin-top:10px">Paste a code from another device to restore it here:</p>
-      <textarea class="cloud-box" data-ui data-ref="cloudImport" aria-label="Save code to import" rows="3" placeholder="Paste save code…"></textarea>
-      <label class="import-confirm"><input type="checkbox" data-ui data-ref="confirmImport"/>Replace progress on this device with this save.</label>
+      <textarea class="cloud-box" data-ui aria-label="Save code to import" rows="3" placeholder="Paste save code…"></textarea>
+      <label class="import-confirm"><input type="checkbox" data-ui/>Replace progress on this device with this save.</label>
       <button class="mini-btn" data-ui data-action="import-cloud">Import save</button>
       ${s.cloudMessage ? `<p class="note" role="status">${s.cloudMessage}</p>` : ""}
     </div>
@@ -3349,7 +3430,7 @@ export function renderFlightRecap(path: [number, number][]): string {
 export function renderCoinMultiplierCard(coins: number, claimed: boolean, rewarded = false): string {
   if (coins <= 0) return "";
   if (claimed) {
-    return `<div class="multiplier-cta-card claimed">✓ 3× bonus applied &nbsp;+● ${coins * 2} extra coins</div>`;
+    return `<div class="multiplier-cta-card claimed">✓ 3× bonus applied &nbsp;+● ${formatNumberLocalized(coins * 2)} extra coins</div>`;
   }
   if (rewarded) {
     // Portal editions route the bonus through the platform's rewarded ad: the
@@ -3360,7 +3441,7 @@ export function renderCoinMultiplierCard(coins: number, claimed: boolean, reward
         <b>3× Flight Coin Bonus</b>
         <span>Watch a short ad · triple ● ${coins} → ● ${coins * 3}</span>
       </div>
-      <button class="primary-btn gold wide" data-ui data-action="multiply-run-coins">🎬 Watch → 3× &nbsp;+● ${coins * 2}</button>
+      <button class="primary-btn gold wide" data-ui data-action="multiply-run-coins">🎬 Watch → 3× &nbsp;+● ${formatNumberLocalized(coins * 2)}</button>
     </div>`;
   }
   return `<div class="multiplier-cta-card">
@@ -3368,7 +3449,7 @@ export function renderCoinMultiplierCard(coins: number, claimed: boolean, reward
         <b>3× Flight Coin Bonus</b>
         <span>Triple ● ${coins} → ● ${coins * 3}</span>
       </div>
-      <button class="primary-btn gold wide" data-ui data-action="multiply-run-coins">Claim 3× &nbsp;+● ${coins * 2}</button>
+      <button class="primary-btn gold wide" data-ui data-action="multiply-run-coins">Claim 3× &nbsp;+● ${formatNumberLocalized(coins * 2)}</button>
     </div>`;
 }
 
@@ -3437,7 +3518,7 @@ function renderGameOver(s: HudSnapshot): string {
           : `<button class="soft-btn wide" data-ui data-action="share-run" ${s.share.busy ? "disabled" : ""}>${s.share.busy ? "Publishing…" : "Share this run for a friend"}</button>`
       }
       <div class="redeem">
-        <input data-ui data-ref="shareCode" data-enter-action="load-run" aria-label="Shared run code" placeholder="A friend's run code" maxlength="40" autocomplete="off" spellcheck="false" />
+        <input data-ui data-enter-action="load-run" aria-label="Shared run code" placeholder="A friend's run code" maxlength="40" autocomplete="off" spellcheck="false" />
         <button class="mini-btn" data-ui data-action="load-run" ${s.share.busy ? "disabled" : ""}>Load</button>
       </div>
       ${
@@ -3455,21 +3536,21 @@ function renderGameOver(s: HudSnapshot): string {
     <p class="tagline">${s.massRace ? "Your place, your progress, your next race." : "A little farther. A little smoother. One more flight?"}</p>
     <div class="result-actions"><button class="play-again-btn" data-ui data-action="${resultsPrimaryAction(s)}">${s.massRace && s.roomCode ? "Back to race lobby" : s.massRace && s.racePlace > 0 ? "Race again · same stakes" : t("hud.gameover.flyAgain", undefined, "Fly Again")}</button><button class="soft-btn" data-ui data-action="menu">${t("hud.gameover.mainMenu", undefined, "Main Menu")}</button></div>
     ${!s.massRace ? `<p class="fineprint replay-note">Fly again replays this exact course so you can race the ghost of the run you just flew 👻</p>` : ""}
-    ${s.newBest ? `<div class="new-best">👑 NEW BEST · ${formatDistance(s.distance)}<small>your farthest flight yet</small></div>` : ""}
+    ${s.newBest ? `<div class="new-best">👑 NEW BEST · ${distanceText(s.distance)}<small>your farthest flight yet</small></div>` : ""}
     ${s.boardScope === "global" && s.boardMetric === "distance" && s.board && s.board.yourRank > 0 ? `<div class="reward-strip rank-strip">Leaderboard rank · <b>#${s.board.yourRank}</b> of ${s.board.total}</div>` : ""}
 
     ${shareBlock}
     ${renderFlightRecap(s.flightPath)}
     <div class="over-stats result-summary">
-      <div><span>${t("hud.stat.distance", undefined, "Distance")}</span><b>${formatDistance(s.distance)}</b></div>
+      <div><span>${t("hud.stat.distance", undefined, "Distance")}</span><b>${distanceText(s.distance)}</b></div>
       <div><span>Score</span><b>${Math.floor(s.score).toLocaleString()}</b></div>
-      <div><span>${t("hud.stat.coins", undefined, "Coins")}</span><b>${s.coins}</b></div>
+      <div><span>${t("hud.stat.coins", undefined, "Coins")}</span><b>${formatNumberLocalized(s.coins)}</b></div>
     </div>
 
     ${renderCoinMultiplierCard(s.coins, s.multiplierClaimed, s.portalName !== "none")}
 
     ${renderNextFlight(s)}
-    <details class="result-details" data-ref="flightDetails"><summary>Flight details <span>Landmarks &amp; skill</span></summary><div class="over-stats">
+    <details class="result-details"><summary>Flight details <span>Landmarks &amp; skill</span></summary><div class="over-stats">
       <div><span>Perfects</span><b>${s.perfects}</b></div>
       <div><span>Skyline moments</span><b>${s.zeniths}</b></div>
       <div><span>Rings</span><b>${s.rings}</b></div>
@@ -3499,7 +3580,7 @@ function renderGameOver(s: HudSnapshot): string {
       <button class="soft-btn" data-ui data-action="open-atlas">${menuIcon("atlas")} Atlas</button>
 
     </div>
-    <details class="result-details" data-ref="progressDetails"><summary>Progress &amp; rewards <span>Goals, quests &amp; records</span></summary>
+    <details class="result-details"><summary>Progress &amp; rewards <span>Goals, quests &amp; records</span></summary>
     ${renderGoalList(s.sessionGoals)}
     ${renderQuests(s.quests)}
     ${renderMissions(s.missions, s.newlyCompleted)}
@@ -3528,23 +3609,19 @@ function renderContinue(s: HudSnapshot): string {
   return `
     <div class="results-kicker">${escapeHtml(s.modeName)} · flight recap</div>
     <h2>Second wind?</h2>
-    <p class="tagline">Sunbird is dozing off at ${formatDistance(s.distance)}.</p>
+    <p class="tagline">Sunbird is dozing off at ${distanceText(s.distance)}.</p>
     ${s.continueReason ? `<p class="continue-reason${s.continueHighlight ? " is-highlight" : ""}">${escapeHtml(s.continueReason)}</p>` : ""}
     <div class="over-stats result-summary">
-      <div><span>${t("hud.stat.distance", undefined, "Distance")}</span><b>${formatDistance(s.distance)}</b></div>
+      <div><span>${t("hud.stat.distance", undefined, "Distance")}</span><b>${distanceText(s.distance)}</b></div>
       <div><span>Score</span><b>${Math.floor(s.score).toLocaleString()}</b></div>
-      <div><span>${t("hud.stat.coins", undefined, "Coins")}</span><b>${s.coins}</b></div>
+      <div><span>${t("hud.stat.coins", undefined, "Coins")}</span><b>${formatNumberLocalized(s.coins)}</b></div>
     </div>
-    <div class="reward-strip wake-strip" role="status">⏳ Second wind closes in <b data-live="contTimer">${Math.ceil(s.continueTimer)}</b>s</div>
+    ${s.adAvailable
+      ? `<button class="reward-strip wake-strip wake-ad-btn" data-ui data-action="continue-ad" role="status">🎬 ${portal ? "Watch for Second Wind" : "Watch a short clip → Second Wind"} · <b data-live="contTimer">${Math.ceil(s.continueTimer)}</b>s left</button>`
+      : `<div class="reward-strip wake-strip" role="status">⏳ Second wind closes in <b data-live="contTimer">${Math.ceil(s.continueTimer)}</b>s</div>`}
     <div class="result-actions">
       <button class="play-again-btn ${s.canAffordContinue ? "" : "off"}" data-ui data-action="continue-coins" ${s.canAffordContinue ? "" : "disabled"}>Spend ● ${s.continueCost} <small>(you have ${s.wallet})</small></button>
       <button class="soft-btn" data-ui data-action="continue-sleep">Let it sleep</button>
-      ${/* The rewarded option is an action in the same row as the standard
-           ones, so it is the same size as them — never a bigger, louder
-           button (requirements: standard equal or larger, positioned next to
-           or above the reward option). The 🎬 marks it as a video, and it is
-           not green. */ ""}
-      ${s.adAvailable ? `<button class="soft-btn" data-ui data-action="continue-ad">🎬 ${portal ? "Watch for Second Wind" : "Watch a short clip → Second Wind"}</button>` : ""}
     </div>
     ${!portal && s.gold ? `<button class="soft-btn wide" data-ui data-action="continue-gold">✦ Gold · free wake-up</button>` : ""}
     <p class="fineprint replay-note">Sleep ends the flight and shows your recap. Waking up keeps this run alive from where it landed.</p>
@@ -3568,7 +3645,11 @@ function renderAd(s: HudSnapshot): string {
     <div class="portal-ad-wait"><div class="spinner"></div><h3>${header}</h3><p>${subtext}</p></div>
     <div class="ad-bar"><i data-live="adBar"></i></div>
     <div class="ad-actions">
-      <button class="mini-btn" data-ui data-action="ad-skip" data-live="adSkip" disabled>Skip in ${Math.ceil(s.adTimer)}</button>
+      ${
+        s.adSkippable
+          ? `<button class="mini-btn" data-ui data-action="ad-skip" data-live="adSkip" disabled>Continues in ${Math.ceil(s.adTimer)}</button>`
+          : ""
+      }
       ${canRemoveBreaks ? `<button class="mini-btn gold" data-ui data-action="ad-gold">✦ Remove breaks</button>` : ""}
     </div>
   `;

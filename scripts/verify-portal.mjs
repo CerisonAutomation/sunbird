@@ -4,13 +4,13 @@
  * HTML5 portals check (Poki, CrazyGames, and the generic batch). Fails loudly
  * with a concrete reason; exit 0 means shippable.
  *
- * Checks per zip (sunbird-poki/crazy/generic.zip):
+ * Checks the shipped zip (sunbird-poki.zip):
  *   1. Zip exists and fits the strictest size bar (Poki's 8 MB initial-load
  *      target — CrazyGames allows 20 MB mobile / 50 MB initial).
  *   2. Staged index.html carries no manifest link (portals are not installable).
  *   3. No js.stripe.com request URL (external payments are banned on portals).
  *   4. No absolute href="/…"/src="/…" (portals serve from deep CDN subpaths).
- *   5. Correct SDK profile: poki/crazy bundles ship their portal integration.
+ *   5. Correct SDK profile: the Poki bundle ships its portal integration.
  *      The ONLY static remote reference any zip may carry is the target
  *      portal's own SDK script tag — Poki's HTML5 guide requires it verbatim
  *      in the page head, and it is the platform's own host, so it is not the
@@ -30,7 +30,7 @@ import { fileURLToPath } from "node:url";
 
 const root = join(fileURLToPath(import.meta.url), "..", "..");
 const MAX_ZIP_BYTES = 8_000_000; // Poki initial-download target (strictest bar)
-const PORTALS = ["poki", "crazy", "generic"];
+const PORTALS = ["poki"];
 const SDK_URL = {
   poki: "game-cdn.poki.com",
   crazy: "sdk.crazygames.com",

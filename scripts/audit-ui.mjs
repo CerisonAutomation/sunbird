@@ -94,8 +94,20 @@ for (const ref of refsGrabbed) {
 }
 // Dynamic data-ref lookups by name (shop preview etc.) are allowed.
 const dynamicRefTargets = new Set(["shopHeroName"]);
+// Refs this audit cannot see a consumer for, because the consumer is the TEST
+// SUITE — it queries these by data-ref, and this script only scans app code.
+// They are real hooks, not dead markup: deleting one breaks
+// pilot-lookup / pilot-name-surface / menu-continuity (unit) or
+// portal-policy (e2e). Declared here so they are an explicit contract instead
+// of a permanent warning nobody reads.
+const testHookRefs = new Set(["pilotCode", "pilotNameInput", "roomCode"]);
 for (const ref of refsDeclared) {
-  if (!refsGrabbed.has(ref) && !refsQueried.has(ref) && !dynamicRefTargets.has(ref)) {
+  if (
+    !refsGrabbed.has(ref) &&
+    !refsQueried.has(ref) &&
+    !dynamicRefTargets.has(ref) &&
+    !testHookRefs.has(ref)
+  ) {
     warnings.push(`unused ref: data-ref="${ref}" is neither grabbed nor queried`);
   }
 }

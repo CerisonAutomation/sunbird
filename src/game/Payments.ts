@@ -6,15 +6,6 @@ export type PurchaseResult = { ok: true; receipt: string } | { ok: false; error:
 
 const RECEIPT_KEY = "sunbird.receipts";
 
-/** Cleaned up: pure coin economy, no external payment providers needed. */
-export function ensureStripeJs(): Promise<unknown> | null {
-  return null;
-}
-
-export function stripeConfigured(_sku: Sku): boolean {
-  return false;
-}
-
 /**
  * Server-verified entitlements or local coin receipt checks.
  */
@@ -36,14 +27,6 @@ export async function fetchServerEntitlements(deviceId: string): Promise<Sku[]> 
   } catch {
     return [];
   }
-}
-
-export function stripeLinkFor(_sku: Sku, _clientRef: string): string | null {
-  return null;
-}
-
-export function consumeStripeReturn(): Sku | null {
-  return null;
 }
 
 function wait(ms: number): Promise<void> {
@@ -100,7 +83,14 @@ export interface AdProvider {
   isAvailable(): boolean;
 }
 
-export class MockAdProvider implements AdProvider {
+/**
+ * The ad provider for builds with no portal SDK: the game runs its own
+ * countdown break. It was called `MockAdProvider`, which read as a test double
+ * in shipped code — it is neither. This is the real placeholder break, the one
+ * `adGate` lets the player wait out; the portal builds get the SDK's own break
+ * from the platform adapter, not by replacing this class.
+ */
+export class PlaceholderAdProvider implements AdProvider {
   readonly duration = AD_DURATION;
 
   isAvailable(): boolean {

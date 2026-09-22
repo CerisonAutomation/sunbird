@@ -177,6 +177,63 @@ for (const file of THUMBNAILS) {
   );
 }
 
+/* THB-09 -------------------------------------------------------------- */
+/**
+ * The animated loop. THB-09 asks for 3-5 s of real gameplay, and the only thing
+ * that decides a GIF's length is the sum of its frame delays — so the gate reads
+ * them rather than trusting the file to exist. (It existed at 0.9 s once: the
+ * capture paced frames off wall-clock time, so a loaded renderer produced a loop
+ * a fifth of the required length and nothing noticed.)
+ */
+const GIF = join(root, "assets", "submission", "sunbird-thumbnail-animated.gif");
+if (!existsSync(GIF)) {
+  fail("sunbird-thumbnail-animated.gif", "missing — run `pnpm build:poki && node scripts/capture-animated-thumbnail.mjs` (THB-09).");
+} else {
+  const buf = readFileSync(GIF);
+  let totalCs = 0;
+  let frames = 0;
+  let width = 0;
+  let height = 0;
+  if (buf.subarray(0, 3).toString("ascii") !== "GIF") {
+    fail("sunbird-thumbnail-animated.gif", "not a GIF (THB-09).");
+  } else {
+    width = buf.readUInt16LE(6);
+    height = buf.readUInt16LE(8);
+    // Walk the block structure: 0x21 0xF9 is a Graphic Control Extension, whose
+    // delay is the little-endian centisecond pair at offset +4.
+    for (let i = 13 + (buf[10] & 0x80 ? 3 * (1 << ((buf[10] & 0x07) + 1)) : 0); i < buf.length - 8; ) {
+      if (buf[i] === 0x21 && buf[i + 1] === 0xf9) {
+        totalCs += buf.readUInt16LE(i + 4);
+        frames += 1;
+      }
+      if (buf[i] === 0x21) {
+        let j = i + 2;
+        while (j < buf.length && buf[j] !== 0) j += buf[j] + 1;
+        i = j + 1;
+      } else if (buf[i] === 0x2c) {
+        const flags = buf[i + 9];
+        let j = i + 10;
+        if (flags & 0x80) j += 3 * (1 << ((flags & 0x07) + 1));
+        j += 1;
+        while (j < buf.length && buf[j] !== 0) j += buf[j] + 1;
+        i = j + 1;
+      } else if (buf[i] === 0x3b) {
+        break;
+      } else {
+        i += 1;
+      }
+    }
+    const seconds = totalCs / 100;
+    if (seconds < 3 || seconds > 5) {
+      fail("sunbird-thumbnail-animated.gif", `plays for ${seconds.toFixed(1)}s — THB-09 requires 3-5 s of gameplay.`);
+    } else if (width !== height || width < MIN_EDGE) {
+      fail("sunbird-thumbnail-animated.gif", `${width}×${height} — the loop must be square and at least ${MIN_EDGE}px (THB-09).`);
+    } else {
+      note(`sunbird-thumbnail-animated.gif — ${frames} frames, ${seconds.toFixed(1)}s at ${width}×${height} (THB-09)`);
+    }
+  }
+}
+
 if (failures.length) {
   console.error(`\n❌ THUMBNAIL GATE FAILED\n${failures.map((f) => `  • ${f}`).join("\n")}\n`);
   process.exit(1);

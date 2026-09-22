@@ -246,4 +246,18 @@ export class GhostPlayer {
     this.flapT = 0;
     this.mesh.visible = false;
   }
+
+  dispose(): void {
+    // Every mesh in here owns a private geometry (built inline in the
+    // constructor), so the traverse reclaims them all; the three materials are
+    // shared across meshes and released once.
+    this.mesh.traverse((obj) => {
+      if (obj instanceof THREE.Mesh) obj.geometry.dispose();
+    });
+    this.mat.dispose();
+    this.wingMat.dispose();
+    this.accentMat.dispose();
+    this.record = null;
+    this.active = false;
+  }
 }

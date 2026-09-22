@@ -16,9 +16,10 @@ import { PICKUP_STYLE, Collectibles, type CloudKind, type PickupKind } from "./C
 import { evaluateNearMiss, FlowTuner, SessionGoals, type NearMiss } from "./Engagement";
 import { BIG_LAUNCH_QUIPS, BOP_QUIPS, FEVER_QUIPS, GEM_QUIPS, MILESTONE_QUIPS, SLEEP_QUIPS, SPLASH_QUIPS, SURRENDER_QUIPS, THUD_QUIPS, SurpriseEngine, quip } from "./Surprises";
 import type { Fx } from "./Fx";
-import { DPR_COOLDOWN_SECONDS, nextBloomBudget, nextDpr, QUALITY_WINDOW_SECONDS } from "./quality";
+import { DPR_COOLDOWN_SECONDS, EFFECT_UP_FRAME_SECONDS, nextBloomBudget, nextDpr, QUALITY_WINDOW_SECONDS } from "./quality";
 import { LaunchSystem, ratingLabel, type LaunchResult } from "./LaunchSystem";
 import { isRaceMode, MASS_RACE_FIELD, MODES, modeById, PVP_MODES, PVP_WORLDS, RACE_FINISH, type ModeDef, type ModeId, type PvpWorldCourse } from "./Modes";
+import { adBreakAllowsAction, adBreakCanEnd } from "./adGate";
 import { MassRace } from "./MassRace";
 import { FinishGate } from "./FinishGate";
 import { fetchPublicRooms, isMultiplayerConfigured, makeRoomCode, type AnyRealtimeClient } from "./Realtime";
@@ -65,6 +66,7 @@ import {
   COIN_VALUE,
   CONTINUE_COST,
   CONTINUE_DAYLIGHT,
+  AD_SAFETY_SECONDS,
   CONTINUE_TIMEOUT,
   DAYLIGHT_ISLAND_REFILL,
   DAYLIGHT_MAX,
@@ -87,6 +89,7 @@ import {
 ZENITH_ALT,
 ZENITH_DURATION,
 ZENITH_SLOWMO,
+ZENITH_THERMAL_VY,
 SHOP_AD_COINS,
 SHOP_AD_SESSION_CAP,
 } from "./constants";
@@ -105,7 +108,7 @@ import { Missions, type MissionView, type QuestReward, type QuestView, type RunS
 import { ParticleFX } from "./ParticleFX";
 import { TrailRibbon } from "./Trail";
 import { fetchServerEntitlements,
-  MockAdProvider,
+  PlaceholderAdProvider,
   CoinPaymentProvider,
   type AdProvider,
   type Sku,
@@ -180,7 +183,11 @@ export class Game {
   private bloomBudget = { enabled: false, goodWindows: 0, cooldown: 0 };
   private readonly sky: Sky;
   private readonly mockPayments = new CoinPaymentProvider();
-  private readonly ads: AdProvider = new MockAdProvider();
+  private readonly ads: AdProvider = new PlaceholderAdProvider();
+  /** Runs started since load. The Startup row exempts the first one from a break. */
+  private sessionRuns = 0;
+  /** Guards the break-then-run re-entry from requesting a break of its own. */
+  private inRunStartBreak = false;
   private platform: PlatformAdapter | null = null;
   /** Detaches the window error → `captureError` reporters (see platform boot). */
   private detachPortalErrorReporters: (() => void) | null = null;
@@ -343,6 +350,19 @@ export class Game {
   private continuesUsed = 0;
   private continueTimer = 0;
   private adTimer = 0;
+  /**
+   * Wall-clock spent in the "ad" state, and the state we were in before it.
+   *
+   * State "ad" is exit-blocked on purpose (see handleAction): a portal break is
+   * ended by the platform's promise and by nothing else. That is correct for
+   * unskippability, but it means a platform ad that never resolves would trap
+   * the player permanently — every control is inert and there is no other way
+   * out. This pair is the safety valve: after AD_SAFETY_SECONDS the break is
+   * abandoned and the previous state restored, WITHOUT granting anything. The
+   * player still cannot skip an ad; they simply cannot be imprisoned by one.
+   */
+  private adWallClock = 0;
+  private preAdState: GameState | null = null;
   private adReason: AdReason = "interstitial";
   private skipInterstitialOnce = false;
   private runRecorded = false;
@@ -484,6 +504,9 @@ export class Game {
   private bestAtStart = 0;
   private distanceRecordCrossed = false;
   private newBest = false;
+  /** Distance frozen at finishRun() — see the comment there. Read by pushHud()
+   *  so the results screen can't drift away from the number that was scored. */
+  private resultDistance = 0;
   private runGems = 0;
   private runRings = 0;
   private ringChain = 0;
@@ -538,6 +561,9 @@ export class Game {
   private readonly onBlur: () => void;
   private readonly onOrientationChange: () => void;
   private readonly onFullscreenChange: () => void;
+  private readonly onKonami: (e: KeyboardEvent) => void;
+  /** Blocks wheel-scroll over the canvas on portal builds (see constructor). */
+  private readonly onCanvasWheel = (ev: Event): void => ev.preventDefault();
 
   private checkoutSku: Sku = "sunbird_gold";
   private checkoutBusy = false;
@@ -614,7 +640,12 @@ export class Game {
       // Portal pages are long (the game sits in an iframe on a scrollable
       // host page): a wheel over the canvas must not scroll the page.
       // In-game HTML panels keep their own scroll behavior untouched.
-      canvas.addEventListener("wheel", (ev) => ev.preventDefault(), { passive: false });
+      //
+      // Held as a field, not an inline arrow, for the same reason as the Konami
+      // listener: an anonymous handler has no identity, so it can never be
+      // removed, and it is the only listener in this class that was added
+      // without a matching removeEventListener in dispose().
+      canvas.addEventListener("wheel", this.onCanvasWheel, { passive: false });
     }
 
     // Embedded portal browsers often expose a desktop UA at a phone-sized
@@ -837,7 +868,14 @@ export class Game {
 
     // Easter egg: Konami code → 500 coins + confetti
     const KONAMI = ["ArrowUp","ArrowUp","ArrowDown","ArrowDown","ArrowLeft","ArrowRight","ArrowLeft","ArrowRight","b","a"];
-    document.addEventListener("keydown", (e: KeyboardEvent) => {
+    // Held in a field, not an inline arrow, so dispose() can remove it: an
+    // anonymous document listener keeps `this` reachable, and with it the whole
+    // scene graph and every GPU buffer, for the life of the page.
+    this.onKonami = (e: KeyboardEvent) => {
+      // Nothing the player types may act during a live break — this listener is
+      // on `document`, so unlike the Input class it is not silenced by
+      // input.setEnabled(false).
+      if (this.state === "ad") return;
       this.konamiBuffer.push(e.key);
       if (this.konamiBuffer.length > KONAMI.length) this.konamiBuffer.shift();
       if (this.konamiBuffer.join(",") === KONAMI.join(",")) {
@@ -846,7 +884,8 @@ export class Game {
         this.save.addCoins(500);
         if (this.state === "playing") this.particles.emitConfetti(0, 0);
       }
-    });
+    };
+    document.addEventListener("keydown", this.onKonami);
 
     this.hud.onAction((action, id) => this.handleAction(action, id));
     this.onResize = () => this.resize();
@@ -1084,6 +1123,8 @@ export class Game {
     document.removeEventListener("fullscreenchange", this.onFullscreenChange);
     document.removeEventListener("webkitfullscreenchange", this.onFullscreenChange);
     document.removeEventListener("visibilitychange", this.onVis);
+    document.removeEventListener("keydown", this.onKonami);
+    this.renderer.domElement.removeEventListener("wheel", this.onCanvasWheel);
     this.renderer.domElement.removeEventListener("webglcontextlost", this.onContextLost);
     this.renderer.domElement.removeEventListener("webglcontextrestored", this.onContextRestored);
     window.removeEventListener("beforeinstallprompt", this.onBeforeInstall);
@@ -1112,6 +1153,11 @@ export class Game {
     this.fx?.dispose();
     this.sky.dispose();
     this.collect.dispose();
+    // Both own GPU buffers that renderer.dispose() does not reach, because the
+    // renderer only walks what it has actually drawn.
+    this.livingBg.dispose();
+    this.ghostPlayer.dispose();
+    this.rivalGhostPlayer.dispose();
     this.p1?.dispose(this.scene);
     this.p2?.dispose(this.scene);
     this.p1 = null;
@@ -1197,7 +1243,12 @@ export class Game {
           const before = Math.ceil(this.countdown - 1);
           this.countdown = this.networkStartAt > 0 ? Math.max(0, (this.networkStartAt - Date.now()) / 1000) : this.countdown - raw;
           const after = Math.ceil(this.countdown - 1);
-          if (after !== before) this.audio.chirp();
+          // The countdown used a bird chirp for its ticks, which reads as
+          // ambience rather than a cue, while the purpose-built countdownBeep
+          // (a 440Hz tick, and a bright two-tone GO on the last one) sat
+          // unused. The launch is the one moment a player must react on time,
+          // so it gets the deliberate cue — the final tick is the GO.
+          if (after !== before) this.audio.countdownBeep(after <= 0);
           if (this.countdown <= 0) this.audio.island();
           break;
         }
@@ -1219,6 +1270,19 @@ export class Game {
         break;
       case "ad":
         this.adTimer -= raw;
+        // Safety valve: the ad state is exit-blocked by design, so a platform
+        // ad whose promise never settles must not be allowed to trap the game.
+        // Generous on purpose — every real break resolves long before this, so
+        // a player-initiated skip is still impossible and this only fires when
+        // the SDK has genuinely failed. The previous state is restored and
+        // nothing is granted.
+        this.adWallClock += raw;
+        if (this.adWallClock > AD_SAFETY_SECONDS) {
+          this.telemetry.track("ad_abandoned", { reason: this.adReason, portal: this.platform?.name ?? "none" });
+          this.endPortalAd();
+          const restore = this.preAdState ?? "gameover";
+          this.setState(restore === "ad" ? "gameover" : restore);
+        }
         break;
       case "gameover":
         this.acc += raw;
@@ -1311,12 +1375,12 @@ export class Game {
       if (this.needRelease) return;
       this.menuHold += dt;
       if (this.menuHold >= Math.min(threshold, 0.05)) {
-        if (this.state === "gameover") this.replayRun(true);
+        if (this.state === "gameover") this.replayRun();
         else this.startRun();
       }
     } else {
       if (this.menuHold > 0 && !this.needRelease) {
-        if (this.state === "gameover") this.replayRun(true);
+        if (this.state === "gameover") this.replayRun();
         else this.startRun();
       }
       this.needRelease = false;
@@ -1422,7 +1486,9 @@ export class Game {
         if (ahead && this.ghostWasAhead && !this.ghostPassed && this.runTime > 4) {
           this.ghostPassed = true;
           this.save.addGhostBeat();
-          for (const t of this.achievements.checkNew()) this.hud.toast(`Trophy: ${t.title}`, "gold");
+          const newTrophies = this.achievements.checkNew();
+          for (const t of newTrophies) this.hud.toast(`Trophy: ${t.title}`, "gold");
+          if (newTrophies.length > 0) this.audio.trophy();
           this.hud.toast("Passed your ghost! 👻", "quest");
           this.audio.ding();
           this.bonus += 30;
@@ -1527,9 +1593,12 @@ export class Game {
         this.particles.emitWind(this.bird.x, this.bird.y, 1.4);
       }
 
-      // Stratosphere ascent thermal super-lift
+      // Stratosphere ascent thermal super-lift. The cap was hardcoded to 180 —
+      // 1.5x the bird's own top speed — which turned a thermal column into a
+      // launch to orbit (see ALT_CEILING). ZENITH_THERMAL_VY keeps the mode's
+      // rocketship feel inside the envelope the world is framed for.
       if (this.modeId === "pvp_zenith" && this.weather.inThermal) {
-        this.bird.vy = Math.min(180, this.bird.vy + dt * 25);
+        this.bird.vy = Math.min(ZENITH_THERMAL_VY, this.bird.vy + dt * 25);
       }
 
       // Knockout mode elimination evaluation
@@ -1622,8 +1691,12 @@ export class Game {
       this.bird.grounded = false;
       this.particles.emitWaterBounce(this.bird.x, WATER_Y);
       this.audio.shield();
+      // The popup below shouts "BOING!" — it needs to be voiced. This bounce
+      // played only the shield chime, so the loudest word on screen had no
+      // sound behind it.
+      this.audio.boing();
       this.hud.toast("Shield bounce!", "power");
-      this.popupAtBird(quip(BOP_QUIPS, this.bounceCount++), "bop");
+      this.popupAtBird(this.bopWord(), "bop");
       this.shake(0.6);
       this.haptic([15, 10, 15, 10, 30]);
     }
@@ -2162,7 +2235,7 @@ export class Game {
     this.particles.burstRing(this.bird.x, this.bird.y, 0xffcf33);
     this.particles.emitBounceBop(this.bird.x, this.bird.y, 1.0, 0.85, 0.2);
     this.particles.emitConfetti(this.bird.x, this.bird.y + 1);
-    this.popupAtBird(quip(BOP_QUIPS, this.bounceCount++), "bop");
+    this.popupAtBird(this.bopWord(), "bop");
     this.camera.punch(4);
     this.hud.toast("🌻 Sunflower bounce +80", "gold");
     this.glow(0.55);
@@ -2302,7 +2375,7 @@ export class Game {
     this.particles.emitConfetti(x, y + 1);
     this.particles.burstRing(x, y, 0xff6b6b);
     this.particles.emitBounceBop(x, y, 1.0, 0.42, 0.75);
-    this.popupAtBird(quip(BOP_QUIPS, this.bounceCount++), "bop");
+    this.popupAtBird(this.bopWord(), "bop");
     this.camera.punch(6);
     this.shake(0.3);
     this.hud.toast("🎈 Balloon bounce! +150", "gold");
@@ -2310,6 +2383,19 @@ export class Game {
     this.glow(0.7);
     this.haptic([20, 10, 40, 20, 60]);
     this.telemetry.track("balloon", {});
+  }
+
+  /**
+   * Next rotating bop word for a bounce, voiced to match. The words and the
+   * bounce sounds were decorrelated — "WHEEE!" is a slide whistle, but it could
+   * land on a water splash or a balloon pop and never sound like the word on
+   * screen. It now brings its own voice; the springy words ride whatever bounce
+   * sound the caller already played.
+   */
+  private bopWord(): string {
+    const word = quip(BOP_QUIPS, this.bounceCount++);
+    if (word === "WHEEE!") this.audio.slideWhistle();
+    return word;
   }
 
   private checkZenith(): void {
@@ -2353,11 +2439,44 @@ export class Game {
     this.telemetry.track("manual_boost", { source });
   }
 
+  /**
+   * A Star Wish, collected in the space band above the cloud deck. It grants
+   * ONE random power rather than a fixed one: the uncertainty is what makes the
+   * climb worth repeating, and it means a star is never a dud you already hold.
+   *
+   * The wish is derived from the star's own x, deliberately not Math.random().
+   * This game rolls its hills and its surprises from the run seed so a race or a
+   * daily challenge is decided by flying, never by luck the field cannot share.
+   */
+  private grantStarWish(x: number, y: number): void {
+    const pool: PickupKind[] = [
+      "longglide", "wingboost", "magnet", "feather", "cloudboost", "goldenwings", "shield",
+    ];
+    const wish = pool[Math.abs(Math.floor(x)) % pool.length]!;
+    this.pickups += 1;
+    this.bonus += 150;
+    this.awardXp(XP_RULES.coin);
+    this.powers.add(wish);
+    this.audio.chapterFanfare();
+    this.particles.emitPickup(x, y, 1, 0.97, 0.9);
+    this.particles.burstRing(x, y, 0xfff2c0);
+    this.particles.emitConfetti(x, y + 1);
+    this.flash("perfect");
+    this.glow(0.7);
+    this.haptic([50, 30, 50, 30, 120]);
+    this.hud.toast(`⭐ WISH GRANTED — ${PICKUP_STYLE[wish].label}`, "gold");
+  }
+
   private onPickup(kind: PickupKind, x: number, y: number): void {
     if (this.challengeMods.noPowerups) {
       // Pure Sky: the pickup pops visually but grants nothing.
       this.particles.emitCollect(x, y);
       this.hud.toast("Pure Sky — power-ups are inert", "info");
+      return;
+    }
+    // A star pays a random power instead of one of its own (see grantStarWish).
+    if (kind === "star") {
+      this.grantStarWish(x, y);
       return;
     }
     this.pickups += 1;
@@ -2580,6 +2699,9 @@ export class Game {
     // margin beside the card. Every other state keeps gameplay framing.
     const attract = this.state === "menu" && !this.versus;
     this.camera.update(rawDt, this.bird, playing, this.terrain.landingGround(this.bird.x, this.bird.vx), attract, this.feverOn);
+    // Tell the bird how far away the camera settled, so it can compensate for
+    // the altitude dolly and stay legible. Must follow camera.update().
+    this.bird.setViewDistance(this.camera.viewDistance);
     // Sink foreground props that would cross the bird's sight line (per-view
     // in split-screen so neither player loses their bird behind a tree).
     this.terrain.updateOcclusion(
@@ -2612,7 +2734,8 @@ export class Game {
   /** Shared sky / fog / palette work, driven by whoever the camera follows. */
   private applyWorldLook(x: number, altitude: number): void {
     const biome = this.terrain.biomeAt(x + 60);
-    this.audio.setBiome(biome.musicMode);
+    // The island picks the song, so crossing a border changes the music.
+    this.audio.setBiome(biome.musicMode, biome.id);
     const dayT = this.state === "menu" ? 0.86 : Math.max(0, Math.min(1, this.daylight / this.daylightMax()));
     const altT = clamp((altitude - ALT_CLOUDS) / (ALT_STRATO - ALT_CLOUDS), 0, 1);
     const isAurora = biome.id === "aurora";
@@ -2692,6 +2815,18 @@ export class Game {
   /* ------------------------------------------------------------- run flow */
 
   private startRun(opts?: RunOptions): void {
+    // Poki, "PokiSDK: HTML5" step 4: "we recommend calling commercialBreak()
+    // before every gameplayStart(), whenever the player has shown intent to
+    // continue playing." Every run start in the game funnels through here, so
+    // the rule lives here rather than at the thirteen call sites that used to
+    // skip it — only restarts ever asked for a break, so a player who kept
+    // launching runs from the menu was never offered one at all.
+    if (this.shouldBreakBeforeRun(opts)) {
+      this.inRunStartBreak = true;
+      void this.restartWithPortalBreak(opts).finally(() => { this.inRunStartBreak = false; });
+      return;
+    }
+    this.sessionRuns += 1;
     this.exitVersus();
     this.mode = modeById(this.modeId);
     // Portal game events: open this attempt's measurement span. The run is a
@@ -2903,8 +3038,14 @@ export class Game {
     this.hud.toast(quip(SLEEP_QUIPS, Math.round(this.bird.x)), "cloud");
     const gold = this.save.state.gold;
     const canCoins = this.save.state.wallet >= CONTINUE_COST;
+    // A portal BUILD is not a portal SESSION: a blocked SDK script, an ad-blocked
+    // browser or an off-portal preview all leave the Poki build with no ad
+    // surface at all. Asking `portalEnabled()` here offered "Watch for Second
+    // Wind" in exactly those sessions, and the reward path opens with
+    // `if (!this.adsLive()) return;` — so the button was offered AND inert: the
+    // tap did nothing, with no ad, no toast and no state change.
     const canAd = this.portalEnabled()
-      ? Boolean(this.platform && this.platform.name !== "none")
+      ? this.adsLive()
       : !gold && this.ads.isAvailable() && this.save.adsLeftToday() > 0;
     // Honest tiering: free players get 1 second wind, VIP gets 2, and Gold
     // gets what its feature list promises — the sun never wins on a technicality.
@@ -2973,9 +3114,16 @@ export class Game {
     // without an outcome would break the drop-off funnel.)
     this.platform?.measure("run", this.modeId, this.runOutcome);
     const stats = this.runStats();
+    // Freeze the number the results card shows: `bird.asleep` only damps
+    // velocity (see Bird.update), it doesn't zero it, so the bird keeps
+    // coasting for a couple of seconds after this point. Score, leaderboard
+    // submission and this XP award all read `stats.distance` right here —
+    // the HUD must show that same frozen number on the results screen, not
+    // keep re-reading a bird position that is still sliding underneath it.
+    this.resultDistance = stats.distance;
     this.newBest = this.bestAtStart > 0 && stats.distance > this.bestAtStart;
     // A personal best is the one moment CrazyGames wants celebrated site-wide.
-    if (this.newBest) this.platform?.happytime();
+    if (this.newBest) this.platform?.happyTime();
     this.telemetry.track("run_end", { mode: this.modeId, distance: Math.round(stats.distance), newBest: this.newBest });
 
     // A duel abandoned short of the line is a loss — no free retries on rating.
@@ -3020,6 +3168,8 @@ export class Game {
     }
 
     // Global board + weekly cups both score off the same verified run stats.
+    // durationMs is not decoration: the server's plausibility gate reads it, and
+    // a submission that carries none is quarantined instead of ranked.
     this.board.submit({
       deviceId: this.save.state.deviceId,
       name: this.racedName(),
@@ -3031,6 +3181,7 @@ export class Game {
       score: Math.round(this.score()),
       seed: this.seed,
       mode: this.modeId,
+      durationMs: Math.max(0, Math.round(this.runTime * 1000)),
     });
     this.boardPage = null;
     // Re-pull the board so the results screen (and the home screen) can show
@@ -3045,6 +3196,7 @@ export class Game {
       coins: this.runCoins,
     });
     for (const cup of improvedCups) this.hud.toast(`${cup.icon} ${cup.name} — new personal best`, "gold");
+    if (improvedCups.length > 0) this.audio.personalBest();
     this.save.persist();
 
     this.newlyCompleted = this.missions.applyRun(stats);
@@ -3136,8 +3288,10 @@ export class Game {
     if (mastery) {
       if (mastery.skill) {
         this.hud.toast(`★ ${this.mode.name} MASTERED · skill unlocked: ${mastery.skill.name} (${mastery.skill.desc}) · +${mastery.coins} coins`, "gold");
+        this.audio.chapterFanfare();
       } else {
         this.hud.toast(`${this.mode.icon} ${this.mode.name} mastery Lv.${mastery.level} · +2% coins in mode · +${mastery.coins} coins`, "gold");
+        this.audio.milestone();
       }
     }
     const score = this.score();
@@ -3201,6 +3355,7 @@ export class Game {
     }
     if (this.newlyCompleted.length) this.hud.toast("Nest upgraded!", "island");
     for (const t of newTrophies) this.hud.toast(`Trophy: ${t.title}`, "gold");
+    if (newTrophies.length > 0) this.audio.trophy();
 
     const runs = this.save.state.runsPlayed;
     const dueAd = !this.portalEnabled() && !this.save.state.gold && this.save.shouldShowInterstitial(runs);
@@ -3401,6 +3556,19 @@ export class Game {
   /* --------------------------------------------------------------- actions */
 
   private handleAction(action: string, id: string): void {
+    // While a break is live, the ONLY actions that may run are the ones the
+    // game owns on a placeholder ad. This is the canonical guard: input was
+    // already disabled during a break, but that only gates the Input class
+    // (keys, dive, pause) — the HUD's own DOM buttons stayed clickable, so any
+    // "back"/navigate/pause control left on screen could still fire and walk
+    // the player out of the ad. A portal break is ended by the SDK promise and
+    // nothing else.
+    //
+    // The rule itself lives in ./adGate, where a unit test enumerates every
+    // action in the shipping markup against both break kinds.
+    if (this.state === "ad" && !adBreakAllowsAction(action, this.portalEnabled())) {
+      return;
+    }
     void this.audio.resume();
     switch (action) {
       case "spin-wheel": {
@@ -3523,7 +3691,7 @@ export class Game {
         if (this.state !== "ad" && this.state !== "continue") this.startRun();
         break;
       case "retry":
-        if (this.state === "gameover") this.replayRun(true);
+        if (this.state === "gameover") this.replayRun();
         break;
       case "pause":
         if (this.state === "playing") this.setState("paused");
@@ -3544,7 +3712,14 @@ export class Game {
       case "restart-flight":
         if (this.state === "paused" || this.state === "playing") {
           if (this.state === "paused") this.closePauseScreen();
-          this.replayRun(false);
+          // A restart is death-and-restart by another name, so it takes the
+          // same break (Poki's event table). It carried `false` here while the
+          // identical button on the recap passed `true`, so this whole class of
+          // natural breaks — the ones a player makes without dying — signalled
+          // nothing and could never be filled. The stop is already on the books
+          // either way: `setState("ad")` sends it when we come from `playing`,
+          // and the pause transition sent it when we come from `paused`.
+          this.replayRun();
         }
         break;
       case "menu":
@@ -4092,7 +4267,9 @@ export class Game {
       }
       case "shop-free-coins": {
         // Rewarded ad from the shop: capped per session to prevent ad farming.
-        if (!this.platform || this.platform.name === "none") break;
+        // The card is hidden without a live ad surface (HUD: `adAvailable`), so
+        // this is the second half of the same gate.
+        if (!this.adsLive()) break;
         if (this.shopAdClaimed >= SHOP_AD_SESSION_CAP) {
           this.hud.toast("Ad rewards capped for this visit", "info");
           break;
@@ -4541,7 +4718,7 @@ export class Game {
         // or an AI-flock race replays locally, exactly as it was flown.
         if (this.state !== "gameover") break;
         const opts = this.lastMatchOpts ?? { ranked: false, storm: false };
-        if (this.duelActive || this.versus) this.replayRun(true);
+        if (this.duelActive || this.versus) this.replayRun();
         else if (this.localRace || !isMultiplayerConfigured()) this.launchMatch(opts, true);
         else this.beginMatchmaking(opts);
         break;
@@ -4582,7 +4759,11 @@ export class Game {
         break;
       case "continue-ad":
         if (this.state === "continue") {
-          if (this.portalEnabled()) {
+          if (this.portalEnabled() && !this.adsLive()) {
+            // Unreachable while `canAd` gates the offer, and deliberately not
+            // silent: a tap that does nothing is the worst outcome available.
+            this.hud.toast("Ads aren't available right now — second wind costs coins", "info");
+          } else if (this.portalEnabled()) {
             // Poki game-events: the player chose the rewarded option. The label
             // matches the `visible` event for the same offer kind (REQ-14).
             const kind = this.continueOfferView?.kind ?? "standard";
@@ -4603,10 +4784,21 @@ export class Game {
         if (this.state === "continue") this.finishRun();
         break;
       case "ad-skip":
-        if (this.state === "ad" && this.adTimer <= 0) this.endAd();
+        // Placeholder ads only. A portal-served break is ended by the SDK's own
+        // completion callback, never by a game button: on that path adTimer is
+        // left at 0, so an unguarded `adTimer <= 0` test was already true and
+        // the button rendered enabled during a real ad — clicking it skipped
+        // the break AND paid out the reward.
+        if (this.state === "ad" && adBreakCanEnd(this.portalEnabled(), this.adTimer)) this.endAd();
         break;
       case "ad-gold":
-        if (this.state === "ad") {
+        // The upsell must not be an ad-skip. This button used to end the break
+        // immediately (finishRun/gameover + paywall), so a player could dismiss
+        // every sponsored break without it ever playing — the break was skipped
+        // for free and the offer was never actually taken. It now waits out the
+        // same timer as `ad-skip`, so the ad always runs; the player still keeps
+        // the shortcut to the offer afterwards.
+        if (this.state === "ad" && adBreakCanEnd(this.portalEnabled(), this.adTimer)) {
           if (this.adReason === "continue") {
             this.skipInterstitialOnce = true;
             this.finishRun();
@@ -4737,9 +4929,11 @@ export class Game {
     }
     if (this.input.consumeRestart()) {
       if (this.state === "gameover") {
-        this.replayRun(true);
+        this.replayRun();
       } else if (this.state === "playing" || this.state === "paused") {
-        this.replayRun(false);
+        // Same break as the recap's restart: R abandons the current run for a
+        // fresh one, which is intent to keep playing. See "restart-flight".
+        this.replayRun();
       }
     }
     if (this.input.consumeMute()) {
@@ -5165,10 +5359,12 @@ export class Game {
       this.save.ownSkin(pick);
       const skinDef = skinById(pick);
       this.hud.toast(`🥚 Vault Hatched: ${skinDef.name} Bird Skin!`, "gold");
+      this.audio.eggHatch();
     } else if (rng < 0.70 && unownedTrails.length > 0) {
       const pick = unownedTrails[Math.floor(Math.random() * unownedTrails.length)]!;
       this.save.ownTrail(pick);
       this.hud.toast(`🥚 Vault Hatched: ${pick.replace("trail_", "").toUpperCase()} Trail!`, "gold");
+      this.audio.eggHatch();
     } else {
       const reward = 300 + Math.floor(Math.random() * 300);
       this.save.addCoins(reward);
@@ -5247,6 +5443,30 @@ export class Game {
     this.bird.applySkin({ body: s.body, wing: s.wing, belly: s.belly, beak: s.beak });
   }
 
+  /**
+   * Bloom is the expensive effect: desktop only, never under reduced-motion (a
+   * steady glow reads as flicker to some players), and never in split-screen.
+   * Split-screen draws two viewports from one scene, so a full-screen post pass
+   * costs roughly double at exactly the moment the GPU is busiest.
+   */
+  private bloomEligible(): boolean {
+    const s = this.save.state.settings;
+    return !s.reduceMotion && !this.isMobile && !this.versus;
+  }
+
+  /**
+   * Apply the bloom policy for the current mode. Switching into or out of
+   * split-screen does not re-run applySettings(), so both transitions call this
+   * explicitly — otherwise a quality:"high" desktop player kept bloom through a
+   * two-viewport versus match, and lost it afterwards until the next full
+   * settings pass.
+   */
+  private applyBloomPolicy(): void {
+    this.useBloom = this.bloomEligible() && this.save.state.settings.quality === "high";
+    this.bloomBudget = { enabled: false, goodWindows: 0, cooldown: 0 };
+    if (!this.useBloom) this.fx?.setBase(0);
+  }
+
   private applySettings(): void {
     const s = this.save.state.settings;
     this.audio.setMuted(s.mute);
@@ -5254,11 +5474,7 @@ export class Game {
     this.audio.setVolumes(s.musicVolume, s.sfxVolume);
     this.audio.setMusicTrack(s.musicTrack);
     this.camera.setReduceMotion(s.reduceMotion);
-    // Bloom is the expensive effect — desktop high/auto only, and never under
-    // reduced-motion (a steady glow reads as flicker to some players).
-    this.useBloom = !s.reduceMotion && !this.isMobile && s.quality === "high";
-    this.bloomBudget = { enabled: false, goodWindows: 0, cooldown: 0 };
-    if (!this.useBloom) this.fx?.setBase(0);
+    this.applyBloomPolicy();
     // Accessibility classes live on <html> so every overlay inherits them.
     document.documentElement.classList.toggle("a11y-color", s.colorAssist);
     document.documentElement.classList.toggle("a11y-bigtext", s.bigText);
@@ -5319,7 +5535,7 @@ export class Game {
     // Resolution is two-way: step down when the budget is blown, and back up
     // when headroom returns, with a lock-out so it cannot oscillate. The old
     // loop only ever stepped down, so one bad moment degraded the whole session.
-    this.bloomBudget = nextBloomBudget(this.bloomBudget, this.frameEma, !this.isMobile && !this.save.state.settings.reduceMotion && !this.versus);
+    this.bloomBudget = nextBloomBudget(this.bloomBudget, this.frameEma, this.bloomEligible());
     this.useBloom = this.bloomBudget.enabled;
     const previousDpr = this.dpr;
     this.dpr = nextDpr(this.dpr, this.preferredDpr(), this.frameEma, this.dprCooldown);
@@ -5342,7 +5558,7 @@ export class Game {
         this.particles.setBudget(this.particleBudget);
       }
     } else if (
-      this.frameEma < 1 / 58 &&
+      this.frameEma < EFFECT_UP_FRAME_SECONDS &&
       !this.isMobile &&
       this.deviceProfile.tier !== "lite" &&
       this.renderer.shadowMap.enabled === false
@@ -5511,6 +5727,12 @@ export class Game {
   private adsLive(): boolean {
     const platform = this.platform;
     if (!this.portalEnabled() || !platform || platform.name === "none") return false;
+    // An ad-blocked browser has no ad surface, so a break is not requested at
+    // all. Requesting it anyway is what MON-12 calls looping the request: the
+    // promise never settles, and the player is left holding a game that muted
+    // itself and disabled input for an ad that was never coming. The cached
+    // probe already existed for this; nothing consulted it.
+    if (platform.hasAdBlock?.()) return false;
     return platform.capabilities().includes("ads");
   }
 
@@ -6020,8 +6242,17 @@ export class Game {
     this.bump();
   }
 
-  /** A portal-controlled commercial break at the natural death/restart seam. */
-  private replayRun(allowPortalBreak: boolean): void {
+  /**
+   * A portal-controlled commercial break at the natural death/restart seam.
+   *
+   * Every restart is a break opportunity — it is the same "stop, then back into
+   * a run" moment whether the player died, abandoned the flight, or restarted
+   * from the pause card. There is deliberately no `allowPortalBreak` opt-out
+   * any more: one existed, two of the six paths passed `false`, and those ad
+   * slots were silently unfillable ever after. A break that will not serve
+   * resolves on its own, so asking costs nothing.
+   */
+  private replayRun(): void {
     if (this.versus) { this.startVersus(); return; }
     if (isRaceMode(this.modeId) && this.roomCode && !this.localRace) {
       // An online race "replay" means going back through the search so the next
@@ -6049,8 +6280,32 @@ export class Game {
         event: this.eventRun, storm: this.stormfront }),
       replay: true,
     };
-    if (allowPortalBreak && this.adsLive()) void this.restartWithPortalBreak(options);
+    if (this.adsLive()) void this.restartWithPortalBreak(options);
     else this.startRun(options);
+  }
+
+  /**
+   * Is this run start a break opportunity? (Poki, "PokiSDK: HTML5", step 4.)
+   *
+   * Three things are deliberately NOT opportunities:
+   *  • the first run of the session — the Startup row of Poki's event table is
+   *    `gameLoadingFinished() → gameplayStart()` with no break, because the
+   *    player has already paid for it with the loading screen;
+   *  • a live race — a duel, a room, or a same-screen 1v1 has other people
+   *    waiting, and the platform's own guidance is that a break belongs at a
+   *    natural stop, not between "ready" and the start line;
+   *  • the run that a break is handing into, which must not ask for another.
+   *
+   * Everything else — Play, the daily course, a gauntlet, a solo mode, a storm
+   * run — is a player choosing to keep playing, which is exactly the moment the
+   * doc asks to be signalled. Whether an ad actually serves is Poki's call.
+   */
+  private shouldBreakBeforeRun(opts?: RunOptions): boolean {
+    if (this.inRunStartBreak) return false;
+    if (this.sessionRuns === 0) return false;
+    if (!this.adsLive()) return false;
+    if (opts?.duel || this.versus || this.localRace || this.roomCode) return false;
+    return true;
   }
 
   private async restartWithPortalBreak(options: RunOptions = {}): Promise<void> {
@@ -6141,7 +6396,7 @@ export class Game {
    *  high-price mythic tier (2500-10000) stays aspirational. */
   private async multiplyCoinsFromShopAd(): Promise<void> {
     const platform = this.platform;
-    if (!platform || platform.name === "none") return;
+    if (!this.adsLive() || !platform || platform.name === "none") return;
     if (this.shopAdClaimed >= SHOP_AD_SESSION_CAP) {
       this.hud.toast("Free coin rewards capped for this hour", "info");
       return;
@@ -6187,6 +6442,14 @@ export class Game {
   private setState(s: GameState): void {
     const previous = this.state;
     this.state = s;
+    // Arm and disarm the break safety valve (see adWallClock).
+    if (s === "ad") {
+      this.preAdState = previous;
+      this.adWallClock = 0;
+    } else if (previous === "ad") {
+      this.preAdState = null;
+      this.adWallClock = 0;
+    }
     // Leaving pause entirely collapses any open pause sub-screen state so the
     // next pause opens cleanly on the base card.
     if (s !== "paused") this.pauseScreenOrigin = null;
@@ -6611,7 +6874,11 @@ export class Game {
       // when the deployed SDK actually offers it.
       portalLeaderboard: this.platform?.capabilities().includes("leaderboard") ?? false,
       version: this.uiVersion,
-      distance: stats.distance,
+      // gameover reads the frozen finishRun() number (see resultDistance):
+      // the bird keeps coasting under the results card, and re-reading its
+      // live position here made the results distance climb past the number
+      // that was actually scored and submitted to the leaderboard.
+      distance: this.state === "gameover" ? this.resultDistance : stats.distance,
       coins: this.runCoins,
       multiplierClaimed: this.multiplierClaimed,
       daylight: this.daylight,
@@ -6647,6 +6914,7 @@ export class Game {
       // Portal: only advertise a rewarded option the SDK can actually pay out.
       adAvailable: this.portalEnabled() ? this.adsLive() : this.ads.isAvailable(),
       adTimer: this.adTimer,
+      adSkippable: !this.portalEnabled(),
       adTotal: this.ads.duration,
       adReason: this.adReason,
       seedLabel: this.seedLabel(),
@@ -6793,6 +7061,7 @@ export class Game {
       roomCapacity: this.net?.info().capacity ?? MASS_RACE_FIELD,
       roomReady: this.net?.info().ready ?? false,
       roomReadyCount: (this.net?.roster().filter((p) => p.ready).length ?? 0) + (this.net?.info().ready ? 1 : 0),
+      roomAiFallback: this.net?.info().aiFallback ?? false,
       roomSize: this.roomSize,
       roomSkill: this.roomSkill,
       roomMuted: this.roomMuted,
@@ -6816,8 +7085,9 @@ export class Game {
         this.state === "menu" && this.screen === "live"
           // Truth only: the pilots actually seated in this room. No padded
           // name-pool rivals, no borrowed leaderboard names — an empty room
-          // renders as an empty room.
-          ? lobbyRivals(this.net?.roster() ?? [])
+          // renders as an empty room. When the room is the local AI fallback,
+          // every row is tagged as an AI pilot rather than as a live human.
+          ? lobbyRivals(this.net?.roster() ?? [], this.net?.info().aiFallback ?? false)
           : [],
       raceRated: this.rankedRace,
       raceVerified: this.serverPlaceApplied,
@@ -6880,6 +7150,7 @@ export class Game {
     this.disconnectRace();
     this.roomCode = "";
     this.versus = true;
+    this.applyBloomPolicy();
     this.modeId = "race";
     this.mode = modeById("race");
     this.versusWinner = 0;
@@ -6982,6 +7253,7 @@ export class Game {
 
   private exitVersus(): void {
     this.versus = false;
+    this.applyBloomPolicy();
     this.input.splitMode = "off";
     this.bird.root.visible = true;
     if (this.p1) this.p1.bird.root.visible = false;

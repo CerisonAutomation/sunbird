@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { SUPPORTED_LOCALES, matchLocale } from "../index";
+import { SUPPORTED_LOCALES, formatNumberLocalized, matchLocale } from "../index";
 import barrel from "../translations.barrel.json";
 
 /**
@@ -131,5 +131,68 @@ describe("runtime packs (generated from the barrel)", () => {
       const missing = keys.filter((k) => typeof pack[k] !== "string" || pack[k].length === 0);
       expect(missing, file).toEqual([]);
     }
+  });
+});
+
+/**
+ * The coin readouts go through this. Grouping is the whole point: the flight
+ * HUD counter used `String(s.coins)`, so 12480 rendered as "12480" there while
+ * every menu showed "12,480" — the same number, two shapes, on the screen the
+ * player looks at most.
+ */
+describe("localized number formatting (the coin counters)", () => {
+  it("groups thousands in English", () => {
+    expect(formatNumberLocalized(12_480, "en")).toBe("12,480");
+    expect(formatNumberLocalized(999_999, "en")).toBe("999,999");
+  });
+
+  it("uses the locale's own separators", () => {
+    // German swaps the separator roles; a hardcoded en-US toLocaleString got
+    // this wrong for every player whose language was not English.
+    expect(formatNumberLocalized(12_480, "de")).toBe("12.480");
+    expect(formatNumberLocalized(12_480, "pt-BR")).toBe("12.480");
+  });
+
+  it("leaves amounts under a thousand untouched in every shipped locale", () => {
+    for (const locale of SUPPORTED_LOCALES) {
+      expect(formatNumberLocalized(240, locale.code), locale.code).toBe("240");
+    }
+  });
+});
+
+/**
+ * The coverage direction that was missing.
+ *
+ * Every test above walks barrel → packs. Nothing walked source → barrel, so a
+ * `t("some.key", undefined, "English")` whose key was never added looked
+ * perfectly healthy: 20 locales, 44 keys, all green — while that string
+ * silently rendered its English fallback for every non-English player. That is
+ * the very failure the barrel's doc comment claims to prevent, inverted. This
+ * closes it: any literal key passed to `t()` must exist in the barrel.
+ */
+describe("source → barrel coverage (the direction that was missing)", () => {
+  it("every literal key passed to t() exists in the barrel", () => {
+    const root = resolve(__dirname, "../../..");
+    const barrelDoc = JSON.parse(readFileSync(resolve(root, "src/i18n/translations.barrel.json"), "utf8")) as {
+      barrel: Record<string, unknown>;
+    };
+    const known = new Set(Object.keys(barrelDoc.barrel));
+    // A translation key is dotted, lowercase and space-free. That shape is what
+    // separates a real t("hud.stat.coins") from an unrelated local named `t`.
+    const call = /\bt\(\s*["'`]([a-z0-9]+(?:\.[a-z0-9-]+)+)["'`]/g;
+    const walk = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+        const full = resolve(dir, entry.name);
+        if (entry.isDirectory()) return entry.name === "__tests__" || entry.name === "packs" ? [] : walk(full);
+        return /\.tsx?$/.test(entry.name) ? [full] : [];
+      });
+    const unknown = new Map<string, string>();
+    for (const file of walk(resolve(root, "src"))) {
+      for (const match of readFileSync(file, "utf8").matchAll(call)) {
+        const key = match[1]!;
+        if (!known.has(key)) unknown.set(key, file.slice(root.length + 1));
+      }
+    }
+    expect([...unknown].map(([key, file]) => `${key}  (${file})`)).toEqual([]);
   });
 });

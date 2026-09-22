@@ -45,6 +45,7 @@ function fixture() {
     createOscillator: create,
     createBufferSource: create,
     createBuffer: (_channels: number, length: number) => ({ getChannelData: () => new Float32Array(length) }),
+    createWaveShaper: () => { const n = create(); (n as unknown as { curve: null }).curve = null; return n; },
   };
   const music = new Music(ctx as unknown as AudioContext, dry as unknown as AudioNode, wet as unknown as AudioNode);
   return { music, nodes, ctx, dry, wet };
@@ -105,7 +106,7 @@ describe("arcade chiptune family", () => {
     // percussive instrument). Both layers must be audible: the assertion that
     // the bell is *quieter* than the lead is the part that stops the score
     // drifting back to bell-solo.
-    expect(s.bpm).toBe(164);
+    expect(s.bpm).toBe(176);
     expect(s.chipGain.gain.value).toBeGreaterThan(0);
     expect(s.ukeGain.gain.value).toBe(0);
     expect(s.glockGain.gain.value).toBeGreaterThan(0);
@@ -128,7 +129,7 @@ describe("arcade chiptune family", () => {
 
     const s = internals(music);
     expect(s.isChipTrack).toBe(false);
-    expect(s.bpm).toBe(132); // bright biome default (upbeat floor)
+    expect(s.bpm).toBe(130); // bright biome default
     expect(s.chipGain.gain.value).toBe(0);
     expect(s.ukeGain.gain.value).toBeGreaterThan(0);
     // The ukulele/whistle carries the tune and the bell shimmers underneath it.
@@ -171,10 +172,12 @@ describe("arcade chiptune family", () => {
     music.setLevel(0.8);
     (music as unknown as { onTrackChange?: (n: string) => void }).onTrackChange = (n) => announced.add(n);
     const ctx = (music as unknown as { ctx: { currentTime: number } }).ctx;
-    // Run ~40 s of audio: at every tempo in the library (100–170 BPM) that
-    // is well past two 8-bar sections, so at least two section flips (and
-    // announcements) must happen no matter which track the shuffle opens on.
-    for (let i = 0; i < 400; i++) { ctx.currentTime += 0.1; vi.advanceTimersByTime(25); }
+    // Run ~200 s of audio: a section now holds for PASSES_PER_SECTION (3)
+    // passes of its 8-bar progression before the shuffle advances, so two
+    // section flips need 48 bars. At the slowest tempo in the library (100 BPM)
+    // that is ~115 s, so 200 s clears it with margin no matter which track the
+    // shuffle opens on. (This was ~40 s when a section lasted a single pass.)
+    for (let i = 0; i < 2000; i++) { ctx.currentTime += 0.1; vi.advanceTimersByTime(25); }
     expect(announced.size).toBeGreaterThanOrEqual(2);
     music.dispose();
   });

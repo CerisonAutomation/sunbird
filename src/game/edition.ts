@@ -1,7 +1,7 @@
 /**
  * Portal edition strings — the WEB/generic/itch flavour.
  *
- * `vite.config.ts` swaps this module for `edition.poki.ts` / `edition.crazy.ts`
+ * `vite.config.ts` swaps this module for `edition.poki.ts` in the portal build
  * at build time (same plugin that shims the portal adapters), so every bundle
  * contains exactly ONE edition's strings. That is deliberate: a shared ternary
  * on the runtime portal name embeds all three names in every build, and portal
@@ -60,5 +60,14 @@ export const CUSTOM_PILOT_NAMES = true;
 // enabling dead-code elimination of IAP UI (e.g. "Remove breaks" button) in
 // portal builds. VITE_SELL_AD_REMOVAL is set in vite.config.ts; portal editions
 // override this to false via their own export — but the define wins for DCE.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const SELL_AD_REMOVAL: boolean = !!(import.meta.env.VITE_SELL_AD_REMOVAL as any);
+// Typed in src/vite-env.d.ts, so no cast and no lint suppression are needed.
+export const SELL_AD_REMOVAL: boolean = !!import.meta.env.VITE_SELL_AD_REMOVAL;
+
+/**
+ * Call-sign names that would read as a claim to be the platform or the game
+ * itself (the direct build). Kept HERE, per edition, rather than in the moderation module:
+ * that module is shared by every build, so a literal platform name in it ships
+ * a foreign portal marker into the other portal bundles — which is a real gate
+ * failure, not a hypothetical one.
+ */
+export const RESERVED_PILOT_NAMES: readonly string[] = ["sunbird"];

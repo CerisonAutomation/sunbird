@@ -20,6 +20,11 @@
  *   ROOT-06  everything index.html references locally is present
  *   ROOT-07  no other portal's markers (SDK global, CDN URL, edition string)
  *            appear in the folder — the Poki edition ships Poki only
+ *   ROOT-08  the Poki edition keeps Poki's own integrations (Netlib/AUDS/SDK)
+ *   ROOT-09  poki.json points the CLI at this same folder, so the tree that
+ *            gets uploaded is the tree that was verified
+ *   ROOT-10  the shipped html carries the Poki game id, so AUDS and the
+ *            leaderboard are live rather than silently dormant
  *
  * Usage: node scripts/verify-upload.mjs
  */
@@ -181,6 +186,44 @@ if (folderHtml) {
   const missed = missingMarkersIn(folderHtml.toString("utf8"), "poki");
   if (missed.length) bad("ROOT-08", `${UPLOAD}/ is missing Poki platform integration — ${missed.join("; ")}`);
   else ok("ROOT-08", `${UPLOAD}/ keeps Poki's own integrations (Netlib P2P · AUDS · SDK)`);
+}
+
+/* ROOT-09 ------------------------------------------------------------ */
+// The CLI uploads whatever `poki.json`'s `build_dir` names, so it has to name
+// the directory every check above just validated. It pointed at `dist-poki`
+// (vite's raw output) while this gate checked `poki-upload/`: the gate stayed
+// green and the CLI pushed a tree with no SDK-01 head tag and a dangling
+// manifest link. Keep the verified artifact and the uploaded artifact equal.
+try {
+  const { build_dir: buildDir } = JSON.parse(readFileSync("poki.json", "utf8"));
+  if (buildDir === UPLOAD) ok("ROOT-09", `poki.json build_dir is ${UPLOAD}/ — the CLI uploads the verified folder`);
+  else bad("ROOT-09", `poki.json build_dir is "${buildDir}" but this gate validates ${UPLOAD}/ — the CLI would push an unverified tree`);
+} catch {
+  bad("ROOT-09", "poki.json missing or unreadable — `poki upload` would fall back to build_dir \"dist\"");
+}
+
+/* ROOT-10 ------------------------------------------------------------ */
+// AUDS and the Poki leaderboard only exist when the build carries the
+// Poki-issued game id: without it every AUDS call is skipped and the
+// integration is dormant rather than broken — which is exactly the kind of
+// absence nobody notices until the board is empty in production. The id is
+// baked in by `build:poki` from the same `poki.json` the CLI uploads with.
+if (folderHtml) {
+  let gameId = "";
+  try {
+    gameId = JSON.parse(readFileSync("poki.json", "utf8")).game_id ?? "";
+  } catch {
+    /* reported below */
+  }
+  const html = folderHtml.toString("utf8");
+  if (!gameId) bad("ROOT-10", "poki.json has no game_id — the shipped build cannot carry AUDS");
+  else if (!html.includes(gameId)) {
+    bad("ROOT-10", `${UPLOAD}/index.html does not carry the game id (${gameId}) — AUDS and the Poki leaderboard would be dormant`);
+  } else if (!html.includes("auds.poki.io")) {
+    bad("ROOT-10", `${UPLOAD}/index.html has the game id but no AUDS host — the board would never load`);
+  } else {
+    ok("ROOT-10", `ships the Poki game id (${gameId.slice(0, 8)}…) with AUDS live`);
+  }
 }
 
 /* ----------------------------------------------------------------- report -- */

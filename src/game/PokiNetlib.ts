@@ -65,6 +65,13 @@ export type RoomInfo = {
   startsInMs: number;
   error: string;
   ready: boolean;
+  /**
+   * True when this "room" is the local AI fallback rather than networked
+   * pilots. The roster is populated either way, so without this flag the lobby
+   * presents four generated pilots as live players — the one thing
+   * `lobbyRivals` promises never to do. Callers use it to label them as AI.
+   */
+  aiFallback: boolean;
 };
 
 export type PresenceEvent =
@@ -104,9 +111,10 @@ type NetMsg =
   | { type: "start"; at: number; seed: string }
   | { type: "place"; id: string; place: number };
 
-/** Re-exports for callers that still import them from here. */
-export { POKI_NETLIB_GAME_ID as NETLIB_GAME_ID } from "./PokiMpUtils";
-export { isPokiMultiplayerAvailable } from "./PokiMpUtils";
+// The three compatibility re-exports that used to sit here (`NETLIB_GAME_ID`,
+// `isPokiMultiplayerAvailable`, `makeRoomCode`) had no callers in the repo —
+// every consumer already imports from ./PokiMpUtils directly. Removed rather
+// than left as a second, drifting name for the same value.
 
 export class PokiNetlibClient implements NetTransport {
   state: PresenceState = "offline";
@@ -892,6 +900,7 @@ export class PokiNetlibClient implements NetTransport {
       startsInMs: this.startsAt > 0 ? Math.max(0, this.startsAt - Date.now()) : 0,
       error: this.errorText,
       ready: this.localReady,
+      aiFallback: this.isAutonomous,
     };
   }
 
@@ -1026,5 +1035,3 @@ export function closeLobbyBrowser(): void {
   browseReady = false;
 }
 
-/** Room-code helper — re-exported for callers that import from here. */
-export { makePokiRoomCode as makeRoomCode } from "./PokiMpUtils";

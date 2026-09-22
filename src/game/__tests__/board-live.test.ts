@@ -24,8 +24,8 @@ describe.skipIf(!LIVE)("live leaderboard (reference server)", () => {
     async () => {
       const pilotA = `board-a-${Math.random().toString(36).slice(2, 8)}`;
       const pilotB = `board-b-${Math.random().toString(36).slice(2, 8)}`;
-      const rowA = { deviceId: pilotA, name: "Board A", skin: "sunbird", distance: 5000, altitude: 120, perfects: 8, coins: 40, score: 6100, mode: "daytrip", seed: "live-a" };
-      const rowB = { deviceId: pilotB, name: "Board B", skin: "sunbird", distance: 8000, altitude: 200, perfects: 12, coins: 70, score: 9800, mode: "daytrip", seed: "live-b" };
+      const rowA = { deviceId: pilotA, name: "Board A", skin: "sunbird", distance: 5000, altitude: 120, perfects: 8, coins: 40, score: 6100, mode: "daytrip", seed: "live-a", durationMs: 333000 };
+      const rowB = { deviceId: pilotB, name: "Board B", skin: "sunbird", distance: 8000, altitude: 200, perfects: 12, coins: 70, score: 9800, mode: "daytrip", seed: "live-b", durationMs: 533000 };
 
       const lbA = new Leaderboard(pilotA);
       const lbB = new Leaderboard(pilotB);

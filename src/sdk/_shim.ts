@@ -13,9 +13,9 @@ import type { PlatformAdapter, PlatformEvents, PlatformIdentity, PlatformSystemI
 
 /** Stub adapter used when this SDK isn't the build target. */
 class StubAdapter implements PlatformAdapter {
-  readonly name: "poki" | "crazy";
+  readonly name: "poki";
   readonly ready = false;
-  constructor(_events: PlatformEvents, name: "poki" | "crazy", _bannerId?: string) { this.name = name; }
+  constructor(_events: PlatformEvents, name: "poki" = "poki", _bannerId?: string) { this.name = name; }
   capabilities(): string[] { return []; }
   environment(): string | null { return null; }
   loadingStart(): void {}
@@ -24,7 +24,7 @@ class StubAdapter implements PlatformAdapter {
   gameplayStart(): void {}
   gameplayStop(): void {}
   pause(): void {}
-  happytime(): void {}
+  happyTime(): void {}
   async commercialBreak(): Promise<void> {}
   async rewardedBreak(): Promise<boolean> { return false; }
   async showMidgameAd(): Promise<void> {}
@@ -91,7 +91,4 @@ export function pokiSubmitScore(_score: number, _leaderboard?: string): boolean 
 
 export class PokiAdapter extends StubAdapter {
   constructor(events: PlatformEvents) { super(events, "poki"); }
-}
-export class CrazyGamesAdapter extends StubAdapter {
-  constructor(events: PlatformEvents, bannerId?: string) { super(events, "crazy", bannerId); }
 }

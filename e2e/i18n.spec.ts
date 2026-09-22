@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { SunbirdPage } from "./SunbirdPage";
-import { SUPPORTED_LOCALES } from "../src/i18n";
+import { SUPPORTED_LOCALES } from "../src/i18n/locales";
 
 /**
  * Localization (Poki requirement: multiple languages, layouts adapt to

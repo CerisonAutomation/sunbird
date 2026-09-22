@@ -22,9 +22,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import * as crazyEdition from "../edition.crazy";
 import * as directEdition from "../edition";
-import * as genericEdition from "../edition.generic";
 import * as pokiEdition from "../edition.poki";
 
 describe("edition policy flags", () => {
@@ -40,12 +38,11 @@ describe("edition policy flags", () => {
     expect(pokiEdition.SELL_AD_REMOVAL).toBe(false);
   });
 
-  it.each([
-    ["crazy", crazyEdition],
-    ["generic", genericEdition],
-  ] as const)("%s edition forbids free-text names and ad-removal sales", (_portal, edition) => {
-    expect(edition.CUSTOM_PILOT_NAMES).toBe(false);
-    expect(edition.SELL_AD_REMOVAL).toBe(false);
+  it("the direct/web edition forbids neither, which is the contrast that matters", () => {
+    // The other portal editions are gone — Poki is the only portal this game
+    // ships to — so the contrast is now Poki's policy against the neutral build.
+    expect(directEdition.CUSTOM_PILOT_NAMES).toBe(true);
+    expect(directEdition.SELL_AD_REMOVAL).toBe(true);
   });
 });
 
@@ -65,12 +62,28 @@ describe("GOLD.features", () => {
     const join = (await import("node:path")).join;
     const src = fs.readFileSync(join(process.cwd(), "src", "game", "Economy.ts"), "utf8");
 
+    // What actually matters for DCE is that the bullet sits directly behind the
+    // `import.meta.env` member expression, so `define` can fold it. The cast
+    // that was pinned here (`as any`) was incidental syntax — and it forced a
+    // lint-suppression comment, which `verify:prod` refuses in shipped client
+    // code. The property is now typed in src/vite-env.d.ts, so the cast is gone;
+    // this pattern tolerates it either way while still requiring the direct
+    // member expression. The assertion below is what proves it is not reached
+    // through an imported const.
     expect(src).toMatch(
-      /\.\.\.\(\(import\.meta\.env\.VITE_SELL_AD_REMOVAL as any\) \? \["No sponsored breaks, ever"\] : \[\]\)/,
+      /\.\.\.\(import\.meta\.env\.VITE_SELL_AD_REMOVAL(?: as any)? \? \["No sponsored breaks, ever"\] : \[\]\)/,
     );
     // The string must never be reachable via a plain imported const, which
     // Rollup would not constant-fold across modules.
-    expect(src).not.toMatch(/SELL_AD_REMOVAL \? \["No sponsored breaks/);
+    //
+    // The lookbehind is load-bearing. Without it this pattern is satisfied by
+    // the GOOD form too, because `import.meta.env.VITE_SELL_AD_REMOVAL ? [`
+    // contains the substring `SELL_AD_REMOVAL ? [`. The old `as any` cast
+    // happened to break the match by sitting between them, so removing the cast
+    // silently turned this guard into a tautology — it rejected the foldable
+    // form it exists to protect. A bare identifier (no `VITE_` prefix) is the
+    // thing to catch.
+    expect(src).not.toMatch(/(?<!import\.meta\.env\.VITE_)SELL_AD_REMOVAL \? \["No sponsored breaks/);
   });
 
   it("keeps the bullet in the direct build", async () => {

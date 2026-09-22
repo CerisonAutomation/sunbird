@@ -25,9 +25,10 @@ describe("poki loading net", () => {
   beforeEach(() => {
     calls.length = 0;
     vi.resetModules();
+    // Mirrors the REAL surface: `gameLoadingFinished` is the documented release,
+    // and there is no `signalGameReady` on Poki (verified against the live SDK).
     (window as unknown as { PokiSDK: unknown }).PokiSDK = {
       gameLoadingFinished: () => calls.push("gameLoadingFinished"),
-      signalGameReady: () => calls.push("signalGameReady"),
     };
   });
 
@@ -44,7 +45,6 @@ describe("poki loading net", () => {
     runLoadingNet(); // idempotent calls are allowed; the adapter dedupes its own
 
     expect(calls.filter((c) => c === "gameLoadingFinished")).toHaveLength(2);
-    expect(calls.filter((c) => c === "signalGameReady")).toHaveLength(2);
   });
 
   it("never throws when the SDK never arrived (blocked script, CSP)", async () => {

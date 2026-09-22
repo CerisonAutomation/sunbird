@@ -105,12 +105,13 @@ describe("edition policy — who may type a name", () => {
   const read = (file: string): string =>
     readFileSync(join(process.cwd(), "src", "game", file), "utf8");
 
-  it("poki and the direct build allow free text, unfiltered editions do not", () => {
+  it("both shipping editions allow free text, and both gate it", () => {
+    // Poki and the direct build are the only editions now. Both allow typed
+    // names — the guard is the filter and the choke point, not a lockout — and
+    // both must declare it, so an edition cannot ship without the decision.
     expect(read("edition.poki.ts")).toMatch(/export const CUSTOM_PILOT_NAMES = true;/);
-    for (const file of ["edition.crazy.ts", "edition.generic.ts"]) {
-      expect(read(file), file).toMatch(/export const CUSTOM_PILOT_NAMES = false;/);
-    }
     expect(read("edition.ts")).toMatch(/export const CUSTOM_PILOT_NAMES = true;/);
+    expect(read("edition.poki.ts")).toMatch(/RESERVED_PILOT_NAMES/);
   });
 });
 

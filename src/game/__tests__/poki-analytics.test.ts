@@ -7,7 +7,7 @@ import { PokiAdapter } from "../../sdk/poki";
  *
  * Poki's own analytics are driven entirely by the SDK calls the game makes:
  * loading lifecycle, gameplayStart/Stop, commercialBreak, rewardedBreak and
- * happytime. There is no separate analytics beacon to add — the correct
+ * happyTime. There is no separate analytics beacon to add — the correct
  * implementation is that every one of these calls forwards EXACTLY ONCE, in
  * an order the Inspector accepts (no consecutive duplicates), with ad-open /
  * ad-close bookkeeping that mutes and un-mutes the game around the break.
@@ -27,7 +27,7 @@ function recordingSdk() {
     gameLoadingFinished: () => calls.push("gameLoadingFinished"),
     gameplayStart: () => calls.push("gameplayStart"),
     gameplayStop: () => calls.push("gameplayStop"),
-    happytime: () => calls.push("happytime"),
+    happyTime: () => calls.push("happyTime"),
     commercialBreak: async (onStart?: () => void) => {
       calls.push("commercialBreak:open");
       onStart?.();
@@ -62,11 +62,11 @@ describe("Poki analytics coverage (SDK event surface)", () => {
     expect(calls).toEqual(["gameplayStart", "gameplayStop", "gameLoadingFinished"]);
   });
 
-  it("fires happytime() for milestone celebrations (Poki's celebratory overlay + analytics)", () => {
+  it("fires happyTime() for milestone celebrations (Poki's celebratory overlay + analytics)", () => {
     const { calls, sdk } = recordingSdk();
     const p = platformWith(calls, sdk);
-    p.happytime();
-    expect(calls).toEqual(["happytime"]);
+    p.happyTime();
+    expect(calls).toEqual(["happyTime"]);
   });
 
   it("commercialBreak forwards with ad-open/close bookkeeping, never throws into gameplay", async () => {
@@ -87,7 +87,7 @@ describe("Poki analytics coverage (SDK event surface)", () => {
     const p = platformWith([], undefined);
     expect(() => p.gameplayStart()).not.toThrow();
     expect(() => p.gameplayStop()).not.toThrow();
-    expect(() => p.happytime()).not.toThrow();
+    expect(() => p.happyTime()).not.toThrow();
     await expect(p.commercialBreak()).resolves.toBeUndefined();
     await expect(p.rewardedBreak()).resolves.toBe(false);
   });
@@ -136,6 +136,209 @@ describe("Poki analytics coverage (SDK event surface)", () => {
   });
 });
 
+describe("Poki SDK: every method we call exists on the real SDK", () => {
+  /**
+   * The SDK surface, enumerated from the LIVE script
+   * (`https://game-cdn.poki.com/scripts/v2/poki-sdk.js`) by loading it and
+   * reading `Object.keys(window.PokiSDK)`.
+   *
+   * This test exists because two calls were silently dead for want of a letter:
+   * the adapter called `happytime()` and `hasAdBlock()`, and the SDK exposes
+   * `happyTime` and `isAdBlocked`. Neither fails, logs, or throws — an optional
+   * call on a missing method is a no-op — so the celebration overlay never fired
+   * and the ad-block probe always answered "no". A typo in an optional SDK call
+   * is invisible by construction, which is exactly why it needs a pin.
+   */
+  const REAL_SDK_SURFACE = new Set([
+    "captureError", "commercialBreak", "customEvent", "destroyAd", "displayAd",
+    "enableEventTracking", "gameInteractive", "gameLoadingFinished", "gameLoadingProgress",
+    "gameLoadingStart", "gameplayStart", "gameplayStop", "generateScreenshot",
+    "getDeviceInfo", "getLanguage", "getLeaderboard", "getToken", "getURLParam", "getUser",
+    "happyTime", "init", "initWithVideoHB", "isAdBlocked", "logError", "login", "measure",
+    "movePill", "muteAd", "openExternalLink", "playtestCaptureHtmlForce",
+    "playtestCaptureHtmlOff", "playtestCaptureHtmlOn", "playtestCaptureHtmlOnce",
+    "playtestSetCanvas", "rewardedBreak", "roundEnd", "roundStart", "sendHighscore",
+    "setDebug", "setDebugTouchOverlayController", "setLogging", "setPlayerAge",
+    "setPlaytestCanvas", "setVolume", "shareableURL", "showLeaderboard",
+  ]);
+
+  it("names only methods the SDK actually exposes", async () => {
+    const fs = await import("node:fs");
+    const join = (await import("node:path")).join;
+    const adapter = fs.readFileSync(join(process.cwd(), "src", "sdk", "poki.ts"), "utf8");
+
+    // Every `this.sdk?.name(` / `sdk?.name(` call in the adapter and the boot
+    // path, minus the ones that are ours rather than the SDK's.
+    const called = new Set<string>();
+    for (const m of adapter.matchAll(/sdk\?\.([a-zA-Z]+)\??\.?\(/g)) called.add(m[1]!);
+    const boot = fs.readFileSync(join(process.cwd(), "src", "sdk", "platform.ts"), "utf8");
+    for (const m of boot.matchAll(/getPoki\(\)\?\.([a-zA-Z]+)/g)) called.add(m[1]!);
+
+    const unknown = [...called].filter((name) => !REAL_SDK_SURFACE.has(name));
+    expect(unknown, `these SDK calls do not exist on the real SDK: ${unknown.join(", ")}`).toEqual([]);
+  });
+});
+
+describe("Poki ads: the call shape is exactly the documented one", () => {
+  /**
+   * developers.poki.com — "PokiSDK: HTML5", steps 4, 5 and "Final steps":
+   *
+   *   commercialBreak(cb).then(() => { unmute; enable; gameplayStart })
+   *   rewardedBreak(cb).then(success => success ? reward : no reward)
+   *   "Make sure that audio and keyboard input are disabled during commercial
+   *    breaks" — and the callback "might not always get called".
+   *
+   * The critical contract is that the `.then()` / promise settlement always
+   * fires — Poki is explicit that not every `commercialBreak()` serves an
+   * ad, and the game must proceed either way. The adapter therefore races
+   * the SDK promise against a settle timeout (BREAK_LOAD_TIMEOUT_MS): a
+   * live ad resolves in well under a second, so this race can never cut a
+   * live ad short. Its only job is to guarantee that a promise which never
+   * settles (broken CDN, Inspector with no ad service behind it) still
+   * releases the game instead of wedging it. The game's own
+   * `AD_SAFETY_SECONDS` valve at the tick level is a hard second layer —
+   * a live break is never abandoned by two competing timers.
+   */
+  it("arms a settle timeout so an unresolving SDK promise can never wedge the game", async () => {
+    const fs = await import("node:fs");
+    const join = (await import("node:path")).join;
+    const adapter = fs.readFileSync(join(process.cwd(), "src", "sdk", "poki.ts"), "utf8");
+
+    // Both break calls race the SDK promise against a settle timer.
+    // A live ad resolves in well under a second (real breaks land
+    // in 1–3s), so this race cannot cut a live ad short — it only
+    // guarantees that a promise which never settles still releases
+    // the game. The doc contract is `commercialBreak(cb).then(() =>
+    // ... proceed ...)`: the `.then()` must fire even when Poki
+    // serves nothing.
+    for (const name of ["commercialBreak", "rewardedBreak"]) {
+      const start = adapter.indexOf(`async ${name}(): Promise`);
+      const body = adapter.slice(start, adapter.indexOf("\n  }", start));
+      expect(
+        body,
+        `${name} must race its SDK promise against a settle timeout`,
+      ).toMatch(/Promise\.race\(\[/);
+      expect(
+        body,
+        `${name} timeout must reference BREAK_LOAD_TIMEOUT_MS`,
+      ).toMatch(/BREAK_LOAD_TIMEOUT_MS/);
+    }
+  });
+
+  it("waits on the platform's promise and imposes no timer of its own", async () => {
+    const fs = await import("node:fs");
+    const join = (await import("node:path")).join;
+    const adapter = fs.readFileSync(join(process.cwd(), "src", "sdk", "poki.ts"), "utf8");
+
+    expect(adapter, "the documented call shape").toMatch(/sdk\.commercialBreak\(\(\) => \{/);
+    expect(adapter, "the documented call shape").toMatch(/sdk\.rewardedBreak\(\(\) => \{/);
+    // The await now races the SDK promise against a settle timer
+    // instead of awaiting the SDK call directly — the SDK call still
+    // runs and resolves or times out; the race is what guarantees the
+    // game never wedges. Inside the SDK argument there is no timer:
+    // a game-side ad timer can only cut a live ad short.
+    const bodyOf = (name: string): string => {
+      const from = adapter.indexOf(`async ${name}(): Promise`);
+      return adapter.slice(from, adapter.indexOf("\n  }", from));
+    };
+    for (const name of ["commercialBreak", "rewardedBreak"]) {
+      // Both break calls race the SDK promise against a settle
+      // timer — a live ad resolves in well under a second, so this
+      // race cannot cut a live ad short; it only guarantees a
+      // promise that never settles still releases the game.
+      expect(bodyOf(name), `${name} must race its SDK promise`).toMatch(/Promise\.race\(/);
+      expect(bodyOf(name), `${name} must reference BREAK_LOAD_TIMEOUT_MS`).toMatch(/BREAK_LOAD_TIMEOUT_MS/);
+      // The settle timer lives in the throwaway Promise, not in the
+      // argument the SDK receives. Extract just the SDK call's
+      // callback argument (between `name(() => {` and its
+      // matching close) — it must contain no timer, because a
+      // game-side timer can only cut a live ad short.
+      const callStart = bodyOf(name).indexOf(`${name}(() => {`);
+      let braceDepth = 0;
+      let callbackEnd = callStart;
+      for (let i = callStart; i < bodyOf(name).length; i++) {
+        if (bodyOf(name)[i] === "{") braceDepth++;
+        if (bodyOf(name)[i] === "}") { braceDepth--; if (braceDepth === 0) { callbackEnd = i + 1; break; } }
+      }
+      const callbackBody = bodyOf(name).slice(callStart, callbackEnd);
+      expect(callbackBody, `${name} SDK argument must not arm a timer`).not.toMatch(/setTimeout|setInterval/);
+    }
+    // And the one last-resort exit lives in the game, not the adapter.
+    const game = fs.readFileSync(join(process.cwd(), "src", "game", "Game.ts"), "utf8");
+    expect(game, "the single valve is the game's").toContain("AD_SAFETY_SECONDS");
+  });
+
+  it("books the ad open/close so audio and input are restored even when the ad never opens", async () => {
+    const { calls, sdk } = recordingSdk();
+    const p = platformWith(calls, sdk);
+    await p.commercialBreak();
+    expect(calls, "an opened ad must be closed").toEqual([
+      "commercialBreak:open", "ad:opened", "ad:closed",
+    ]);
+
+    // A declined break calls no callback at all — the game must still come back
+    // from it (this is why the bookkeeping lives in a finally, not the callback).
+    const declined: Calls = [];
+    const silent = platformWith(declined, {
+      commercialBreak: async () => { declined.push("commercialBreak:declined"); },
+    });
+    await expect(silent.commercialBreak()).resolves.toBeUndefined();
+    expect(declined).toEqual(["commercialBreak:declined"]);
+  });
+
+  it("reports a blocked browser to the game, so no break is requested at all", () => {
+    const calls: Calls = [];
+    const blocked = platformWith(calls, { isAdBlocked: () => true });
+    expect(blocked.hasAdBlock()).toBe(true);
+    const clear = platformWith(calls, { isAdBlocked: () => false });
+    expect(clear.hasAdBlock()).toBe(false);
+  });
+});
+
+describe("Poki SDK: every method we call exists on the real SDK", () => {
+  /**
+   * The SDK surface, enumerated from the LIVE script
+   * (`https://game-cdn.poki.com/scripts/v2/poki-sdk.js`) by loading it and
+   * reading `Object.keys(window.PokiSDK)`.
+   *
+   * This test exists because two calls were silently dead for want of a letter:
+   * the adapter called `happytime()` and `hasAdBlock()`, and the SDK exposes
+   * `happyTime` and `isAdBlocked`. Neither fails, logs, or throws — an optional
+   * call on a missing method is a no-op — so the celebration overlay never fired
+   * and the ad-block probe always answered "no". A typo in an optional SDK call
+   * is invisible by construction, which is exactly why it needs a pin.
+   */
+  const REAL_SDK_SURFACE = new Set([
+    "captureError", "commercialBreak", "customEvent", "destroyAd", "displayAd",
+    "enableEventTracking", "gameInteractive", "gameLoadingFinished", "gameLoadingProgress",
+    "gameLoadingStart", "gameplayStart", "gameplayStop", "generateScreenshot",
+    "getDeviceInfo", "getLanguage", "getLeaderboard", "getToken", "getURLParam", "getUser",
+    "happyTime", "init", "initWithVideoHB", "isAdBlocked", "logError", "login", "measure",
+    "movePill", "muteAd", "openExternalLink", "playtestCaptureHtmlForce",
+    "playtestCaptureHtmlOff", "playtestCaptureHtmlOn", "playtestCaptureHtmlOnce",
+    "playtestSetCanvas", "rewardedBreak", "roundEnd", "roundStart", "sendHighscore",
+    "setDebug", "setDebugTouchOverlayController", "setLogging", "setPlayerAge",
+    "setPlaytestCanvas", "setVolume", "shareableURL", "showLeaderboard",
+  ]);
+
+  it("names only methods the SDK actually exposes", async () => {
+    const fs = await import("node:fs");
+    const join = (await import("node:path")).join;
+    const adapter = fs.readFileSync(join(process.cwd(), "src", "sdk", "poki.ts"), "utf8");
+
+    // Every `this.sdk?.name(` / `sdk?.name(` call in the adapter and the boot
+    // path, minus the ones that are ours rather than the SDK's.
+    const called = new Set<string>();
+    for (const m of adapter.matchAll(/sdk\?\.([a-zA-Z]+)\??\.?\(/g)) called.add(m[1]!);
+    const boot = fs.readFileSync(join(process.cwd(), "src", "sdk", "platform.ts"), "utf8");
+    for (const m of boot.matchAll(/getPoki\(\)\?\.([a-zA-Z]+)/g)) called.add(m[1]!);
+
+    const unknown = [...called].filter((name) => !REAL_SDK_SURFACE.has(name));
+    expect(unknown, `these SDK calls do not exist on the real SDK: ${unknown.join(", ")}`).toEqual([]);
+  });
+});
+
+
 describe("Poki ad-placement canon (guideline: breaks only at natural break points)", () => {
   // Reads the live source so a new call site can never ship unreviewed: every
   // commercial break must sit in a named placement method, and the placement
@@ -170,5 +373,52 @@ describe("Poki ad-placement canon (guideline: breaks only at natural break point
     expect(src).toContain("this.gameplaySink.send");
     const toMenu = src.slice(src.indexOf("private async menuAfterPortalBreak"));
     expect(toMenu.slice(0, 900)).not.toContain("gameplayStart");
+  });
+
+  it("gives every restart path the break, with no switch to turn it off", async () => {
+    const fs = await import("node:fs");
+    const join = (await import("node:path")).join;
+    const src = fs.readFileSync(join(process.cwd(), "src", "game", "Game.ts"), "utf8");
+
+    // `replayRun` used to take `allowPortalBreak`, and two of its callers passed
+    // `false`: restarting without dying (R, and the pause card's "Restart
+    // flight"). Those breaks were signalled to nobody, so they could never be
+    // filled — while the identical button on the recap passed `true`. A switch
+    // that disables a natural break point is how the ad surface went quiet, so
+    // the parameter is gone and this guards against its return.
+    expect(src).toContain("private replayRun(): void");
+    expect(src).not.toContain("private replayRun(allowPortalBreak");
+    expect(src, "no restart may pass an opt-out argument").not.toMatch(/this\.replayRun\([^)\s]/);
+    // Seven restart seams — 3 recap/tap-to-fly, 1 pause card, 1 hotkey,
+    // 1 duel/versus, 1 menu — and every one asks for the break when live.
+    expect([...src.matchAll(/this\.replayRun\(\)/g)].length).toBe(7);
+    expect(src).toContain("if (this.adsLive()) void this.restartWithPortalBreak(options);");
+
+    // The ad decision must consult the portal's ad-block report, and the adapter
+    // must be able to survive a break that never settles. Both were gaps: the
+    // probe was cached for a short-circuit nothing called, and the SDK promise
+    // was awaited raw, so a blocked request left the game muted and input-disabled
+    // forever — the player's "the ads are broken".
+    expect(src, "adsLive must consult the ad-block probe (MON-12)").toMatch(/this\.platform\?\.hasAdBlock|platform\.hasAdBlock\?\.\(\)/);
+    const adapter = fs.readFileSync(join(process.cwd(), "src", "sdk", "poki.ts"), "utf8");
+    expect(adapter, "the adapter awaits the platform promise itself").toMatch(/await (Promise\.race|sdk\.commercialBreak)\(/);
+    expect(adapter, "and imposes no timer that could cut an ad short").not.toMatch(/guard<T>|AD_HOSTAGE_MS/);
+  });
+
+  it("signals a break before every run start the doc asks for, and only those", async () => {
+    // Step 4: "call commercialBreak() before every gameplayStart(), whenever the
+    // player has shown intent to continue playing". Only restarts used to ask,
+    // so the thirteen other run starts — Play, the daily course, a gauntlet, a
+    // solo mode, a storm run — reached gameplayStart with nothing signalled.
+    const fs = await import("node:fs");
+    const join = (await import("node:path")).join;
+    const src = fs.readFileSync(join(process.cwd(), "src", "game", "Game.ts"), "utf8");
+
+    expect(src, "the rule must sit at the run-start choke point").toContain("private shouldBreakBeforeRun(");
+    expect(src, "and startRun must consult it").toMatch(/shouldBreakBeforeRun\(opts\)/);
+    // The exemptions Poki's own event table implies.
+    expect(src, "the Startup row is exempt").toMatch(/sessionRuns === 0\) return false/);
+    expect(src, "a live race is exempt — the other pilots are waiting").toMatch(/this\.localRace \|\| this\.roomCode/);
+    expect(src, "the run a break hands into must not ask for another").toMatch(/inRunStartBreak\) return false/);
   });
 });
