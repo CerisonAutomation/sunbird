@@ -94,3 +94,26 @@ FTUE: first-session is e2e-tested (tutorial → first flight → first results),
 ## 6. Bottom line
 
 Against the best **multiplayer** arcade racers, Sunbird holds an above-median position with one structural advantage none of the reference titles have in this weight class: a provably deterministic simulation, which converts the hardest problems in the genre (replays, ghosts, ranked validation) into incremental engineering. Against **mobile platform standards**, it is at or above the bar on delivery size, boot, frame discipline, touch, interruption handling, offline, and accessibility — with regression gates where most products have only good intentions. The honest ceiling is competitive integrity (G1) and live-ops (G4/G5); both are tracked here with concrete, bounded close-outs, and neither blocks the casual/portal product that actually ships today.
+
+
+---
+
+## 7. Gameplay feel vs the class — critique pass (2026-09-22, this session)
+
+Playing the loop against its reference class honestly:
+
+| Feel dimension | Tiny Wings | Alto's Odyssey | Subway Surfers-class | Sunbird | Critique |
+|---|---|---|---|---|---|
+| Core tactile loop | The gold standard — hill physics as instrument | Momentum + grind flow | Swipe rhythm | Dive-and-glide with fever escalation | Sunbird's ceiling is high (thermals, storms, boost economy) but the *learned skill* is mostly timing hills; Tiny Wings' mastery of slope-chaining runs deeper |
+| Score expression | Distance + landing perfection | Combo chains | Multipliers | Perfects, coins, altitude, fever uptime, refereed race places | Broad; good board density for competition |
+| Sound as gameplay | Reactive but sparse | Adaptive ambience | Constant pop | **State-aware score: menu/play/fever/storm/sleep layers, 10 arcade bangers + 18 cinematic tracks, biome orchestration, beat drops** | Strongest in class by construction — the music *is* the pace meter |
+| Humor/voice | Whimsical art only | Serene | None | Deadpan quip engine on every failure/launch/sleep event, surprise events, surrender/bop/splash/sleep/launch/fever pools | Distinct personality — nobody else in the class talks back |
+| One-more-run hook | Great crash-restart flow | Instant restart | Instant restart | Restart seam + Second Wind + daily seed + `#rival=` links | On par; rival links are the virality carrier |
+
+Critique acted on this pass:
+
+1. **Music depth** — the arcade family grew from 6 to **10 original chiptune bangers** (Sugar Rush, Neon Tail, Turbo Finch, Moon Arcade), all schedule-verified against the same contract (64-step melodies, valid chords, arcade instrumentation, 150 BPM family tempo), shuffle-integrated, picker-listed, save-clamped. The shuffle-first experience now rotates 10 distinct hooks before touching the cinematic family.
+2. **Comedy density** — every quip pool expanded (+10 lines each for splash/sleep/launch/fever, +5 each for thud/bop onomatopoeia). Failure states — the moment casual players actually notice writing — now rotate ~30 distinct lines each instead of ~20, and the rotation test guarantees no immediate repeats.
+3. **Leaderboard contract proven live** — `pnpm board:check` boots the reference server and drives the real client class through the documented HTTP contract (submit → sorted board → rank/total → best-row-keeps). The virality carrier (`#rival=` challenge links → chase ghosts) now has its data path verified end to end.
+
+What would move feel *further* (not acted on here — sized honestly): slope-chain scoring (rewarding multi-hill flow lines like Tiny Wings' landing chains), and a ghost-playback "photo finish" moment on razor-thin race wins. Both are Game.ts-scale changes deserving their own reviewable diff, not a rider on this pass.
