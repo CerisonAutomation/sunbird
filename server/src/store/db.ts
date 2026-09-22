@@ -22,6 +22,20 @@ import type {
   Tournament,
 } from "../types.js";
 
+/** One pilot's best run under the root /board + /score contract. */
+export type DeviceBoardRow = {
+  deviceId: string;
+  name: string;
+  skin: string;
+  distance: number;
+  altitude: number;
+  perfects: number;
+  coins: number;
+  score: number;
+  /** Server-assigned UTC date (YYYY-MM-DD) the best row was set. */
+  date: string;
+};
+
 export type DbState = {
   /** schema version for future migrations */
   schema: number;
@@ -54,6 +68,13 @@ export type DbState = {
   /** reward grants outside tournaments: grantKey → ISO time. */
   grants: Record<string, string>;
   moderationCases: ModerationCase[];
+  /**
+   * Device-keyed leaderboard rows for the root `/board` + `/score` contract
+   * (LEADERBOARD_API.md) — the surface the shipped client and the offline
+   * outbox speak. One best row per device (kept by distance, exactly like
+   * the reference server), file-persisted with the rest of the state.
+   */
+  deviceBoard: Record<string, DeviceBoardRow>;
 };
 
 export function emptyDbState(): DbState {
@@ -78,6 +99,7 @@ export function emptyDbState(): DbState {
     seasons: {},
     grants: {},
     moderationCases: [],
+    deviceBoard: {},
   };
 }
 

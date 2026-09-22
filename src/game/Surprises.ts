@@ -18,7 +18,9 @@ export type SurpriseKind =
   | "sneeze" // the bird sneezes mid-air. That's it. That's the feature.
   | "coin-comet" // a comet of coins streaks overhead
   | "photobomb" // a giant fish photobombs a jump over water
-  | "encore"; // the music flips to fever mode for 8s, free
+  | "encore" // the music flips to fever mode for 8s, free
+  | "moonbow" // a moonbow arcs over the islands — pure delight, no strings
+  | "flock-chorus"; // a V-formation of birds honks past and tips you
 
 export type Surprise = {
   kind: SurpriseKind;
@@ -35,6 +37,28 @@ const POOL: { kind: SurpriseKind; weight: number; toasts: string[]; coins: numbe
     weight: 3,
     toasts: ["🦢 A golden goose honks past — it's raining coins!", "🦢 The golden goose approves of your form!"],
     coins: 25,
+    fever: 0,
+  },
+  {
+    kind: "moonbow",
+    weight: 2,
+    toasts: [
+      "🌈 A moonbow arcs over the islands. The sky is showing off",
+      "🌈 Seven colours, zero explanation. Fly through it anyway",
+      "🌈 The islands hired a lighting designer. It was the sky",
+    ],
+    coins: 0,
+    fever: 0,
+  },
+  {
+    kind: "flock-chorus",
+    weight: 2,
+    toasts: [
+      "🪿 A flock flies past in perfect V — they tip you for the show",
+      "🪿 The formation team requests you keep the window seat",
+      "🪿 Squad of geese salutes you with one honk each",
+    ],
+    coins: 10,
     fever: 0,
   },
   {

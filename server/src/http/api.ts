@@ -40,6 +40,74 @@ function telemetryIngest(ctx: Ctx, _p: Params, _q: URLSearchParams, body: Record
 }
 
 export const V1_ROUTES: Route[] = [
+  /* ------------------------------------------------- device board (root) */
+
+  {
+    // The LEADERBOARD_API.md surface the shipped client speaks: GET /board.
+    // Device-keyed best rows (kept by distance), daily or global scope,
+    // server-computed rank/total. Persisted with the Db (file backend).
+    method: "GET",
+    re: /^\/board$/,
+    rl: "read",
+    auth: "optional",
+    handler: (ctx, _p, q) => {
+      const wanted = ["distance", "altitude", "perfects", "coins", "score"];
+      const metricRaw = q.get("metric") ?? "distance";
+      const metric = (wanted.includes(metricRaw) ? metricRaw : "distance") as
+        | "distance"
+        | "altitude"
+        | "perfects"
+        | "coins"
+        | "score";
+      const scope = q.get("scope") === "daily" ? "daily" : "global";
+      const device = cleanText(q.get("device"), 64);
+      const today = new Date(ctx.now()).toISOString().slice(0, 10);
+      let rows = Object.values(ctx.db.state.deviceBoard);
+      if (scope === "daily") rows = rows.filter((r) => r.date === today);
+      rows.sort((a, b) => b[metric] - a[metric]);
+      const rank = rows.findIndex((r) => r.deviceId === device) + 1;
+      return { entries: rows.slice(0, 50), rank, total: rows.length };
+    },
+  },
+  {
+    // POST /score — the run-record ingestion from LEADERBOARD_API.md.
+    // Best-row-per-device semantics by distance; every field cleaned and
+    // clamped server-side. The optional `sig` (HMAC) is accepted and stored
+    // only when present — verification stays with the edge deployment.
+    method: "POST",
+    re: /^\/score$/,
+    rl: "write",
+    auth: "optional",
+    bodyMaxBytes: 4096,
+    handler: (ctx, _p, _q, body) => {
+      const deviceId = cleanText(body.deviceId, 64);
+      if (!deviceId) throw new HttpError(400, "deviceId required", "invalidDevice");
+      const num = (v: unknown, max: number): number =>
+        typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.min(Math.floor(v), max)) : 0;
+      const row = {
+        deviceId,
+        name: cleanText(body.name, 14) || "Pilot",
+        skin: cleanText(body.skin, 24) || "sunbird",
+        distance: num(body.distance, 500_000),
+        altitude: num(body.altitude, 10_000),
+        perfects: num(body.perfects, 5_000),
+        coins: num(body.coins, 100_000),
+        score: num(body.score, 5_000_000),
+        date: new Date(ctx.now()).toISOString().slice(0, 10),
+      };
+      const prev = ctx.db.state.deviceBoard[row.deviceId];
+      // Keep the best row per pilot rather than an ever-growing log.
+      if (!prev || row.distance > prev.distance) {
+        ctx.db.state.deviceBoard[row.deviceId] = row;
+        // touch() marks the state dirty; flush() writes it through
+        // immediately so a score that just landed survives a crash.
+        ctx.db.touch();
+        ctx.db.flush();
+      }
+      return { ok: true };
+    },
+  },
+
   /* ---------------------------------------------------------------- health */
 
   {

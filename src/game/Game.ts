@@ -1659,6 +1659,18 @@ export class Game {
           this.enterFever();
           this.feverTimer = Math.max(this.feverTimer, surprise.feverSeconds);
           break;
+        case "moonbow":
+          // A shimmering arc overhead: glissando + a burst of colour above
+          // the bird. Pure delight — no coins, no strings attached.
+          this.audio.triggerViralGlissando();
+          this.particles.emitConfetti(this.bird.x, this.bird.y - 14);
+          break;
+        case "flock-chorus":
+          // A V-formation honks past downwind: a gust, honks, and a tip.
+          this.audio.honk();
+          this.audio.slideWhistle();
+          this.particles.emitWind(this.bird.x - 8, this.bird.y, 0.6);
+          break;
       }
       if (surprise.coins > 0) {
         this.runCoins += surprise.coins;
