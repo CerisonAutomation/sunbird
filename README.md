@@ -27,6 +27,7 @@ Sunbird is a complete HTML5 arcade game: 8 flight modes, 40-pilot races, daily/w
 | Leaderboard | Vercel Functions ([api/](./api/)) + Upstash Redis, on-device fallback ([LEADERBOARD_API.md](./LEADERBOARD_API.md)) |
 | Ghosts | Async PvP via ghost publish/chase ([src/game/GhostNet.ts](./src/game/GhostNet.ts)) |
 | Caching | Content-hashed Vite assets + immutable HTTP caching; legacy service worker safely retired |
+| Resilience | Client kernel ([src/game/resilience/](./src/game/resilience/)): crash capture + persisted journal, per-host circuit breakers, timeout/retry with full-jitter backoff, durable offline outbox for score uploads, main-thread stall watchdog, quota self-healing storage writes |
 
 ## Quick start
 

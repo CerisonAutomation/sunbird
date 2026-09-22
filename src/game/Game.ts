@@ -119,6 +119,8 @@ import { GameplayEventSink } from "./GameplayEvents";
 import { LivingBackground } from "./LivingBackground";
 import { Sky } from "./Sky";
 import { Telemetry } from "./Telemetry";
+import { crashReporter } from "./resilience/CrashReporter";
+import { Watchdog } from "./resilience/Watchdog";
 import { TerrainSystem } from "./TerrainSystem";
 import { Weather } from "./Weather";
 
@@ -178,6 +180,16 @@ export class Game {
     else this.platform?.gameplayStop();
   });
   private readonly telemetry = new Telemetry();
+  /** Detects multi-second main-thread stalls while the tab is visible and
+   * reports them through telemetry. Suspended during context loss and ad
+   * breaks (rAF legitimately stops there — naively checking would report
+   * every tab switch as a stall). */
+  private readonly watchdog = new Watchdog({
+    onStall: (stallMs, bucket, worstTaskMs) => {
+      this.telemetry.track("main_thread_stall", { ms: stallMs, bucket, worstTaskMs });
+      crashReporter.breadcrumb(`stall ${bucket} (${Math.round(stallMs)}ms, worst task ${worstTaskMs}ms)`);
+    },
+  });
   private readonly ghostRecorder = new GhostRecorder();
   private readonly ghostPlayer = new GhostPlayer();
   /** Network rival ghost (async PvP on the daily seed) — amber silhouette. */
@@ -533,6 +545,13 @@ export class Game {
     this.seasonPass = new SeasonPass(this.save);
     this.board = new Leaderboard(this.save.state.deviceId);
     this.telemetry.bindDevice(this.save.state.deviceId);
+    // The crash reporter's network copy goes through the same privacy
+    // pipeline as every other event; the journal from the previous session
+    // (if any) is reported exactly once, here.
+    crashReporter.attach(this.telemetry);
+    const priorCrashes = crashReporter.previousSessionCrashes.length;
+    if (priorCrashes > 0) this.telemetry.track("boot_after_crash", { count: priorCrashes });
+    this.watchdog.start();
     // Persistence failures (quota / blocked storage) lose progress silently
     // unless we say so — route them through the same observability bus.
     this.save.onPersistError = () => this.telemetry.track("save_persist_failed", {});
@@ -642,6 +661,7 @@ export class Game {
       this.contextLost = true;
       if (this.state === "playing") this.setState("paused");
       this.audio.setHiddenMuted(true);
+      this.watchdog.suspend(); // rAF stops with the context — not a stall
       this.hud.toast("Graphics context lost — restoring…");
       this.telemetry.track("webgl_context_lost", {});
       // If the GPU never comes back, say so instead of leaving a dead canvas.
@@ -654,6 +674,7 @@ export class Game {
     };
     this.onContextRestored = () => {
       this.contextLost = false;
+      this.watchdog.resume();
       this.renderWidth = 0; // force a fresh buffer after GPU/context restoration
       this.audio.setHiddenMuted(false);
       // Rebuild the drawing buffer at the current size and drop the stale clock.
@@ -954,6 +975,7 @@ export class Game {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.watchdog.stop();
     cancelAnimationFrame(this.raf);
     this.resizeObs.disconnect();
     this.orientationTimers.forEach(id => window.clearTimeout(id));
