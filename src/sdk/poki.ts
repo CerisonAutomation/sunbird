@@ -31,6 +31,7 @@ import type {
 } from "./platform";
 import { localCloudFallback } from "./local";
 import { setLoadingNet } from "./net";
+import { createAudsIfConfigured, AUDSPREFIX, PokiAuds } from "./auds";
 
 type PokiUser = { username: string; avatarUrl?: string | null } | null;
 type PokiShareableData = Record<string, string | number | boolean>;
@@ -134,6 +135,7 @@ let scoreSubmit: ((leaderboard: string, score: number) => void) | null = null;
 /** Options for the boot path's `PokiSDK.init()` — the leaderboard handshake. */
 export function pokiInitOptions(): PokiInitOptions {
   return {
+    ...(import.meta.env.DEV ? { debug: true, logging: true } : {}),
     submitScore: (submit) => {
       scoreSubmit = typeof submit === "function" ? submit : null;
     },
@@ -194,6 +196,9 @@ setLoadingNet(() => {
 export class PokiAdapter implements PlatformAdapter {
   readonly name = "poki" as const;
   readonly ready = true;
+
+  /** AUDS client — non-null only when VITE_POKI_GAME_ID is configured. */
+  private readonly auds: PokiAuds | null = createAudsIfConfigured();
 
   constructor(private readonly events: PlatformEvents) {}
 
@@ -317,6 +322,19 @@ export class PokiAdapter implements PlatformAdapter {
     // Poki intentionally does not expose a banner placement API.
   }
 
+  /** Cache the Poki user id after first resolution so we don't await on every save. */
+  private _cachedAudsUserId: string | null | undefined = undefined;
+  private async _audsUserId(): Promise<string | null> {
+    if (this._cachedAudsUserId !== undefined) return this._cachedAudsUserId;
+    try {
+      const u = await this.sdk?.getUser?.();
+      this._cachedAudsUserId = u?.username ?? null;
+    } catch {
+      this._cachedAudsUserId = null;
+    }
+    return this._cachedAudsUserId;
+  }
+
   /** Cached ad-block detection result (probed once at boot). */
   private adBlockProbed = false;
   private cachedAdBlock = false;
@@ -329,13 +347,41 @@ export class PokiAdapter implements PlatformAdapter {
     } catch { /* ignore */ }
   }
 
-  /* cloud save — localStorage fallback (Poki has no public data module) */
-  saveCloud<T>(key: string, value: T): Promise<void> {
+  /* cloud save — AUDS when game id configured, localStorage fallback otherwise */
+  async saveCloud<T>(key: string, value: T): Promise<void> {
+    if (this.auds) {
+      try {
+        const userId = await this._audsUserId();
+        const existingId = PokiAuds.readSingletonId(AUDSPREFIX.settings, userId ?? undefined);
+        const slot = await this.auds.putSingleton(
+          AUDSPREFIX.settings,
+          { key },
+          { key, value: JSON.stringify(value) },
+          { existingId, userId: userId ?? undefined },
+        );
+        if (slot) return;
+      } catch { /* fall through to local */ }
+    }
     return localCloudFallback.save(key, value);
   }
-  loadCloud<T>(key: string): Promise<T | null> {
+
+  async loadCloud<T>(key: string): Promise<T | null> {
+    if (this.auds) {
+      try {
+        const userId = await this._audsUserId();
+        const id = PokiAuds.readSingletonId(AUDSPREFIX.settings, userId ?? undefined);
+        if (id) {
+          const entry = await this.auds.fetchById(AUDSPREFIX.settings, id);
+          if (entry?.data) {
+            const raw = (entry.data as Record<string, unknown>)["value"];
+            if (typeof raw === "string") return JSON.parse(raw) as T;
+          }
+        }
+      } catch { /* fall through to local */ }
+    }
     return localCloudFallback.load<T>(key);
   }
+
   removeCloud(key: string): Promise<void> {
     return localCloudFallback.remove(key);
   }

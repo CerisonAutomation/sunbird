@@ -103,9 +103,20 @@ export const SAVE_KEY_CORRUPT = "sunbird.save.corrupt";
 export const DAYLIGHT_MAX_GOLD = 62;
 export const CONTINUE_COST = 80;
 export const CONTINUE_DAYLIGHT = 16;
-export const CONTINUE_TIMEOUT = 4;
+export const CONTINUE_TIMEOUT = 15;
 export const AD_DURATION = 4;
+// Poki controls ad frequency on the portal; this applies only to dev/standalone builds.
 export const INTERSTITIAL_EVERY = 3;
+
+export const DAILY_STIPEND = 250;
+/** Portal shop: coins granted per watched rewarded ad (kept modest so the
+ *  2500+ mythic tier stays a long-term chase, not an ad-weekend grind). */
+export const SHOP_AD_COINS = 60;
+/** Portal shop: rewarded-coin claims allowed per session (anti-farm cap). */
+export const SHOP_AD_SESSION_CAP = 5;
+
+export const PIGGY_BANK_MIN_SMASH = 50;
+export const PIGGY_BANK_CAP = 1000;
 
 export const ZENITH_ALT = 42;
 

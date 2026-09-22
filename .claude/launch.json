@@ -9,6 +9,17 @@
         "dev"
       ],
       "port": 5173
+    },
+    {
+      "name": "poki-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "--yes",
+        "serve",
+        "poki-upload"
+      ],
+      "port": 5174,
+      "autoPort": true
     }
   ]
 }

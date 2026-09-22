@@ -151,16 +151,16 @@ describe("Poki ad-placement canon (guideline: breaks only at natural break point
       + [...src.matchAll(/await this\.platform\?\.commercialBreak\(\)/g)].length;
     const rewarded = [...src.matchAll(/await platform\.rewardedBreak\(\)/g)].length;
     expect(commercial).toBe(3); // restartWithPortalBreak, resumeFromPause, menuAfterPortalBreak
-    expect(rewarded).toBe(2); // multiplierWithPortalReward, continueWithPortalReward
+    expect(rewarded).toBe(3); // multiplierWithPortalReward, continueWithPortalReward, multiplyCoinsFromShopAd
 
     for (const fn of ["restartWithPortalBreak", "resumeFromPause", "menuAfterPortalBreak"]) {
       expect(src).toContain(`private async ${fn}`);
     }
-    for (const fn of ["continueWithPortalReward", "multiplierWithPortalReward"]) {
+    for (const fn of ["continueWithPortalReward", "multiplierWithPortalReward", "multiplyCoinsFromShopAd"]) {
       expect(src).toContain(`private async ${fn}`);
     }
     // Every break request carries a placement label for the dashboard.
-    for (const placement of ['"restart"', '"resume"', '"to-menu"', '"continue"', '"results-multiplier"']) {
+    for (const placement of ['"restart"', '"resume"', '"to-menu"', '"continue"', '"results-multiplier"', '"shop-free-coins"']) {
       expect(src).toContain(`placement: ${placement}`);
     }
   });

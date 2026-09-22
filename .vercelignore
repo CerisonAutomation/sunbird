@@ -6,6 +6,8 @@ dist-poki/
 dist-crazy/
 dist-generic/
 dist-itch/
+.env
+.env.*
 .git/
 .graph-it/
 .playwright-mcp/

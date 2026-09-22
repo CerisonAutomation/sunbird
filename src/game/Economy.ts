@@ -1,4 +1,3 @@
-import { SELL_AD_REMOVAL } from "./edition";
 
 export type SkinRarity = "starter" | "common" | "rare" | "epic" | "legendary" | "mythic";
 export type CollectionId = "starter" | "nature" | "elements" | "cosmic" | "seasonal" | "premium" | "tournament" | "achievement";
@@ -535,6 +534,9 @@ const BASE_SKINS: SkinDef[] = [
   { id: "solar_flare", name: "Solar Flare", perk: "+6% speed · +2 s fever", price: 850, body: 0xff4400, wing: 0xff8800, belly: 0xffccaa, beak: 0xffaa00, speedMult: 1.06, feverBonus: 2, daylightBonus: 0, magnetAlways: false, rarity: "legendary", collection: "cosmic" },
   { id: "black_hole", name: "Black Hole", perk: "+5 s daylight · magnet", price: 900, body: 0x111122, wing: 0x222244, belly: 0x333355, beak: 0x6666aa, speedMult: 1, feverBonus: 0, daylightBonus: 5, magnetAlways: false, rarity: "mythic", collection: "cosmic" },
   { id: "dark_matter", name: "Dark Matter", perk: "+4% speed · +4 s fever", price: 850, body: 0x1a1a2e, wing: 0x333355, belly: 0x4a4a6a, beak: 0x8888aa, speedMult: 1.04, feverBonus: 4, daylightBonus: 0, magnetAlways: false, rarity: "mythic", collection: "cosmic" },
+  { id: "apex_roc", name: "Apex Roc", perk: "+8% speed · +5 s fever · +6 s daylight", price: 2500, body: 0x0f2a3d, wing: 0x1f6f8b, belly: 0xd9f6ff, beak: 0xffc94d, speedMult: 1.08, feverBonus: 5, daylightBonus: 6, magnetAlways: false, rarity: "mythic", collection: "cosmic" },
+  { id: "solar_sovereign", name: "Solar Sovereign", perk: "+8% speed · +5 s fever · +8 s daylight", price: 5000, body: 0x3d1e00, wing: 0xff8c1a, belly: 0xfff3d6, beak: 0xffe45e, speedMult: 1.08, feverBonus: 5, daylightBonus: 8, magnetAlways: false, rarity: "mythic", collection: "cosmic" },
+  { id: "eclipse_origin", name: "Eclipse Origin", perk: "+8% speed · +5 s fever · +10 s daylight", price: 10000, body: 0x050510, wing: 0x6a0dad, belly: 0xf5ecff, beak: 0xffd700, speedMult: 1.08, feverBonus: 5, daylightBonus: 10, magnetAlways: false, rarity: "mythic", collection: "cosmic" },
 ];
 
 /**
@@ -645,7 +647,15 @@ const GOLD_FEATURES = [
   "Phoenix skin — permanent coin magnet & ember trail",
   "2× coins on every flight",
   "+10 s longer days",
-  ...(SELL_AD_REMOVAL ? ["No sponsored breaks, ever"] : []),
+  // Use import.meta.env directly so Vite's define folds this to false in portal
+  // builds, letting Rollup DCE the string ("No sponsored breaks") from the bundle.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ...((import.meta.env.VITE_SELL_AD_REMOVAL as any) ? ["No sponsored breaks, ever"] : []),
+  // NOTE: On portal builds (Poki) SELL_AD_REMOVAL=false and the continue screen
+  // always shows the rewarded ad path (portal owns monetisation). The "free second
+  // wind" perk is architecturally correct but invisible on Poki — don't try to
+  // surface it there. If Gold is ever cross-marketed to Poki players, add a
+  // compensating perk (e.g. +20% coin bonus) that works within portal rules.
   "Unlimited free second winds — the sun never wins",
   "Fly yesterday's hills or wild random seeds",
   "Unlocks the Nest Pass premium reward track",

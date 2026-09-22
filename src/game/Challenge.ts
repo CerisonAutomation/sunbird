@@ -53,9 +53,12 @@ export function readChallengeFromUrl(): RivalChallenge | null {
   }
 }
 
-/** Builds a shareable challenge URL for the given run, optionally pinning the mode. */
+/** Builds a shareable challenge URL for the given run, optionally pinning the mode.
+ *  In production portals, set VITE_SHARE_BASE_URL to the canonical game URL so
+ *  shared links go to the real page rather than the localhost dev server. */
 export function buildChallengeUrl(seed: string, distance: number, name: string, mode?: string): string {
-  const base = `${window.location.origin}${window.location.pathname}`;
+  const envBase = (import.meta.env.VITE_SHARE_BASE_URL as string | undefined)?.trim();
+  const base = envBase ? envBase.replace(/\/$/, "") : `${window.location.origin}${window.location.pathname}`.replace(/\/$/, "");
   const payload = `${seed}.${Math.floor(distance)}.${encodeURIComponent(name)}`;
   return `${base}#${KEY}=${payload}${mode ? `&${MODE_KEY}=${encodeURIComponent(mode)}` : ""}`;
 }

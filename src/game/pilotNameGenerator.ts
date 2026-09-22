@@ -36,3 +36,20 @@ export function generatePilotName(): string {
   // violate the limit the rest of the game enforces.
   return `${PILOT_PREFIXES[0]!}${PILOT_BIRDS[0]!}${Math.floor(10 + Math.random() * 89)}`.slice(0, PILOT_NAME_MAX);
 }
+
+// Basic profanity filter — pattern-based, not dictionary exhaustive.
+// Blocks the most common slurs/hate-speech roots; curated names from
+// generatePilotName() always pass (they use only aviation/nature vocab).
+const BLOCKED = [
+  /fuck/i, /shit/i, /cunt/i, /nigger/i, /nigga/i, /faggot/i, /fag(?!on)/i,
+  /bitch/i, /asshole/i, /bastard/i, /retard/i, /cock(?!pit)/i,
+  /dick(?!ens|son)/i, /pussy/i, /whore/i, /slut/i, /porn/i, /rape/i,
+  /nazi/i, /hitler/i, /kkk/i,
+];
+
+/** Returns true when the name is acceptable to broadcast to other players. */
+export function isPilotNameClean(name: string): boolean {
+  const n = name.trim();
+  if (n.length === 0 || n.length > PILOT_NAME_MAX) return false;
+  return BLOCKED.every((re) => !re.test(n));
+}

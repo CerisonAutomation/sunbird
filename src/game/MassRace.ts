@@ -4,6 +4,7 @@ import { BIRD_RADIUS } from "./constants";
 import { LaunchSystem } from "./LaunchSystem";
 import { clamp, lerp, SeededRandom, truncate } from "./math";
 import type { TerrainSystem } from "./TerrainSystem";
+import { generatePilotName } from "./pilotNameGenerator";
 
 export const MAX_RIVALS = 40;
 
@@ -11,7 +12,7 @@ const OPTIMAL_LEAD = 70;
 
 export type RivalKind = "local" | "remote";
 
-export type AIArchetype = "apex" | "draft_hunter" | "soarer" | "daredevil" | "pacer";
+export type AIArchetype = "apex" | "draft_hunter" | "soarer" | "daredevil" | "pacer" | "berserker" | "tactician";
 
 export type Rival = {
   id: string;
@@ -88,6 +89,7 @@ export interface NetTransport {
   poll(): RemoteSnapshot[];
 }
 
+/** Fallback short names for shuffle() and legacy callers; spawn() now uses the full pilot generator. */
 const NAMES = [
   "Aria", "Kestrel", "Nomi", "Tavi", "Wren", "Bex", "Juno", "Pike", "Sable", "Fen",
   "Rook", "Vale", "Ivy", "Cass", "Odin", "Lux", "Nyx", "Brann", "Skye", "Ozzy",
@@ -210,36 +212,71 @@ export class MassRace {
   spawn(count: number, seed: string, terrain: TerrainSystem, startX: number): void {
     const n = clamp(Math.floor(count), 0, MAX_RIVALS);
     this.ensureCapacity(n);
-    const rng = new SeededRandom(`${seed}:field`);
     this.rivals = [];
-    const ARCHETYPES: AIArchetype[] = ["apex", "draft_hunter", "soarer", "daredevil", "pacer"];
+    // 7-archetype mix: top pilots are apex/berserker/tactician; mid pack fills
+    // in soarer/daredevil/draft_hunter; tail is padded with pacers.
+    const ARCHETYPES: AIArchetype[] = [
+      "apex", "draft_hunter", "soarer", "daredevil", "pacer", "berserker", "tactician",
+    ];
+
+    // Generate unique pilot names seeded from the race seed for determinism.
+    const nameRng = new SeededRandom(`${seed}:names`);
+    const usedNames = new Set<string>();
 
     for (let i = 0; i < n; i++) {
       const bird = new Bird();
       bird.reset(startX, terrain.heightAt(startX) + BIRD_RADIUS);
       const tierRank = i / Math.max(1, n);
-      const baseSkill = tierRank < 0.15 ? 0.86 + rng.range(0, 0.12) : tierRank < 0.4 ? 0.68 + rng.range(0, 0.16) : 0.35 + rng.range(0, 0.3);
-      const skill = clamp(baseSkill, 0.22, 1);
-      const archetype = ARCHETYPES[i % ARCHETYPES.length]!;
-      const errorSpread = (1 - skill) * 36;
-      const lead = clamp(OPTIMAL_LEAD + rng.range(-errorSpread, errorSpread), 20, 120);
+      // Three-tier skill distribution: top 15% are elites, next 25% are strong,
+      // the lower 60% are the approachable mid-to-tail field.
+      const baseSkill =
+        tierRank < 0.15 ? 0.88 + nameRng.range(0, 0.11)
+        : tierRank < 0.4  ? 0.70 + nameRng.range(0, 0.14)
+        :                    0.34 + nameRng.range(0, 0.32);
+      const skill = clamp(baseSkill, 0.22, 1.0);
+
+      // Elite slots bias toward apex/berserker/tactician; tail toward pacer.
+      let archetype: AIArchetype;
+      if (tierRank < 0.15) {
+        archetype = (["apex", "berserker", "tactician"] as AIArchetype[])[i % 3]!;
+      } else {
+        archetype = ARCHETYPES[i % ARCHETYPES.length]!;
+      }
+
+      const errorSpread = (1 - skill) * 38;
+      const lead = clamp(OPTIMAL_LEAD + nameRng.range(-errorSpread, errorSpread), 18, 125);
+
+      // Generate a unique pilot name.
+      let pilotName: string;
+      let attempts = 0;
+      do {
+        pilotName = generatePilotName();
+        attempts++;
+      } while (usedNames.has(pilotName) && attempts < 10);
+      usedNames.add(pilotName);
+
       this.rivals.push({
         id: `ai-${i}`,
-        name: NAMES[i % NAMES.length]!,
+        name: pilotName,
         kind: "local",
         bird,
         launch: new LaunchSystem(),
         prevX: bird.x,
         prevY: bird.y,
         lead,
-        wobbleAmp: (1 - skill) * 16 + 2,
-        wobbleRate: rng.range(0.35, 1.25),
-        wobblePhase: rng.range(0, Math.PI * 2),
-        reaction: 0.14 - skill * 0.10 + rng.range(0, 0.04),
-        reactionT: rng.range(0, 0.14),
+        wobbleAmp: (1 - skill) * 15 + 1.5,
+        wobbleRate: nameRng.range(0.30, 1.30),
+        wobblePhase: nameRng.range(0, Math.PI * 2),
+        // Apex and tactician have tighter reaction loops; daredevil is reckless-fast.
+        reaction:
+          archetype === "apex" ? 0.06 - skill * 0.04 + nameRng.range(0, 0.02)
+          : archetype === "tactician" ? 0.09 - skill * 0.05 + nameRng.range(0, 0.03)
+          : archetype === "daredevil" ? 0.08 - skill * 0.05 + nameRng.range(0, 0.04)
+          : 0.14 - skill * 0.10 + nameRng.range(0, 0.04),
+        reactionT: nameRng.range(0, 0.14),
         diving: false,
         skill,
-        hue: rng.next(),
+        hue: nameRng.next(),
         finished: false,
         finishTime: 0,
         alive: true,
@@ -373,16 +410,45 @@ export class MassRace {
           wantDive = distToCrest > judged;
         }
 
-        // Archetype behavior tuning
-        if (r.archetype === "soarer" && r.bird.vy > 4) {
-          wantDive = false;
-        } else if (r.archetype === "daredevil" && r.bird.altitude > 24) {
-          wantDive = true;
-        } else if (r.archetype === "draft_hunter" && playerX !== undefined) {
-          const dx = playerX - r.bird.x;
-          if (dx > 0 && dx < this.draftBehind && Math.abs(r.bird.y - (playerY ?? 0)) < 8) {
-            wantDive = slope < 0 || distToCrest > 35;
-          }
+        // Per-archetype decision overrides
+        switch (r.archetype) {
+          case "apex":
+            // Elite pilot: corrects for terrain slope more aggressively, ignores wobble noise.
+            if (slope < -0.08) wantDive = true;
+            else if (slope > 0.06) wantDive = false;
+            break;
+          case "soarer":
+            // Prefers altitude; never dives unless falling fast.
+            if (r.bird.vy > 3.5) wantDive = false;
+            if (r.bird.altitude > 30 && slope >= 0) wantDive = false;
+            break;
+          case "daredevil":
+            // Goes full dive-bomb at any reasonable altitude; loves crests.
+            if (r.bird.altitude > 18) wantDive = true;
+            if (distToCrest < 25) wantDive = false; // release right before crest for launch
+            break;
+          case "berserker":
+            // Extremely aggressive: dives on every downslope, full throttle.
+            if (slope < -0.03) wantDive = true;
+            if (slope > 0.07) wantDive = false;
+            break;
+          case "tactician":
+            // Energy-conservative: climbs patiently on uphills, then unleashes.
+            if (slope > 0.02) wantDive = false;   // gain height
+            if (slope < -0.06) wantDive = true;   // cash in altitude as speed
+            break;
+          case "draft_hunter":
+            // Actively aligns behind the player or any rival for slipstream.
+            if (playerX !== undefined) {
+              const dx = playerX - r.bird.x;
+              if (dx > 0 && dx < this.draftBehind && Math.abs(r.bird.y - (playerY ?? 0)) < 8) {
+                wantDive = slope < 0 || distToCrest > 35;
+              }
+            }
+            break;
+          case "pacer":
+            // Default pacer — uses the standard terrain-reading logic (no override).
+            break;
         }
 
         r.diving = wantDive;
@@ -426,18 +492,41 @@ export class MassRace {
         r.draftTime = Math.max(0, (r.draftTime || 0) - dt * 2);
       }
 
-      // Dynamic pacer / pack drama:
+      // Dynamic pacer / pack drama + rubber-band catch-up:
       if (playerX !== undefined) {
         const lag = playerX - r.bird.x;
+        // Standard pacer surge
         if ((r.archetype === "pacer" || lag > 150) && lag > 75 && lag < 450) {
           r.bird.vx = Math.min(185, r.bird.vx + dt * (lag > 220 ? 4.5 : 2.2));
         }
+        // Rubber-band: any rival 350+ m behind gets a hidden boost proportional to lag
+        if (lag > 350 && lag < 800) {
+          const boost = dt * clamp((lag - 350) / 150, 0, 1) * 3.5;
+          r.bird.vx = Math.min(195, r.bird.vx + boost);
+        }
+        // Berserker pushes even harder when trailing
+        if (r.archetype === "berserker" && lag > 100 && lag < 600) {
+          r.bird.vx = Math.min(210, r.bird.vx + dt * 3.8);
+        }
+        // Tactician conserves speed when comfortably ahead to stay in "launch position"
+        if (r.archetype === "tactician" && lag < -120) {
+          r.bird.vx = Math.max(60, r.bird.vx - dt * 1.5);
+        }
       }
 
-      // AI emotes when overtaking into 1st place:
-      if (playerX !== undefined && r.bird.x > playerX && time - (r.lastEmoteTime || 0) > 12 && Math.random() < 0.18) {
-        r.lastEmoteTime = time;
-        this.showEmote(r.id, "👑");
+      // AI emotes on overtake / archetype personality moments
+      if (playerX !== undefined && r.bird.x > playerX && time - (r.lastEmoteTime || 0) > 12) {
+        if (Math.random() < 0.22) {
+          r.lastEmoteTime = time;
+          // Archetype-flavoured taunt on overtake
+          const taunt =
+            r.archetype === "berserker" ? "💥" :
+            r.archetype === "apex"      ? "⚡" :
+            r.archetype === "tactician" ? "🎯" :
+            r.archetype === "soarer"    ? "🌤️" :
+            "👑";
+          this.showEmote(r.id, taunt);
+        }
       }
 
       r.launch.observeInput(r.diving, time);

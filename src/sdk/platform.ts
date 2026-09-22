@@ -456,6 +456,7 @@ function bootstrapSdk(): Promise<{ name: PlatformName; platformEnvironment: stri
     type PokiGlobal = {
       init?: (options?: { submitScore?: (submit: (leaderboard: string, score: number) => void) => void }) => Promise<void>;
       setDebug?: (v: boolean) => void;
+      enableEventTracking?: () => void;
       gameLoadingStart?: () => void;
       movePill?: (x: number, y: number) => void;
     };
@@ -469,6 +470,8 @@ function bootstrapSdk(): Promise<{ name: PlatformName; platformEnvironment: stri
         // submitPlatformScore(). Passing no options would silently leave the
         // portal leaderboards unwired.
         await getPoki()?.init?.(pokiInitOptions());
+        // Enable Poki event tracking after init for analytics.
+        getPoki()?.enableEventTracking?.();
         // gameLoadingStart() fires exactly once, right after init, before
         // any asset/3D scene work begins. Game.loadingFinished() is called
         // by the Game constructor once the renderer/HUD/terrain are ready.

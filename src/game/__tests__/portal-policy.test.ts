@@ -33,8 +33,14 @@ describe("edition policy flags", () => {
     expect(directEdition.SELL_AD_REMOVAL).toBe(true);
   });
 
+  // Poki now allows free-text pilot names with profanity filtering (isPilotNameClean).
+  // crazy/generic still forbid them (no filter shipped there).
+  it("poki edition allows free-text names (profanity-filtered) but forbids ad-removal sales", () => {
+    expect(pokiEdition.CUSTOM_PILOT_NAMES).toBe(true);
+    expect(pokiEdition.SELL_AD_REMOVAL).toBe(false);
+  });
+
   it.each([
-    ["poki", pokiEdition],
     ["crazy", crazyEdition],
     ["generic", genericEdition],
   ] as const)("%s edition forbids free-text names and ad-removal sales", (_portal, edition) => {
@@ -49,19 +55,22 @@ describe("GOLD.features", () => {
     vi.doUnmock("../edition");
   });
 
-  it("drops the ad-removal bullet when the edition cannot sell it", async () => {
-    vi.doMock("../edition", async (importOriginal) => ({
-      ...(await importOriginal<typeof import("../edition")>()),
-      SELL_AD_REMOVAL: false,
-    }));
+  // The bullet is gated on the Vite define (not an imported const) so Rollup
+  // can fold it away and DCE the string out of portal bundles entirely. That
+  // makes it a compile-time contract: module mocking cannot reach it, so the
+  // portal-off case is asserted on the source shape here and on the actual
+  // bundle by scripts/portal-markers.mjs (`pnpm verify:portals`).
+  it("gates the ad-removal bullet on the Vite define so portal bundles can DCE it", async () => {
+    const fs = await import("node:fs");
+    const join = (await import("node:path")).join;
+    const src = fs.readFileSync(join(process.cwd(), "src", "game", "Economy.ts"), "utf8");
 
-    const { GOLD } = await import("../Economy");
-
-    expect(GOLD.features.some((f) => /sponsored breaks/i.test(f))).toBe(false);
-    // The rest of the pitch survives untouched — this is a removal, not a rewrite.
-    expect(GOLD.features).toContain("2× coins on every flight");
-    expect(GOLD.features).toContain("Unlocks the Nest Pass premium reward track");
-    expect(GOLD.features).toHaveLength(6);
+    expect(src).toMatch(
+      /\.\.\.\(\(import\.meta\.env\.VITE_SELL_AD_REMOVAL as any\) \? \["No sponsored breaks, ever"\] : \[\]\)/,
+    );
+    // The string must never be reachable via a plain imported const, which
+    // Rollup would not constant-fold across modules.
+    expect(src).not.toMatch(/SELL_AD_REMOVAL \? \["No sponsored breaks/);
   });
 
   it("keeps the bullet in the direct build", async () => {

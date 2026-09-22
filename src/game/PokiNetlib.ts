@@ -18,6 +18,7 @@
  * See https://github.com/poki/netlib and developers.poki.com/guide/game-dev-tools.
  */
 import { Network, type Peer, type LobbyListEntry } from "@poki/netlib";
+import { generatePilotName } from "./pilotNameGenerator";
 import type {
   NetTransport,
   RemoteSnapshot,
@@ -49,6 +50,8 @@ export type RoomPeer = {
   emote: string;
   emoteAt: number;
   ready: boolean;
+  /** Round-trip latency in ms from the control channel ping (0 if unavailable). */
+  latencyMs: number;
   you: boolean;
 };
 
@@ -171,12 +174,13 @@ export class PokiNetlibClient implements NetTransport {
     this.errorText = "";
     this.tracks.clear();
 
-    const mockPeers = [
-      { id: "auto_1", name: "Zephyr Wing", skin: "phoenix", hue: 0.12 },
-      { id: "auto_2", name: "Echo Falcon", skin: "aurora", hue: 0.55 },
-      { id: "auto_3", name: "Solaris Ace", skin: "solstice", hue: 0.82 },
-      { id: "auto_4", name: "Cloud Swift", skin: "stormcrow", hue: 0.38 },
-    ];
+    const SKINS = ["phoenix", "aurora", "solstice", "stormcrow", "sunbird", "midnight"];
+    const mockPeers = Array.from({ length: 4 }, (_, i) => ({
+      id: `auto_${i + 1}`,
+      name: generatePilotName(),
+      skin: SKINS[i % SKINS.length]!,
+      hue: (i * 0.21 + 0.08) % 1,
+    }));
     for (const p of mockPeers) {
       const t = this.track(p.id);
       t.name = p.name;
@@ -259,18 +263,26 @@ export class PokiNetlibClient implements NetTransport {
             // into a forest of empty rooms.
             let joined = false;
             try {
+              // Push mode + availability filtering to the signaling server
+              // (MongoDB-style operators) so we only receive joinable sunbird
+              // lobbies — avoids downloading lobbies from other games sharing
+              // the same game-id bucket, and reduces client-side sort cost.
               const lobbies = await network.list(
-                { public: true },
-                { createdAt: -1 },
+                {
+                  $and: [
+                    { public: { $eq: true } },
+                    { hasPassword: { $eq: false } },
+                    { playerCount: { $gt: 0 } },
+                    { "customData.mode": { $eq: "sunbird-race" } },
+                  ],
+                },
+                { playerCount: -1 },
                 20,
               );
               const candidate = (lobbies ?? [])
                 .filter((l) =>
                   l &&
-                  l.public &&
-                  !l.hasPassword &&
                   l.code &&
-                  (l.customData?.mode === "sunbird-race" || l.playerCount > 0) &&
                   l.playerCount < (l.maxPlayers || MAX_CAPACITY),
                 )
                 .sort((a, b) => {
@@ -834,6 +846,7 @@ export class PokiNetlibClient implements NetTransport {
   roster(): RoomPeer[] {
     const peers: RoomPeer[] = [];
     for (const t of this.tracks.values()) {
+      const peer = this.net?.peers.get(t.id);
       peers.push({
         id: t.id,
         name: t.name,
@@ -846,6 +859,7 @@ export class PokiNetlibClient implements NetTransport {
         emote: this.clock - t.emoteAt < 2.5 ? t.emote : "",
         emoteAt: t.emoteAt,
         ready: t.ready,
+        latencyMs: peer?.latency ? Math.round(peer.latency.average) : 0,
         you: false,
       });
     }

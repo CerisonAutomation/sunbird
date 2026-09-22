@@ -45,4 +45,9 @@ export const CUSTOM_PILOT_NAMES = true;
  * (Poki rule REQ-20). Portal builds never inject interstitials of their own, so
  * on a portal the claim would be non-compliant *and* untrue.
  */
-export const SELL_AD_REMOVAL = true;
+// Read from the Vite define so cross-module usage is constant-folded by Rollup,
+// enabling dead-code elimination of IAP UI (e.g. "Remove breaks" button) in
+// portal builds. VITE_SELL_AD_REMOVAL is set in vite.config.ts; portal editions
+// override this to false via their own export — but the define wins for DCE.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const SELL_AD_REMOVAL: boolean = !!(import.meta.env.VITE_SELL_AD_REMOVAL as any);

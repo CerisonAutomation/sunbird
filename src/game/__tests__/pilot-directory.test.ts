@@ -135,8 +135,9 @@ describe("pilot directory: network", () => {
     const body = JSON.parse(String(init.body)) as { values: Record<string, unknown>; data: Record<string, unknown> };
     expect(body.values.code).toBe("SUN-9F3K2A");
     expect(body.data.bestDistance).toBe(4210);
-    // The record remembers its creator's secret, so the next publish updates it.
-    expect(localStorage.getItem(`auds-secret:anon:${PILOT_KEY}:entry-1`)).toBe("s3cret");
+    // The record remembers its creator's secret (under the poki_ignore prefix so
+    // Poki's automatic cloud-save sync skips these credential keys).
+    expect(localStorage.getItem(`poki_ignore-auds-secret:anon:${PILOT_KEY}:entry-1`)).toBe("s3cret");
   });
 
   it("refuses to publish a record without a valid code", async () => {

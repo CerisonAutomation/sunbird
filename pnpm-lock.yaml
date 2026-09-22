@@ -11,6 +11,9 @@ importers:
       '@poki/netlib':
         specifier: ^0.0.20
         version: 0.0.20
+      '@poki/sdk':
+        specifier: ^0.0.5
+        version: 0.0.5
       '@stripe/stripe-js':
         specifier: ^9.15.0
         version: 9.16.0
@@ -518,6 +521,10 @@ packages:
 
   '@poki/netlib@0.0.20':
     resolution: {integrity: sha512-x23mkcWwXU2WyyYUKOVyL2IdZGg8u7XLsuxMsxS0x2HNSh5v+5GgcjZ0llr8CwsQXYTtO8XJnCquFbyyemVpVg==}
+    engines: {node: '>=14'}
+
+  '@poki/sdk@0.0.5':
+    resolution: {integrity: sha512-3WiC5jtxoJC1LlcHeLwo1oD8WZ++tIchs/F/BVWMlajEuuFBkDZtv/AqTEk2+N2dn1y/XQEi6VA53yqmZ+2Ulw==}
     engines: {node: '>=14'}
 
   '@rolldown/pluginutils@1.0.0-beta.47':
@@ -2569,6 +2576,8 @@ snapshots:
   '@poki/netlib@0.0.20':
     dependencies:
       eventemitter3: 5.0.4
+
+  '@poki/sdk@0.0.5': {}
 
   '@rolldown/pluginutils@1.0.0-beta.47': {}
 

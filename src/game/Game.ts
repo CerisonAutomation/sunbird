@@ -26,7 +26,7 @@ import { photoFinishMessage } from "./RacePolish";
 import { SlopeChain } from "./SlopeChain";
 import { RoomWatcher, ROOM_POLL_MS, roomSummaryLine, summarizeRooms, type LiveRoom } from "./RoomBrowser";
 import { Leaderboard, loadPilotName, savePilotName, isLeaderboardOnline, type BoardMetric, type BoardPage, type BoardScope } from "./Leaderboard";
-import { generatePilotName } from "./pilotNameGenerator";
+import { generatePilotName, isPilotNameClean } from "./pilotNameGenerator";
 import { setLocale, whenLocaleReady, type SupportedLocale } from "../i18n";
 import { Tournaments, TRAILS, weekKey, type PrizeGrant } from "./Tournaments";
 import {
@@ -79,12 +79,15 @@ import {
   MANUAL_BOOST_TIME,
   PHYS_DT,
   PICKUP_SUN_TIME,
+  DAILY_STIPEND,
   REFERRAL_BONUS,
   STALL_SPEED,
   WATER_Y,
-  ZENITH_ALT,
-  ZENITH_DURATION,
-  ZENITH_SLOWMO,
+ZENITH_ALT,
+ZENITH_DURATION,
+ZENITH_SLOWMO,
+SHOP_AD_COINS,
+SHOP_AD_SESSION_CAP,
 } from "./constants";
 import { BOOSTS, COLLECTIONS, GOLD, PROMO_CODES, SHOP_TRAILS, SKINS, STARTER_PACK, VIP, WHEEL_SECTORS, dailyDealBoost, dailyFlashBird, skinById, type BoostView, type ShopTrailDef, type ShopTrailView, type SkinDef, type SkinView } from "./Economy";
 import { nextWings, wingsFor, wingsProgress, wingsPromotion } from "./Career";
@@ -116,7 +119,8 @@ import { flag } from "./Flags";
 import { variant } from "./Experiments";
 import { buildRoomInviteUrl, normalizeRoomCode, readRoomInviteFromUrl } from "./RoomInvite";
 import { PORTAL_BANNER_ID, attachPortalErrorReporters, initPlatform, isCoarsePointer, isPortalBuild, portalTarget as getPortalTarget, type PlatformAdapter } from "../sdk/platform";
-import { CUSTOM_PILOT_NAMES, POKI_MULTIPLAYER, SQUAD_CHAT } from "./edition";
+import { CUSTOM_PILOT_NAMES, POKI_MULTIPLAYER, SELL_AD_REMOVAL, SQUAD_CHAT } from "./edition";
+import type { PokiNetlibClient } from "./PokiNetlib";
 import { GameplayEventSink } from "./GameplayEvents";
 import { LivingBackground } from "./LivingBackground";
 import { Sky } from "./Sky";
@@ -125,6 +129,14 @@ import { crashReporter } from "./resilience/CrashReporter";
 import { Watchdog } from "./resilience/Watchdog";
 import { TerrainSystem } from "./TerrainSystem";
 import { Weather } from "./Weather";
+
+// On Poki builds, eagerly fetch the PokiNetlib module so createNetTransport
+// can instantiate PokiNetlibClient synchronously when the player first taps PvP.
+// The dynamic import keeps @poki/netlib out of non-Poki bundles (Rollup DCE).
+let _PokiNetlibClass: typeof PokiNetlibClient | null = null;
+if (POKI_MULTIPLAYER) {
+  void import("./PokiNetlib").then((m) => { _PokiNetlibClass = m.PokiNetlibClient; }).catch(() => { /* best-effort */ });
+}
 
 export type GameState = UiState;
 type AdReason = "continue" | "interstitial";
@@ -307,6 +319,10 @@ export class Game {
    * re-renders every frame, so without this flag the bonus was re-claimable
    * forever (each claim tripled runCoins and re-armed the card). */
   private multiplierClaimed = false;
+  /** Rewarded-ad coin claims earned via the shop this hour (see adHourKey). */
+  private shopAdClaimed = 0;
+  /** Hour-buckets the shopAdClaimed counter; resets when the wall-clock hour rolls. */
+  private adHourKey = Math.floor(Date.now() / 3_600_000);
   private runClouds = 0;
   private zeniths = 0;
   private pickups = 0;
@@ -768,6 +784,16 @@ export class Game {
       this.pendingRoomInvite = roomInvite;
     }
 
+    // Async-race share link: ?run=CODE → auto-populate the shared-run input
+    // so the friend who clicked a result link lands straight into loading that run.
+    try {
+      const runParam = new URLSearchParams(window.location.search).get("run");
+      if (runParam && runParam.length > 0) {
+        this.shareCode = runParam.trim();
+        window.history.replaceState({}, "", `${window.location.pathname}${window.location.hash}`);
+      }
+    } catch { /* non-browser env */ }
+
     this.onFocus = () => {
       if (!this.hidden) {
         this.audio.setHiddenMuted(false);
@@ -977,8 +1003,10 @@ export class Game {
     }
   }
 
-  private createNetTransport(deviceId: string, pilotName: string, skinId: string): RealtimeClient {
-    // For now: Poki uses local multiplayer (AI rivals). Netlib P2P can be added post-launch.
+  private createNetTransport(deviceId: string, pilotName: string, skinId: string): AnyRealtimeClient {
+    if (POKI_MULTIPLAYER && _PokiNetlibClass) {
+      return new _PokiNetlibClass(deviceId, pilotName, skinId, 0.06);
+    }
     return new RealtimeClient(deviceId, pilotName, skinId, 0.06);
   }
 
@@ -1250,6 +1278,9 @@ export class Game {
     this.boostTimer = Math.max(0, this.boostTimer - dt);
     this.manualBoostCooldown = Math.max(0, this.manualBoostCooldown - dt);
     this.runTime += dt;
+    // Hour roll resets the shop ad reward counter (cap per wall-clock hour).
+    const nowHour = Math.floor(Date.now() / 3_600_000);
+    if (nowHour !== this.adHourKey) { this.adHourKey = nowHour; this.shopAdClaimed = 0; }
     this.xpFlush -= dt;
     if (this.xpFlush <= 0) {
       this.xpFlush = 2;
@@ -1949,7 +1980,10 @@ export class Game {
     }
     const surfaceY = this.terrain.isOcean(this.bird.x) ? WATER_Y : this.terrain.heightAt(this.bird.x);
     const settleAlt = this.bird.y - surfaceY;
-    const settled = (this.bird.grounded || this.bird.inWater || settleAlt < 6) && this.bird.speed() < 6;
+    // Threshold is deliberately below MIN_KEEP_SPEED (6) so the speed-bleed
+    // that keeps a grounded AFK bird slow doesn't resonate with Bird.step()'s
+    // MIN_KEEP_SPEED floor and falsely trigger the settle timer mid-play.
+    const settled = (this.bird.grounded || this.bird.inWater || settleAlt < 6) && this.bird.speed() < 4;
     if (!this.bird.asleep && !this.input.diving && settled) {
       this.settleAcc += dt;
     } else {
@@ -2475,9 +2509,9 @@ export class Game {
     this.massRace.syncVisual(visDt, this.bird.x, interp);
     if (this.massRace.active && this.state === "playing") {
       const tags = this.massRace.getVisibleNameTags(this.camera.camera.position.x, this.bird.x, this.bird.y, this.startX);
-      this.hud.updateNameTags(tags, this.camera.camera, window.innerWidth, window.innerHeight);
+      this.hud.updateNameTags(tags, this.camera.camera, this.renderWidth, this.renderHeight);
     } else {
-      this.hud.updateNameTags([], this.camera.camera, window.innerWidth, window.innerHeight);
+      this.hud.updateNameTags([], this.camera.camera, this.renderWidth, this.renderHeight);
     }
     this.finishRemaining = this.finishGate.update(visDt, this.bird.x);
     this.updateTrailRibbon(visDt);
@@ -3491,6 +3525,7 @@ export class Game {
         this.setScreen("shop");
         break;
       case "open-paywall":
+        if (!SELL_AD_REMOVAL) break;
         this.restoreMessage = "";
         this.setScreen("paywall");
         this.telemetry.track("paywall_open", { from: this.state });
@@ -3543,6 +3578,7 @@ export class Game {
         // renders and owns it, so there is nothing to guard beyond offering the
         // button only when the capability is reported.
         this.platform?.showLeaderboard();
+        this.platform?.measure("button", "portal-leaderboard", "interact");
         this.telemetry.track("portal_leaderboard_open", { portal: this.platform?.name ?? "none" });
         break;
       }
@@ -3556,7 +3592,11 @@ export class Game {
         // player-typed text. The direct/web build owns its own surfaces and
         // keeps free rename.
         const freeText = CUSTOM_PILOT_NAMES;
-        const requested = this.hud.readValue("pilotName") || this.pilotName;
+        const requested = (this.hud.readValue("pilotName") || this.pilotName).trim();
+        if (freeText && !isPilotNameClean(requested)) {
+          this.hud.toast("That call sign isn't allowed — try a different one", "warn");
+          break;
+        }
         const chosen = freeText ? requested : generatePilotName();
         const next = savePilotName(chosen);
         this.pilotName = next;
@@ -3637,7 +3677,7 @@ export class Game {
           this.hud.toast("🔥 Rise from the ashes, Phoenix!", "gold");
         } else if (nameLower === "sunbird") {
           this.hud.toast("🌟 You ARE the Sunbird.", "gold");
-          this.save.addCoins(250);
+          this.save.addCoins(DAILY_STIPEND);
         } else {
           this.hud.toast(`Welcome, ${next}!`, "info");
         }
@@ -3967,12 +4007,22 @@ export class Game {
         // The card disables via the snapshot, but a double-tap can land before
         // the re-render — the handler must be its own guard.
         if (this.save.state.lastStipendClaimed === this.today) break;
-        this.save.addCoins(250);
+        this.save.addCoins(DAILY_STIPEND);
         this.save.state.lastStipendClaimed = this.today;
         this.audio.chapterFanfare();
         this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
-        this.hud.toast("🪙 Daily Flight Stipend Claimed! +● 250 coins!", "gold");
+        this.hud.toast(`🪙 Daily Flight Stipend Claimed! +● ${DAILY_STIPEND} coins!`, "gold");
         this.bump();
+        break;
+      }
+      case "shop-free-coins": {
+        // Rewarded ad from the shop: capped per session to prevent ad farming.
+        if (!this.platform || this.platform.name === "none") break;
+        if (this.shopAdClaimed >= SHOP_AD_SESSION_CAP) {
+          this.hud.toast("Ad rewards capped for this visit", "info");
+          break;
+        };
+        void this.multiplyCoinsFromShopAd();
         break;
       }
       case "buy-bundle": {
@@ -3990,10 +4040,10 @@ export class Game {
         this.save.armBoost("magnet");
         this.save.ownTrail("trail_tide");
         this.save.equipTrail("trail_tide");
-        this.save.addCoins(250);
+        this.save.addCoins(DAILY_STIPEND);
         this.audio.chapterFanfare();
         this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
-        this.hud.toast("📦 Ace Wingman Crate Unlocked! 3 Boosts + Tideglass Trail + 250 Coins!", "gold");
+        this.hud.toast(`📦 Ace Wingman Crate Unlocked! 3 Boosts + Tideglass Trail + ${DAILY_STIPEND} Coins!`, "gold");
         this.bump();
         break;
       }
@@ -4099,6 +4149,15 @@ export class Game {
             this.shareError = "Sharing isn't available in this build — no platform store is configured.";
           }
           this.bump();
+        });
+        break;
+      }
+      case "copy-score": {
+        const dist = Math.round(this.runStats().distance);
+        const text = `I flew ${dist.toLocaleString()} m in Sunbird: Golden Flight! Can you beat it?`;
+        void copyText(text).then((ok) => {
+          if (this.disposed) return;
+          this.hud.toast(ok ? "Score copied to clipboard!" : text, ok ? "gold" : "info");
         });
         break;
       }
@@ -4345,6 +4404,7 @@ export class Game {
         this.save.equipSkin(id);
         this.applySkin();
         this.audio.ding();
+        this.platform?.measure("cosmetic", id ?? "skin", "interact");
         this.bump();
         break;
       case "buy-boost":
@@ -4360,7 +4420,7 @@ export class Game {
         this.buyCoinGold();
         break;
       case "vip-buy":
-        this.buyPortalVip();
+        if (SELL_AD_REMOVAL) this.buyPortalVip();
         break;
       case "buy-vault":
         this.buyMysteryVault();
@@ -5421,19 +5481,35 @@ export class Game {
     // room starts (with a shared 6s countdown) only once every seated pilot
     // has readied up.
     const ready = this.net?.state === "lobby" ? (this.net.info().ready ? "ready" : "unready") : "none";
-    // Someone real is in the room — keep the search open until the room starts.
-    if (live > 0 && this.mmPhase === "waiting") this.mmPhase = "searching";
+    // "Waiting" phase: the search window elapsed with real pilots in the room.
+    // Keep the lobby alive for ready-up rather than abandoning them to AI; if
+    // they all leave, reopen the search window.
     if (this.mmPhase === "waiting") {
-      this.hud.setMatchmaking(true, live, this.roomSize, 0, "waiting", this.mmRooms, ready);
-      return;
+      if (live > 0) {
+        this.hud.setMatchmaking(true, live, this.roomSize, 0, "waiting", this.mmRooms, ready);
+        return;
+      }
+      this.mmPhase = "searching";
+      this.mmDeadline = performance.now() + Game.MM_WINDOW * 1000;
+      this.startRoomWatch();
+      this.hud.toast("Pilot left — searching again", "info");
     }
+
     const secsLeft = (this.mmDeadline - performance.now()) / 1000;
     this.hud.setMatchmaking(true, live, this.roomSize, Math.max(0, secsLeft), "searching", this.mmRooms, ready);
     if (secsLeft <= 0) {
-      // The window elapsed with nobody to race. Fall back to a clearly
-      // labeled AI flock so the pilot is never left staring at a dead
-      // search — real pilots still require an explicit Ready; only an
-      // empty room may launch on its own.
+      if (live > 0) {
+        // Real pilots found before the window closed — hold the lobby open.
+        // The "start" net event fires once everyone readies (allReady in
+        // PokiNetlib). Only an empty room may launch on its own.
+        this.mmPhase = "waiting";
+        this.hud.setMatchmaking(true, live, this.roomSize, 0, "waiting", this.mmRooms, ready);
+        this.hud.toast(`${live} pilot${live === 1 ? "" : "s"} found — hit Ready to race`, "gold");
+        this.telemetry.track("matchmaking_live_waiting", { count: live });
+        return;
+      }
+      // Empty lobby — fall back to a clearly labeled AI flock so the pilot is
+      // never left staring at a dead search.
       this.mmPhase = "waiting";
       const opts = this.mmOpts;
       this.mmOpts = null;
@@ -5894,7 +5970,37 @@ export class Game {
     this.bump();
   }
 
-  /** Rewarded continue never succeeds unless the platform explicitly grants it. */
+  /** Shop free-coins rewarded break: capped per hour, modest payout so the
+   *  high-price mythic tier (2500-10000) stays aspirational. */
+  private async multiplyCoinsFromShopAd(): Promise<void> {
+    const platform = this.platform;
+    if (!platform || platform.name === "none") return;
+    if (this.shopAdClaimed >= SHOP_AD_SESSION_CAP) {
+      this.hud.toast("Free coin rewards capped for this hour", "info");
+      return;
+    }
+    this.telemetry.track("portal_break_request", { portal: platform.name, placement: "shop-free-coins" });
+    // Shop free-coin break does not bookend gameplay (no gameplayStop/start),
+    // so mute + disable input directly around the break instead of begin/endPortalAd
+    // (which would risk a duplicate gameplayStop from the sink).
+    this.audio.setAdMuted(true);
+    this.input.setEnabled(false);
+    const earned = await platform.rewardedBreak();
+    if (this.disposed) return;
+    this.audio.setAdMuted(false);
+    this.input.setEnabled(true);
+    if (earned) {
+      this.shopAdClaimed++;
+      const payout = Math.min(SHOP_AD_COINS, 60);
+      this.save.addCoins(payout);
+      this.audio.chapterFanfare();
+      this.hud.toast(`🍪 Here's a little flying fuel — +● ${payout} coins`, "gold");
+      this.bump();
+    } else {
+      this.hud.toast("No reward this time — try again next hour", "info");
+    }
+  }
+
   private async continueWithPortalReward(): Promise<void> {
     const platform = this.platform;
     if (!this.adsLive() || !platform || platform.name === "none") return;

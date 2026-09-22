@@ -16,8 +16,11 @@ export const POKI_MULTIPLAYER = true;
 /** Poki forbids chat in multiplayer surfaces (REQ-31) — emotes only. */
 export const SQUAD_CHAT = false;
 
-/** No unmoderated player text or personal data (content & player safety). */
-export const CUSTOM_PILOT_NAMES = false;
+/** Player text is allowed with profanity filtering (isPilotNameClean). */
+export const CUSTOM_PILOT_NAMES = true;
 
-/** Poki owns ad scheduling and forbids in-app purchases (REQ-20). */
+/** Poki owns ad scheduling and forbids in-app purchases (REQ-20).
+ * Unconditionally false: this is the edition's policy, not a build toggle.
+ * DCE of the IAP UI comes from vite.config's VITE_SELL_AD_REMOVAL define being
+ * folded at the use sites, not from this export. */
 export const SELL_AD_REMOVAL = false;
