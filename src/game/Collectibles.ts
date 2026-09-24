@@ -45,13 +45,21 @@ export const PICKUP_STYLE: Record<PickupKind, { color: number; emissive: number;
 };
 
 const SPAWN_CELL = 26;
-const MAX_COINS = 512;
+const MAX_COINS_BASE = 512; // base for high tier
 const MAX_GEMS = 96;
-// Courses (4–6 hoops each, ~1/3 of spawn windows) raise the number of
-// live rings at once; the pool must cover the widest window rather than
-// silently dropping hoops out of a course.
-const MAX_RINGS = 120;
-const MAX_BALLOONS = 24;
+const MAX_RINGS_BASE = 120; // base for high tier
+const MAX_BALLOONS_BASE = 24; // base for high tier
+// Legacy constants kept for tests that import them — actual pools use instance fields maxCoins/maxRings/maxBalloons
+const _MAX_COINS = MAX_COINS_BASE;
+const _MAX_RINGS = MAX_RINGS_BASE;
+const _MAX_BALLOONS = MAX_BALLOONS_BASE;
+const MAX_COINS = _MAX_COINS;
+const MAX_RINGS = _MAX_RINGS;
+const MAX_BALLOONS = _MAX_BALLOONS;
+// Keep TS happy — these legacy names are imported by tests
+void MAX_COINS;
+void MAX_RINGS;
+void MAX_BALLOONS;
 const BALLOON_COLORS = [0xff6b6b, 0xffc14a, 0x6ad8ff, 0xb18cff, 0x7fe8a0];
 const coinDummy = new THREE.Object3D();
 
@@ -99,10 +107,20 @@ export class Collectibles {
   /** X position of the most-recently spawned ring course, used to enforce a
    *  minimum gap between courses so they never visually overlap. */
   private lastRingCourseX = -Infinity;
+  private readonly qualityTier: "lite" | "mid" | "high";
+  private maxCoins: number;
+  private maxRings: number;
+  private maxBalloons: number;
 
-  constructor(seedN: number, seedStr = String(seedN)) {
+  constructor(seedN: number, seedStr = String(seedN), qualityTier: "lite" | "mid" | "high" = "high") {
     this.seedN = seedN;
     this.seedStr = seedStr;
+    this.qualityTier = qualityTier;
+    void this.qualityTier;
+    // Performance: lite = fewer coins/rings/balloons
+    this.maxCoins = qualityTier === "lite" ? 384 : qualityTier === "mid" ? 448 : MAX_COINS_BASE;
+    this.maxRings = qualityTier === "lite" ? 80 : qualityTier === "mid" ? 100 : MAX_RINGS_BASE;
+    this.maxBalloons = qualityTier === "lite" ? 16 : qualityTier === "mid" ? 20 : MAX_BALLOONS_BASE;
     this.coinGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.12, 12);
     this.gemGeo = new THREE.OctahedronGeometry(0.95, 0);
     this.coinMat = new THREE.MeshLambertMaterial({ color: 0xffd24a, emissive: 0x553300 });
@@ -110,7 +128,7 @@ export class Collectibles {
     // Hundreds of coin meshes are one of the largest draw-call costs. Coins
     // and sky gems each share an InstancedMesh, while their collision data is
     // still independent in the lightweight Coin records below.
-    this.coinMesh = new THREE.InstancedMesh(this.coinGeo, this.coinMat, MAX_COINS);
+    this.coinMesh = new THREE.InstancedMesh(this.coinGeo, this.coinMat, this.maxCoins);
     this.gemMesh = new THREE.InstancedMesh(this.gemGeo, this.gemMat, MAX_GEMS);
     this.coinMesh.count = 0;
     this.gemMesh.count = 0;
@@ -134,7 +152,7 @@ export class Collectibles {
     this.ringGeo = new THREE.TorusGeometry(4.4, 0.34, 10, 44);
     this.ringGeo.rotateY(Math.PI / 2);
     this.ringMat = new THREE.MeshLambertMaterial({ color: 0xffcf3e, emissive: 0x7a4200 });
-    this.ringMesh = new THREE.InstancedMesh(this.ringGeo, this.ringMat, MAX_RINGS);
+    this.ringMesh = new THREE.InstancedMesh(this.ringGeo, this.ringMat, this.maxRings);
     this.ringMesh.count = 0;
     this.ringMesh.frustumCulled = false;
     this.group.add(this.ringMesh);
@@ -522,7 +540,7 @@ export class Collectibles {
     const idle = this.coinPool.find((c) => c.taken && c.gem === gem);
     if (idle) return idle;
     const slot = gem ? this.gemCursor++ : this.coinCursor++;
-    if (slot >= (gem ? MAX_GEMS : MAX_COINS)) {
+    if (slot >= (gem ? MAX_GEMS : this.maxCoins)) {
       // Pool pressure only occurs far behind the camera. Reuse an old inactive
       // visual slot rather than allocating a new draw call.
       const fallback = this.coinPool.find((c) => c.gem === gem && c.taken);
@@ -559,7 +577,7 @@ export class Collectibles {
     const idle = this.ringPool.find((r) => r.taken);
     if (idle) return idle;
     const slot = this.ringCursor++;
-    if (slot >= MAX_RINGS) {
+    if (slot >= this.maxRings) {
       const fallback = this.ringPool.find((r) => r.taken);
       if (fallback) return fallback;
       return { x: 0, y: -9999, r: 4.4, taken: true, slot: -1 };
@@ -581,7 +599,7 @@ export class Collectibles {
 
   private placeBalloon(x: number, y: number, phase: number, drift: number): void {
     // Hard cap keeps the balloon pool bounded even under dense spawn windows.
-    if (this.activeBalloons.length >= MAX_BALLOONS) return;
+    if (this.activeBalloons.length >= this.maxBalloons) return;
     const b = this.allocBalloon();
     b.x = x;
     b.y = y;

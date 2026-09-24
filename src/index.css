@@ -484,6 +484,24 @@ textarea {
   font-size: 12px;
   font-weight: 600;
   box-shadow: 0 3px 0 rgba(42, 28, 40, 0.12);
+  position: relative;
+  overflow: hidden;
+}
+.island-chip i {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 100%;
+  background: rgba(0,0,0,0.12);
+  display: block;
+}
+.island-chip i b {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #4aa85c, #86dc7e);
+  width: 0%;
+  transition: width 0.2s linear;
 }
 
 .fever-wrap {
@@ -1379,6 +1397,18 @@ fieldset.squad-fields {
   text-transform: uppercase;
   color: #b08a72;
   margin-bottom: 6px;
+}
+
+/* Session goals — 3 desktop, 2 mobile (Jetpack Joyride pattern: 3 active, skip for coins) */
+.quests { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.quest { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.6); border-radius: 12px; padding: 6px 10px; font-size: 13px; }
+.quest.done { opacity: 0.6; text-decoration: line-through; }
+.quest .qb { flex: 1; height: 4px; background: rgba(0,0,0,0.12); border-radius: 2px; overflow: hidden; margin-top: 2px; }
+.quest .qb i { display: block; height: 100%; background: linear-gradient(90deg,#ffb020,#ff8a00); transition: width 0.3s; }
+.quest .qr { font-weight: 700; color: #8a6a30; }
+@media (max-width: 600px) {
+  /* Mobile: show 2 missions to avoid clutter, third hidden but still tracked */
+  .quests .quest:nth-child(n+4) { display: none; } /* 1st child is head, so 4th = 3rd quest */
 }
 
 .mission {

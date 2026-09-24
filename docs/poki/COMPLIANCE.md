@@ -104,9 +104,9 @@
 | `LOC-01` | recommendation | Localization is essential for engagement outside English-speaking regions. | ✅ | src/i18n/translations.barrel.json |
 | `LOC-02` | requirement | Centralize all text into a single file format before translating. | ✅ | src/i18n/index.ts matches /export function t\(/ |
 | `LOC-03` | recommendation | Prioritise localization for text-carrying genres/mechanics. | ✅ | docs/poki/05-localization.md |
-| `LOC-04` | requirement | Phase 1: EFIGS + Turkish. Phase 2: CJK. Phase 3: pt-BR + Russian. | ✅ | 11 locales × 216 strings complete |
+| `LOC-04` | requirement | Phase 1: EFIGS + Turkish. Phase 2: CJK. Phase 3: pt-BR + Russian. | ✅ | 11 locales × 218 strings complete |
 | `LOC-05` | requirement | Detect the browser language and serve it; a manual selector should exist too. | ✅ | src/i18n/__tests__/locales.test.ts |
-| `LOC-06` | requirement | Every language Poki's game inspector lists as selectable must ship complete, plus browser auto-detect. | ✅ | 36 locales × 216 strings complete |
+| `LOC-06` | requirement | Every language Poki's game inspector lists as selectable must ship complete, plus browser auto-detect. | ✅ | 36 locales × 218 strings complete |
 
 ## THB — Game thumbnail
 

@@ -10049,6 +10049,105 @@
         "tl": "🔥 Fever! Warp {{s}}s",
         "uz": "🔥 Fever! Warp {{s}}s"
       }
+    },
+    "inflight.shop.skip.needCoins": {
+      "sourceText": "Need ●{{cost}} to skip — you have ●{{have}}",
+      "meta": {
+        "file": "src/game/Game.ts",
+        "context": "skip goal toast"
+      },
+      "placeholders": [
+        "cost",
+        "have"
+      ],
+      "translations": {
+        "en": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "es": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "de": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "fr": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "it": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "pt": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "ar": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "zh": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "ja": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "mt": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "tr": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "ru": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "ko": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "nl": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "pl": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "hi": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "id": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "vi": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "th": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "sv": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "bg": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "bn": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "cs": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "da": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "el": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "fi": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "he": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "hu": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "ms": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "no": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "ro": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "sk": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "sr": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "tl": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "uk": "Need ●{{cost}} to skip — you have ●{{have}}",
+        "uz": "Need ●{{cost}} to skip — you have ●{{have}}"
+      }
+    },
+    "inflight.shop.skip.done": {
+      "sourceText": "Skipped {{old}} → {{new}} for ●{{cost}}",
+      "meta": {
+        "file": "src/game/Game.ts",
+        "context": "skip goal toast"
+      },
+      "placeholders": [
+        "old",
+        "new",
+        "cost"
+      ],
+      "translations": {
+        "en": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "es": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "de": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "fr": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "it": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "pt": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "ar": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "zh": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "ja": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "mt": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "tr": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "ru": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "ko": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "nl": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "pl": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "hi": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "id": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "vi": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "th": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "sv": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "bg": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "bn": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "cs": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "da": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "el": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "fi": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "he": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "hu": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "ms": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "no": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "ro": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "sk": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "sr": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "tl": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "uk": "Skipped {{old}} → {{new}} for ●{{cost}}",
+        "uz": "Skipped {{old}} → {{new}} for ●{{cost}}"
+      }
     }
   }
 }

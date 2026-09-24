@@ -495,6 +495,7 @@ export class HUD {
   private coinsEl!: HTMLElement;
   private bestEl!: HTMLElement;
   private islandEl!: HTMLElement;
+  private islandFillEl!: HTMLElement;
   private multEl!: HTMLElement;
   private goldChip!: HTMLElement;
   private vipChip!: HTMLElement;
@@ -692,7 +693,7 @@ export class HUD {
           <div class="emote-options hidden" id="flight-emotes">${[["👋", "Wave"], ["🔥", "Fire"], ["😂", "Laugh"], ["🙌", "Bravo"], ["👑", "Crown"], ["🤝", "GG"]].map(([icon, label]) => `<button data-ui data-action="emote" data-id="${icon}" aria-label="Send ${label}" title="Send ${label}">${icon} ${label}</button>`).join("")}</div>
         </div>
         <div class="mid-meta">
-          <div class="island-chip" data-ref="island">Island 1</div>
+          <div class="island-chip" data-ref="island">Island 1 <i><b data-ref="islandFill"></b></i></div>
           <div class="biome-chip" data-ref="biome"></div>
           <div class="mult-chip" data-ref="mult">×1.0</div>
           <div class="gold-chip hidden" data-ref="goldChip">✦ GOLD</div>
@@ -1241,7 +1242,11 @@ export class HUD {
       this.setText(this.distanceEl, "dist", formatDistance(s.distance));
       this.setText(this.coinsEl, "coins", String(s.coins));
       this.setText(this.bestEl, "best", formatDistance(s.bestDistance));
+      // Island progress bar: localX / ISLAND_PERIOD = % to next island (goal gradient)
+      const localX = s.distance % 920; // ISLAND_PERIOD
+      const islandPct = Math.max(0, Math.min(100, (localX / 920) * 100));
       this.setText(this.islandEl, "island", `Island ${s.island + 1}`);
+      this.setStyle(this.islandFillEl, "islandFill", "width", `${islandPct.toFixed(1)}%`);
       // Chaos-free: combo and mult share one slot — when chaining, show ×N chain, otherwise ×1.0 mult
       if (s.combo >= 2) {
         this.setText(this.multEl, "mult", `×${s.combo} chain`);
@@ -1815,6 +1820,7 @@ export class HUD {
     this.coinsEl = grab("coins");
     this.bestEl = grab("best");
     this.islandEl = grab("island");
+    this.islandFillEl = grab("islandFill");
     this.multEl = grab("mult");
     this.goldChip = grab("goldChip");
     this.vipChip = grab("vipChip");
@@ -3352,11 +3358,12 @@ function renderShop(s: HudSnapshot, browse: ShopBrowse): string {
     <details class="shop-section" data-ref="shopBoosts"><summary><span class="section-art">${menuIcon("boost")}</span>Boosts &amp; upgrades <span>${armedBoosts.length} armed</span></summary>
       <p class="fineprint">One-flight boosts are used in solo or casual AI flights. Live races and ranked practice use equal flight equipment and keep these boosts for later. Permanent upgrades stay with you.</p>
       <div class="boost-list">${s.boosts.map((b) => renderBoostRow(b, s.wallet)).join("")}</div>
-      <div class="section-title">Nest <small>permanent score multiplier</small></div>
+      <div class="section-title">Nest <small>permanent score multiplier — visible growth like Tiny Wings</small></div>
       <div class="boost-list"><div class="boost-row nest-row">
-        <span class="bi">${menuIcon("story")}</span>
-        <div><div class="mt">Nest upgrade <span class="boost-once">forever</span></div>
-        <div class="md">Lv.${s.nestLevel} · ×${s.nestMult.toFixed(2)} score${s.nestMaxed ? " · fully upgraded" : ` · next ×${(s.nestMult + 0.12).toFixed(2)}`}</div></div>
+        <span class="bi" style="font-size:${16 + s.nestLevel * 2}px">${"🪺".repeat(Math.min(3, Math.ceil(s.nestLevel / 3)))}</span>
+        <div><div class="mt">Nest upgrade <span class="boost-once">forever</span> ${"⭐".repeat(s.nestLevel)}</div>
+        <div class="md">Lv.${s.nestLevel} · ×${s.nestMult.toFixed(2)} score${s.nestMaxed ? " · fully upgraded — nest at max size!" : ` · next ×${(s.nestMult + 0.12).toFixed(2)} — grows bigger!`}</div>
+        <div class="qb" style="margin-top:4px"><i style="width:${Math.min(100, (s.nestLevel / 10) * 100)}%"></i></div></div>
         ${
           s.nestMaxed
             ? `<span class="tag on">MAX ✓</span>`
@@ -3710,12 +3717,14 @@ function renderNextAction(s: HudSnapshot): string {
 
 function renderGoalList(goals: SessionGoal[]): string {
   if (!goals.length) return "";
-  return `<div class="quests"><div class="mission-head">Session goals</div>${goals
+  return `<div class="quests"><div class="mission-head">Session goals — 3 active, skip for coins like Jetpack Joyride</div>${goals
     .map((g) => {
       const pct = Math.min(100, (g.progress / g.target) * 100);
+      const skipCost = Math.max(80, Math.round(g.reward * 1.5));
       return `<div class="quest ${g.done ? "done" : ""}">
         <div><div class="mt">${g.label}</div><div class="qb"><i style="width:${pct}%"></i></div></div>
         <span class="qr">● ${g.reward}</span>
+        ${!g.done ? `<button class="mini-btn" data-ui data-action="skip-goal" data-id="${g.id}" title="Skip for ●${skipCost}">Skip ●${skipCost}</button>` : ""}
       </div>`;
     })
     .join("")}</div>`;

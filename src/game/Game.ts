@@ -880,12 +880,17 @@ export class Game {
       if (this.state === "menu" || this.state === "playing") this.hud.toast(`♪ ${name}`, "info");
     });
 
-    this.terrain = new TerrainSystem(this.seed);
-    this.scene.add(this.terrain.group);
-    bootStage("world");
-
+    // Critical preload: bird first (player must see self immediately), then first 2 islands
+    // (920 units each = 1840). Remaining chunks load via idle — EA-05 progressive.
     this.bird = new Bird();
     this.bird.addTo(this.scene);
+    const qualityTier = this.deviceProfile.tier === "lite" ? "lite" : this.deviceProfile.tier === "standard" ? "mid" : "high";
+    this.terrain = new TerrainSystem(this.seed, qualityTier);
+    this.scene.add(this.terrain.group);
+    // Pre-warm first 2 islands synchronously — player spawns at 0, needs 0-1840 visible
+    this.terrain.update(0);
+    this.terrain.update(920);
+    bootStage("world");
     this.ghostPlayer.addTo(this.scene);
     this.rivalGhostPlayer.addTo(this.scene);
     this.rivalGhostPlayer.setTint(0xffc86a, 0xffe8b0);
@@ -901,7 +906,7 @@ export class Game {
     this.scene.add(this.sky.group);
     this.sky.addLights(this.scene);
 
-    this.collect = new Collectibles(this.terrain.seedN);
+    this.collect = new Collectibles(this.terrain.seedN, this.seed, qualityTier);
     this.scene.add(this.collect.group);
     this.weather = new Weather(this.terrain.seedN);
     this.weather.addTo(this.scene);
@@ -5253,6 +5258,23 @@ export class Game {
         this.onboardingTip = null;
         this.bump();
         break;
+      case "skip-goal": {
+        const goalId = (action as { id?: string }).id;
+        if (!goalId) break;
+        const goal = this.goals.goals.find((g) => g.id === goalId);
+        if (!goal || goal.done) break;
+        const cost = this.goals.skipCost(goal);
+        if (this.save.state.wallet < cost) {
+          this.hud.toast(t("inflight.shop.skip.needCoins", { cost, have: this.save.state.wallet }, `Need ●${cost} to skip — you have ●${this.save.state.wallet}`), "warn");
+          break;
+        }
+        this.save.spend(cost);
+        const replacement = this.goals.skip(goalId, this.seed);
+        this.hud.toast(t("inflight.shop.skip.done", { old: goal.label, new: replacement?.label ?? "new goal", cost }, `Skipped ${goal.label} → ${replacement?.label ?? "new goal"} for ●${cost}`), "info");
+        this.telemetry.track("goal_skip", { id: goalId, cost, newId: replacement?.id ?? "" });
+        this.pushHud();
+        break;
+      }
       case "continue-ad":
         if (this.state === "continue") {
           if (this.portalEnabled()) {
@@ -5885,9 +5907,10 @@ export class Game {
     this.collect.dispose();
     this.scene.remove(this.weather.group);
     this.weather.dispose();
-    this.terrain = new TerrainSystem(seed);
+    const qualityTier2 = this.deviceProfile.tier === "lite" ? "lite" : this.deviceProfile.tier === "standard" ? "mid" : "high";
+    this.terrain = new TerrainSystem(seed, qualityTier2);
     this.scene.add(this.terrain.group);
-    this.collect = new Collectibles(this.terrain.seedN);
+    this.collect = new Collectibles(this.terrain.seedN, seed, qualityTier2);
     this.scene.add(this.collect.group);
     this.weather = new Weather(this.terrain.seedN);
     this.weather.addTo(this.scene);
@@ -5953,7 +5976,7 @@ export class Game {
     // Mobile gets a lighter decorative particle stream by default. Gameplay
     // events still render because critical emitters are short-lived and the
     // adaptive quality loop can shed more work under sustained load.
-    this.particleBudget = s.quality === "low" ? 0.3 : this.isMobile ? 0.5 : 1;
+    this.particleBudget = s.quality === "low" ? 0.3 : this.deviceProfile.tier === "lite" || this.isMobile || this.deviceProfile.tier === "standard" ? 0.5 : 1;
     this.particles.setBudget(this.particleBudget);
     // Soft shadows are the single priciest feature on mobile GPUs — keep them
     // only when the user asked for high quality (auto tiers shed them first).

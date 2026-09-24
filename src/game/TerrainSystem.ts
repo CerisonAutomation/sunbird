@@ -84,14 +84,32 @@ export class TerrainSystem {
   private readonly hVal = new Float64Array(HEIGHT_CACHE_SIZE);
   /** Flow calibration: <1 gentler arches, >1 tighter and steeper. */
   private difficulty = 1;
+  /** Quality tier: lite devices get fewer chunks, lower res, less deco */
+  private readonly qualityTier: "lite" | "mid" | "high";
+  private visibleBack = VISIBLE_CHUNKS_BACK;
+  private visibleFwd = VISIBLE_CHUNKS_FWD;
+  private chunkRes = CHUNK_RES;
   /** Sorted crest x-positions — the AI's "where is the next lip" index. */
   private readonly crests: number[] = [];
   private crestScannedTo = -Infinity;
   /** Deterministic sunflower bounce pads, cached per island (like segments). */
   private readonly padCache = new Map<number, BouncePad[]>();
 
-  constructor(seedStr: string) {
+  constructor(seedStr: string, qualityTier: "lite" | "mid" | "high" = "high") {
     this.seedStr = seedStr;
+    this.qualityTier = qualityTier;
+    // Keep for telemetry/debug
+    void this.qualityTier;
+    // Performance: lite tier = 10 fwd vs 14, 2.2 res vs 1.8, less draw calls
+    if (qualityTier === "lite") {
+      this.visibleBack = 3;
+      this.visibleFwd = 10;
+      this.chunkRes = 2.2;
+    } else if (qualityTier === "mid") {
+      this.visibleBack = 4;
+      this.visibleFwd = 12;
+      this.chunkRes = 2.0;
+    }
     const rng = new SeededRandom(seedStr);
     this.seedN = (rng.seed % 99991) + 17;
 
@@ -341,8 +359,8 @@ export class TerrainSystem {
     const center = Math.floor(camX / CHUNK_SIZE);
     if (center !== this.chunkCenter) {
       this.chunkCenter = center;
-      const lo = center - VISIBLE_CHUNKS_BACK;
-      const hi = center + VISIBLE_CHUNKS_FWD;
+      const lo = center - this.visibleBack;
+      const hi = center + this.visibleFwd;
       for (let id = lo; id <= hi; id++) if (!this.chunks.has(id)) this.spawnChunk(id);
       for (const [id, chunk] of this.chunks) {
         if (id < lo || id > hi) {
@@ -579,7 +597,7 @@ export class TerrainSystem {
 
   private buildChunkGeo(id: number): THREE.BufferGeometry {
     const x0 = id * CHUNK_SIZE;
-    const n = Math.ceil(CHUNK_SIZE / CHUNK_RES);
+    const n = Math.ceil(CHUNK_SIZE / this.chunkRes);
     const dx = CHUNK_SIZE / n;
     const hz = TERRAIN_HALF_Z;
     const depth = TERRAIN_FACE_DEPTH;
@@ -769,7 +787,8 @@ export class TerrainSystem {
     // Per-chunk personality: density breathes chunk to chunk (sparse plains,
     // crowded groves) instead of a uniform 7-per-chunk carpet.
     const densJitter = 0.55 + hash01(id, this.seedN + 501) * 0.9;
-    const count = Math.round(7 * biome.decoDensity * densJitter);
+    const decoScale = this.qualityTier === "lite" ? 0.6 : this.qualityTier === "mid" ? 0.8 : 1;
+    const count = Math.round(7 * biome.decoDensity * densJitter * decoScale);
     const placements: Placement[] = [];
     // Grove chunks (~1 in 5): props cluster tightly around one anchor point,
     // reading as a copse or an oasis rather than even scatter.
@@ -864,7 +883,7 @@ export class TerrainSystem {
 
     // Second pass: small scatter (rocks / tufts / glints) between the props.
     const scatter: { x: number; y: number; z: number; s: number; rot: number }[] = [];
-    const sCount = Math.round(10 * biome.decoDensity);
+    const sCount = Math.round(10 * biome.decoDensity * decoScale);
     for (let i = 0; i < sCount; i++) {
       const r1 = hash01(id * 197 + i * 11, this.seedN + 401);
       const r2 = hash01(id * 197 + i * 11, this.seedN + 402);

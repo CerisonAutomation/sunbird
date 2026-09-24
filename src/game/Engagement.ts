@@ -198,6 +198,24 @@ export class SessionGoals {
     }
     return bestFrac >= 0.55 ? best : null;
   }
+
+  /** Skip a goal for coins (Jetpack Joyride-style): pay to replace with new goal */
+  skip(id: string, seed: string): SessionGoal | null {
+    const idx = this.goals.findIndex((g) => g.id === id);
+    if (idx === -1) return null;
+    const old = this.goals[idx]!;
+    const rng = new SeededRandom(`${seed}:skip:${id}:${Date.now()}`);
+    const used = new Set(this.goals.map((x) => x.kind));
+    used.delete(old.kind);
+    const replacement = this.make(rng, used);
+    this.goals[idx] = replacement;
+    return replacement;
+  }
+
+  /** Cost to skip a goal — scales with reward */
+  skipCost(goal: SessionGoal): number {
+    return Math.max(80, Math.round(goal.reward * 1.5));
+  }
 }
 
 /* ============================================================== near miss */
