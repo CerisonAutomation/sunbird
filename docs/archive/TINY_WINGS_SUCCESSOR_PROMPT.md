@@ -1,5 +1,7 @@
 # SUNBIRD — Tiny Wings Successor: Master Build Prompt (standalone, v9)
 
+> **Status:** archived — the v9 master build prompt that specified the game as it now exists. Kept as the design bible’s origin; current behaviour is the code, and the comparison against the reference title is [`../BENCHMARKS.md`](../BENCHMARKS.md) §1.
+
 > The name is SUNBIRD. It stays. **Prompt version: v9 — task zero asserts
 > this string exists verbatim in the working copy; a missing or older
 > version means you are executing a stale prompt: STOP and ask the human

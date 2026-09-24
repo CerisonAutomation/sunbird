@@ -1,3 +1,4 @@
+import { backendBase } from "./apiBase";
 import { AD_DURATION } from "./constants";
 import { storage } from "./Storage";
 
@@ -6,21 +7,21 @@ export type PurchaseResult = { ok: true; receipt: string } | { ok: false; error:
 
 const RECEIPT_KEY = "sunbird.receipts";
 
-/** Cleaned up: pure coin economy, no external payment providers needed. */
-export function ensureStripeJs(): Promise<unknown> | null {
-  return null;
-}
-
-export function stripeConfigured(_sku: Sku): boolean {
-  return false;
-}
+// There is no payment provider in this build. Four stubs (`ensureStripeJs`,
+// `stripeConfigured`, `stripeLinkFor`, `consumeStripeReturn`) used to sit here
+// returning null/false as a "we removed Stripe" marker; nothing called them, and
+// a function named `ensureStripeJs` that returns null is an invitation to wire it
+// back up. The economy is coins (`CoinPaymentProvider`) plus server-verified
+// entitlements below. `scripts/audit-zips.mjs` and `scripts/verify-portal.mjs`
+// still fail a portal build that contains the word, so the guard outlives the
+// code it was guarding.
 
 /**
  * Server-verified entitlements or local coin receipt checks.
  */
 export async function fetchServerEntitlements(deviceId: string): Promise<Sku[]> {
-  const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
-  const base = (env.VITE_LEADERBOARD_URL ?? (env.DEV ? "/mp" : "")).replace(/\/$/, "");
+  // Entitlements live under `/mp` — see `apiBase.ts` for the prefix contract.
+  const base = backendBase("/mp");
   if (!base) return [];
   try {
     const ctrl = new AbortController();
@@ -36,14 +37,6 @@ export async function fetchServerEntitlements(deviceId: string): Promise<Sku[]> 
   } catch {
     return [];
   }
-}
-
-export function stripeLinkFor(_sku: Sku, _clientRef: string): string | null {
-  return null;
-}
-
-export function consumeStripeReturn(): Sku | null {
-  return null;
 }
 
 function wait(ms: number): Promise<void> {

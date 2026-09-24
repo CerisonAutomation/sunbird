@@ -10,7 +10,7 @@
  *
  * REST API (JSON; same-origin by default, SOCIAL_ALLOWED_ORIGINS for CORS):
  * All non-health requests require a separate Bearer capability. Existing
- * unauthenticated databases require a trusted migration; see docs/CONSOLIDATION_AUDIT.md.
+ * unauthenticated databases require a trusted migration; see docs/audits/CONSOLIDATION_AUDIT.md.
  *   POST /register            { deviceId, name }                 → { ok, code }
  *   GET  /profile?device=     → { name, code, friends: [...] }
  *   POST /friends/add         { deviceId, code }                 → { ok, friend }

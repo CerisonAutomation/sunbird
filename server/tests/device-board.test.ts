@@ -3,7 +3,7 @@ import { buildCtx } from "../src/server.js";
 import { V1_ROUTES } from "../src/http/api.js";
 import type { Ctx } from "../src/core/ctx.js";
 import type { Route } from "../src/http/router.js";
-import { Db, dataFilePath, emptyDbState } from "../src/store/db.js";
+import { Db, dataFilePath } from "../src/store/db.js";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -54,7 +54,12 @@ describe("device board (root /board + /score)", () => {
     expect(page.entries[0]).toMatchObject({ deviceId: "device-B", distance: 8000 });
     // Sorted best-first.
     for (let i = 1; i < page.entries.length; i++) {
-      expect(page.entries[i - 1]!.distance).toBeGreaterThanOrEqual(page.entries[i]!.distance);
+      // The handler's JSON rows are loosely typed (`Record<string, unknown>`),
+      // so narrow before the numeric comparison — the board contract is that
+      // distance sorts best-first.
+      expect(Number(page.entries[i - 1]!.distance)).toBeGreaterThanOrEqual(
+        Number(page.entries[i]!.distance),
+      );
     }
   });
 

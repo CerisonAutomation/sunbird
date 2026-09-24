@@ -53,7 +53,14 @@ const CONSONANT = (chord: string, pc: number): boolean => {
   if (TRIAD[chord]!.includes(pc)) return true;
   const root = TRIAD[chord]![0]!;
   const offset = (pc - root + 12) % 12;
-  return offset === 9 || offset === 2 || offset === 5 || (MINOR.has(chord) && offset === 10);
+  if (offset === 9 || offset === 2 || offset === 5) return true;
+  // Minor triads take the minor 7th (offset 10) and the minor 6th (offset 8 —
+  // F over Am, i.e. Am6). The 6th comes in two sizes and this guard used to
+  // allow only the major one (offset 9), so a perfectly ordinary Am6 arrival was
+  // reported as a clash the moment PROG_J bar 8 became a modal Em→Am cadence
+  // instead of resting on F. The doc comment above has always promised "a triad,
+  // 6th, 9th, or the sus-4"; now the code means it.
+  return MINOR.has(chord) && (offset === 10 || offset === 8);
 };
 
 describe("melodic contract", () => {

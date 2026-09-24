@@ -1,3 +1,5 @@
+import { execFileSync } from "child_process";
+import { readFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import tailwindcss from "@tailwindcss/vite";
@@ -59,6 +61,22 @@ function portalShimPlugin(): Plugin {
                 : null;
         return edition; // null => the neutral src/game/edition.ts
       }
+      // Per-target legal disclosures (privacy sections + external-host table).
+      // Same reasoning as the edition strings: one shared policy that lists
+      // every target's hosts puts a competitor's name and endpoints into each
+      // bundle, which fails verify:portals AND misinforms the player reading it.
+      if (base === "legal.edition" || base === "legal.edition.ts") {
+        if (dir !== "game") return null;
+        const legalEdition =
+          PORTAL === "poki"
+            ? path.resolve(__dirname, "src/game/legal.edition.poki.ts")
+            : PORTAL === "crazy" || PORTAL === "crazygames"
+              ? path.resolve(__dirname, "src/game/legal.edition.crazy.ts")
+              : PORTAL === "generic"
+                ? path.resolve(__dirname, "src/game/legal.edition.generic.ts")
+                : null;
+        return legalEdition; // null => the direct/web src/game/legal.edition.ts
+      }
       if (dir !== "sdk") return null;
       if (base === "poki" || base === "poki.ts") {
         if (PORTAL !== "poki") return shim;
@@ -71,8 +89,40 @@ function portalShimPlugin(): Plugin {
   };
 }
 
-// Stamp the service worker cache key per build so each deploy busts stale caches.
-const BUILD_ID = Date.now().toString(36);
+/** Short commit sha, or null in a source-only checkout (no .git to ask). */
+function gitShortSha(): string | null {
+  try {
+    const sha = execFileSync("git", ["rev-parse", "--short=8", "HEAD"], { cwd: __dirname, encoding: "utf8" }).trim();
+    return sha || null;
+  } catch {
+    return null;
+  }
+}
+
+/* Build identity — deterministic on purpose. --------------------------------
+ *
+ * This used to be `Date.now().toString(36)`, described as a service-worker
+ * cache stamp. The worker has since become a retirement shim (public/sw.js
+ * deletes `sunbird-shell-*` caches and reads nothing), and no module ever
+ * imported the define — so the id was dead weight that changed on *every*
+ * build. That is the worst of both worlds: a "version" that moves when the code
+ * did not (non-reproducible zips, a moving target for the server's
+ * SUNBIRD_CLIENT_BUILD pin, leaderboard rows nobody can attribute) and no
+ * identity at all when the code did change.
+ *
+ * Now it is derived from what actually changed: package.json's semver, the
+ * portal target, and the commit. Same commit + same target = same id, so
+ * rebuilds are comparable and a score, a crash report or an uploaded zip can be
+ * tied back to the code that produced it. Vercel injects the sha as an env var;
+ * `SUNBIRD_BUILD_SHA` overrides for release builds cut outside git.
+ *
+ * `docs/VERSIONS.md` is the inventory of every version identifier in the repo,
+ * and `src/game/__tests__/version-lockstep.test.ts` fails the build when any two
+ * of them disagree. */
+const APP_VERSION = (JSON.parse(readFileSync(path.resolve(__dirname, "package.json"), "utf8")) as { version: string })
+  .version;
+const GIT_SHA = (process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.SUNBIRD_BUILD_SHA ?? gitShortSha() ?? "dev").slice(0, 8);
+const BUILD_ID = `${APP_VERSION}-${PORTAL}-${GIT_SHA}`;
 
 // Stamp a short copyright notice onto every emitted chunk. Rollup's
 // `output.banner` is not honoured through Vite's output pipeline (verified: it
@@ -161,6 +211,8 @@ export default defineConfig({
   },
   define: {
     "import.meta.env.VITE_BUILD_ID": JSON.stringify(BUILD_ID),
+    "import.meta.env.VITE_APP_VERSION": JSON.stringify(APP_VERSION),
+    "import.meta.env.VITE_GIT_SHA": JSON.stringify(GIT_SHA),
     // Freeze the portal target to a compile-time constant so Rollup can
     // statically fold `TARGET === "poki"` / `TARGET === "crazy"` branches
     // and strip non-target SDK URLs / branches (e.g. Poki Netlib dynamic
@@ -174,6 +226,14 @@ export default defineConfig({
     // strings ("Remove breaks", "No sponsored breaks") in the bundle.
     // preventAssignment:true (Vite default) means import/export bindings are
     // NOT replaced, only expression usages — so edition exports still compile.
+    // Simulated sponsored breaks are a DEV-ONLY rehearsal of the ad-state UI,
+    // never a shipped experience. The direct build has no ad network wired in,
+    // so a "simulated" break pauses a run to show "Your ad is loading… Skip in 3"
+    // for nothing — and the Gold pitch would then be selling the removal of a
+    // break that was never an ad. Off by default; `VITE_SIM_BREAKS=true pnpm dev`
+    // to exercise the flow. Portals own their own ad scheduling (REQ-20), so the
+    // flag is pinned false for every portal target regardless of the env var.
+    "import.meta.env.VITE_SIM_BREAKS": JSON.stringify(PORTAL === "none" && process.env.VITE_SIM_BREAKS === "true"),
     "import.meta.env.VITE_SELL_AD_REMOVAL": JSON.stringify(PORTAL === "none"),
   },
   build: {

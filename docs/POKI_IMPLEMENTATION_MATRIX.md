@@ -25,7 +25,7 @@ Legend: ✅ implemented + verified · 🟡 implemented, external step remains (o
 | Touch AND keyboard controls, WASD/arrows/space/return standards | ✅ | Keyboard + touch + mouse paths; `e2e/input-standards.spec.ts` pins the control standards |
 | Clear goals: short-term + long-term | ✅ | Missions, challenges, career, mastery (5 levels), season pass, collections, ranked seasons — all tested in `src/game/__tests__/` |
 | Congratulate the player | ✅ | FirstFlight celebration state, confetti moments, results 👑 NEW BEST banner, achievement unlocks, audio feedback (`Audio.ts` jingles) |
-| Tune difficulty gradually | ✅ | Biome progression (per-island difficulty), storm acts escalation, mastery coin ramps; `docs/FLIGHT_PERFORMANCE_AUDIT.md` |
+| Tune difficulty gradually | ✅ | Biome progression (per-island difficulty), storm acts escalation, mastery coin ramps; `audits/FLIGHT_PERFORMANCE_AUDIT.md` |
 | Playtesting hooks | ✅ | `boot_after_crash` telemetry, aggregate counters, Playtest-ready `dist-poki/` build; per-funnel analytics deliberately not collected (privacy posture, see LEGAL_SECURITY §1.2) |
 
 ## 3. Localization

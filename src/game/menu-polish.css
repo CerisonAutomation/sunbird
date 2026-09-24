@@ -41,8 +41,8 @@
 .overlay :is(.mini-btn,.soft-btn,.nav-btn,.seg button,.tier-reward) { min-height: 44px; }
 .overlay .mini-btn { min-width: 44px; }
 .overlay .section-title { color: #735340; line-height: 1.5; gap: 8px; flex-wrap: wrap; }
-.overlay :is(.fineprint,.tagline,.empty-note,.md) { color: #71574c; line-height: 1.55; }
-.overlay .section-title small { color: #71574c; }
+.overlay :is(.fineprint,.tagline,.empty-note,.md) { color: var(--cocoa); line-height: 1.55; }
+.overlay .section-title small { color: var(--cocoa); }
 .overlay .redeem { display: flex; gap: 8px; align-items: center; }
 .overlay .redeem input { flex: 1; width: 0; }
 .overlay .redeem button { flex-shrink: 0; }
@@ -71,7 +71,7 @@
 .menu-hero .quick-action span { font-size: 11px; }
 .menu-hero .home-more { margin: 12px 0 0; background: #fffaf2; border-color: #dfcfbc; }
 .menu-hero .home-more > summary { display: flex; flex-wrap: wrap; gap: 2px 8px; padding: 12px; min-height: 52px; font-size: 13px; }
-.menu-hero .home-more > summary span { margin-left: 0; font-size: 11px; font-weight: 400; color: #71574c; }
+.menu-hero .home-more > summary span { margin-left: 0; font-size: 11px; font-weight: 400; color: var(--cocoa); }
 .menu-hero .home-more[open] > summary span { visibility: visible; }
 .menu-hero .daily-strip { min-height: 62px; margin: 0; border: 1px solid #e5d2aa; }
 .menu-hero .hero-meta { flex-wrap: wrap; }
@@ -79,7 +79,7 @@
 .menu-hero .home-more .mode-cards { grid-template-columns: minmax(0,1fr); }
 .menu-hero .home-more .mode-card-main { min-height: 80px; }
 /* Settings: meaningful state, continuous volume, explicit choices. */
-.settings-intro { font-size: 13px; color: #71574c; line-height: 1.5; text-align: left; margin: 0 0 14px; }
+.settings-intro { font-size: 13px; color: var(--cocoa); line-height: 1.5; text-align: left; margin: 0 0 14px; }
 .overlay .setting-row { gap: 12px; min-height: 60px; box-shadow: none; border: 1px solid #e5d8c8; background: #fffdf8; padding: 8px 12px; text-align: left; }
 .overlay .setting-row > span, .overlay .setting-row > label { font-size: 13px; font-weight: 600; }
 .overlay .setting-volume, .overlay .setting-select { display: grid; grid-template-columns: minmax(0,1fr); gap: 4px; }
@@ -112,7 +112,7 @@
   height: 26px;
   border-radius: 50%;
   background: linear-gradient(135deg, #ff9a62, #ff6b3d);
-  border: 2px solid #ffffff;
+  border: 2px solid var(--pure-white);
   box-shadow: 0 2px 6px rgba(120, 60, 20, 0.35);
   margin-top: -9px;
   transition: transform 0.12s ease;
@@ -122,7 +122,7 @@
   height: 26px;
   border-radius: 50%;
   background: linear-gradient(135deg, #ff9a62, #ff6b3d);
-  border: 2px solid #ffffff;
+  border: 2px solid var(--pure-white);
   box-shadow: 0 2px 6px rgba(120, 60, 20, 0.35);
   transition: transform 0.12s ease;
 }
@@ -139,7 +139,7 @@
 .overlay .toggle i { width: 20px; height: 20px; top: 12px; left: 6px; }
 .overlay .toggle.on i { left: 26px; }
 .danger-zone { margin-top: 20px; border-top: 1px solid #decfbd; padding-top: 10px; }
-.danger-zone summary { min-height: 44px; padding: 12px 0; font-size: 13px; color: #71574c; cursor: pointer; }
+.danger-zone summary { min-height: 44px; padding: 12px 0; font-size: 13px; color: var(--cocoa); cursor: pointer; }
 /* Shop: compact collection index, explicit cost and ownership. */
 .overlay .collection { border: 1px solid #e1d1bd; border-radius: 14px; background: #fffaf2; margin: 5px 0; }
 .overlay .collection .coll-head { margin: 0; padding: 8px 12px; min-height: 40px; cursor: pointer; gap: 8px; flex-wrap: wrap; }
@@ -147,13 +147,13 @@
 .overlay .collection[open] .coll-head::before { content: "−"; }
 .overlay .collection summary { list-style: none; }
 .overlay .collection summary::-webkit-details-marker { display: none; }
-.overlay .collection .coll-count { font-size: 10px; padding: 3px 6px; color: #71574c; }
+.overlay .collection .coll-count { font-size: 10px; padding: 3px 6px; color: var(--cocoa); }
 .overlay .collection .skin-grid { padding: 0 10px 10px; gap: 10px; }
 .overlay .skin-card { min-width: 0; border-radius: 16px; }
 .overlay .skin-card :is(.sk-perk,.tag) { white-space: normal; overflow-wrap: anywhere; }
 .overlay .shop-section { border-top: 1px solid #decfbd; margin-top: 10px; padding: 0 0 6px; }
 .overlay .shop-section > summary { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; font-size: 14px; font-weight: 700; }
-.overlay .shop-section > summary span { color: #71574c; font-size: 11px; font-weight: 400; }
+.overlay .shop-section > summary span { color: var(--cocoa); font-size: 11px; font-weight: 400; }
 .overlay .shop-section > summary::after { content: "+"; }
 .overlay .shop-section[open] > summary::after { content: "−"; }
 @media (min-width: 840px) {
@@ -181,7 +181,7 @@
 }
 .overlay .room-ctl .seg button { min-width: 44px; padding-inline: 8px; }
 .overlay .trophy-collection > summary { text-transform: capitalize; }
-.overlay .import-confirm { display: flex; align-items: center; gap: 10px; min-height: 48px; text-align: left; font-size: 12px; line-height: 1.4; margin: 8px 0; color: #71574c; }
+.overlay .import-confirm { display: flex; align-items: center; gap: 10px; min-height: 48px; text-align: left; font-size: 12px; line-height: 1.4; margin: 8px 0; color: var(--cocoa); }
 .overlay .import-confirm input { flex: 0 0 22px; width: 22px; height: 22px; }
 .overlay .screen-head > span:empty { display: none; }
 .overlay .screen-head h2 { white-space: normal; overflow-wrap: anywhere; line-height: 1.2; }
@@ -198,17 +198,39 @@
 @media (prefers-reduced-motion: reduce) {
   .overlay *, .overlay *::before, .overlay *::after { animation: none !important; transition: none !important; }
 }
+/* --- moment strip: the "what was funny" row of the recap card ---
+   One chip per moment kind the flight produced (see Moments.ts). The row is
+   deliberately above the fold: a recap that leads with metres teaches players
+   that distance is the point, a recap that leads with "4 BONKs" teaches them
+   the flight had a story worth repeating - and worth sharing. */
+.moment-strip { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 2px; }
+.moment-chip {
+  display: inline-flex; align-items: baseline; gap: 5px;
+  padding: 5px 10px; border-radius: 999px;
+  background: #fff6dd; border: 1px solid #e4c986;
+  color: #6a4a10; font: 800 11px/1.4 var(--body);
+  letter-spacing: .06em; text-transform: uppercase; white-space: nowrap;
+}
+.moment-chip b { font-size: 13px; line-height: 1; filter: saturate(1.15); }
+.moment-chip i { font-style: normal; font-weight: 900; color: #a3701a; }
+.moment-line {
+  margin: 2px 0 10px; color: #6d5a2c;
+  font: 600 13px/1.45 var(--body);
+}
+/* Longer translations (de/ru/fi) must not clip: chips wrap, labels shrink. */
+@supports (overflow-wrap: anywhere) { .moment-chip { overflow-wrap: anywhere; } }
+
 /* The next-flight decision comes before the detail-heavy results catalogue. */
 .results-kicker { font-size: 11px; letter-spacing: .13em; text-transform: uppercase; color: #80583e; margin-bottom: 8px; }
 .results-card > h2 { font-size: 28px; margin: 0 0 6px; }
 .result-actions { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px; align-items: stretch; margin: 16px 0; }
 .result-actions .play-again-btn { margin: 0; min-height: 52px; font-size: 17px; padding: 12px; }
-.result-actions .soft-btn { margin: 0; min-width: 80px; font-size: 13px; color: #71574c; border-color: #d5c4ad; background: rgba(255,255,255,0.5); }
+.result-actions .soft-btn { margin: 0; min-width: 80px; font-size: 13px; color: var(--cocoa); border-color: #d5c4ad; background: rgba(255,255,255,0.5); }
 .results-card .result-summary { grid-template-columns: repeat(3,minmax(0,1fr)); margin: 12px 0; }
 .result-summary b { font-size: clamp(17px,4vw,24px); overflow-wrap: anywhere; }
 .result-details { border: 1px solid #e1d1bd; border-radius: 14px; background: #fffaf2; margin: 12px 0; text-align: left; padding: 0 12px; }
 .result-details > summary { cursor: pointer; min-height: 52px; padding: 12px 0; font-weight: 700; font-size: 13px; }
-.result-details > summary span { display: block; font-size: 11px; font-weight: 400; color: #71574c; margin-top: 3px; }
+.result-details > summary span { display: block; font-size: 11px; font-weight: 400; color: var(--cocoa); margin-top: 3px; }
 .result-details .over-stats { margin-bottom: 12px; }
 .result-links { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
 .result-links .soft-btn { min-width: 0; font-size: 12px; padding: 10px 6px; }
@@ -376,7 +398,7 @@
    card, not a button, but the whole thing opens the leaderboards — a player
    who sees their name here taps it. */
 .home-board { display:block; width:100%; text-align:left; margin:0 0 12px; padding:12px 14px;
-  background:linear-gradient(145deg,#2f2a4a,#1d1b33); color:#fff;
+  background:linear-gradient(145deg,#2f2a4a,#1d1b33); color:var(--pure-white);
   border:1px solid #4b4570; border-radius:17px; cursor:pointer;
   box-shadow:0 3px 0 #14122a66, 0 6px 16px #14122a33; font-family:var(--body); }
 .home-board:hover { border-color:#6f66a3; }
@@ -667,7 +689,7 @@
   transition: box-shadow .14s ease, border-color .14s ease, background .14s ease !important;
 }
 .destination-grid .destination:hover {
-  background: linear-gradient(150deg, #fffef8 0%, #fff4e0 100%) !important;
+  background: linear-gradient(150deg, var(--ivory) 0%, #fff4e0 100%) !important;
   border-color: #c4a66e !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.95),
@@ -1062,7 +1084,7 @@ button,
   text-align: left;
   cursor: pointer;
   font-family: inherit;
-  border: 1.5px solid #d4aa44;
+  border: 1.5px solid var(--brass);
   background: linear-gradient(145deg, #fffbec, #fff3c4);
   box-shadow:
     inset 0 1px 0 rgba(255,255,220,0.9),
@@ -1109,7 +1131,7 @@ button,
 .hpc-body b {
   display: block;
   font: 700 13px/1.3 var(--display);
-  color: #2c1f14;
+  color: var(--bark);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1117,7 +1139,7 @@ button,
 .hpc-body span {
   display: block;
   font: 400 11px/1.4 var(--body);
-  color: #7a5c30;
+  color: var(--bronze-deep);
   margin-top: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1155,7 +1177,7 @@ button,
   padding: 14px 16px !important;
   border-radius: 16px !important;
   background: linear-gradient(145deg, #fffdf5, #fff4d8) !important;
-  border: 1.5px solid #d4aa44 !important;
+  border: 1.5px solid var(--brass) !important;
   border-top-color: #fffbe8 !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,220,0.9),
@@ -1175,7 +1197,7 @@ button,
 .progress-destinations .destination[data-action="open-challenges"] .destination-copy b,
 .progress-destinations .destination[data-action="open-board"] .destination-copy b {
   font-size: 15px !important;
-  color: #2c1f14 !important;
+  color: var(--bark) !important;
 }
 .progress-destinations .destination[data-action="open-challenges"] .destination-copy span,
 .progress-destinations .destination[data-action="open-board"] .destination-copy span {
@@ -1238,7 +1260,7 @@ button,
 .overlay .screen-head h2 {
   font-size: clamp(19px, 5vw, 23px);
   letter-spacing: -.03em;
-  color: #2c1f14;
+  color: var(--bark);
   font-weight: 700;
 }
 
@@ -1270,7 +1292,7 @@ button,
 .home-section-title > small {
   font: 700 9px/1.4 var(--body) !important;
   letter-spacing: .14em !important;
-  color: #9a7b4e !important;
+  color: var(--khaki) !important;
   background: rgba(180,140,60,0.1);
   border-radius: 4px;
   padding: 2px 5px;
@@ -1278,7 +1300,7 @@ button,
 
 /* ── Soft buttons: genuine depth, tactile press ───────────────────────────── */
 .overlay .soft-btn {
-  background: linear-gradient(165deg, #ffffff 0%, #f8f1e4 100%) !important;
+  background: linear-gradient(165deg, var(--pure-white) 0%, #f8f1e4 100%) !important;
   border: 1px solid #cdbfa5 !important;
   border-bottom-color: #b8a68a !important;
   box-shadow:
@@ -1290,7 +1312,7 @@ button,
   transition: box-shadow .12s ease, transform .1s ease, background .12s ease !important;
 }
 .overlay .soft-btn:hover {
-  background: linear-gradient(165deg, #fffef8 0%, #fff4e0 100%) !important;
+  background: linear-gradient(165deg, var(--ivory) 0%, #fff4e0 100%) !important;
   border-color: #c09d78 !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.98),
@@ -1315,7 +1337,7 @@ button,
     inset 0 1px 0 rgba(255,255,210,0.45),
     0 4px 0 #b54c0e,
     0 7px 18px rgba(180,70,10,0.28) !important;
-  color: #fff !important;
+  color: var(--pure-white) !important;
   text-shadow: 0 1px 2px rgba(100,30,0,0.35) !important;
   font-weight: 700 !important;
   letter-spacing: .01em;
@@ -1346,7 +1368,7 @@ button,
   box-shadow:
     inset 0 2px 4px rgba(100,70,20,0.07),
     0 1px 0 rgba(255,255,255,0.85) !important;
-  color: #2c1f14 !important;
+  color: var(--bark) !important;
   border-radius: 12px !important;
 }
 .overlay :is(input, select, textarea):not([type="range"]):focus {
@@ -1368,7 +1390,7 @@ button,
     0 6px 16px rgba(80,60,20,0.08) !important;
 }
 .board-podium .podium-spot:first-child {
-  background: linear-gradient(145deg, #fff9dc, #ffecaa) !important;
+  background: linear-gradient(145deg, #fff9dc, var(--butter)) !important;
   border-color: #cfa82a !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,210,0.95),
@@ -1448,7 +1470,7 @@ button,
 }
 .trophy-grid .trophy.unlocked {
   background: linear-gradient(145deg, #fffbec, #fff3c4) !important;
-  border: 1px solid #d4aa44 !important;
+  border: 1px solid var(--brass) !important;
   border-top-color: #fffbdd !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,220,0.9),
@@ -1458,7 +1480,7 @@ button,
 .trophy-collection > summary {
   font-size: 16px !important;
   font-weight: 700 !important;
-  color: #2c1f14 !important;
+  color: var(--bark) !important;
   padding: 12px 0 !important;
   border-bottom: 1.5px solid #decfbd !important;
 }
@@ -1476,7 +1498,7 @@ button,
 .overlay .section-title {
   font-size: 13px !important;
   font-weight: 700 !important;
-  color: #2c1f14 !important;
+  color: var(--bark) !important;
   letter-spacing: .01em !important;
   display: flex;
   align-items: center;
@@ -1486,7 +1508,7 @@ button,
 .overlay .section-title small {
   font-size: 11px !important;
   font-weight: 400 !important;
-  color: #9a7b4e !important;
+  color: var(--khaki) !important;
 }
 
 /* ── Squad: section heading style ──────────────────────────────────────────── */
@@ -1498,8 +1520,8 @@ button,
 
 /* ── Squad invite / pilot code card ────────────────────────────────────────── */
 .squad-invite {
-  background: linear-gradient(130deg, #fff9dc 0%, #ffecaa 100%) !important;
-  border: 1px solid #d4aa44 !important;
+  background: linear-gradient(130deg, #fff9dc 0%, var(--butter) 100%) !important;
+  border: 1px solid var(--brass) !important;
   border-top-color: #fff8cc !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,220,0.9),
@@ -1524,7 +1546,7 @@ button,
 .format-divider {
   font: 700 11px/1.4 var(--display) !important;
   letter-spacing: .1em !important;
-  color: #7a5c30 !important;
+  color: var(--bronze-deep) !important;
   text-transform: uppercase;
   margin: 16px 0 8px !important;
   padding: 8px 12px !important;
@@ -1542,14 +1564,14 @@ button,
 .format-btn.on {
   border-left-color: #d4900a !important;
   background: linear-gradient(135deg, #fffbee, #fff1c4) !important;
-  border-color: #d4aa44 !important;
+  border-color: var(--brass) !important;
 }
 
 /* ── Setting rows: warmer, lifted feel ─────────────────────────────────────── */
 .overlay .setting-row {
   background: linear-gradient(155deg, #fffdf5, #fff6e2) !important;
   border: 1px solid #d5c4a0 !important;
-  border-top-color: #fffef8 !important;
+  border-top-color: var(--ivory) !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.9),
     0 2px 0 rgba(160,130,60,0.12),
@@ -1562,10 +1584,10 @@ button,
 /* ── Collection headers in shop: bolder heading ─────────────────────────────── */
 .overlay .collection .coll-head b {
   font: 700 16px var(--display) !important;
-  color: #2c1f14 !important;
+  color: var(--bark) !important;
 }
 .overlay .collection {
-  background: linear-gradient(to bottom, #fffef8, #fffaee) !important;
+  background: linear-gradient(to bottom, var(--ivory), #fffaee) !important;
   border: 1px solid #d5c4a0 !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.9),
@@ -1594,7 +1616,7 @@ button,
 }
 .board-badge.local {
   background: #f0e8d4 !important;
-  color: #7a5c30 !important;
+  color: var(--bronze-deep) !important;
   border: 1px solid #c8aa70 !important;
 }
 .board-badge.live {
@@ -1632,8 +1654,8 @@ button,
 
 /* ── Squad offline banner: amber toast, not bland grey ─────────────────────── */
 .squad-offline-note {
-  background: linear-gradient(130deg, #fff8e0, #ffecaa) !important;
-  border: 1.5px solid #d4aa44 !important;
+  background: linear-gradient(130deg, #fff8e0, var(--butter)) !important;
+  border: 1.5px solid var(--brass) !important;
   color: #4a3010 !important;
   border-radius: 14px !important;
   box-shadow:
@@ -1644,7 +1666,7 @@ button,
 /* ── Club card ──────────────────────────────────────────────────────────────── */
 .club-card.mine {
   background: linear-gradient(145deg, #fffcec, #fff3cc) !important;
-  border: 1px solid #d4aa44 !important;
+  border: 1px solid var(--brass) !important;
   border-top-color: #fffbe8 !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,220,0.85),
@@ -1655,13 +1677,13 @@ button,
 .squad-quest-card {
   background: linear-gradient(150deg, #fffdf5, #f6f0e0) !important;
   border: 1px solid #d8c89a !important;
-  border-top-color: #fffef8 !important;
+  border-top-color: var(--ivory) !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,240,0.9),
     0 2px 0 rgba(150,120,50,0.15),
     0 4px 10px rgba(80,60,20,0.06) !important;
 }
-.squad-quest-card .sq-info b { color: #2c1f14 !important; }
+.squad-quest-card .sq-info b { color: var(--bark) !important; }
 .squad-quest-card .sq-info span { color: #7a6040 !important; }
 .squad-quest-card .sq-prog { color: #b06a10 !important; font-weight: 700; }
 
@@ -1715,7 +1737,7 @@ button,
 .pause-kicker {
   font: 700 9px/1 var(--body) !important;
   letter-spacing: .18em !important;
-  color: #7a5c30 !important;
+  color: var(--bronze-deep) !important;
   background: linear-gradient(135deg, rgba(255,236,160,0.7), rgba(255,218,100,0.5));
   border: 1px solid rgba(200,160,50,0.35);
   border-radius: 20px;
@@ -1726,7 +1748,7 @@ button,
 }
 .pause-card h2 {
   font-size: 28px !important;
-  color: #2c1f14 !important;
+  color: var(--bark) !important;
   margin: 2px 0 6px !important;
 }
 .pause-card .tagline {
@@ -1741,7 +1763,7 @@ button,
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid #dccead;
-  background: linear-gradient(to bottom, #fffef8, #fff8ec);
+  background: linear-gradient(to bottom, var(--ivory), #fff8ec);
 }
 .prs {
   flex: 1;
@@ -1754,14 +1776,14 @@ button,
   display: block;
   font: 700 8px/1.4 var(--body) !important;
   letter-spacing: .12em !important;
-  color: #9a7b4e !important;
+  color: var(--khaki) !important;
   text-transform: uppercase;
   margin-bottom: 4px;
 }
 .prs .prs-value {
   display: block;
   font: 700 18px/1.1 var(--display) !important;
-  color: #2c1f14 !important;
+  color: var(--bark) !important;
 }
 .pause-resume {
   background: linear-gradient(145deg, #ffb53a 0%, #ff8c1a 55%, #f56a10 100%) !important;
@@ -1771,7 +1793,7 @@ button,
     inset 0 1px 0 rgba(255,255,210,0.45),
     0 4px 0 #b54c0e,
     0 7px 18px rgba(180,70,10,0.28) !important;
-  color: #fff !important;
+  color: var(--pure-white) !important;
   font-weight: 700 !important;
   font-size: 16px !important;
   min-height: 52px !important;
@@ -1790,7 +1812,7 @@ button,
   padding: 10px 4px !important;
   border-radius: 14px !important;
   border: 1px solid #d8c8a8 !important;
-  background: linear-gradient(155deg, #fffef8, #fff6e4) !important;
+  background: linear-gradient(155deg, var(--ivory), #fff6e4) !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.9),
     0 2px 0 rgba(150,120,50,0.15) !important;
@@ -1800,7 +1822,7 @@ button,
   transition: box-shadow .12s ease, transform .1s ease !important;
 }
 .pause-q:hover {
-  background: linear-gradient(155deg, #fffef8, #fff0d0) !important;
+  background: linear-gradient(155deg, var(--ivory), #fff0d0) !important;
   border-color: #c4a860 !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.95),
@@ -1826,7 +1848,7 @@ button,
   margin-top: 8px !important;
 }
 .ghost-btn {
-  background: linear-gradient(165deg, #ffffff, #f8f1e4) !important;
+  background: linear-gradient(165deg, var(--pure-white), #f8f1e4) !important;
   border: 1px solid #cdbfa5 !important;
   border-bottom-color: #b8a68a !important;
   box-shadow:
@@ -1851,7 +1873,7 @@ button,
 }
 .pause-exit-note {
   font-size: 11px !important;
-  color: #9a7b4e !important;
+  color: var(--khaki) !important;
   text-align: center !important;
   margin-top: 8px !important;
 }
@@ -1859,7 +1881,7 @@ button,
 /* ── Progress screen: pc-row cards warm palette ─────────────────────────────── */
 .pc-row {
   border-radius: 18px !important;
-  border: 1.5px solid #d4aa44 !important;
+  border: 1.5px solid var(--brass) !important;
   padding: 16px !important;
   margin: 12px 0 !important;
   box-shadow:
@@ -1869,7 +1891,7 @@ button,
 }
 .pc--blue {
   background: linear-gradient(145deg, #fdf8e8, #fff3c0) !important;
-  border-color: #d4aa44 !important;
+  border-color: var(--brass) !important;
 }
 .pc--pink {
   background: linear-gradient(145deg, #fff0e8, #ffe4c8) !important;
@@ -1898,7 +1920,7 @@ button,
 }
 .pc-body b {
   font: 700 16px/1.3 var(--display) !important;
-  color: #2c1f14 !important;
+  color: var(--bark) !important;
   display: block;
   margin-bottom: 4px;
 }
@@ -1935,7 +1957,7 @@ button,
   right: 0;
   top: 14px;
   font: 400 10px var(--body) !important;
-  color: #9a7b4e !important;
+  color: var(--khaki) !important;
 }
 
 /* ── Hero meta pills ────────────────────────────────────────────────────────── */
@@ -1943,7 +1965,7 @@ button,
   font: 600 11px/1.4 var(--body) !important;
   padding: 4px 10px !important;
   border-radius: 20px !important;
-  border: 1px solid #d4aa44 !important;
+  border: 1px solid var(--brass) !important;
   background: linear-gradient(135deg, #fff9dc, #ffecb0) !important;
   color: #5a3800 !important;
   box-shadow: 0 2px 0 rgba(160,120,20,0.18) !important;
@@ -1951,9 +1973,9 @@ button,
 
 /* ── Utility destination tiles (Shop/Squad/Settings): richer 3-col cards ────── */
 .utility-destinations .destination {
-  background: linear-gradient(155deg, #fffef8, #fff6e4) !important;
+  background: linear-gradient(155deg, var(--ivory), #fff6e4) !important;
   border: 1px solid #d4c0a0 !important;
-  border-top-color: #fffef8 !important;
+  border-top-color: var(--ivory) !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.9),
     0 2px 0 rgba(150,120,60,0.16),
@@ -1975,7 +1997,7 @@ button,
 .utility-destinations .destination-copy b {
   font-size: 13px !important;
   font-weight: 700 !important;
-  color: #2c1f14 !important;
+  color: var(--bark) !important;
 }
 
 /* ── Section number codes: styled badge, not dev label ──────────────────────── */
@@ -1986,14 +2008,14 @@ button,
   padding: 2px 7px !important;
   font: 700 8px/1.5 var(--body) !important;
   letter-spacing: .1em !important;
-  color: #7a5c30 !important;
+  color: var(--bronze-deep) !important;
 }
 
 /* ── Shop: header kicker and section labels ─────────────────────────────────── */
 .shop-intro {
   font: 700 9px/1.5 var(--body) !important;
   letter-spacing: .16em !important;
-  color: #9a7b4e !important;
+  color: var(--khaki) !important;
   background: linear-gradient(135deg, rgba(255,236,160,0.5), rgba(255,215,80,0.3));
   border: 1px solid rgba(200,160,50,0.25);
   border-radius: 8px;
@@ -2005,14 +2027,14 @@ button,
   display: block !important;
   font: 600 16px/1.4 var(--display) !important;
   letter-spacing: 0 !important;
-  color: #2c1f14 !important;
+  color: var(--bark) !important;
   margin-top: 2px !important;
 }
 
 /* ── Shop hero bird card ────────────────────────────────────────────────────── */
 .shop-hero {
   background: linear-gradient(130deg, #fff9e0 0%, #ffedb8 60%, #ffe090 100%) !important;
-  border: 1.5px solid #d4aa44 !important;
+  border: 1.5px solid var(--brass) !important;
   border-top-color: #fff8cc !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,220,0.9),
@@ -2025,7 +2047,7 @@ button,
 [class*="flash-sale"],
 [class*="daily-sale"] {
   background: linear-gradient(135deg, #ff6b35, #e84020) !important;
-  color: #fff !important;
+  color: var(--pure-white) !important;
   border: 1px solid #c03010 !important;
   box-shadow: 0 2px 6px rgba(200,50,10,0.3) !important;
 }
@@ -2039,7 +2061,7 @@ button,
 .results-card .results-kicker {
   font: 700 9px/1.4 var(--body) !important;
   letter-spacing: .18em !important;
-  color: #9a7b4e !important;
+  color: var(--khaki) !important;
   background: linear-gradient(135deg, rgba(255,236,160,0.7), rgba(255,218,100,0.5));
   border: 1px solid rgba(200,160,50,0.3);
   border-radius: 20px;
@@ -2048,11 +2070,11 @@ button,
 }
 .results-card h2 {
   font-size: 32px !important;
-  color: #2c1f14 !important;
+  color: var(--bark) !important;
   letter-spacing: -.03em !important;
 }
 .result-summary {
-  background: linear-gradient(to bottom, #fffef8, #fff8ec) !important;
+  background: linear-gradient(to bottom, var(--ivory), #fff8ec) !important;
   border: 1px solid #dccead !important;
   border-radius: 16px !important;
   overflow: hidden;
@@ -2066,10 +2088,10 @@ button,
 }
 .result-summary > *:last-child { border-right: none !important; }
 .result-summary b {
-  color: #2c1f14 !important;
+  color: var(--bark) !important;
 }
 .result-summary small {
-  color: #9a7b4e !important;
+  color: var(--khaki) !important;
   font-size: 9px !important;
   letter-spacing: .1em !important;
   display: block;
@@ -2078,8 +2100,8 @@ button,
 
 /* ── Rank / score / stat badges on results ──────────────────────────────────── */
 .reward-strip {
-  background: linear-gradient(145deg, #fff9e0, #ffecaa) !important;
-  border: 1.5px solid #d4aa44 !important;
+  background: linear-gradient(145deg, #fff9e0, var(--butter)) !important;
+  border: 1.5px solid var(--brass) !important;
   border-top-color: #fffbcc !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,220,0.9),
@@ -2098,33 +2120,33 @@ button,
 /* ── Next flight card ────────────────────────────────────────────────────────── */
 .next-flight {
   background: linear-gradient(135deg, #fff9e0, #ffecb8) !important;
-  border: 1.5px solid #d4aa44 !important;
+  border: 1.5px solid var(--brass) !important;
   border-top-color: #fffbcc !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,220,0.85),
     0 4px 0 rgba(160,120,20,0.22),
     0 8px 20px rgba(140,100,20,0.1) !important;
 }
-.next-flight b { color: #2c1f14 !important; }
+.next-flight b { color: var(--bark) !important; }
 .next-flight p { color: #6b4c2a !important; }
-.next-flight small { color: #9a7b4e !important; }
+.next-flight small { color: var(--khaki) !important; }
 
 /* ── Race/lobby entry card ───────────────────────────────────────────────────── */
 .room-entry {
   background: linear-gradient(145deg, #fff9e8, #ffebb4) !important;
-  border: 1.5px solid #d4aa44 !important;
+  border: 1.5px solid var(--brass) !important;
   border-top-color: #fffbcc !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,220,0.9),
     0 4px 0 rgba(160,120,20,0.22),
     0 8px 24px rgba(160,120,20,0.14) !important;
 }
-.room-entry h3 { color: #2c1f14 !important; }
+.room-entry h3 { color: var(--bark) !important; }
 
 /* ── Race section (PvP lobby) ────────────────────────────────────────────────── */
 .race-section {
   background: linear-gradient(150deg, #fffdf5, #fff4d8) !important;
-  border: 1.5px solid #d4c090 !important;
+  border: 1.5px solid var(--sand) !important;
   border-top-color: #fffbe8 !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,220,0.85),
@@ -2133,16 +2155,16 @@ button,
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
-.race-section h3 { color: #2c1f14 !important; font-weight: 700 !important; }
+.race-section h3 { color: var(--bark) !important; font-weight: 700 !important; }
 .race-section p { color: #6b4c2a !important; }
 
 /* ── Skin cards: no backdrop-filter (flash), warm gradient ──────────────────── */
 .skin-card,
 .boost-row,
 .trail-card {
-  background: linear-gradient(155deg, #fffef8, #fff4e0) !important;
+  background: linear-gradient(155deg, var(--ivory), #fff4e0) !important;
   border: 1px solid #d4c0a0 !important;
-  border-top-color: #fffef8 !important;
+  border-top-color: var(--ivory) !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.9),
     0 2px 0 rgba(150,120,60,0.14),
@@ -2180,7 +2202,7 @@ button,
 .event-meta b {
   font: 700 10px/1.4 var(--body) !important;
   letter-spacing: .1em !important;
-  color: #7a5c30 !important;
+  color: var(--bronze-deep) !important;
   text-transform: uppercase;
 }
 
@@ -2206,8 +2228,8 @@ button,
 
 /* ── Tier card / Nest Pass ────────────────────────────────────────────────────── */
 .tier-card {
-  background: linear-gradient(155deg, #fffef8, #fff4e0) !important;
-  border: 1px solid #d4c090 !important;
+  background: linear-gradient(155deg, var(--ivory), #fff4e0) !important;
+  border: 1px solid var(--sand) !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.9),
     0 3px 0 rgba(150,120,50,0.14),
@@ -2246,8 +2268,8 @@ button,
 
 /* ── Lock chip (upgrade prompt) ──────────────────────────────────────────────── */
 .lock-chip {
-  background: linear-gradient(135deg, #fff9dc, #ffecaa) !important;
-  border: 1.5px solid #d4aa44 !important;
+  background: linear-gradient(135deg, #fff9dc, var(--butter)) !important;
+  border: 1.5px solid var(--brass) !important;
   color: #5a3800 !important;
   font-weight: 700 !important;
   border-radius: 20px !important;
@@ -2260,8 +2282,8 @@ button,
 
 /* ── Room/lobby bird waiting cards ──────────────────────────────────────────── */
 .room-bird {
-  background: linear-gradient(155deg, #fffef8, #fff6e4) !important;
-  border: 1px solid #d4c090 !important;
+  background: linear-gradient(155deg, var(--ivory), #fff6e4) !important;
+  border: 1px solid var(--sand) !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.9),
     0 2px 0 rgba(150,120,50,0.14) !important;
@@ -2277,7 +2299,7 @@ button,
 /* ── Match-making banner (waiting for opponent) ──────────────────────────────── */
 .room-connecting {
   background: linear-gradient(145deg, #fffbec, #fff3c4) !important;
-  border: 1px solid #d4aa44 !important;
+  border: 1px solid var(--brass) !important;
   border-radius: 16px !important;
   padding: 14px !important;
   box-shadow:
@@ -2302,7 +2324,7 @@ button,
   border: 1.5px dashed #d4c080 !important;
 }
 .board-row.empty {
-  color: #9a7b4e !important;
+  color: var(--khaki) !important;
   font-style: italic;
   padding: 20px 14px !important;
   text-align: center;
@@ -2339,7 +2361,7 @@ button,
 .section-title {
   font: 700 9px/1.5 var(--body) !important;
   letter-spacing: .16em !important;
-  color: #9a7b4e !important;
+  color: var(--khaki) !important;
   text-transform: uppercase !important;
   margin: 18px 0 4px !important;
 }
@@ -2370,7 +2392,7 @@ button,
   top: 3px !important;
   left: 3px !important;
   border-radius: 50% !important;
-  background: #fff !important;
+  background: var(--pure-white) !important;
   box-shadow: 0 1px 4px rgba(0,0,0,0.25) !important;
   transition: transform .2s ease !important;
 }
@@ -2399,19 +2421,19 @@ input[type="range"]::-webkit-slider-thumb {
   width: 18px !important;
   height: 18px !important;
   border-radius: 50% !important;
-  background: #fff !important;
-  border: 2px solid #d4aa44 !important;
+  background: var(--pure-white) !important;
+  border: 2px solid var(--brass) !important;
   box-shadow: 0 1px 4px rgba(0,0,0,0.2) !important;
   cursor: pointer !important;
 }
 .setting-select select,
 select.setting-select {
-  background: linear-gradient(to bottom, #fffef8, #fff8ec) !important;
-  border: 1px solid #d4c090 !important;
+  background: linear-gradient(to bottom, var(--ivory), #fff8ec) !important;
+  border: 1px solid var(--sand) !important;
   border-radius: 10px !important;
   padding: 7px 28px 7px 10px !important;
   font: 500 13px var(--body) !important;
-  color: #2c1f14 !important;
+  color: var(--bark) !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.9),
     0 2px 0 rgba(150,120,50,0.14) !important;
@@ -2451,8 +2473,8 @@ select.setting-select {
   font: 600 11px/1.4 var(--body) !important;
   padding: 5px 12px !important;
   border-radius: 20px !important;
-  border: 1px solid #d4c090 !important;
-  background: linear-gradient(135deg, #fffef8, #fff4e0) !important;
+  border: 1px solid var(--sand) !important;
+  background: linear-gradient(135deg, var(--ivory), #fff4e0) !important;
   color: #4a3620 !important;
   text-decoration: none !important;
   box-shadow: 0 2px 0 rgba(150,120,50,0.14) !important;
@@ -2460,7 +2482,7 @@ select.setting-select {
 }
 .shop-jumps a:hover,
 .shop-jumps button:hover {
-  background: linear-gradient(135deg, #fff9dc, #ffecaa) !important;
+  background: linear-gradient(135deg, #fff9dc, var(--butter)) !important;
   border-color: #c4a040 !important;
 }
 .shop-filters {
@@ -2474,8 +2496,8 @@ select.setting-select {
   font: 600 10px/1.4 var(--body) !important;
   padding: 4px 10px !important;
   border-radius: 20px !important;
-  border: 1px solid #d4c090 !important;
-  background: linear-gradient(135deg, #fffef8, #fff4e0) !important;
+  border: 1px solid var(--sand) !important;
+  background: linear-gradient(135deg, var(--ivory), #fff4e0) !important;
   color: #4a3620 !important;
   box-shadow: 0 2px 0 rgba(150,120,50,0.12) !important;
   cursor: pointer !important;
@@ -2499,12 +2521,12 @@ select.setting-select {
   border-radius: 6px !important;
   border: 1px solid rgba(200,160,50,0.3) !important;
   background: linear-gradient(135deg, rgba(255,236,160,0.5), rgba(255,215,80,0.3)) !important;
-  color: #7a5c30 !important;
+  color: var(--bronze-deep) !important;
 }
 .deal,
 .deal-tag {
   background: linear-gradient(135deg, #ff6b35, #e84020) !important;
-  color: #fff !important;
+  color: var(--pure-white) !important;
   border: 1px solid #c03010 !important;
   border-radius: 6px !important;
   font: 700 9px/1.4 var(--body) !important;
@@ -2525,15 +2547,15 @@ select.setting-select {
 .r-common  { background: #f0ece4 !important; color: #6a5a40 !important; border: 1px solid #d0c4a8 !important; }
 .r-rare    { background: linear-gradient(135deg, #e8f0ff, #d4e4ff) !important; color: #2040a0 !important; border: 1px solid #a0b8e8 !important; }
 .r-epic    { background: linear-gradient(135deg, #f4e8ff, #e8d4ff) !important; color: #6020a0 !important; border: 1px solid #c0a0e8 !important; }
-.r-legendary { background: linear-gradient(135deg, #fff8e0, #ffecaa) !important; color: #804000 !important; border: 1px solid #e0b840 !important; box-shadow: 0 0 6px rgba(220,160,20,0.3) !important; }
+.r-legendary { background: linear-gradient(135deg, #fff8e0, var(--butter)) !important; color: #804000 !important; border: 1px solid #e0b840 !important; box-shadow: 0 0 6px rgba(220,160,20,0.3) !important; }
 .r-mythic  { background: linear-gradient(135deg, #ffe8f8, #ffd4f0) !important; color: #800060 !important; border: 1px solid #e090c0 !important; box-shadow: 0 0 8px rgba(220,60,160,0.25) !important; }
 .r-starter { background: #f4efe8 !important; color: #6a5a40 !important; border: 1px solid #d0c4a8 !important; }
 .r-prize   { background: linear-gradient(135deg, #fff4cc, #ffe078) !important; color: #5a3000 !important; border: 1.5px solid #d4a020 !important; }
 
 /* ── Progress cards: gold, red, vault variants ───────────────────────────────── */
 .pc--gold {
-  background: linear-gradient(145deg, #fff9e0, #ffecaa) !important;
-  border-color: #d4aa44 !important;
+  background: linear-gradient(145deg, #fff9e0, var(--butter)) !important;
+  border-color: var(--brass) !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,220,0.9),
     0 4px 0 rgba(160,120,20,0.22),
@@ -2556,19 +2578,19 @@ select.setting-select {
   border-radius: 20px !important;
   background: linear-gradient(135deg, rgba(255,236,160,0.7), rgba(255,218,100,0.5)) !important;
   border: 1px solid rgba(200,160,50,0.35) !important;
-  color: #7a5c30 !important;
+  color: var(--bronze-deep) !important;
   margin-bottom: 8px !important;
 }
 .pc-label {
   font: 700 9px/1.4 var(--body) !important;
   letter-spacing: .12em !important;
-  color: #9a7b4e !important;
+  color: var(--khaki) !important;
   text-transform: uppercase !important;
   margin-bottom: 4px !important;
 }
 .pc-header {
   font: 700 18px/1.3 var(--display) !important;
-  color: #2c1f14 !important;
+  color: var(--bark) !important;
   margin-bottom: 6px !important;
 }
 .pc-price {
@@ -2589,7 +2611,7 @@ select.setting-select {
   gap: 12px !important;
   padding: 10px 12px !important;
   border-radius: 14px !important;
-  background: linear-gradient(155deg, #fffef8, #fff6e4) !important;
+  background: linear-gradient(155deg, var(--ivory), #fff6e4) !important;
   border: 1px solid #d4c0a0 !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.9),
@@ -2616,17 +2638,17 @@ select.setting-select {
   padding: 10px 14px !important;
   border-radius: 14px 14px 0 0 !important;
   background: linear-gradient(135deg, rgba(255,236,160,0.4), rgba(255,215,80,0.2)) !important;
-  border: 1px solid #d4c090 !important;
+  border: 1px solid var(--sand) !important;
   border-bottom: none !important;
   cursor: pointer !important;
 }
 .coll-head b {
   font: 700 14px/1.3 var(--display) !important;
-  color: #2c1f14 !important;
+  color: var(--bark) !important;
 }
 .coll-count {
   font: 600 11px/1.4 var(--body) !important;
-  color: #9a7b4e !important;
+  color: var(--khaki) !important;
   background: rgba(200,160,50,0.12) !important;
   border-radius: 20px !important;
   padding: 2px 8px !important;
@@ -2658,13 +2680,13 @@ select.setting-select {
 }
 .sk-name {
   font: 700 10px/1.3 var(--body) !important;
-  color: #2c1f14 !important;
+  color: var(--bark) !important;
   margin-top: 6px !important;
   display: block !important;
 }
 .sk-perk {
   font: 400 9px/1.4 var(--body) !important;
-  color: #9a7b4e !important;
+  color: var(--khaki) !important;
   display: block !important;
   margin-top: 2px !important;
 }
@@ -2680,7 +2702,7 @@ select.setting-select {
   padding: 1px 5px !important;
   border-radius: 4px !important;
   background: rgba(200,160,50,0.12) !important;
-  color: #7a5c30 !important;
+  color: var(--bronze-deep) !important;
 }
 
 /* ── Upsell / VIP card ───────────────────────────────────────────────────────── */
@@ -2713,7 +2735,7 @@ select.setting-select {
   padding: 10px 12px !important;
   border-radius: 14px !important;
   background: linear-gradient(145deg, #fffbec, #fff3c4) !important;
-  border: 1.5px solid #d4aa44 !important;
+  border: 1.5px solid var(--brass) !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,220,0.85),
     0 3px 0 rgba(160,120,20,0.18) !important;
@@ -2728,7 +2750,7 @@ select.setting-select {
   padding: 8px 12px !important;
   border-radius: 12px !important;
   background: linear-gradient(145deg, #fffdf5, #fff4d8) !important;
-  border: 1px solid #d4c090 !important;
+  border: 1px solid var(--sand) !important;
   box-shadow: 0 2px 0 rgba(150,120,50,0.12) !important;
   margin: 4px 0 !important;
 }
@@ -2737,7 +2759,7 @@ select.setting-select {
 .board-refresh,
 button[data-action="board-refresh"],
 .board-footer button {
-  background: linear-gradient(165deg, #ffffff, #f8f1e4) !important;
+  background: linear-gradient(165deg, var(--pure-white), #f8f1e4) !important;
   border: 1px solid #cdbfa5 !important;
   border-bottom-color: #b8a68a !important;
   box-shadow:
@@ -2760,7 +2782,7 @@ button[data-action="board-refresh"],
 .field-label {
   font: 700 9px/1.5 var(--body) !important;
   letter-spacing: .14em !important;
-  color: #9a7b4e !important;
+  color: var(--khaki) !important;
   text-transform: uppercase !important;
   margin-bottom: 6px !important;
   display: block !important;
@@ -2787,8 +2809,8 @@ button[data-action="board-refresh"],
 }
 .rank-prize,
 .prize-strip > * {
-  background: linear-gradient(145deg, #fffef8, #fff6e4) !important;
-  border: 1px solid #d4c090 !important;
+  background: linear-gradient(145deg, var(--ivory), #fff6e4) !important;
+  border: 1px solid var(--sand) !important;
   border-radius: 12px !important;
   padding: 10px 6px !important;
   text-align: center !important;
@@ -2828,6 +2850,26 @@ button[data-action="board-refresh"],
   font-size: 12px !important;
   color: #7a6040 !important;
 }
+/*
+ * The whole results screen is an instant-retry surface: `holdToStart` replays
+ * the run from the `gameover` state, and Input excludes buttons/`[data-action]`
+ * so the hint never steals a Share or Main Menu tap. The mechanism was already
+ * there — nobody could find it, which is why it gets its own line and a slow
+ * breath instead of being folded into the replay footnote.
+ */
+.fineprint.retry-hint {
+  font-size: 12.5px !important;
+  color: #b99a63 !important;
+  letter-spacing: 0.02em;
+  animation: retry-hint-breathe 2.6s ease-in-out infinite;
+}
+@keyframes retry-hint-breathe {
+  0%, 100% { opacity: 0.72; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fineprint.retry-hint { animation: none !important; opacity: 1 !important; }
+}
 
 /* ── Section art headers ─────────────────────────────────────────────────────── */
 .section-art {
@@ -2854,7 +2896,7 @@ button[data-action="board-refresh"],
 /* ── Match count in shop filter ──────────────────────────────────────────────── */
 .shop-match-count {
   font: 400 11px var(--body) !important;
-  color: #9a7b4e !important;
+  color: var(--khaki) !important;
   margin: 6px 0 2px !important;
 }
 
@@ -2864,8 +2906,8 @@ button[data-action="board-refresh"],
 .rank-section {
   margin: 16px 0 !important;
   padding: 14px !important;
-  background: linear-gradient(145deg, #fffef8, #fff6e4) !important;
-  border: 1px solid #d4c090 !important;
+  background: linear-gradient(145deg, var(--ivory), #fff6e4) !important;
+  border: 1px solid var(--sand) !important;
   border-radius: 16px !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.9),
@@ -2885,8 +2927,8 @@ button[data-action="board-refresh"],
   font: 600 11px/1.4 var(--body) !important;
   padding: 4px 12px !important;
   border-radius: 20px !important;
-  background: linear-gradient(135deg, #fff9dc, #ffecaa) !important;
-  border: 1.5px solid #d4aa44 !important;
+  background: linear-gradient(135deg, #fff9dc, var(--butter)) !important;
+  border: 1.5px solid var(--brass) !important;
   color: #5a3800 !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,220,0.85),
@@ -2907,7 +2949,7 @@ button[data-action="board-refresh"],
   width: 32px !important;
   height: 32px !important;
   border-radius: 50% !important;
-  border: 2px solid #d4c090 !important;
+  border: 2px solid var(--sand) !important;
   box-shadow: 0 2px 0 rgba(150,120,50,0.14) !important;
   flex: 0 0 32px !important;
 }
@@ -3015,7 +3057,7 @@ button.upsell:active,
     inset 0 1px 0 rgba(255,220,100,0.5),
     0 3px 0 #b54c0e,
     0 5px 12px rgba(180,70,10,0.28) !important;
-  color: #fff !important;
+  color: var(--pure-white) !important;
   text-shadow: 0 1px 2px rgba(120,40,0,0.4) !important;
   letter-spacing: .02em !important;
   transition: box-shadow .12s, transform .1s !important;
@@ -3042,7 +3084,7 @@ button.upsell:active,
   border: 1px solid #aa1800 !important;
   border-radius: 20px !important;
   padding: 4px 12px !important;
-  color: #fff !important;
+  color: var(--pure-white) !important;
   font: 700 9px/1.4 var(--body) !important;
   letter-spacing: .08em !important;
   text-shadow: 0 1px 2px rgba(0,0,0,0.3) !important;
@@ -3093,7 +3135,7 @@ button.upsell:active,
     inset 0 1px 0 rgba(255,160,130,0.4),
     0 4px 0 #881000,
     0 7px 18px rgba(180,30,10,0.3) !important;
-  color: #fff !important;
+  color: var(--pure-white) !important;
   text-shadow: 0 1px 2px rgba(80,0,0,0.4) !important;
 }
 
@@ -3114,7 +3156,7 @@ button.upsell:active,
     inset 0 1px 0 rgba(255,230,120,0.45),
     0 4px 0 #b54c0e,
     0 7px 18px rgba(180,70,10,0.28) !important;
-  color: #fff !important;
+  color: var(--pure-white) !important;
   text-shadow: 0 1px 2px rgba(120,40,0,0.4) !important;
 }
 .primary-btn.gold:active {
@@ -3189,8 +3231,8 @@ button.upsell:active,
 /* ── Leaderboard "🏆 Poki leaderboard" → rename to "🏆 Full rankings" ─────── */
 /* (already renamed in source; if old bundle shows it, style it well) */
 .overlay [data-action="open-portal-leaderboard"] {
-  background: linear-gradient(145deg, #fff9e0, #ffecaa) !important;
-  border: 1.5px solid #d4aa44 !important;
+  background: linear-gradient(145deg, #fff9e0, var(--butter)) !important;
+  border: 1.5px solid var(--brass) !important;
   border-top-color: #fffbcc !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,220,0.85),
@@ -3210,11 +3252,11 @@ button.upsell:active,
 .pilot-name-row input[type="text"] {
   flex: 1 !important;
   background: linear-gradient(to bottom, #fffdf6, #fff9ec) !important;
-  border: 1.5px solid #d4c090 !important;
+  border: 1.5px solid var(--sand) !important;
   border-radius: 10px !important;
   padding: 9px 12px !important;
   font: 600 14px var(--body) !important;
-  color: #2c1f14 !important;
+  color: var(--bark) !important;
   box-shadow:
     inset 0 1px 3px rgba(100,70,20,0.07),
     0 1px 0 rgba(255,255,255,0.9) !important;
@@ -3230,7 +3272,7 @@ button.upsell:active,
 /* ── Prize / tournament card ─────────────────────────────────────────────────── */
 .prize-card {
   background: linear-gradient(145deg, #fff9e8, #ffebb4) !important;
-  border: 1.5px solid #d4aa44 !important;
+  border: 1.5px solid var(--brass) !important;
   border-top-color: #fffbcc !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,220,0.9),
@@ -3242,7 +3284,7 @@ button.upsell:active,
 }
 .prize-card h3 {
   font: 700 15px/1.3 var(--display) !important;
-  color: #2c1f14 !important;
+  color: var(--bark) !important;
   margin-bottom: 6px !important;
 }
 .prize-card p {
@@ -3271,14 +3313,14 @@ button.upsell:active,
 }
 .board-row .rank {
   font: 700 12px/1 var(--display) !important;
-  color: #9a7b4e !important;
+  color: var(--khaki) !important;
   min-width: 22px !important;
   text-align: right !important;
 }
 .board-row .name {
   flex: 1 !important;
   font: 600 13px/1.4 var(--body) !important;
-  color: #2c1f14 !important;
+  color: var(--bark) !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
   white-space: nowrap !important;
@@ -3308,7 +3350,7 @@ button.upsell:active,
 }
 .board-rank b {
   font-size: 16px !important;
-  color: #2c1f14 !important;
+  color: var(--bark) !important;
 }
 
 /* ── Seg tabs: ensure active pill is always warm amber ───────────────────────── */
@@ -3347,7 +3389,7 @@ button.upsell:active,
 .board-rank ~ .section-title {
   font: 700 9px/1.5 var(--body) !important;
   letter-spacing: .16em !important;
-  color: #9a7b4e !important;
+  color: var(--khaki) !important;
   text-transform: uppercase !important;
   margin: 16px 0 8px !important;
   padding-bottom: 6px !important;
@@ -3365,7 +3407,7 @@ button.upsell:active,
   border-radius: 20px !important;
   background: linear-gradient(135deg, rgba(255,236,160,0.7), rgba(255,218,100,0.5)) !important;
   border: 1px solid rgba(200,160,50,0.35) !important;
-  color: #7a5c30 !important;
+  color: var(--bronze-deep) !important;
 }
 
 /* ── Home pulse row: ensure cells never bleed on narrow screens ──────────────── */
@@ -3396,7 +3438,7 @@ button.upsell:active,
 /* ── Squad: club card, member row ────────────────────────────────────────────── */
 .club-card {
   background: linear-gradient(145deg, #fff9e8, #ffebb4) !important;
-  border: 1.5px solid #d4aa44 !important;
+  border: 1.5px solid var(--brass) !important;
   border-top-color: #fffbcc !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,220,0.85),
@@ -3416,7 +3458,7 @@ button.upsell:active,
 .member-row .member-name {
   flex: 1 !important;
   font: 600 13px/1.4 var(--body) !important;
-  color: #2c1f14 !important;
+  color: var(--bark) !important;
 }
 .member-row .member-score {
   font: 700 12px/1 var(--display) !important;
@@ -3425,8 +3467,8 @@ button.upsell:active,
 
 /* ── Account screen: transfer, sync rows ────────────────────────────────────── */
 .account-section {
-  background: linear-gradient(145deg, #fffef8, #fff6e4) !important;
-  border: 1px solid #d4c090 !important;
+  background: linear-gradient(145deg, var(--ivory), #fff6e4) !important;
+  border: 1px solid var(--sand) !important;
   border-radius: 16px !important;
   padding: 14px !important;
   margin: 10px 0 !important;
@@ -3455,11 +3497,11 @@ button.upsell:active,
 .trophy .trophy-icon { font-size: 28px !important; line-height: 1; }
 .trophy .trophy-name {
   font: 700 10px/1.3 var(--body) !important;
-  color: #2c1f14 !important;
+  color: var(--bark) !important;
 }
 .trophy .trophy-desc {
   font: 400 9px/1.4 var(--body) !important;
-  color: #9a7b4e !important;
+  color: var(--khaki) !important;
 }
 
 /* ── Scores screen: your-scores table ────────────────────────────────────────── */
@@ -3478,11 +3520,11 @@ button.upsell:active,
 }
 .score-row .score-val {
   font: 700 14px/1 var(--display) !important;
-  color: #2c1f14 !important;
+  color: var(--bark) !important;
 }
 .score-row .score-date {
   font: 400 10px/1.4 var(--body) !important;
-  color: #9a7b4e !important;
+  color: var(--khaki) !important;
   min-width: 60px !important;
   text-align: right !important;
 }
@@ -3501,7 +3543,7 @@ button.upsell:active,
 .ad-label {
   font: 700 9px/1.5 var(--body) !important;
   letter-spacing: .16em !important;
-  color: #9a7b4e !important;
+  color: var(--khaki) !important;
   text-transform: uppercase !important;
   text-align: center !important;
   margin-bottom: 8px !important;
@@ -3583,7 +3625,7 @@ button.upsell:active,
 }
 .pod-name {
   font: 700 11px/1.3 var(--body) !important;
-  color: #2c1f14 !important;
+  color: var(--bark) !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
   white-space: nowrap !important;
@@ -3622,7 +3664,7 @@ button.upsell:active,
 .prize-tier b {
   display: block !important;
   font: 600 10px/1.4 var(--body) !important;
-  color: #2c1f14 !important;
+  color: var(--bark) !important;
 }
 .prize-tier.gold {
   background: linear-gradient(145deg, #fffde0, #fff4aa) !important;
@@ -3669,7 +3711,7 @@ button.upsell:active,
 /* ── Home record section (personal best stat bar) ────────────────────────────── */
 .home-record {
   background: linear-gradient(145deg, #fff9e8, #ffebb4) !important;
-  border: 1.5px solid #d4aa44 !important;
+  border: 1.5px solid var(--brass) !important;
   border-top-color: #fffbcc !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,220,0.85),
@@ -3679,19 +3721,47 @@ button.upsell:active,
   margin: 10px 0 !important;
 }
 
-/* ── Stat value / coin display ───────────────────────────────────────────────── */
+/* ── Stat value / coin display ─────────────────────────────────────────────────
+   These are the FLIGHT HUD's distance / coin readouts — `.stat-value` exists
+   nowhere else (HUD.ts:610,622), and `.hud-header`, `.top-bar` and `.stat-block`
+   are all transparent in index.css, so the text floats directly on the sky.
+
+   The parchment colours this rule used to carry were written for menu cards and
+   leaked here behind `!important` (main.tsx loads index.css first, then this
+   file). Measured against the real zenith colours in src/game/Sky.ts:
+     var(--bark) on night #12102c → 1.2:1   (invisible)
+     var(--bark) on dusk  #3a2460 → 0.8:1   (worse than invisible — darker than sky)
+     var(--khaki) on night #12102c → 2.6:1   (an 8px label, unreadable)
+   White is the only colour that survives every sky the game paints: 18.9:1 on
+   night, 13.1:1 on dusk, 3.0:1 on the brightest day blue — where the shadow
+   below carries it, which is exactly what index.css already did before this
+   override won the cascade. The coin value keeps a warm gold so it still reads
+   as coin (7.9:1 on night, 2.4:1 on day blue + shadow).
+
+   The label also goes 8px → 10px: 8px uppercase with .12em tracking is below
+   any comfortable minimum on a phone, and index.css had it at 11px. */
 .stat-value {
   font: 700 22px/1.1 var(--display) !important;
-  color: #2c1f14 !important;
+  color: var(--text-on-sky) !important;
+  text-shadow:
+    0 0 2px rgba(var(--halo-on-sky), 0.85),
+    0 1px 2px rgba(var(--halo-on-sky), 0.7),
+    0 2px 10px rgba(var(--halo-on-sky), 0.42) !important;
 }
+/* The coin counter stays white as well: gold ink (#ffd76a) measured 1.6:1 on the
+   golden-hour zenith #58b8f0 — worse than the white it replaced. The coin glyph
+   (index.css `.stat-value.coin::before`, a gold radial-gradient disc) already
+   says "coins", so the number does not have to. */
 .stat-value.coin {
-  color: #7a4800 !important;
+  color: var(--text-on-sky) !important;
 }
 .stat-label {
-  font: 700 8px/1.4 var(--body) !important;
+  font: 700 10px/1.4 var(--body) !important;
   letter-spacing: .12em !important;
   text-transform: uppercase !important;
-  color: #9a7b4e !important;
+  color: var(--text-on-sky) !important;
+  opacity: .92 !important;
+  text-shadow: 0 1px 2px rgba(var(--halo-on-sky), 0.6) !important;
   margin-bottom: 2px !important;
 }
 
@@ -3706,7 +3776,7 @@ hr.divider {
 
 /* ── "Save" / "Random" inline buttons next to name input ────────────────────── */
 .pilot-name-row .mini-btn:not(.gold) {
-  background: linear-gradient(165deg, #ffffff, #f8f1e4) !important;
+  background: linear-gradient(165deg, var(--pure-white), #f8f1e4) !important;
   border: 1px solid #cdbfa5 !important;
   border-bottom-color: #b8a68a !important;
   box-shadow:
@@ -3720,7 +3790,7 @@ hr.divider {
 
 /* ── Mini-btn default (non-gold variant) ─────────────────────────────────────── */
 .mini-btn:not(.gold) {
-  background: linear-gradient(165deg, #ffffff, #f8f1e4) !important;
+  background: linear-gradient(165deg, var(--pure-white), #f8f1e4) !important;
   border: 1px solid #cdbfa5 !important;
   border-bottom-color: #b8a68a !important;
   box-shadow:
@@ -3736,8 +3806,8 @@ hr.divider {
 
 /* ── Coin pill (wallet display in header) ────────────────────────────────────── */
 .pill.coin {
-  background: linear-gradient(135deg, #fff9e0, #ffecaa) !important;
-  border: 1.5px solid #d4aa44 !important;
+  background: linear-gradient(135deg, #fff9e0, var(--butter)) !important;
+  border: 1.5px solid var(--brass) !important;
   color: #5a3800 !important;
   font-weight: 700 !important;
   font-size: 13px !important;
@@ -3756,7 +3826,7 @@ hr.divider {
   font-weight: 600 !important;
   border-radius: 14px !important;
   margin-bottom: 8px !important;
-  background: linear-gradient(165deg, #ffffff, #f8f1e4) !important;
+  background: linear-gradient(165deg, var(--pure-white), #f8f1e4) !important;
   border: 1px solid #cdbfa5 !important;
   border-bottom-color: #b8a68a !important;
   box-shadow:
@@ -3771,8 +3841,8 @@ hr.divider {
 
 /* Portal leaderboard soft-btn: special gold treatment */
 .overlay [data-action="open-portal-leaderboard"].soft-btn.wide {
-  background: linear-gradient(145deg, #fff9e0, #ffecaa) !important;
-  border: 1.5px solid #d4aa44 !important;
+  background: linear-gradient(145deg, #fff9e0, var(--butter)) !important;
+  border: 1.5px solid var(--brass) !important;
   border-top-color: #fffbcc !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,220,0.85),
@@ -3799,7 +3869,7 @@ hr.divider {
 .result-kicker {
   font: 700 9px/1.4 var(--body) !important;
   letter-spacing: .18em !important;
-  color: #9a7b4e !important;
+  color: var(--khaki) !important;
   background: linear-gradient(135deg, rgba(255,236,160,0.7), rgba(255,218,100,0.5)) !important;
   border: 1px solid rgba(200,160,50,0.3) !important;
   border-radius: 20px !important;
@@ -3812,15 +3882,15 @@ hr.divider {
 .result-distance,
 .result-score {
   font: 700 clamp(36px, 10vw, 52px)/1 var(--display) !important;
-  color: #2c1f14 !important;
+  color: var(--bark) !important;
   letter-spacing: -.04em !important;
   line-height: 1 !important;
 }
 
 /* ── Coin counter in HUD (in-flight) ─────────────────────────────────────────── */
 .hud-coins {
-  background: linear-gradient(135deg, #fff9dc, #ffecaa) !important;
-  border: 1.5px solid #d4aa44 !important;
+  background: linear-gradient(135deg, #fff9dc, var(--butter)) !important;
+  border: 1.5px solid var(--brass) !important;
   border-radius: 20px !important;
   padding: 4px 12px !important;
   font: 700 14px/1.3 var(--display) !important;
@@ -3851,7 +3921,7 @@ hr.divider {
 /* ── Campaign / story card ───────────────────────────────────────────────────── */
 .campaign-card {
   background: linear-gradient(145deg, #fff9e8, #ffebb4) !important;
-  border: 1.5px solid #d4aa44 !important;
+  border: 1.5px solid var(--brass) !important;
   border-top-color: #fffbcc !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,220,0.85),
@@ -3875,13 +3945,13 @@ hr.divider {
   box-shadow:
     inset 0 1px 0 rgba(255,230,120,0.45),
     0 3px 0 #b54c0e !important;
-  color: #fff !important;
+  color: var(--pure-white) !important;
   font-weight: 700 !important;
   border-radius: 12px !important;
   padding: 11px !important;
 }
 .cancel-btn {
-  background: linear-gradient(165deg, #ffffff, #f8f1e4) !important;
+  background: linear-gradient(165deg, var(--pure-white), #f8f1e4) !important;
   border: 1px solid #cdbfa5 !important;
   border-bottom-color: #b8a68a !important;
   box-shadow:

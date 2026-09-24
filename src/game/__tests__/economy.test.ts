@@ -23,8 +23,9 @@ describe("skin catalogue", () => {
 
   it("keeps cosmetics as meaningful long-term unlocks without charging for prize birds", () => {
     const purchasable = SKINS.filter((s) => s.price > 0 && !s.goldOnly && !s.vipOnly && !s.prizeOnly);
-    expect(Math.min(...purchasable.map((s) => s.price))).toBeGreaterThanOrEqual(275);
-    expect(Math.max(...purchasable.map((s) => s.price))).toBeGreaterThanOrEqual(1500);
+    // Rebalanced: first bird in 1 run (80), top tier 800-900 not 1500, still meaningful long-term
+    expect(Math.min(...purchasable.map((s) => s.price))).toBeGreaterThanOrEqual(80);
+    expect(Math.max(...purchasable.map((s) => s.price))).toBeGreaterThanOrEqual(800);
   });
 
   it("prize skins are never purchasable and explain how to earn them", () => {
@@ -101,7 +102,8 @@ describe("shop trails", () => {
   });
 
   it("prices trails above a single-run impulse purchase", () => {
-    expect(Math.min(...SHOP_TRAILS.map((t) => t.price))).toBeGreaterThanOrEqual(400);
+    // Rebalanced: trails are 2-4 runs (180-320), not 5-8 (400+). Still above 1-run impulse (80) but accessible.
+    expect(Math.min(...SHOP_TRAILS.map((t) => t.price))).toBeGreaterThanOrEqual(150);
   });
 
   it("shop trail ids never collide with prize trail ids or each other", () => {

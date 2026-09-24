@@ -11,13 +11,12 @@
  * personal ghost carries the experience, exactly as before.
  */
 
+import { backendBase } from "./apiBase";
 import { breakerKeyFor, fetchJson } from "./resilience/fetchJson";
 
-const ENV = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
-
+/** Ghosts live under `/mp` — see `apiBase.ts` for the prefix contract. */
 function apiBase(): string {
-  const url = ENV.VITE_LEADERBOARD_URL ?? (ENV.DEV ? "/mp" : "");
-  return (url || "").replace(/\/$/, "");
+  return backendBase("/mp");
 }
 
 type Sample = [number, number, number, number];

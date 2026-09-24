@@ -22,9 +22,9 @@ Every production-MVP blocker was re-verified against the actual code on this dat
 | Graceful shutdown + health/ready probes (SIGTERM/SIGINT, 503 during drain) | ✅ | `rust/.../main.rs` (`shutdown_signal`, middleware), `server/src/index.ts` |
 | Metrics | ✅ | Prometheus endpoint on a private port (`rust/.../metrics.rs`), `/metrics` plain on the social server |
 | Portal zips separate + deep-audited | ✅ | `scripts/audit-zips.mjs`, `scripts/verify-portal.mjs` — part of the build pipeline |
-| Poki launch (SDK event sequences, ad hierarchy, incognito, size, exclusivity) | ✅ | `POKI_COMPLIANCE_AUDIT.md` — full doc-by-doc matrix |
+| Poki launch (SDK event sequences, ad hierarchy, incognito, size, exclusivity) | ✅ | `docs/audits/POKI_COMPLIANCE_AUDIT.md` — full doc-by-doc matrix |
 
-⬜ Deferred by decision: AUDS global data (needs the live Poki game id), portal multiplayer (external-server approval process), Netlib. See `POKI_COMPLIANCE_AUDIT.md` §8.
+⬜ Deferred by decision: AUDS global data (needs the live Poki game id), portal multiplayer (external-server approval process), Netlib. See `docs/audits/POKI_COMPLIANCE_AUDIT.md` §8.
 
 ## Apps Under Management
 

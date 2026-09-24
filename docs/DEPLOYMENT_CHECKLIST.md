@@ -181,6 +181,6 @@ pnpm test:e2e:multiplayer
 
 For deployment issues:
 1. Check Vercel build logs and error messages
-2. Review `docs/PR_VALIDATION.md` for validation results
+2. Review `audits/PR_VALIDATION.md` for validation results
 3. Consult the Known Issues section above
 4. Contact the team on Slack with build logs and reproduction steps

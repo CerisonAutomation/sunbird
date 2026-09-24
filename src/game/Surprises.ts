@@ -35,7 +35,13 @@ const POOL: { kind: SurpriseKind; weight: number; toasts: string[]; coins: numbe
   {
     kind: "golden-goose",
     weight: 3,
-    toasts: ["🦢 A golden goose honks past — it's raining coins!", "🦢 The golden goose approves of your form!"],
+    toasts: [
+      "🦢 A golden goose honks past — it's raining coins!",
+      "🦢 The golden goose approves of your form!",
+      "🦢 Goose: 'Nice flying, kid. Here's rent money'",
+      "🦢 That goose just Venmo'd you coins. Geese have Venmo now",
+      "🦢 Golden goose says you're doing amazing sweetie! +25 coins",
+    ],
     coins: 25,
     fever: 0,
   },
@@ -46,6 +52,8 @@ const POOL: { kind: SurpriseKind; weight: number; toasts: string[]; coins: numbe
       "🌈 A moonbow arcs over the islands. The sky is showing off",
       "🌈 Seven colours, zero explanation. Fly through it anyway",
       "🌈 The islands hired a lighting designer. It was the sky",
+      "🌈 The sky just said 'look what I can do!' — show-off",
+      "🌈 Moonbow! Even the moon is trying to impress you!",
     ],
     coins: 0,
     fever: 0,
@@ -57,6 +65,8 @@ const POOL: { kind: SurpriseKind; weight: number; toasts: string[]; coins: numbe
       "🪿 A flock flies past in perfect V — they tip you for the show",
       "🪿 The formation team requests you keep the window seat",
       "🪿 Squad of geese salutes you with one honk each",
+      "🪿 Geese: 'We practiced this V for you. You're welcome'",
+      "🪿 Those geese just gave you a standing ovation. In the air!",
     ],
     coins: 10,
     fever: 0,
@@ -69,6 +79,8 @@ const POOL: { kind: SurpriseKind; weight: number; toasts: string[]; coins: numbe
       "💨 The wind remembered it owes you one",
       "💨 The atmosphere decided to be helpful for once",
       "💨 Unexpected wind. Your feathers: impressed",
+      "💨 Wind: 'I got you bro' — you: *zooms*",
+      "💨 That tailwind was so strong, even your shadow sped up!",
     ],
     coins: 0,
     fever: 0,
@@ -81,6 +93,8 @@ const POOL: { kind: SurpriseKind; weight: number; toasts: string[]; coins: numbe
       "🤧 Achoo! Feathers everywhere",
       "🤧 Mid-flight sneeze. Zero regrets",
       "🤧 That sneeze reached Mach 0.4. Impressive",
+      "🤧 Bird flu? No, just flying flu. Very contagious. Very fast",
+      "🤧 That sneeze was so powerful, it added +2 speed. Science!",
     ],
     coins: 0,
     fever: 0,
@@ -88,14 +102,24 @@ const POOL: { kind: SurpriseKind; weight: number; toasts: string[]; coins: numbe
   {
     kind: "coin-comet",
     weight: 3,
-    toasts: ["☄ A coin comet streaks by — grab the debris!", "☄ Coin comet! Someone up there likes you"],
+    toasts: [
+      "☄ A coin comet streaks by — grab the debris!",
+      "☄ Coin comet! Someone up there likes you",
+      "☄ That comet was literally made of money. You: *yoink*",
+      "☄ Coin comet! The universe has a tip jar and it's for you!",
+    ],
     coins: 15,
     fever: 0,
   },
   {
     kind: "photobomb",
     weight: 2,
-    toasts: ["🐟 A fish photobombed your jump. It will tell its friends", "🐟 That fish has seen things"],
+    toasts: [
+      "🐟 A fish photobombed your jump. It will tell its friends",
+      "🐟 That fish has seen things",
+      "🐟 Fish: 'I was just swimming here and this bird...'",
+      "🐟 That fish will have a story for its fish kids tonight!",
+    ],
     coins: 5,
     fever: 0,
   },
@@ -107,6 +131,8 @@ const POOL: { kind: SurpriseKind; weight: number; toasts: string[]; coins: numbe
       "🎶 Surprise encore! Ride the beat",
       "🎶 The DJ looked at your speed and said 'yes'",
       "🔥 Mystery heat detected. Fever granted by the universe",
+      "🎶 The sky just dropped a beat. You dropped a fever!",
+      "🔥 The sun said 'you're hot' and meant it literally!",
     ],
     coins: 0,
     fever: 8,
@@ -116,14 +142,27 @@ const POOL: { kind: SurpriseKind; weight: number; toasts: string[]; coins: numbe
 const COOLDOWN_S = 45;
 /** No surprises in the first stretch — let the player settle into the run. */
 const MIN_DISTANCE_M = 320;
+/**
+ * First-flights are held to a stricter contract than the rest of the game: a
+ * new player must meet something delightful inside ~20 seconds, or they meet
+ * the menu again instead. Warm mode shortens the fuse and lowers the distance
+ * gate for the opening surprise only, then hands the run back to the normal
+ * rarity curve — the guarantee is about the first laugh, not about spam.
+ */
+const WARM_COOLDOWN_S = 6;
+const WARM_MIN_DISTANCE_M = 140;
 
 export class SurpriseEngine {
   private cooldown = 0;
   private fired = 0;
   private lastKind: SurpriseKind | null = null;
+  private warm = false;
 
-  reset(): void {
-    this.cooldown = 18; // small warm-up before the first one is possible
+  /** @param opts.warm first-session mode: the opening surprise arrives fast. */
+  reset(opts: { warm?: boolean } = {}): void {
+    this.warm = Boolean(opts.warm);
+    // small warm-up before the first one is possible (much shorter when warm)
+    this.cooldown = this.warm ? WARM_COOLDOWN_S : 18;
     this.fired = 0;
     this.lastKind = null;
   }
@@ -134,12 +173,18 @@ export class SurpriseEngine {
    */
   tick(dt: number, distance: number, airborne: boolean, rng: () => number = Math.random): Surprise | null {
     this.cooldown -= dt;
-    if (this.cooldown > 0 || !airborne || distance < MIN_DISTANCE_M) return null;
+    const gate = this.warm ? WARM_MIN_DISTANCE_M : MIN_DISTANCE_M;
+    if (this.cooldown > 0 || !airborne || distance < gate) return null;
     // Base 1.2%/check, ramping slightly with distance; capped so it stays rare.
-    const p = Math.min(0.035, 0.012 + distance / 220_000);
+    // Warm mode roughly doubles the opening odds so the first flight reliably
+    // contains one surprise instead of usually containing one.
+    const base = this.warm ? 0.026 : 0.012;
+    const p = Math.min(this.warm ? 0.06 : 0.035, base + distance / 220_000);
     if (rng() >= p) return null;
     this.cooldown = COOLDOWN_S * (1 + this.fired * 0.5); // each one rarer than the last
     this.fired += 1;
+    // The guarantee has been paid: the rest of the run uses the normal gate.
+    this.warm = false;
     // Never serve the exact same surprise twice in a row — variety is the point.
     let surprise = pickSurprise(rng);
     let guard = 0;

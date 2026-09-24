@@ -10,6 +10,12 @@ export const PORTAL_EDITION_NOTE = "CrazyGames edition · portal rewards enabled
 
 export const LEADERBOARD_CLOUD_LABEL = "☁️ cloud";
 
+/** No cloud board is configured in this edition: say so in the portal's words. */
+export const LEADERBOARD_LOCAL: { chip: string; sentence: string } = {
+  chip: "CrazyGames \u00b7 on-device",
+  sentence: "This build keeps scores on your device.",
+};
+
 /** CrazyGames multiplayer is its own instant-multiplayer module, not netlib. */
 export const POKI_MULTIPLAYER = false;
 
@@ -24,3 +30,9 @@ export const CUSTOM_PILOT_NAMES = false;
  * DCE of the IAP UI comes from vite.config's VITE_SELL_AD_REMOVAL define being
  * folded at the use sites, not from this export. */
 export const SELL_AD_REMOVAL = false;
+
+/**
+ * CrazyGames supplies real interstitial/rewarded calls and owns ad
+ * frequency: the game never rehearses a break it cannot serve.
+ */
+export const SIMULATED_BREAKS = false;

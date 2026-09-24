@@ -35,9 +35,10 @@ type Segment = { start: number; len: number; height: number; base: number; baseN
 /** A sunflower bounce pad anchored to the hills. x/y are world coords. */
 type BouncePad = { x: number; y: number };
 
-/** Sunflower pads: spacing along the island, and the radius that triggers a bounce. */
-const PAD_SPACING = 165;
-const PAD_RADIUS = 3.2;
+/** Sunflower pads: tighter spacing = more trampolines = less boring flat.
+ * 165→105 = ~8-9 pads per island vs 5-6, constant decisions. */
+const PAD_SPACING = 105;
+const PAD_RADIUS = 3.4;
 
 type Chunk = {
   id: number;
@@ -521,33 +522,31 @@ export class TerrainSystem {
       let len: number;
       let height: number;
 
-      // Every few segments, lay a deliberate "perfect ramp sequence":
-      // deep valley -> tight kicker -> long glide. Chainable by a good player.
-      // Height-to-length ratio is the real tuning knob: it decides how sharply
-      // a crest curves away, and therefore how steeply you can launch off it.
-      if (sincePerfect >= 3 && remaining > 380 && roll > 0.4) {
+      // Every 2 segments, lay a "perfect ramp sequence": deep valley -> kicker -> landing -> launch.
+      // V2: more frequent (was 3, now 2) and tighter, so you chain launches instead of gliding.
+      if (sincePerfect >= 2 && remaining > 320 && roll > 0.35) {
         sincePerfect = 0;
         const s = speedScale;
-        push(92 * s, 24, base - 2); // deep carving valley
-        push(64 * s, 25, base + 1); //  kicker with a crisp lip
-        push(78 * s, 19, base); //     landing roller
-        push(100 * s, 30, base); //     big launch ramp
-        used += (92 + 64 + 78 + 100) * s;
+        push(72 * s, 22, base - 2); // deep carving valley — hold to carve
+        push(52 * s, 24, base + 1); // kicker with crisp lip — release!
+        push(62 * s, 17, base); // landing roller — quick touch
+        push(84 * s, 28, base); // big launch ramp — again!
+        used += (72 + 52 + 62 + 84) * s;
         continue;
       }
 
-      if (roll < 0.26) {
-        len = rng.range(58, 74) * speedScale; // quick roller
-        height = rng.range(11, 15);
-      } else if (roll < 0.6) {
-        len = rng.range(76, 104) * speedScale; // medium rolling hill
-        height = rng.range(17, 24);
-      } else if (roll < 0.82) {
-        len = rng.range(112, 148) * speedScale; // long smooth slope
-        height = rng.range(24, 32);
+      if (roll < 0.28) {
+        len = rng.range(42, 60) * speedScale; // quick roller — 30% faster rhythm
+        height = rng.range(10, 14);
+      } else if (roll < 0.62) {
+        len = rng.range(60, 85) * speedScale; // medium hill — still snappy
+        height = rng.range(16, 22);
+      } else if (roll < 0.84) {
+        len = rng.range(85, 115) * speedScale; // long slope — not too long
+        height = rng.range(22, 30);
       } else {
-        len = rng.range(150, 190) * speedScale; // occasional huge ramp
-        height = rng.range(34, 44);
+        len = rng.range(110, 145) * speedScale; // huge ramp — rare, rewarding
+        height = rng.range(32, 40);
       }
       if (len > remaining) len = Math.max(62, remaining);
       const drift = rng.range(-2.5, 2.5);

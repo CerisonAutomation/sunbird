@@ -1,5 +1,7 @@
 # SUNBIRD — Competitive Audit vs. Top Games & Implementation Report
 
+> **Status:** archived — competitive gap analysis against top mobile/web titles (Brawl Stars, Clash Royale, Subway Surfers, Mario Kart Tour, Fall Guys) plus its implementation log, 2026-09-11. The live benchmark set is [`../BENCHMARKS.md`](../BENCHMARKS.md).
+
 Date: 2026-09-11 · Branch: `arena/01a08de2-sunbird`
 
 This document records (1) the gap analysis against top mobile/web titles
@@ -27,7 +29,7 @@ with the repo's "no fake multiplayer, no decorative prizes" principles.
 
 ## What was deliberately NOT done (needs infrastructure, not client code)
 
-Per `../../REPO_TRUTH_AUDIT.md` and `../../RUST_MIGRATION_PLAN.md`, these remain honest
+Per `REPO_TRUTH_AUDIT.md` and `RUST_MIGRATION_PLAN.md`, these remain honest
 gaps that cannot be closed client-side without shipping the Rust
 authoritative backend and an account system:
 

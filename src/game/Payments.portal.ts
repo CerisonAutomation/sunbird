@@ -7,24 +7,8 @@
 export type Sku = "sunbird_gold" | "sunbird_vip" | "sunbird_starter";
 export type PurchaseResult = { ok: true; receipt: string } | { ok: false; error: string };
 
-export function ensureStripeJs(): Promise<unknown> | null {
-  return null;
-}
-
-export function stripeConfigured(_sku: Sku): boolean {
-  return false;
-}
-
 export async function fetchServerEntitlements(_deviceId: string): Promise<Sku[]> {
   return [];
-}
-
-export function stripeLinkFor(_sku: Sku, _clientRef: string): string | null {
-  return null;
-}
-
-export function consumeStripeReturn(): Sku | null {
-  return null;
 }
 
 export class CoinPaymentProvider {

@@ -89,7 +89,7 @@ for (const portal of PORTALS) {
   // Third-party backend markers: the portal editions are local/coin-only, so
   // the Upstash-backed leaderboard Worker, Stripe endpoints and keys, and
   // their dev fallbacks must not survive into the bundle. The build blanks
-  // VITE_STRIPE_STARTER_LINK / VITE_SOCIAL_URL / multiplayer URLs, and this
+  // VITE_SOCIAL_URL / multiplayer URLs, and this
   // check is the regression tripwire for that (the bundle is inlined into
   // index.html, so the html string IS the full bundle).
   const FORBIDDEN_MARKERS = [

@@ -1,7 +1,7 @@
 # Comparative review — Sunbird vs multiplayer and mobile category standards
 
 **Date:** 2026-09-22 · Scope: netcode, platform engineering, product loops · Method: measured evidence in this workspace + public industry reference points, stated as such.
-**Companion:** [RESILIENCE_AUDIT.md](RESILIENCE_AUDIT.md) (reliability scorecard), [LEGAL_SECURITY.md](LEGAL_SECURITY.md) (EU register), [POKI_COMPLIANCE_AUDIT.md](POKI_COMPLIANCE_AUDIT.md) (platform rules).
+**Companion:** [audits/RESILIENCE_AUDIT.md](audits/RESILIENCE_AUDIT.md) (reliability scorecard), [LEGAL_SECURITY.md](../LEGAL_SECURITY.md) (EU register), [audits/POKI_COMPLIANCE_AUDIT.md](audits/POKI_COMPLIANCE_AUDIT.md) (platform rules).
 
 ---
 
@@ -12,7 +12,7 @@
 | `pnpm pvp:check` — boots the real server; protocol smoke + two live `RealtimeClient`s + pilot-directory contract + public room list | **PASS** — server, wire protocol, two real clients, directory and room list agree; no identity fields leak into the public room list |
 | `pnpm botsim:40` — 40 headless WebSocket pilots on the shipped frame vocabulary, one room, 12 s | **PASS 10/10 gates** — 40/40 seated in 111 ms; state frames flowing to every client (p50 223 received); broadcast tick p95 68 ms (target ≤300 ms); finish places unique; **4/4 dropped pilots re-seated with the same identity in the same room**; adversarial teleport/magnitude bots **contained by the server** (no impossible position relayed) |
 | Live ops endpoints during the run | `/health` → `{"ok":true,"rooms":1,"pilots":40,"players":40}`; `/mp/v1/telemetry/summary` live; SIGTERM drained cleanly |
-| Unit/protocol layer | 1,296 client tests + 31 server tests green, incl. bit-exact deterministic-sim, protocol contract pinned on both TS and Rust implementations |
+| Unit/protocol layer | 1,398 client tests + 38 server tests green, incl. bit-exact deterministic-sim, protocol contract pinned on both TS and Rust implementations |
 | Browser e2e (Playwright) | **Not executable in this sandbox** — the Playwright browser CDN is unreachable from this workspace (TLS reset on download). CI runs the full matrix with `--with-deps` (`.github/workflows/ci.yml`, artifact pass included); the two projects (desktop 1280×800, Pixel 7) cover 25 spec files. This is an environment limitation, not a repo gap — stated plainly rather than skipped silently. |
 | Rust server | Not compilable here (no cargo); its behavior is pinned indirectly by the protocol-contract suite and the TypeScript server mirror of the same contract |
 
@@ -29,7 +29,7 @@ Scale: 1–5 where 3 = competent genre median, 4 = clearly above the published c
 | Anti-cheat depth | **3.5** | Movement envelope + HMAC scores + rate limits + containment proven live; no full replay re-simulation in production (deferred by decision — the determinism makes it cheap to add later) |
 | Delivery & footprint | **5** | 1.8 MB self-contained portal build (vs 30–150 MB typical for the category); zero required backend; full offline mode — structurally better than the mobile bar, not just equal |
 | Device/platform engineering | **4.5** | Adaptive DPR + bloom budgeting, SwiftShader fallback, haptics, safe-area/orientation audits, 48px-class targets, visibility/ad-break suspend correctness |
-| Reach & localization | **4.5** | 14 locales incl. Arabic RTL with visual-baseline e2e; portal matrix (Poki/Crazy/generic) fully gated |
+| Reach & localization | **5** | 36 locales (the 34 the portal inspector offers + 2 legacy) × 103 barrel keys with 100% pack coverage, Arabic/Hebrew RTL with visual-baseline e2e, and an i18n debt ratchet on the strings still in English; portal matrix (Poki/Crazy/generic) fully gated |
 | Retention/loop design | **3.5** | Daily/weekly/season/career breadth is real and tested; no server-side live-ops flags/events yet, no cross-device cloud save on web |
 | Competitive integrity ceiling | **3** | Honest and well-protected for casual play; not yet at the ranked-esports bar (full server re-simulation) |
 | Privacy/compliance | **4.5** | No PII by construction, EU register with roles/bases/rights mapping, portal builds make zero external calls |
@@ -68,7 +68,7 @@ Reference points: Google Play Core Vitals (user-perceived crash rate ≤ 1.09%, 
 | Interruption handling | Calls/notifications/tab switches must not corrupt state | Visibility-aware pause/mute, ad-break suspend (watchdog + audio), server resume proven live | Meets the bar |
 | Offline | Expected for casual arcade | Full offline play; honest "local/practice" labeling instead of fake online | Meets the bar; honesty labeling is above norm |
 | Accessibility | WCAG-class | Reduce-motion, colorblind-assist, large-text (persisted, applied), keyboard paths, RTL, `input-standards` e2e | Above category norm |
-| Localization | Top titles ship 10–20 locales | **14 locales** incl. Arabic RTL with layout baselines | Meets the bar |
+| Localization | Top titles ship 10–20 locales | **36 locales** incl. Arabic + Hebrew RTL with layout baselines, generated from one barrel | Above the bar |
 | Crash/health telemetry | Store vitals pipelines | Device-local redacted crash journal + `boot_after_crash` counts + aggregate server sink (no PII) | Works within the privacy posture; no store-integrated vitals yet (web-first product) |
 | Battery/thermal | Throttle gracefully | Adaptive quality loop (DPR floor/ceiling, cooldowns), low-power GPU preference on mobile, shadows shed on lite tier | Meets the bar |
 

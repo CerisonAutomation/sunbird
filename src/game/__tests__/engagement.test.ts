@@ -107,3 +107,55 @@ describe("evaluateNearMiss", () => {
     expect(evaluateNearMiss(500, 0, 0, 0, 0, 0).kind).toBe("none");
   });
 });
+
+describe("SessionGoals first-session mode", () => {
+  const build = (starter: boolean, skill = 0.5): SessionGoals => {
+    const tuner = new FlowTuner();
+    tuner.skill = skill;
+    const g = new SessionGoals(tuner);
+    // Same seed => same three goal kinds in the same order, so the two tables
+    // can be compared goal by goal.
+    g.reset("seed", { starter });
+    return g;
+  };
+
+  it("targets a first-timer can reach on the flight they are on", () => {
+    for (const goal of build(true).goals) {
+      expect(goal.target).toBeGreaterThan(0);
+      // Nothing on the starter table asks for more than a short first flight.
+      expect(goal.target).toBeLessThanOrEqual(250);
+      expect(goal.label.length).toBeGreaterThan(4);
+    }
+  });
+
+  it("pays a first reward worth noticing", () => {
+    for (const goal of build(true).goals) expect(goal.reward).toBeGreaterThanOrEqual(40);
+  });
+
+  it("keeps refilling at starter difficulty for the whole first session", () => {
+    const g = build(true);
+    for (let i = 0; i < 6; i += 1) {
+      const first = g.goals[0]!;
+      g.update({ [first.kind]: first.target + 1 } as never);
+    }
+    expect(g.goals).toHaveLength(3);
+    expect(g.goals.every((x) => !x.done)).toBe(true);
+    expect(g.goals.every((x) => x.reward >= 40)).toBe(true);
+  });
+
+  it("asks strictly more of a player with history, goal for goal", () => {
+    const starter = build(true).goals;
+    const normal = build(false).goals;
+    expect(normal).toHaveLength(starter.length);
+    for (let i = 0; i < normal.length; i += 1) {
+      expect(normal[i].kind).toBe(starter[i].kind);
+      expect(normal[i].target).toBeGreaterThan(starter[i].target);
+    }
+  });
+
+  it("still scales with measured skill once history exists", () => {
+    const rookie = build(false, 0.1).goals[0]!;
+    const ace = build(false, 0.95).goals[0]!;
+    expect(ace.target).toBeGreaterThan(rookie.target);
+  });
+});

@@ -84,6 +84,28 @@ const GOAL_SHAPES: { kind: GoalKind; base: number; scale: number; word: (n: numb
 ];
 
 /**
+ * Starter targets for a player with no measured history.
+ *
+ * The audit's number, not a vibe: the first reward has to land inside roughly
+ * 30 seconds or the first session ends before the loop ever pays out. A fresh
+ * player flies a few hundred metres and collects a handful of coins in that
+ * time, so the skill-scaled table above (which starts at ~1,400 m even at the
+ * default skill estimate) is the wrong table for them. These are winnable on
+ * the very first flight, and `SessionGoals` stops using them as soon as the
+ * player has real history.
+ */
+const STARTER_TARGETS: { kind: GoalKind; target: number }[] = [
+  { kind: "distance", target: 250 },
+  { kind: "perfects", target: 1 },
+  { kind: "combo", target: 2 },
+  { kind: "altitude", target: 40 },
+  { kind: "coins", target: 6 },
+  { kind: "clouds", target: 2 },
+  { kind: "gems", target: 1 },
+  { kind: "sunflowers", target: 1 },
+];
+
+/**
  * A rolling set of three short goals.
  *
  * The Zeigarnik effect says unfinished tasks stay mentally "open" — so the list
@@ -94,11 +116,18 @@ const GOAL_SHAPES: { kind: GoalKind; base: number; scale: number; word: (n: numb
 export class SessionGoals {
   goals: SessionGoal[] = [];
   private seq = 0;
+  /** While true, targets come from `STARTER_TARGETS` instead of the skill curve. */
+  private starter = false;
 
   constructor(private readonly tuner: FlowTuner) {}
 
-  reset(seed: string): void {
+  /**
+   * @param opts.starter first-session mode: small, winnable targets so the
+   * first reward lands inside the first 30 seconds of play.
+   */
+  reset(seed: string, opts: { starter?: boolean } = {}): void {
     this.seq = 0;
+    this.starter = Boolean(opts.starter);
     this.goals = [];
     const rng = new SeededRandom(`${seed}:goals`);
     const used = new Set<GoalKind>();
@@ -110,18 +139,26 @@ export class SessionGoals {
     let guard = 0;
     while (used.has(shape.kind) && guard++ < 24) shape = GOAL_SHAPES[rng.int(0, GOAL_SHAPES.length)]!;
     used.add(shape.kind);
+    // First sessions get the starter table: same kinds, same words, targets a
+    // brand-new player can actually reach on the flight they are on right now.
+    const starterTarget = this.starter ? STARTER_TARGETS.find((x) => x.kind === shape.kind)?.target : undefined;
     const s = this.tuner.skill;
     // Target lands a little beyond what this player usually manages.
     const raw = shape.base + shape.scale * (0.35 + s * 0.75) * rng.range(0.85, 1.15);
-    const target = shape.kind === "distance" || shape.kind === "altitude" || shape.kind === "coins"
-      ? Math.round(raw / 5) * 5
-      : Math.max(1, Math.round(raw));
+    const target = starterTarget
+      ? starterTarget
+      : shape.kind === "distance" || shape.kind === "altitude" || shape.kind === "coins"
+        ? Math.round(raw / 5) * 5
+        : Math.max(1, Math.round(raw));
+    const reward = Math.round(25 + target * (shape.kind === "distance" ? 0.03 : shape.kind === "altitude" ? 0.25 : 8));
     return {
       id: `g${this.seq++}`,
       kind: shape.kind,
       target,
       label: shape.word(target),
-      reward: Math.round(25 + target * (shape.kind === "distance" ? 0.03 : shape.kind === "altitude" ? 0.25 : 8)),
+      // A first reward that reads "3 coins" teaches nothing; the floor keeps the
+      // opening payout worth noticing without inflating the economy later.
+      reward: this.starter ? Math.max(40, reward) : reward,
       progress: 0,
       done: false,
     };

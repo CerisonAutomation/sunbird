@@ -359,27 +359,27 @@ export class Collectibles {
       // A launch ramp — steep upslope heading toward a lip.
       const isRamp = slope > 0.42;
 
-      if (isDive && !inRampZone && rng.next() < 0.85) {
-        // follow the slope: a readable line of coins skimming the surface
-        for (let i = 0; i < 5; i++) {
-          const cx = x + i * 4.4;
+      if (isDive && !inRampZone && rng.next() < 0.92) {
+        // follow the slope: dense line teaching dive
+        for (let i = 0; i < 6; i++) {
+          const cx = x + i * 4.2;
           this.placeCoin(cx, terrain.heightAt(cx) + 2.2, false);
         }
-      } else if (isRamp && rng.next() < 0.9) {
-        // trace the launch arc off the lip
-        const v = 52;
+      } else if (isRamp && rng.next() < 0.94) {
+        // trace the launch arc off the lip — 8 coins, longer arc
+        const v = 54;
         const ang = Math.atan(terrain.slopeAt(x + 12));
-        for (let i = 1; i <= 7; i++) {
-          const t = i * 0.14;
+        for (let i = 1; i <= 8; i++) {
+          const t = i * 0.13;
           const cx = x + 12 + Math.cos(ang) * v * t;
-          const cy = terrain.heightAt(x + 12) + 2 + Math.sin(ang) * v * t - 0.5 * 30 * t * t;
-          if (cy > terrain.heightAt(cx) + 1.5) this.placeCoin(cx, cy, false);
+          const cy = terrain.heightAt(x + 12) + 2 + Math.sin(ang) * v * t - 0.5 * 28 * t * t;
+          if (cy > terrain.heightAt(cx) + 1.2) this.placeCoin(cx, cy, false);
         }
-      } else if (isCrest && rng.next() < 0.55) {
-        // small hop arc over the crest
-        for (let i = 0; i < 5; i++) {
-          const cx = x - 8 + i * 4;
-          const bump = Math.sin((i / 4) * Math.PI) * 5;
+      } else if (isCrest && rng.next() < 0.68) {
+        // hop arc over crest — 6 coins, more visible
+        for (let i = 0; i < 6; i++) {
+          const cx = x - 8 + i * 3.8;
+          const bump = Math.sin((i / 5) * Math.PI) * 5.5;
           this.placeCoin(cx, terrain.heightAt(cx) + 2.4 + bump, false);
         }
       }
@@ -397,47 +397,38 @@ export class Collectibles {
         this.placeCoin(x + rng.range(-6, 6), hh + alt + rng.range(0, 30), true);
       }
 
-      // Sky rings — laid out as COURSES, not as scattered singles.
-      //
-      // Single rings 16% of the time meant the ring chain (three inside 2.8 s,
-      // which is what pays the speed boost and the combo) was close to
-      // unreachable in normal play: the sky had nothing to aim at and long
-      // airtime had no objective. A course threads 4–6 hoops 26–34 units apart
-      // along a shallow arc, so a pilot who holds their line threads several in
-      // a row — and one who doesn't can see exactly how to fix it. A third of
-      // the courses rise, a third descend, the rest stay level, so the sky
-      // asks for a decision instead of a straight line.
-      //
-      // Probability is 18% per 26-unit cell (was 34%): a course spans ~120 m
-      // and we want ~1 per 150 m on average. The gap guard (130 units) prevents
-      // two courses from ever starting inside each other's span.
-      const courseGap = x - this.lastRingCourseX > 130;
-      if (courseGap && rng.next() < 0.18) {
+      // Sky rings — COURSES every ~90m, 4-7 hoops, so long air has objectives.
+      // V2 anti-bore: 18%→28% spawn, gap 130→85, 4-6→4-7 hoops, 30→26 spacing.
+      const courseGap = x - this.lastRingCourseX > 85;
+      if (courseGap && rng.next() < 0.28) {
         this.lastRingCourseX = x;
-        const count = 4 + Math.floor(rng.next() * 3); // 4–6 hoops
+        const count = 4 + Math.floor(rng.next() * 4); // 4–7 hoops
         const shape = rng.next();
-        // Slope is per hoop along a line in WORLD space, not a height above the
-        // terrain: terrain-relative hoops zig-zag by tens of metres as hills
-        // rise and fall, which is a course nobody can thread. Anchored to the
-        // air the bird is actually in, the hoops form one continuous line.
-        const climb = shape < 0.34 ? 2.0 : shape < 0.68 ? -2.4 : 0;
+        const climb = shape < 0.34 ? 2.2 : shape < 0.68 ? -2.6 : 0.2;
         const phase = rng.next() * Math.PI * 2;
-        // Entry height is set so an ordinary launch off the hill below reaches
-        // the first hoop; later hoops are clamped above the ground so a course
-        // never buries a ring inside a hill.
-        const startY = terrain.heightAt(x) + 16 + rng.range(0, 10);
+        const startY = terrain.heightAt(x) + 14 + rng.range(0, 12);
         for (let i = 0; i < count; i++) {
-          const rx = x + i * 30 + rng.range(-3, 3);
-          const roll = Math.sin(phase + i * 0.9) * 2.2;
-          const ry = Math.max(terrain.heightAt(rx) + 7, startY + climb * i + roll);
+          const rx = x + i * 26 + rng.range(-2, 2);
+          const roll = Math.sin(phase + i * 0.9) * 2.4;
+          const ry = Math.max(terrain.heightAt(rx) + 6, startY + climb * i + roll);
           this.placeRing(rx, ry, 4.4);
         }
       }
 
-      // Balloons: rare, up in the cloud layer — pop one for a huge bounce.
-      if (rng.next() < 0.07) {
-        const alt = ALT_CLOUDS + rng.range(-6, 30);
-        this.placeBalloon(x + rng.range(-12, 12), hh + alt, rng.next() * 6, rng.range(-1, 1));
+      // Balloons: more frequent — pop for huge bounce, breaks long glides.
+      if (rng.next() < 0.11) {
+        const alt = ALT_CLOUDS + rng.range(-8, 32);
+        this.placeBalloon(x + rng.range(-12, 12), hh + alt, rng.next() * 6, rng.range(-1.2, 1.2));
+      }
+
+      // Extra coin arcs in air — give glides purpose.
+      if (!inRampZone && rng.next() < 0.22 && terrain.heightAt(x) > 5) {
+        const arcH = 4 + rng.next() * 6;
+        for (let i = 0; i < 4; i++) {
+          const cx = x + i * 5;
+          const cy = hh + 6 + Math.sin((i / 3) * Math.PI) * arcH;
+          if (cy > terrain.heightAt(cx) + 2) this.placeCoin(cx, cy, false);
+        }
       }
 
       // Power-ups sit on crests and just past ramps so they reward good lines.

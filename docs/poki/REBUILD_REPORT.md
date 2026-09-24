@@ -10,7 +10,7 @@ a verifier.
 
 ## 1. The game already satisfied most of the guide — the gap was *provability*
 
-The previous compliance pass (`../../POKI_COMPLIANCE_AUDIT.md`) had already fixed
+The previous compliance pass (`../audits/POKI_COMPLIANCE_AUDIT.md`) had already fixed
 the behavioural defects the rules care about (run-outcome funnel, rewarded
 placement analytics, fake ad affordances, scaling sizes, coin faucets). What was
 missing was that none of it was **executable**: the rules lived in a 30 KB
