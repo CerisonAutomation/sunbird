@@ -1420,11 +1420,6 @@ export class HUD {
       // keep 3 active in session (refill instantly on complete — endless completion).
       // One primary chase + one secondary is readable at 60fps on phone, 3 would be
       // chaos on narrow viewports. Career rung underneath = number that only goes up.
-      const ranked = s.sessionGoals
-        .filter((g) => !g.done && g.target > 0)
-        .map((g) => ({ g, pct: Math.max(0, Math.min(1, g.progress / g.target)) }))
-        .sort((a, b) => b.pct - a.pct)
-        .slice(0, 2); // 2 missions visible in-run (was 1, now 2 for richer chase)
       const career =
         s.wings.nextNeeded > 0
           ? {
@@ -1439,6 +1434,12 @@ export class HUD {
       // (BeatLine.ts), this row is the countdown to it, and it only exists inside
       // the cue window — a mark 3 km away is scenery, not a goal.
       const beat = s.beatLine;
+      // Max 2 rows total: 1 goal + career, or 1 goal + beat. Never 3.
+      const ranked = s.sessionGoals
+        .filter((g) => !g.done && g.target > 0)
+        .map((g) => ({ g, pct: Math.max(0, Math.min(1, g.progress / g.target)) }))
+        .sort((a, b) => b.pct - a.pct)
+        .slice(0, beat ?? career ? 1 : 2);
       // Quantized to 25 m so a countdown ticking every frame cannot rebuild the
       // strip 60 times a second — the same discipline as the 5 % fill steps, and
       // coarser than them, because a gap closes faster than a bar fills.

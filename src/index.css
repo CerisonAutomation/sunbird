@@ -1404,7 +1404,7 @@ fieldset.squad-fields {
 .quest { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.6); border-radius: 12px; padding: 6px 10px; font-size: 13px; }
 .quest.done { opacity: 0.6; text-decoration: line-through; }
 .quest .qb { flex: 1; height: 4px; background: rgba(0,0,0,0.12); border-radius: 2px; overflow: hidden; margin-top: 2px; }
-.quest .qb i { display: block; height: 100%; background: linear-gradient(90deg,#ffb020,#ff8a00); transition: width 0.3s; }
+.quest .qb i { display: block; height: 100%; background: linear-gradient(90deg,var(--amber),#ff8a00); transition: width 0.3s; }
 .quest .qr { font-weight: 700; color: #8a6a30; }
 @media (max-width: 600px) {
   /* Mobile: show 2 missions to avoid clutter, third hidden but still tracked */

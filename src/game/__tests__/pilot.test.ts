@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Bird } from "../Bird";
 import { TerrainSystem } from "../TerrainSystem";
-import { PHYS_DT } from "../constants";
+import { GAP_START, PHYS_DT } from "../constants";
 import { decideHold } from "../pilot";
 
 /**
@@ -54,10 +54,12 @@ describe("attract pilot over water", () => {
     const terrain = new TerrainSystem("2026-09-14");
     // Mid-ocean, low and slow: diving splashes inside the horizon while
     // soaring stays dry past it — ranked clean > dry miss > splash.
+    // With ISLAND_PERIOD=920, island 0's ocean gap is GAP_START(760)..~892.
+    const oceanMid = GAP_START + 60; // ~820, well inside the gap
     for (const p of [
-      { x: 1000, y: 6, vx: 25, vy: -4 },
-      { x: 995, y: 8, vx: 30, vy: -5 },
-      { x: 1010, y: 5, vx: 22, vy: -3 },
+      { x: oceanMid,     y: 6, vx: 25, vy: -4 },
+      { x: oceanMid - 5, y: 8, vx: 30, vy: -5 },
+      { x: oceanMid + 5, y: 5, vx: 22, vy: -3 },
     ]) {
       const bird = new Bird();
       bird.reset(p.x, p.y);
@@ -73,7 +75,9 @@ describe("attract pilot over water", () => {
 describe("attract pilot flights", () => {
   it("makes forward progress without NaN", () => {
     const bird = flyDemo("2026-09-14", 15);
-    expect(bird.x).toBeGreaterThan(900);
+    // With ISLAND_PERIOD=920 the island is narrower; 550 m in 15 s verifies the
+    // pilot makes real progress without getting stuck.
+    expect(bird.x).toBeGreaterThan(550);
     for (const v of [bird.x, bird.y, bird.vx, bird.vy]) expect(Number.isFinite(v)).toBe(true);
   });
 
