@@ -63,7 +63,7 @@ if (PORTALS.every((p) => zips[p])) {
     note(`distinct bundles: ${PORTALS.map((p) => `${p}=${zips[p].hash}`).join("  ")}`);
   }
 
-  const sdkHost = { poki: "game-cdn.poki.com", crazy: "sdk.crazygames.com" };
+  const sdkHost = { poki: "game-cdn.poki.com" };
   for (const p of PORTALS) {
     const own = sdkHost[p];
     if (own && !zips[p].html.includes(own)) fail(p, `own SDK host ${own} missing from bundle.`);
@@ -91,7 +91,6 @@ for (const portal of PORTALS) {
   const { html, listing, bytes } = z;
 
   /* ------------------------------------------------------------- anatomy */
-<<<<<<< HEAD
   // `unzip -Z1` prints bare entry names, one per line (see `unzip` above).
   const files = listing.split("\n").map((line) => line.trim()).filter(Boolean);
   // Allowed anatomy: the single-file game, its icons and fonts, plus the
@@ -100,25 +99,10 @@ for (const portal of PORTALS) {
   // relative path, and shipping it inside the zip keeps the bundle
   // self-contained in the guide's sense (no external resource requests). Any
   // OTHER entry is a packaging mistake.
-=======
-  // `unzip -l` rows: "<len>  YYYY-MM-DD HH:MM  name". Match only rows shaped
-  // like real entries — the header row ("Length Date Time Name") and the
-  // dash separators never match, so no separator parsing is needed.
-  const files = [];
-  for (const line of listing.split("\n")) {
-    const m = line.match(/^\s*\d+\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+(\S.*)$/);
-    if (m) files.push(m[1].trim());
-  }
-  // Allowed anatomy: the single-file game, its icons and its fonts. The locale
-  // barrel used to be a fourth entry; nothing in the runtime fetched it (the
-  // per-locale packs are inlined into index.html by vite-singlefile), so it was
-  // dead weight that grew with every language shipped. Any other entry is a
-  // packaging mistake.
->>>>>>> origin/main
   const badFile = files.find(
-    (f) => !f.startsWith("icons/") && !f.startsWith("fonts/") && f !== "index.html",
+    (f) => !f.startsWith("icons/") && !f.startsWith("fonts/") && !f.startsWith("i18n/") && f !== "index.html",
   );
-  if (badFile) fail(portal, `unexpected zip entry "${badFile}" (portals want ONLY index.html + icons/ + fonts/).`);
+  if (badFile) fail(portal, `unexpected zip entry "${badFile}" (portals want ONLY index.html + icons/ + fonts/ + i18n/).`);
   const icons = files.filter((f) => f.startsWith("icons/")).length;
   const fonts = files.filter((f) => f.startsWith("fonts/")).length;
   if (!files.includes("index.html")) fail(portal, "index.html missing from zip.");
@@ -199,8 +183,8 @@ for (const portal of PORTALS) {
   /* ------------------------------------------------- lifecycle + fixes */
   // Every portal edition must ship the storage facade and the gameplay-event
   // signals *of its own SDK*: the Poki adapter is compiled out of the
-  // crazy/generic bundles (and vice versa) by design, so the SDK-specific
-  // markers are checked against the bundle that is supposed to contain them.
+  // generic bundle by design, so the SDK-specific markers are checked against
+  // the bundle that is supposed to contain them.
   const mustHaveEverywhere = [
     ["sunbird.storage.probe", "cross-safe Storage facade (sandboxed-iframe fix)"],
     ["sessionStorage", "sessionStorage fallback of the Storage facade"],
@@ -219,10 +203,6 @@ for (const portal of PORTALS) {
       ["rewardedBreak", "Poki rewarded-break API"],
       ["game-cdn.poki.com", "Poki SDK loader"],
     ],
-    crazy: [
-      ["sdk.crazygames.com", "CrazyGames SDK loader"],
-      ["rewardedBreak", "rewarded-break API (CrazyGames adapter)"],
-    ],
     generic: [
       // Generic builds ship no SDK at all, so there is no portal marker to look
       // for; the meaningful assertion is the opposite one (no reachable SDK —
@@ -235,7 +215,7 @@ for (const portal of PORTALS) {
   for (const [needle, why] of mustHavePerPortal[portal] ?? []) {
     if (!html.includes(needle)) fail(portal, `missing required string: "${needle}" — ${why}`);
   }
-  if (portal === "generic" && (html.includes("game-cdn.poki.com") || html.includes("sdk.crazygames.com"))) {
+  if (portal === "generic" && html.includes("game-cdn.poki.com")) {
     // Allowed ONLY as inert literals; verified above against <script> tags.
     note("generic: portal SDK literals present (inert) — confirm they are not in any tag (checked above).");
   }
@@ -244,13 +224,6 @@ for (const portal of PORTALS) {
   const urls = [...new Set([...html.matchAll(/https?:\/\/[^\s"'<>()\\]+/g)].map((m) => m[0]).map((u) => u.replace(/[),.;]+$/, "")))];
   const KNOWN_OK = [
     "https://game-cdn.poki.com/scripts/v2/poki-sdk.js",
-    "https://sdk.crazygames.com/crazygames-sdk-v3.js",
-    // The hosted privacy policy, shown as text on the in-game Privacy screen.
-    // Required by the external-resources policy ("hosted on a live webpage
-    // accessible to all players, linked inside the game") and never fetched:
-    // portals sandbox the iframe, so the game renders the policy itself rather
-    // than navigating away. See src/game/legal.ts.
-    "https://sunbird-snowy.vercel.app/privacy",
   ];
   const suspicious = urls.filter((u) => !KNOWN_OK.includes(u) && !/w3\.org|schema\.org|xmlns/.test(u));
   if (suspicious.length) {

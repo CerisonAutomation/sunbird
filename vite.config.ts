@@ -73,11 +73,9 @@ function portalShimPlugin(): Plugin {
         const legalEdition =
           PORTAL === "poki"
             ? path.resolve(__dirname, "src/game/legal.edition.poki.ts")
-            : PORTAL === "crazy" || PORTAL === "crazygames"
-              ? path.resolve(__dirname, "src/game/legal.edition.crazy.ts")
-              : PORTAL === "generic"
-                ? path.resolve(__dirname, "src/game/legal.edition.generic.ts")
-                : null;
+            : PORTAL === "generic"
+              ? path.resolve(__dirname, "src/game/legal.edition.generic.ts")
+              : null;
         return legalEdition; // null => the direct/web src/game/legal.edition.ts
       }
       if (dir !== "sdk") return null;
@@ -270,10 +268,10 @@ export default defineConfig({
                   "./src/game/MassRace.ts",
                   "./src/game/GhostNet.ts",
                   "./src/game/bufferUpdates.ts",
+                  "./src/game/Squad.ts",
                 ],
                 social: [
                   "./src/game/Leaderboard.ts",
-                  "./src/game/Squad.ts",
                   "./src/game/Tournaments.ts",
                 ],
               },

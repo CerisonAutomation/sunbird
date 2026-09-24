@@ -24,7 +24,7 @@ export const APP_VERSION: string = import.meta.env.VITE_APP_VERSION ?? "0.0.0";
 /** Commit the bundle was cut from; `"dev"` in a source-only checkout. */
 export const GIT_SHA: string = import.meta.env.VITE_GIT_SHA ?? "dev";
 
-/** Which edition: `none` (direct/PWA), `poki`, `crazy`, `crazygames`. */
+/** Which edition: `none` (direct/PWA), `poki`, `generic`. */
 export const PORTAL_TARGET: string = import.meta.env.VITE_PORTAL_TARGET ?? "none";
 
 /** `<semver>-<portal>-<sha>` — stamped into boot logs and leaderboard rows. */

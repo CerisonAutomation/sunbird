@@ -3,10 +3,6 @@
  *
  * The core game NEVER touches a portal SDK directly — it speaks this
  * interface. Adapters:
- *   • `CrazyGamesAdapter` — the full official CrazyGames SDK v3 surface
- *     (init, loading/gameplay lifecycle, ads, banners, data-module cloud
- *     save, user identity + system info, portal leaderboard, invites and
- *     instant multiplayer, account linking, IAP tokens, mute, pause/resume).
  *   • `PokiAdapter` — the Poki SDK surface this build targets.
  *   • `LocalAdapter`  — no-op platform + localStorage cloud save, so the
  *     save/identity flows run end-to-end in local dev and generic portals.
@@ -26,18 +22,6 @@ import { runLoadingNet } from "./net";
 // is unnecessary; we can instantiate directly and let Rollup DCE the
 // unused branch completely.
 import { PokiAdapter, pokiInitOptions } from "./poki";
-<<<<<<< HEAD
-=======
-// The Poki global is typed once, from Poki's own published typings (see
-// ./poki-canon). Two hand-rolled subsets used to live in this file and drifted
-// independently of the adapter's type.
-import type { PokiSdk } from "./poki-canon";
-// The portal's language signal is canonical (Poki `getLanguage()`), and it
-// arrives after the i18n module initialised — so it is injected, not imported
-// the other way round.
-import { refreshAutoLocale, setPortalLanguageProvider } from "../i18n";
-import { CrazyGamesAdapter } from "./crazygames";
->>>>>>> origin/main
 
 export type PlatformName = "poki" | "none";
 
@@ -55,7 +39,7 @@ export type PlatformEvents = {
   onResume?: () => void;
 };
 
-/** Portal identity (pseudonymous on CrazyGames; username + avatar). */
+/** Portal identity. */
 export type PlatformIdentity = {
   id: string;
   name: string;
@@ -98,45 +82,24 @@ export interface PlatformAdapter {
   /** Which capabilities this adapter actually provides (telemetry/UI gating). */
   capabilities(): string[];
 
-  /** Portal environment as reported by the SDK ("crazygames" | "local" | "disabled" | null). */
+  /** Portal environment as reported by the SDK ("local" | "disabled" | null). */
   environment(): string | null;
 
   /* ------------------------------------------------------- lifecycle */
   loadingStart(): void;
   loadingFinished(): void;
   /**
-<<<<<<< HEAD
    * Tell the portal the game is playable. On Poki this is `gameLoadingFinished`
    * (one-shot, and the game's own release marker); the adapter owns the mapping.
-=======
-   * Tell the portal the game is playable. The name is CrazyGames' canonical
-   * `game.signalGameReady()`; Poki has no such member, so the Poki adapter maps
-   * this onto its own documented marker (`gameLoadingFinished()`) rather than
-   * calling a method that does not exist — see docs/poki/SDK_CANON.md.
->>>>>>> origin/main
    */
   signalGameReady(): void;
   gameplayStart(): void;
   gameplayStop(): void;
   /** Ask the portal to treat the game as paused (best-effort). */
   pause(): void;
-<<<<<<< HEAD
   /** Portal celebration for a special moment (personal best). Never throws. */
   /** Poki's milestone celebration (`PokiSDK.happyTime`, capital T). */
   happyTime(): void;
-=======
-  /**
-   * Portal celebration for a special moment, at an intensity in 0…1.
-   *
-   * The name and the argument are Poki's canon: `PokiSDK.happyTime(intensity)`
-   * (Defold guide: "value is between 0 and 1"). CrazyGames' equivalent is
-   * spelled `game.happytime()` with no argument and its docs ask for it to be
-   * used sparingly, so that adapter maps the call and gates on intensity.
-   * Sharing one spelling across adapters is what made the Poki celebration a
-   * silent no-op for as long as it did. Never throws.
-   */
-  happyTime(intensity: number): void;
->>>>>>> origin/main
 
   /* -------------------------------------------------------------- ads */
   /** Midgame/commercial break. Resolves when the break is over or unavailable. */
@@ -176,7 +139,6 @@ export interface PlatformAdapter {
   /** Device class as the portal reports it; null when unavailable. */
   deviceCategory(): "mobile" | "tablet" | "desktop" | null;
   /**
-<<<<<<< HEAD
    * The language the portal says this player uses (Poki `getLanguage()`), or
    * null to fall back to browser detection. The guide recommends serving the
    * player's own language automatically rather than making them find a
@@ -194,19 +156,6 @@ export interface PlatformAdapter {
    * saw; a no-op everywhere else.
    */
   playtestCapture(on: boolean): void;
-=======
-   * The portal's own language signal, or null when it has none. On Poki this is
-   * `PokiSDK.getLanguage()` (its `iso_lang` URL param, else navigator.language,
-   * reduced to the base tag) and it outranks the game's own sniffing, so a
-   * player who chose a language on the portal gets it in-game.
-   */
-  portalLanguage(): string | null;
-  /**
-   * Reposition the portal's mobile UI pill (Poki `movePill(topPercent, topPx)`,
-   * topPercent 0–50). No-op on portals without one.
-   */
-  movePill(topPercent: number, topPx: number): void;
->>>>>>> origin/main
   /** Open an external URL through the portal (required instead of navigating). */
   openExternalLink(url: string): void;
   /** Account linking prompt (identity upgrade flow). True when completed. */
@@ -240,7 +189,7 @@ export interface PlatformAdapter {
    * `visible`/`interact` measure placement exposure vs. engagement; any
    * other value is a custom event (Poki reserves `/` and `^` — never use them).
    */
-  measure(category: string, what: string, action: string): void;
+  measure(category: string, label: string, action: string): void;
 /** Share via the portal (best-effort). True on success.
  *
  * `params` is portal share data (Poki appends it to a signed shareable URL,
@@ -464,7 +413,14 @@ function ensureSdk(): Promise<PlatformName> {
   if (loadPromise) return loadPromise;
 
   if (TARGET === "poki") {
-    const getPoki = (): PokiSdk | undefined => (window as unknown as { PokiSDK?: PokiSdk }).PokiSDK;
+    // Poki global
+    type PokiGlobal = {
+      init?: () => Promise<void>;
+      setDebug?: (v: boolean) => void;
+      gameLoadingStart?: () => void;
+      movePill?: (x: number, y: number) => void;
+    };
+    const getPoki = (): PokiGlobal | undefined => (window as unknown as { PokiSDK?: PokiGlobal }).PokiSDK;
     loadPromise = new Promise((resolve) => {
       // Poki Inspector injects the SDK before the bundle loads; wait up to
       // 2 s, then fall back to loading from the Poki CDN.
@@ -522,7 +478,6 @@ function bootstrapSdk(): Promise<{ name: PlatformName; platformEnvironment: stri
 
   let boot: Promise<{ name: PlatformName; platformEnvironment: string | null }>;
   if (TARGET === "poki") {
-<<<<<<< HEAD
     type PokiGlobal = {
       init?: (options?: { submitScore?: (submit: (leaderboard: string, score: number) => void) => void }) => Promise<void>;
       setDebug?: (v: boolean) => void;
@@ -532,9 +487,6 @@ function bootstrapSdk(): Promise<{ name: PlatformName; platformEnvironment: stri
       enableEventTracking?: () => void;
     };
     const getPoki = (): PokiGlobal | undefined => (window as unknown as { PokiSDK?: PokiGlobal }).PokiSDK;
-=======
-    const getPoki = (): PokiSdk | undefined => (window as unknown as { PokiSDK?: PokiSdk }).PokiSDK;
->>>>>>> origin/main
     boot = ensureSdk().then(async (loaded) => {
       if (loaded !== "poki") return { name: "none", platformEnvironment: null };
       try {
@@ -578,13 +530,6 @@ function bootstrapSdk(): Promise<{ name: PlatformName; platformEnvironment: stri
  * saves still work via localStorage and every other call is an honest no-op.
  */
 export async function initPlatform(events: PlatformEvents): Promise<PlatformAdapter> {
-<<<<<<< HEAD
-=======
-  portalEventSink = events;
-  // Read lazily so it always asks the live adapter, and only ever consulted
-  // while the player's preference is "Browser language".
-  setPortalLanguageProvider(() => activeAdapter?.portalLanguage() ?? null);
->>>>>>> origin/main
   // Safety net: on portals the loader must be dismissed even if the Game
   // constructor throws (e.g. headless WebGL failure, content-security, a
   // misbehaving browser). If loadingFinished() has not been called within
@@ -609,12 +554,5 @@ export async function initPlatform(events: PlatformEvents): Promise<PlatformAdap
   const originalFinish = adapter.loadingFinished.bind(adapter);
   adapter.loadingFinished = () => { window.clearTimeout(safety); originalFinish(); };
   activeAdapter = adapter;
-  // A portal language (Poki's `iso_lang` param, else navigator.language) now
-  // outranks the browser's own list; let an "auto" preference follow it. An
-  // explicit player choice is never touched. `setLocale` notifies the pack
-  // listeners, which is the same re-render path the Settings language selector
-  // uses — no game callback is borrowed for it (firing `onResume` here could
-  // unpause a game that is legitimately paused).
-  void refreshAutoLocale();
   return adapter;
 }

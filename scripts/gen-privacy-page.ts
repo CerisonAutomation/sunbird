@@ -30,10 +30,9 @@ import { composePolicy, PRIVACY_POLICY_VERSION, type LegalEdition } from "../src
 // ships another portal's host names.
 import { LEGAL_EDITION as WEB_EDITION } from "../src/game/legal.edition";
 import { LEGAL_EDITION as POKI_EDITION } from "../src/game/legal.edition.poki";
-import { LEGAL_EDITION as CRAZY_EDITION } from "../src/game/legal.edition.crazy";
 import { LEGAL_EDITION as GENERIC_EDITION } from "../src/game/legal.edition.generic";
 
-const EDITIONS: LegalEdition[] = [POKI_EDITION, CRAZY_EDITION, GENERIC_EDITION, WEB_EDITION];
+const EDITIONS: LegalEdition[] = [POKI_EDITION, GENERIC_EDITION, WEB_EDITION];
 const PRIVACY_POLICY = composePolicy(EDITIONS);
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");

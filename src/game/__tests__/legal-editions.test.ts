@@ -34,7 +34,6 @@ import {
   type PolicyDocument,
 } from "../legal";
 import { LEGAL_EDITION as WEB } from "../legal.edition";
-import { LEGAL_EDITION as CRAZY } from "../legal.edition.crazy";
 import { LEGAL_EDITION as GENERIC } from "../legal.edition.generic";
 import { LEGAL_EDITION as POKI } from "../legal.edition.poki";
 
@@ -46,14 +45,13 @@ function policyText(doc: PolicyDocument): string {
   return JSON.stringify(doc);
 }
 
-const EDITIONS: Record<string, LegalEdition> = { web: WEB, poki: POKI, crazy: CRAZY, generic: GENERIC };
+const EDITIONS: Record<string, LegalEdition> = { web: WEB, poki: POKI, generic: GENERIC };
 
 /** Hostnames that belong to a *different* portal — the leak this split exists to prevent. */
 const FOREIGN: Record<string, RegExp> = {
-  web: /poki\.(io|com)|crazygames\.com/i,
-  poki: /crazygames\.com|sdk\.crazygames/i,
-  crazy: /poki\.(io|com)|auds\.poki|netlib\.poki/i,
-  generic: /poki\.(io|com)|crazygames\.com/i,
+  web: /poki\.(io|com)/i,
+  poki: /(?!)/,
+  generic: /poki\.(io|com)/i,
 };
 
 describe("edition isolation — the reason legal.ts was split", () => {
@@ -68,7 +66,7 @@ describe("edition isolation — the reason legal.ts was split", () => {
 
   it("gives the generic edition no network services at all", () => {
     expect(GENERIC.hosts).toEqual([]);
-    // A portal that is not Poki or CrazyGames gets a build that talks to nobody,
+    // A generic portal gets a build that talks to nobody,
     // and the policy must say so rather than imply a service that is not there.
     expect(policyText(composePolicy([GENERIC]))).toMatch(/nothing|no network|not sent|on your device/i);
   });
@@ -78,7 +76,7 @@ describe("edition isolation — the reason legal.ts was split", () => {
     // build, so this is exactly what dist/ and the hosted page's direct section carry.
     expect(PRIVACY_POLICY).toEqual(composePolicy([WEB]));
     expect(EXTERNAL_HOSTS).toEqual(WEB.hosts);
-    expect(policyText(PRIVACY_POLICY)).not.toMatch(/poki|crazygames/i);
+    expect(policyText(PRIVACY_POLICY)).not.toMatch(/poki/i);
   });
 });
 
@@ -111,15 +109,15 @@ describe("the host table is the single source of truth", () => {
   });
 
   it("keeps every host of every edition on the public page (the union)", () => {
-    const page = policyText(composePolicy([POKI, CRAZY, GENERIC, WEB]));
+    const page = policyText(composePolicy([POKI, GENERIC, WEB]));
     for (const edition of Object.values(EDITIONS)) {
       for (const host of edition.hosts) expect(page, `${host.host} must appear on the public page`).toContain(host.host);
     }
   });
 
   it("labels each edition when more than one is composed", () => {
-    const many = composePolicy([POKI, CRAZY, GENERIC, WEB]);
-    for (const edition of [POKI, CRAZY, GENERIC, WEB]) {
+    const many = composePolicy([POKI, GENERIC, WEB]);
+    for (const edition of [POKI, GENERIC, WEB]) {
       expect(policyText(many)).toContain(edition.label);
     }
     // A single-edition policy must NOT be labelled: on the page a player reads
@@ -130,9 +128,9 @@ describe("the host table is the single source of truth", () => {
 });
 
 describe("the public page generator reads the same objects", () => {
-  it("imports all four editions and composes them", () => {
+  it("imports all editions and composes them", () => {
     const src = read("scripts/gen-privacy-page.ts");
-    for (const mod of ["legal.edition.poki", "legal.edition.crazy", "legal.edition.generic", "legal.edition"]) {
+    for (const mod of ["legal.edition.poki", "legal.edition.generic", "legal.edition"]) {
       expect(src, `${mod} must feed the public page`).toMatch(new RegExp(mod.replace(/\./g, "\\.")));
     }
     expect(src).toMatch(/composePolicy\(/);
@@ -149,7 +147,7 @@ describe("the public page generator reads the same objects", () => {
 describe("portal builds point at a live, absolute policy URL", () => {
   it("every portal build script sets VITE_PRIVACY_URL to an https URL", () => {
     const pkg = JSON.parse(read("package.json")) as { scripts: Record<string, string> };
-    for (const script of ["build:poki", "build:crazy", "build:generic"]) {
+    for (const script of ["build:poki", "build:generic"]) {
       const value = pkg.scripts[script]?.match(/VITE_PRIVACY_URL=(\S+)/)?.[1] ?? "";
       expect(value, `${script} must pin an absolute URL — inside a portal iframe the game's own origin is the portal CDN`).toMatch(/^https:\/\/\S+\/privacy$/);
     }

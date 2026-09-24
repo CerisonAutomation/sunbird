@@ -1,12 +1,10 @@
 #!/usr/bin/env node
 /**
- * Portal compliance gate — asserts every submission zip obeys the rules all
- * HTML5 portals check (Poki, CrazyGames, and the generic batch). Fails loudly
- * with a concrete reason; exit 0 means shippable.
+ * Portal compliance gate — asserts the submission zip obeys Poki's rules.
+ * Fails loudly with a concrete reason; exit 0 means shippable.
  *
  * Checks the shipped zip (sunbird-poki.zip):
- *   1. Zip exists and fits the strictest size bar (Poki's 8 MB initial-load
- *      target — CrazyGames allows 20 MB mobile / 50 MB initial).
+ *   1. Zip exists and fits the size bar (Poki's 8 MB initial-load target).
  *   2. Staged index.html carries no manifest link (portals are not installable).
  *   3. No js.stripe.com request URL (external payments are banned on portals).
  *   4. No absolute href="/…"/src="/…" (portals serve from deep CDN subpaths).
@@ -33,7 +31,6 @@ const MAX_ZIP_BYTES = 8_000_000; // Poki initial-download target (strictest bar)
 const PORTALS = ["poki"];
 const SDK_URL = {
   poki: "game-cdn.poki.com",
-  crazy: "sdk.crazygames.com",
   generic: null,
 };
 
@@ -47,7 +44,6 @@ const SDK_URL = {
  */
 const STATIC_REMOTE_ALLOW = {
   poki: [/^https:\/\/game-cdn\.poki\.com\/scripts\/v2\/poki-sdk\.js$/],
-  crazy: [/^https:\/\/sdk\.crazygames\.com\//],
   generic: [],
 };
 

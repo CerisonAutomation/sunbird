@@ -6,38 +6,22 @@
  * portal's. This is not hypothetical: the loading-screen failsafe used to hold
  * a raw `window.PokiSDK` fallback behind `if (TARGET !== "poki") return;`, and
  * the minifier folds positive `TARGET === "poki"` branches but NOT that
- * negative early-return — so the string survived into the CrazyGames and
- * generic bundles. The HUD additionally embedded all three portal names in one
- * runtime ternary. Both are now impossible by construction (target-only modules
- * + the edition swap in vite.config.ts); these markers keep them that way.
+ * negative early-return — so the string survived into the generic bundle.
+ * Both are now impossible by construction (target-only modules + the edition
+ * swap in vite.config.ts); these markers keep them that way.
  *
  * Used by scripts/verify-portal.mjs (built dists, via the zips) and
  * scripts/verify-upload.mjs (the Inspector folder). Add a marker here whenever
  * a new per-target module is introduced.
  */
 export const FOREIGN_MARKERS = {
-  poki: [
-    [/crazygames/i, "CrazyGames marker"],
-    [/sdk\.crazygames\.com/, "CrazyGames SDK URL"],
-    [/CrazyGames edition/, "CrazyGames edition string"],
-  ],
-  crazy: [
-    [/poki/i, "Poki marker"],
-    [/game-cdn\.poki\.com/, "Poki SDK URL"],
-    [/netlib\.poki\.io/, "Poki netlib endpoint"],
-    [/auds\.poki\.io/, "Poki AUDS endpoint"],
-    [/\bPokiSDK\b/, "Poki SDK global"],
-    [/Poki edition/, "Poki edition string"],
-    [/data-ref=["']pilotName/, "free-text pilot name input (read-only with 🎲 roll)"],
-  ],
+  poki: [],
   generic: [
     [/poki/i, "Poki marker"],
     [/game-cdn\.poki\.com/, "Poki SDK URL"],
     [/netlib\.poki\.io/, "Poki netlib endpoint"],
     [/auds\.poki\.io/, "Poki AUDS endpoint"],
     [/\bPokiSDK\b/, "Poki SDK global"],
-    [/crazygames/i, "CrazyGames marker"],
-    [/sdk\.crazygames\.com/, "CrazyGames SDK URL"],
     [/data-ref=["']pilotName/, "free-text pilot name input (read-only with 🎲 roll)"],
   ],
 };
@@ -58,8 +42,8 @@ export const FOREIGN_MARKERS = {
  * Note on pilot names: Poki now permits profanity-filtered free-text pilot
  * names (content & player safety policy updated 2026-09), so the
  * `data-ref="pilotName"` input is a LEGITIMATE Poki surface and must NOT be
- * flagged here. It is instead a foreign marker for crazy/generic (see
- * FOREIGN_MARKERS above) — those editions render the name read-only.
+ * flagged here. It is instead a foreign marker for generic (see
+ * FOREIGN_MARKERS above) — the generic edition renders the name read-only.
  */
 export const PORTAL_FORBIDDEN_MARKERS = [
   [/Message your club/, "club chat input (REQ-31 forbids chat surfaces)"],
@@ -105,7 +89,6 @@ export const REQUIRED_MARKERS = {
     [/auds\.poki\.io/, "Poki AUDS endpoint (leaderboards + share codes)"],
     [/\bPokiSDK\b/, "Poki SDK global"],
   ],
-  crazy: [[/crazygames/i, "CrazyGames SDK marker"]],
   generic: [],
 };
 
