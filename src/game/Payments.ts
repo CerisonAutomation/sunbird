@@ -1,3 +1,4 @@
+import { backendBase } from "./apiBase";
 import { AD_DURATION } from "./constants";
 import { storage } from "./Storage";
 
@@ -6,12 +7,24 @@ export type PurchaseResult = { ok: true; receipt: string } | { ok: false; error:
 
 const RECEIPT_KEY = "sunbird.receipts";
 
+<<<<<<< HEAD
+=======
+// There is no payment provider in this build. Four stubs (`ensureStripeJs`,
+// `stripeConfigured`, `stripeLinkFor`, `consumeStripeReturn`) used to sit here
+// returning null/false as a "we removed Stripe" marker; nothing called them, and
+// a function named `ensureStripeJs` that returns null is an invitation to wire it
+// back up. The economy is coins (`CoinPaymentProvider`) plus server-verified
+// entitlements below. `scripts/audit-zips.mjs` and `scripts/verify-portal.mjs`
+// still fail a portal build that contains the word, so the guard outlives the
+// code it was guarding.
+
+>>>>>>> origin/main
 /**
  * Server-verified entitlements or local coin receipt checks.
  */
 export async function fetchServerEntitlements(deviceId: string): Promise<Sku[]> {
-  const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
-  const base = (env.VITE_LEADERBOARD_URL ?? (env.DEV ? "/mp" : "")).replace(/\/$/, "");
+  // Entitlements live under `/mp` — see `apiBase.ts` for the prefix contract.
+  const base = backendBase("/mp");
   if (!base) return [];
   try {
     const ctrl = new AbortController();

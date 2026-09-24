@@ -7,10 +7,23 @@
  * shipped locale. That shape is ideal for reviewers and coverage tooling, but
  * statically importing it puts ALL locales into the boot bundle (~94 KB).
  *
- * This script projects the barrel into flat per-locale packs
- * (`src/i18n/packs/<locale>.json` — `{ key: text }`), which the runtime
- * lazy-loads one locale at a time. English is generated too: it is the eager
- * fallback pack and the only one imported statically.
+ * This script projects the barrel into **positional** per-locale packs
+ * (`src/i18n/packs/<locale>.json` — an array of texts in `pack-keys.json`
+ * order), which the runtime lazy-loads one locale at a time. English is
+ * generated too: it is the eager fallback pack and the only one imported
+ * statically.
+ *
+ * Why arrays and not `{ key: text }` maps: a portal zip is a single file, so
+ * `import.meta.glob` inlines **all 36** packs into `index.html` no matter how
+ * lazily the runtime asks for them. With maps, every pack repeated the same
+ * 137 key names — 111 KB of the 297 KB payload was key text, i.e. ~0.25 KB of
+ * every key's ~0.75 KB cost. Shipping the key list once (`pack-keys.json`,
+ * ~3 KB) and only the values per locale cuts the i18n payload by about a
+ * third, which is what keeps the remaining untranslated strings affordable
+ * (see `docs/archive/GAME_BACKLOG_2026-09-23.md` §2).
+ *
+ * Position is meaning: a pack whose length differs from `pack-keys.json` is
+ * rejected at load time (`loadPack`) and again by `locales.test.ts`.
  *
  * Regenerate after editing the barrel:
  *
@@ -35,18 +48,29 @@ const codes = [...new Set(Object.values(barrel.barrel).flatMap((e) => Object.key
 
 mkdirSync(outDir, { recursive: true });
 
+// The one canonical order. Sorted so regeneration is stable no matter how the
+// barrel is edited, and so a diff of a pack reads as "this string changed"
+// rather than "everything moved".
+const keys = Object.keys(barrel.barrel).sort();
+const keysPath = join(root, "src/i18n/pack-keys.json");
+writeFileSync(keysPath, JSON.stringify(keys) + "\n");
+
 let written = 0;
 for (const code of codes) {
-  const pack = {};
-  for (const [key, entry] of Object.entries(barrel.barrel)) {
+  const values = keys.map((key) => {
+    const entry = barrel.barrel[key];
     const text = entry.translations[code] ?? entry.translations.en ?? entry.sourceText;
-    if (typeof text === "string" && text.length > 0) pack[key] = text;
-  }
-  const ordered = Object.fromEntries(Object.entries(pack).sort(([a], [b]) => (a < b ? -1 : 1)));
+    // An empty slot means "no text for this locale": the runtime skips it and
+    // falls back to English for that key, exactly as an absent map entry did.
+    return typeof text === "string" ? text : "";
+  });
   const file = join(outDir, `${code}.json`);
-  writeFileSync(file, JSON.stringify(ordered, null, 1) + "\n");
+  writeFileSync(file, JSON.stringify(values) + "\n");
   written += 1;
-  console.log(`  packs/${code}.json — ${Object.keys(ordered).length} keys`);
+  const filled = values.filter((v) => v.length > 0).length;
+  console.log(`  packs/${code}.json — ${filled}/${keys.length} strings`);
 }
 
-console.log(`i18n packs regenerated: ${written} locales from ${Object.keys(barrel.barrel).length} barrel keys`);
+console.log(
+  `i18n packs regenerated: ${written} locales × ${keys.length} barrel keys (positional, + pack-keys.json)`,
+);

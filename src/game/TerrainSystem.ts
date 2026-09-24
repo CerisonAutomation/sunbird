@@ -35,9 +35,10 @@ type Segment = { start: number; len: number; height: number; base: number; baseN
 /** A sunflower bounce pad anchored to the hills. x/y are world coords. */
 type BouncePad = { x: number; y: number };
 
-/** Sunflower pads: spacing along the island, and the radius that triggers a bounce. */
-const PAD_SPACING = 165;
-const PAD_RADIUS = 3.2;
+/** Sunflower pads: tighter spacing = more trampolines = less boring flat.
+ * 165→105 = ~8-9 pads per island vs 5-6, constant decisions. */
+const PAD_SPACING = 105;
+const PAD_RADIUS = 3.4;
 
 type Chunk = {
   id: number;
@@ -83,14 +84,32 @@ export class TerrainSystem {
   private readonly hVal = new Float64Array(HEIGHT_CACHE_SIZE);
   /** Flow calibration: <1 gentler arches, >1 tighter and steeper. */
   private difficulty = 1;
+  /** Quality tier: lite devices get fewer chunks, lower res, less deco */
+  private readonly qualityTier: "lite" | "mid" | "high";
+  private visibleBack = VISIBLE_CHUNKS_BACK;
+  private visibleFwd = VISIBLE_CHUNKS_FWD;
+  private chunkRes = CHUNK_RES;
   /** Sorted crest x-positions — the AI's "where is the next lip" index. */
   private readonly crests: number[] = [];
   private crestScannedTo = -Infinity;
   /** Deterministic sunflower bounce pads, cached per island (like segments). */
   private readonly padCache = new Map<number, BouncePad[]>();
 
-  constructor(seedStr: string) {
+  constructor(seedStr: string, qualityTier: "lite" | "mid" | "high" = "high") {
     this.seedStr = seedStr;
+    this.qualityTier = qualityTier;
+    // Keep for telemetry/debug
+    void this.qualityTier;
+    // Performance: lite tier = 10 fwd vs 14, 2.2 res vs 1.8, less draw calls
+    if (qualityTier === "lite") {
+      this.visibleBack = 3;
+      this.visibleFwd = 10;
+      this.chunkRes = 2.2;
+    } else if (qualityTier === "mid") {
+      this.visibleBack = 4;
+      this.visibleFwd = 12;
+      this.chunkRes = 2.0;
+    }
     const rng = new SeededRandom(seedStr);
     this.seedN = (rng.seed % 99991) + 17;
 
@@ -340,8 +359,8 @@ export class TerrainSystem {
     const center = Math.floor(camX / CHUNK_SIZE);
     if (center !== this.chunkCenter) {
       this.chunkCenter = center;
-      const lo = center - VISIBLE_CHUNKS_BACK;
-      const hi = center + VISIBLE_CHUNKS_FWD;
+      const lo = center - this.visibleBack;
+      const hi = center + this.visibleFwd;
       for (let id = lo; id <= hi; id++) if (!this.chunks.has(id)) this.spawnChunk(id);
       for (const [id, chunk] of this.chunks) {
         if (id < lo || id > hi) {
@@ -521,33 +540,31 @@ export class TerrainSystem {
       let len: number;
       let height: number;
 
-      // Every few segments, lay a deliberate "perfect ramp sequence":
-      // deep valley -> tight kicker -> long glide. Chainable by a good player.
-      // Height-to-length ratio is the real tuning knob: it decides how sharply
-      // a crest curves away, and therefore how steeply you can launch off it.
-      if (sincePerfect >= 3 && remaining > 380 && roll > 0.4) {
+      // Every 2 segments, lay a "perfect ramp sequence": deep valley -> kicker -> landing -> launch.
+      // V2: more frequent (was 3, now 2) and tighter, so you chain launches instead of gliding.
+      if (sincePerfect >= 2 && remaining > 320 && roll > 0.35) {
         sincePerfect = 0;
         const s = speedScale;
-        push(92 * s, 24, base - 2); // deep carving valley
-        push(64 * s, 25, base + 1); //  kicker with a crisp lip
-        push(78 * s, 19, base); //     landing roller
-        push(100 * s, 30, base); //     big launch ramp
-        used += (92 + 64 + 78 + 100) * s;
+        push(72 * s, 22, base - 2); // deep carving valley — hold to carve
+        push(52 * s, 24, base + 1); // kicker with crisp lip — release!
+        push(62 * s, 17, base); // landing roller — quick touch
+        push(84 * s, 28, base); // big launch ramp — again!
+        used += (72 + 52 + 62 + 84) * s;
         continue;
       }
 
-      if (roll < 0.26) {
-        len = rng.range(58, 74) * speedScale; // quick roller
-        height = rng.range(11, 15);
-      } else if (roll < 0.6) {
-        len = rng.range(76, 104) * speedScale; // medium rolling hill
-        height = rng.range(17, 24);
-      } else if (roll < 0.82) {
-        len = rng.range(112, 148) * speedScale; // long smooth slope
-        height = rng.range(24, 32);
+      if (roll < 0.28) {
+        len = rng.range(42, 60) * speedScale; // quick roller — 30% faster rhythm
+        height = rng.range(10, 14);
+      } else if (roll < 0.62) {
+        len = rng.range(60, 85) * speedScale; // medium hill — still snappy
+        height = rng.range(16, 22);
+      } else if (roll < 0.84) {
+        len = rng.range(85, 115) * speedScale; // long slope — not too long
+        height = rng.range(22, 30);
       } else {
-        len = rng.range(150, 190) * speedScale; // occasional huge ramp
-        height = rng.range(34, 44);
+        len = rng.range(110, 145) * speedScale; // huge ramp — rare, rewarding
+        height = rng.range(32, 40);
       }
       if (len > remaining) len = Math.max(62, remaining);
       const drift = rng.range(-2.5, 2.5);
@@ -580,7 +597,7 @@ export class TerrainSystem {
 
   private buildChunkGeo(id: number): THREE.BufferGeometry {
     const x0 = id * CHUNK_SIZE;
-    const n = Math.ceil(CHUNK_SIZE / CHUNK_RES);
+    const n = Math.ceil(CHUNK_SIZE / this.chunkRes);
     const dx = CHUNK_SIZE / n;
     const hz = TERRAIN_HALF_Z;
     const depth = TERRAIN_FACE_DEPTH;
@@ -770,7 +787,8 @@ export class TerrainSystem {
     // Per-chunk personality: density breathes chunk to chunk (sparse plains,
     // crowded groves) instead of a uniform 7-per-chunk carpet.
     const densJitter = 0.55 + hash01(id, this.seedN + 501) * 0.9;
-    const count = Math.round(7 * biome.decoDensity * densJitter);
+    const decoScale = this.qualityTier === "lite" ? 0.6 : this.qualityTier === "mid" ? 0.8 : 1;
+    const count = Math.round(7 * biome.decoDensity * densJitter * decoScale);
     const placements: Placement[] = [];
     // Grove chunks (~1 in 5): props cluster tightly around one anchor point,
     // reading as a copse or an oasis rather than even scatter.
@@ -865,7 +883,7 @@ export class TerrainSystem {
 
     // Second pass: small scatter (rocks / tufts / glints) between the props.
     const scatter: { x: number; y: number; z: number; s: number; rot: number }[] = [];
-    const sCount = Math.round(10 * biome.decoDensity);
+    const sCount = Math.round(10 * biome.decoDensity * decoScale);
     for (let i = 0; i < sCount; i++) {
       const r1 = hash01(id * 197 + i * 11, this.seedN + 401);
       const r2 = hash01(id * 197 + i * 11, this.seedN + 402);

@@ -56,3 +56,64 @@ describe("surprise engine", () => {
     expect(BOP_QUIPS[0]).toBe("BOP!");
   });
 });
+
+describe("first-flight guarantee", () => {
+  it("delivers a surprise inside the first 20 seconds for a new pilot", () => {
+    const e = new SurpriseEngine();
+    e.reset({ warm: true });
+    let fired = 0;
+    let t = 0;
+    // 0.25 s steps, airborne, past the warm distance gate, unlucky-ish rng.
+    while (t < 20 && fired === 0) {
+      t += 0.25;
+      if (e.tick(0.25, 400, true, () => 0.01)) fired += 1;
+    }
+    expect(fired).toBe(1);
+    expect(t).toBeLessThanOrEqual(20);
+  });
+
+  it("still respects a short warm-up so the opening seconds stay readable", () => {
+    const e = new SurpriseEngine();
+    e.reset({ warm: true });
+    for (let i = 0; i < 20; i += 1) expect(e.tick(0.25, 900, true, () => 0)).toBeNull();
+  });
+
+  it("waits for real airspeed: nothing fires below the warm distance gate", () => {
+    const e = new SurpriseEngine();
+    e.reset({ warm: true });
+    for (let i = 0; i < 200; i += 1) expect(e.tick(0.25, 120, true, () => 0)).toBeNull();
+  });
+
+  it("hands the run back to normal rarity after the guaranteed one", () => {
+    const e = new SurpriseEngine();
+    e.reset({ warm: true });
+    let fired = 0;
+    for (let i = 0; i < 400 && fired === 0; i += 1) if (e.tick(0.25, 400, true, () => 0.01)) fired += 1;
+    expect(fired).toBe(1);
+    // After the guarantee is paid, the normal 320 m gate and 45 s cooldown apply:
+    // a short hop past the gate must not fire immediately.
+    let extra = 0;
+    for (let i = 0; i < 40; i += 1) if (e.tick(0.25, 150, true, () => 0)) extra += 1;
+    expect(extra).toBe(0);
+  });
+
+  it("leaves the default contract untouched for returning players", () => {
+    const cold = new SurpriseEngine();
+    cold.reset();
+    const warm = new SurpriseEngine();
+    warm.reset({ warm: true });
+    // Same flight, same rng: the returning player waits out the 18 s warm-up
+    // while the first-timer's fuse is 6 s. That gap IS the feature.
+    let coldAt = -1;
+    let warmAt = -1;
+    for (let i = 1; i <= 120; i += 1) {
+      const t = i * 0.25;
+      if (coldAt < 0 && cold.tick(0.25, 400, true, () => 0.01)) coldAt = t;
+      if (warmAt < 0 && warm.tick(0.25, 400, true, () => 0.01)) warmAt = t;
+    }
+    expect(warmAt).toBeGreaterThan(0);
+    expect(warmAt).toBeLessThanOrEqual(20);
+    expect(coldAt).toBeGreaterThan(warmAt);
+    expect(coldAt).toBeGreaterThanOrEqual(18);
+  });
+});

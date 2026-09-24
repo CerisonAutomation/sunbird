@@ -13,6 +13,7 @@ import { dateSeed } from "./math";
 import { durableSetItem } from "./resilience/durableSet";
 import { openPayload, sealPayload } from "./resilience/crc";
 import { TRACK_NAMES } from "./Music";
+import { COIN_MULTIPLIER_UPGRADES } from "./Economy";
 import { defaultRival, rankSeasonId, ratingDelta, RIVAL_BASE_RATING, seasonReward, softResetRating, streakBonus, type RivalMatch, type RivalState } from "./pvp";
 import { seasonId } from "./season";
 import { emptyTournamentState, type TournamentState } from "./Tournaments";
@@ -48,6 +49,18 @@ export type Settings = {
   quality: Quality;
   /** Distance unit preference: "km" (default) or "mi". */
   distUnit: "km" | "mi";
+  /**
+   * Let the game open the Hangar by itself once per session, the first time a
+   * flight leaves the player able to afford something they do not own.
+   *
+   * On by default because the shop is where progression is felt, and a shop
+   * nobody opens is a feature nobody has. It is a *setting* because an
+   * auto-navigation the player cannot turn off is exactly the kind of thing
+   * that breaks flow — and this game's whole contract is one button and no
+   * interruptions. Fires at most once per session, only on the main menu (never
+   * over a results screen or mid-flight), and says why when it happens.
+   */
+  autoShop: boolean;
 };
 
 export type LifetimeStats = {
@@ -94,6 +107,13 @@ export type SaveState = {
   /** Collection ids whose completion bonus has been paid. */
   claimedCollections: string[];
   redeemedCodes: string[];
+  /**
+   * Calendar day (`YYYY-MM-DD`) of the very first session on this device, ""
+   * until it is stamped. The retention cohort (new / D1 / D2-6 / D7+) is
+   * derived from it, so it is written once and never rewritten - a reset of
+   * progress clears it, which is correct: that device really is new again.
+   */
+  firstPlayed: string;
   runsPlayed: number;
   lifetime: LifetimeStats;
   achievements: string[];
@@ -106,6 +126,14 @@ export type SaveState = {
   tutorialRuns: number;
   /** One-time interactive first-flight coach completed (dive/launch/soar). */
   firstFlightDone: boolean;
+  /** Progressive onboarding tips that have been seen/dismissed (never shown again). */
+  onboardingSeen: string[];
+  /** Flags for contextual onboarding — when player actually opened these */
+  seenShop: boolean;
+  seenPvp: boolean;
+  seenPve: boolean;
+  seenLeaderboards: boolean;
+  seenChallenges: boolean;
   /** rolling flow-calibration estimate */
   skill: number;
   skillSamples: number;
@@ -185,6 +213,7 @@ const DEFAULT_SETTINGS: Settings = {
   bigText: false,
   quality: "auto",
   distUnit: "km",
+  autoShop: true,
 };
 
 function makeDeviceId(): string {
@@ -224,6 +253,7 @@ function defaults(): SaveState {
     streak: { last: "", days: 0, claimedDate: "" },
     claimedCollections: [],
     redeemedCodes: [],
+    firstPlayed: "",
     runsPlayed: 0,
     lifetime: { distance: 0, coins: 0, zeniths: 0, ghostBeats: 0, sunflowers: 0 },
     achievements: [],
@@ -235,6 +265,12 @@ function defaults(): SaveState {
     biomesSeen: [],
     tutorialRuns: 0,
     firstFlightDone: false,
+    onboardingSeen: [],
+    seenShop: false,
+    seenPvp: false,
+    seenPve: false,
+    seenLeaderboards: false,
+    seenChallenges: false,
     skill: 0.25,
     skillSamples: 0,
     bestAltitude: 0,
@@ -336,6 +372,10 @@ export class SaveData {
   /** Optional platform SDK adapter for cloud save syncing (e.g. CrazyGames data.setItem). */
   platformAdapter: { saveData?: (key: string, data: string) => Promise<void> } | null = null;
   private lastPersistErrorAt = 0;
+  /** Timed coin multiplier (the `luckycoin` boost) — session-only on purpose:
+   *  a consumable bought for one flight must not survive into the next. */
+  private coinBonus = 1;
+  private coinBonusUntil = 0;
 
   constructor() {
     this.state = this.load();
@@ -422,6 +462,9 @@ export class SaveData {
           bigText: Boolean(p.settings?.bigText),
           quality: quality === "high" || quality === "low" ? quality : "auto",
           distUnit: p.settings?.distUnit === "mi" ? "mi" : "km",
+          // Undefined (a save from before this existed) means on, matching
+          // DEFAULT_SETTINGS — an explicit `false` is respected.
+          autoShop: p.settings?.autoShop === undefined ? true : Boolean(p.settings.autoShop),
         },
         quests:
           p.quests && typeof p.quests.date === "string"
@@ -432,6 +475,7 @@ export class SaveData {
             ? { last: p.streak.last, days: num(p.streak.days), claimedDate: String(p.streak.claimedDate ?? "") }
             : d.streak,
         redeemedCodes: strArr(p.redeemedCodes),
+        firstPlayed: typeof p.firstPlayed === "string" ? p.firstPlayed : "",
         runsPlayed: num(p.runsPlayed),
         lifetime: {
           distance: num(p.lifetime?.distance),
@@ -458,6 +502,17 @@ export class SaveData {
         claimedCollections: strArr(p.claimedCollections),
         tutorialRuns: num(p.tutorialRuns),
         firstFlightDone: Boolean(p.firstFlightDone),
+        onboardingSeen: strArr(p.onboardingSeen),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        seenShop: Boolean((p as any).seenShop),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        seenPvp: Boolean((p as any).seenPvp),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        seenPve: Boolean((p as any).seenPve),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        seenLeaderboards: Boolean((p as any).seenLeaderboards),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        seenChallenges: Boolean((p as any).seenChallenges),
         skill: p.skill === undefined ? 0.25 : num(p.skill),
         skillSamples: num(p.skillSamples),
         bestAltitude: num(p.bestAltitude),
@@ -873,6 +928,26 @@ export class SaveData {
     return true;
   }
 
+  /** Onboarding: mark a tip as seen so it never shows again. */
+  markOnboardingSeen(id: string): boolean {
+    if (!this.state.onboardingSeen) this.state.onboardingSeen = [];
+    if (this.state.onboardingSeen.includes(id)) return false;
+    this.state.onboardingSeen.push(id);
+    this.persist();
+    return true;
+  }
+
+  /** Onboarding: mark a contextual screen as seen (shop, pvp, etc). */
+  markSeen(area: "shop" | "pvp" | "pve" | "leaderboards" | "challenges"): void {
+    const key = `seen${area.charAt(0).toUpperCase()}${area.slice(1)}` as keyof SaveState;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (!(this.state as any)[key]) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (this.state as any)[key] = true;
+      this.persist();
+    }
+  }
+
   addGhostBeat(): void {
     this.state.lifetime.ghostBeats += 1;
     this.persist();
@@ -922,10 +997,53 @@ export class SaveData {
     return true;
   }
 
-  addCoins(amount: number): void {
-    this.state.wallet += amount;
-    this.state.totalCoins += amount;
+  /**
+   * Award coins. Every coin in the game arrives here, which is what makes it
+   * the right place for multipliers: a bonus applied at one of the ~20 award
+   * sites would be missed by the other nineteen.
+   *
+   * Two independent multipliers stack multiplicatively:
+   *   • permanent — owning `goldenfeather` (see COIN_MULTIPLIER_UPGRADES)
+   *   • timed — `luckycoin`, armed for a run by `setCoinBonus()`
+   * The awarded amount is rounded UP so a 1-coin pickup is never silently
+   * rounded back down to 1 by a 1.1× bonus (a bonus that does nothing on small
+   * awards reads as a broken purchase).
+   */
+  /**
+   * Stamps the first-session day the first time it is asked, then leaves it
+   * alone forever. @returns true when this call is the one that stamped it, so
+   * the caller can tell a brand-new player from a returning one without
+   * reading the field back.
+   */
+  noteFirstPlayed(date: string): boolean {
+    if (this.state.firstPlayed) return false;
+    this.state.firstPlayed = date;
     this.persist();
+    return true;
+  }
+
+  addCoins(amount: number): void {
+    const awarded = Math.max(0, Math.ceil(amount * this.coinMultiplier()));
+    this.state.wallet += awarded;
+    this.state.totalCoins += awarded;
+    this.persist();
+  }
+
+  /** Arm a timed coin multiplier (the `luckycoin` boost). Re-arming extends. */
+  setCoinBonus(multiplier: number, seconds: number): void {
+    this.coinBonus = Math.max(1, multiplier);
+    this.coinBonusUntil = Date.now() + Math.max(0, seconds) * 1000;
+  }
+
+  /** Combined multiplier in effect right now (>= 1). */
+  coinMultiplier(): number {
+    let mult = 1;
+    for (const [id, value] of Object.entries(COIN_MULTIPLIER_UPGRADES)) {
+      if (this.state.ownedUpgrades.includes(id)) mult *= value;
+    }
+    if (this.coinBonus > 1 && Date.now() < this.coinBonusUntil) mult *= this.coinBonus;
+    else this.coinBonus = 1;
+    return mult;
   }
 
   ownSkin(id: string): void {

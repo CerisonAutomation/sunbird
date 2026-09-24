@@ -12,6 +12,7 @@ export const PLAY_DESTINATIONS: MenuDestination[] = [
   { action: "play-daily", icon: "daily", title: "Long Light", detail: "Today's shared course · daily challenge" },
   { action: "open-live", icon: "online", title: "PvP", detail: "Online races, rooms & options" },
   { action: "open-practice", icon: "versus", title: "AI PvP", detail: "Offline race vs the AI flock" },
+  { action: "open-board", icon: "board", title: "Leaderboards", detail: "All-time · weekly · today · you" },
   { action: "mode-select", icon: "compass", title: "Solo modes", detail: "Time Trial · Skyline · Coin Rush" },
   { action: "start-endless", icon: "endless", title: "Endless", detail: "No clock · growing challenge" },
 ];

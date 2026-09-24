@@ -24,7 +24,7 @@ Sunbird is a complete HTML5 arcade game: 8 flight modes, 40-pilot races, daily/w
 | Bundler / style | Vite 7 + Tailwind CSS v4 |
 | Physics | Fixed-step deterministic client sim (`Bird.step()`, bit-exact tested) |
 | Audio | Zero-asset procedural WebAudio synth (SFX + adaptive score, portal-safe) |
-| Payments | Stripe Payment Links on web; portal builds use coin-only VIP progression and optional host rewarded ads |
+| Payments | Coin economy in every build — the client loads no payment processor (`@stripe/stripe-js` is not a dependency; `Payments.ts` returns `null` from every processor entry point). `backend/` ships an optional server-authoritative Stripe webhook so a deployment that sells SKUs can grant them ([DEPLOY.md §5](./DEPLOY.md)) |
 | Multiplayer | Self-hosted Rust room server ([rust/](./rust/)) — lobby, seats, synchronized starts, server-authoritative finish order and a movement envelope that rejects impossible client positions |
 | Leaderboard | Vercel Functions ([api/](./api/)) + Upstash Redis, on-device fallback ([LEADERBOARD_API.md](./LEADERBOARD_API.md)) |
 | Ghosts | Async PvP via ghost publish/chase ([src/game/GhostNet.ts](./src/game/GhostNet.ts)) |
@@ -48,10 +48,7 @@ Copy `.env.example` → `.env.local`. All variables are optional — the game ru
 
 | Variable | Description |
 |---|---|
-| `VITE_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key for real checkout |
-| `VITE_STRIPE_GOLD_LINK` | Payment Link URL for Sunbird Gold ($2.99 lifetime) |
-| `VITE_STRIPE_VIP_LINK` | Payment Link URL for Sunbird VIP ($1.99/mo) |
-| `VITE_STRIPE_STARTER_LINK` | Payment Link URL for First Flight Pack ($0.99 one-time) |
+| `VITE_STRIPE_PUBLISHABLE_KEY`, `VITE_STRIPE_GOLD_LINK`, `VITE_STRIPE_VIP_LINK`, `VITE_STRIPE_STARTER_LINK` | **Reserved and unused by the client.** Every build script blanks them and no code reads a processor origin; `scripts/verify-portal.mjs` fails a zip that contains `js.stripe.com`, `api.stripe.com`, `hooks.stripe.com`, `upstash` or a `pk_live_`/`pk_test_` key. Selling SKUs is a server-side path only ([DEPLOY.md §5](./DEPLOY.md)) |
 | `VITE_PORTAL_TARGET` | `none` (default) \| `poki` \| `crazy` \| `generic` |
 | `VITE_LEADERBOARD_URL` | HTTP base URL for the online leaderboard |
 | `VITE_MULTIPLAYER_URL` | WebSocket URL for realtime multiplayer rooms |
@@ -89,7 +86,7 @@ Copy `.env.example` → `.env.local`. All variables are optional — the game ru
 
 ## Testing
 
-For the flight/performance changes and measurement limits, see [Flight & performance audit](docs/FLIGHT_PERFORMANCE_AUDIT.md).
+For the flight/performance changes and measurement limits, see [Flight & performance audit](docs/audits/FLIGHT_PERFORMANCE_AUDIT.md).
 
 - **Unit** — `npm test`: pure-function coverage across PvP rating, challenges, mastery, economy, ghost codecs, protocol parsing, and bit-exact `Bird.step()` determinism on seeded terrain.
 - **Stability** — the suite is loop-safe: 100 consecutive runs green with zero flakes (each run is independent; no shared state, no wall-clock dependence — season/week tests are timezone-independent).
@@ -101,7 +98,7 @@ For the flight/performance changes and measurement limits, see [Flight & perform
 
 | Target | Upload to | Ads | Payments |
 |---|---|---|---|
-| `dist/` (default) | Vercel / self-host | None (own interstitial) | Stripe enabled |
+| `dist/` (default) | Vercel / self-host | None (own interstitial) | Coins only — no processor wired |
 | `sunbird-poki.zip` | Poki Inspector | Poki commercial + rewarded | Stripped |
 | `sunbird-crazy.zip` | CrazyGames portal | CrazyGames midgame + rewarded (+ banner slot) | Stripped |
 | `sunbird-generic.zip` | GameDistribution, Yandex, itch.io, Newgrounds, GameMonetize, Lagged, Coolmath, Kongregate, Armor, GamePix, Famobi, SoftGames | None (host injects) | Stripped |
@@ -131,7 +128,7 @@ real clients against a real server.
 src/            React shell (App, main) + game/ (engine, HUD, systems)
 rust/           Cargo workspace: sunbird-protocol + sunbird-server (Axum WS)
 api/            Vercel leaderboard functions (+ _lib)
-backend/        Optional Cloudflare Workers: ghosts, telemetry, Stripe entitlements
+backend/        Optional Cloudflare Workers: ghosts, telemetry, Stripe webhook entitlements (server-side only)
 server/social/  Optional PGlite social layer (friends, squads, feed)
 scripts/        verify-prod, mp-smoke, physcheck, portal packaging, icon gen
 public/         PWA manifest, service worker, icons, self-hosted fonts
@@ -139,15 +136,23 @@ public/         PWA manifest, service worker, icons, self-hosted fonts
 
 ## Docs index
 
-- [docs/poki/](./docs/poki/) — **the Poki developer guide, extracted into 113 numbered rules** plus the machine-readable `requirements.json`. `pnpm poki:audit` executes them and regenerates [COMPLIANCE.md](./docs/poki/COMPLIANCE.md); [REBUILD_REPORT.md](./docs/poki/REBUILD_REPORT.md) records what the extraction changed in the game and the evidence for each change.
+**Start at [`docs/README.md`](./docs/README.md)** — the canonical map: one doc per
+topic, generated artefacts marked, snapshots dated and statused. `pnpm docs:audit`
+fails the build on a broken link, an orphan doc, or a snapshot without a status.
+
+- [docs/README.md](./docs/README.md) — "I want to…" navigation, canonical vs generated vs snapshot
+- [docs/HANDOFF.md](./docs/HANDOFF.md) — current state, standing decisions, traps, next queue
+- [docs/BENCHMARKS.md](./docs/BENCHMARKS.md) — Sunbird vs the best games in the class, mechanic by mechanic
 - [ROADMAP.md](./ROADMAP.md) — what works, what's wired-but-undeployed, what's aspirational (the anti-overclaim file)
-- [PORTAL_PUBLISHING.md](./PORTAL_PUBLISHING.md) — portal compliance matrix + QA checklist
-- [LEADERBOARD_API.md](./LEADERBOARD_API.md) — leaderboard + ghost API
+- [docs/poki/](./docs/poki/) — **the Poki developer guide, extracted into 131 numbered rules** plus the machine-readable `requirements.json`. `pnpm poki:audit` executes them and regenerates [COMPLIANCE.md](./docs/poki/COMPLIANCE.md); [REBUILD_REPORT.md](./docs/poki/REBUILD_REPORT.md) records what the extraction changed and the evidence for each change; [CSP_REQUEST.md](./docs/poki/CSP_REQUEST.md) is the paste-ready CSP submission
+- [PORTAL_PUBLISHING.md](./PORTAL_PUBLISHING.md) — the four build targets + monetization matrix
+- [SUBMISSION_CHECKLIST.md](./SUBMISSION_CHECKLIST.md) — the human walkthrough of a portal submission
+- [LEADERBOARD_API.md](./LEADERBOARD_API.md) — leaderboard + realtime wire contract
 - [SOCIAL_API.md](./SOCIAL_API.md) — social layer API
 - [DEPLOY.md](./DEPLOY.md) — hosting, env, Stripe webhook setup
-- [RUST_MIGRATION_PLAN.md](./RUST_MIGRATION_PLAN.md) — phased backend plan + rollback
-- [Menu UX audit](./docs/MENU_UX_AUDIT.md) — prioritized findings, fixes, browser coverage and remaining validation boundaries.
-- [docs/archive/](./docs/archive/) — superseded prompts + dated audit snapshots (history, not guidance)
+- [LEGAL_SECURITY.md](./LEGAL_SECURITY.md) — legal + security evidence register
+- [docs/audits/](./docs/audits/) — dated evidence snapshots, each with a status line
+- [docs/archive/](./docs/archive/) — superseded docs (history, not guidance)
 
 ## Deployment
 
@@ -176,7 +181,7 @@ and Squad services. First install the social service dependency with
 `node server/social/social-server.mjs` on port 8788 alongside Vite. The dev proxy
 uses `/social`; deployed builds need `VITE_SOCIAL_URL` and a reachable service.
 
-See [the consolidation audit](docs/CONSOLIDATION_AUDIT.md) for findings, tests,
+See [the consolidation audit](docs/audits/CONSOLIDATION_AUDIT.md) for findings, tests,
 canonical modules and **mandatory Squad credential migration/deployment limits**.
 The reference Node race server is for preview/protocol testing, not a replacement
 for the production Rust service.

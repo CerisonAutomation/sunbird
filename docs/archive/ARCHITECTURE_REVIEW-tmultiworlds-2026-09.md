@@ -1,5 +1,7 @@
 # Architecture Review — "TMULTIWORLDS" proposal vs. what Sunbird actually is
 
+> **Status:** archived — review of an external "tmultiworlds" Bevy/replicon proposal against this repository (2026-09). The proposal was not adopted; the multiplayer architecture that shipped is `rust/` + [`LEADERBOARD_API.md`](../../LEADERBOARD_API.md).
+
 A long design pitch for a **new** project (`tmultiworlds/`: Bevy + bevy_replicon
 + renet, 3D survival, 40 players, portals, fog-of-war) was put next to this
 repository with the instruction *"compare with our set up and upgrade if

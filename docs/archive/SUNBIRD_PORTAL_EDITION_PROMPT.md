@@ -1,4 +1,6 @@
 # DEPRECATED — use TINY_WINGS_SUCCESSOR_PROMPT.md v9 (SUNBIRD). SKYBOUND name is stale.
+> **Status:** archived — deprecated by its own header and written for the wrong game name (SKYBOUND). Superseded by `TINY_WINGS_SUCCESSOR_PROMPT.md` v9, itself archived.
+
 # SKYBOUND — Portal-Native Arcade Glider: Master Build Spec (v7, frozen)
 
 > v7: PvE + 1P god-mode chapter, 3D direction bible, typo kill. PvP is no

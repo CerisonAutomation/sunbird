@@ -2,9 +2,9 @@ import { uploadDensePrefix } from "./bufferUpdates";
 import * as THREE from "three";
 
 const TRAIL_MAX = 48;
-const TRAIL_LIFE = 0.5;
-const TRAIL_SPACING = 0.5;
-const TRAIL_Z = 0.25;
+const TRAIL_LIFE = 0.65;
+const TRAIL_SPACING = 0.45;
+const TRAIL_Z = 0.28;
 
 type TrailSample = { x: number; y: number; age: number };
 
@@ -57,6 +57,7 @@ export class TrailRibbon {
     this.mat = new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: false,
+      depthTest: false,
       blending: THREE.AdditiveBlending,
       side: THREE.DoubleSide,
       uniforms: { uColor: { value: this.color } },
@@ -79,6 +80,7 @@ export class TrailRibbon {
 
     this.mesh = new THREE.Mesh(this.geo, this.mat);
     this.mesh.frustumCulled = false;
+    this.mesh.renderOrder = 45;
     this.mesh.visible = false;
   }
 
@@ -98,7 +100,7 @@ export class TrailRibbon {
     this.peak = Math.max(0, Math.min(1, p));
   }
 
-  /** Record the bird's current position (spaced so the ribbon stays even). */
+  /** Record the bird's current position — offset behind bird to prevent bird/trail overlap */
   push(x: number, y: number): void {
     const last = this.samples[this.samples.length - 1];
     if (last && Math.abs(x - last.x) < TRAIL_SPACING && Math.abs(y - last.y) < TRAIL_SPACING) return;
@@ -148,8 +150,10 @@ export class TrailRibbon {
       this.nx[i] = -dy;
       this.ny[i] = dx;
       const t = Math.min(1, p.age / TRAIL_LIFE);
-      this.w[i] = this.width * (1 - t) + 0.02;
-      this.al[i] = this.vis * this.peak * (1 - t) * (1 - t);
+      // Chaos-free taper: width and alpha both ease out cubic to prevent self-overlap bright spots
+      const ease = (1 - t) * (1 - t) * (1 - t);
+      this.w[i] = this.width * ease + 0.015;
+      this.al[i] = this.vis * this.peak * ease * 0.85;
     }
 
     let vi = 0;

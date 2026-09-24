@@ -151,6 +151,13 @@ export class MassRace {
   /** Alternates full/dead-reckon frames for far-behind rivals (tiered fidelity). */
   private tierTick = 0;
 
+  /**
+   * Whether trailing rivals receive the catch-up push (see `step`). On for
+   * casual fields, off wherever a result is rated or compared against other
+   * people. Public because the UI has to be able to say which one is true.
+   */
+  private packBalancing = true;
+
   constructor() {
     this.bodyMesh = new THREE.InstancedMesh(this.bodyGeo, this.bodyMat, 1);
     this.bellyMesh = new THREE.InstancedMesh(this.bellyGeo, this.bellyMat, 1);
@@ -356,6 +363,16 @@ export class MassRace {
     return n;
   }
 
+  /** Enables or disables the trailing-rival catch-up push. */
+  setPackBalancing(on: boolean): void {
+    this.packBalancing = on;
+  }
+
+  /** True while trailing rivals are being helped — the UI discloses this. */
+  get packBalancingOn(): boolean {
+    return this.packBalancing;
+  }
+
   setFieldSkill(mult: number): void {
     for (const r of this.rivals) {
       r.skill = Math.min(1, Math.max(0.1, r.skill * mult));
@@ -509,8 +526,16 @@ export class MassRace {
         if ((r.archetype === "pacer" || lag > 150) && lag > 75 && lag < 450) {
           r.bird.vx = Math.min(185, r.bird.vx + dt * (lag > 220 ? 4.5 : 2.2));
         }
-        // Rubber-band: any rival 350+ m behind gets a hidden boost proportional to lag
-        if (lag > 350 && lag < 800) {
+        // Pack balancing (the honest name for rubber-banding): a rival 350+ m
+        // behind gets a catch-up push proportional to the gap, so a casual field
+        // stays a *field* instead of a strung-out line nobody can see.
+        //
+        // Casual only. `setPackBalancing(false)` turns it off for ranked races,
+        // duels and live rooms, where a hidden assist would be deciding a result
+        // somebody is being rated on - and the lobby says so out loud either way
+        // (see `renderRaceLobby`). An assist the player was never told about is
+        // not a difficulty curve, it is a lie with a velocity vector.
+        if (this.packBalancing && lag > 350 && lag < 800) {
           const boost = dt * clamp((lag - 350) / 150, 0, 1) * 3.5;
           r.bird.vx = Math.min(195, r.bird.vx + boost);
         }

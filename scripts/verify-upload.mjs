@@ -141,7 +141,7 @@ if (existsSync(UPLOAD)) {
   // The same anatomy `package-portal.mjs`'s ENTRY_DIRS produces, plus the
   // manifest this script reads. `animated/` is deliberately absent from both:
   // the promo art lives in `promo/` and must not ride along in the upload.
-  const allowedTop = new Set(["index.html", "icons", "fonts", "i18n", "upload-manifest.json"]);
+  const allowedTop = new Set(["index.html", "icons", "fonts", "upload-manifest.json"]);
   const top = readdirSync(UPLOAD);
   const unexpected = top.filter((e) => !allowedTop.has(e));
   if (unexpected.length) bad("ROOT-04", `${UPLOAD}/ has unexpected entries: ${unexpected.join(", ")}`);

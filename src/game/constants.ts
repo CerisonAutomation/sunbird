@@ -5,43 +5,49 @@ export const PHYS_DT = 1 / PHYS_HZ;
  * Height comes from momentum, never from "flapping upward".
  *   hold  -> heavier gravity + strong ground suction (carve the valley)
  *   release -> light gravity + lift from speed (ride the arc)
+ *
+ * TUNED 2026-09-24 v2 for ZERO BOREDOM:
+ * - Glide gravity UP (18→24) so long hangs sink fast
+ * - Lift MAX down (0.46→0.35) → lower ceiling, hill-to-hill not sky-to-sky
+ * - Air drag UP (0.0003→0.00062) → speed decays in long glides, must dive
+ * - Ground friction still low → never stuck uphill, but air is punishing if idle
+ * - Sunflower + landing keep UP → momentum lives when you play well
  */
-export const GRAVITY_GLIDE = 18;
-export const GRAVITY_DIVE = 96;
-/** Gravity along the slope while carving the ground. */
-export const GROUND_G_GLIDE = 30;
-export const GROUND_G_DIVE = 88;
-/** Quadratic air drag (per unit speed²) — low, so momentum lives a long time. */
-export const AIR_DRAG_GLIDE = 0.00042;
-export const AIR_DRAG_DIVE = 0.00016;
-/** Rolling resistance while on the ground. */
-export const GROUND_FRICTION = 0.05;
-export const GROUND_FRICTION_DIVE = 0.018;
+export const GRAVITY_GLIDE = 24;
+export const GRAVITY_DIVE = 98;
+/** Gravity along the slope while carving the ground — low so uphill is not a trap. */
+export const GROUND_G_GLIDE = 18;
+export const GROUND_G_DIVE = 58;
+/** Quadratic air drag — higher = long passive glides bleed speed and sink. */
+export const AIR_DRAG_GLIDE = 0.00062;
+export const AIR_DRAG_DIVE = 0.00014;
+/** Rolling resistance while on the ground — low so you roll out of valleys. */
+export const GROUND_FRICTION = 0.024;
+export const GROUND_FRICTION_DIVE = 0.008;
 /** Speed-borne lift while gliding: cancels up to this fraction of gravity. */
-export const GLIDE_LIFT_MAX = 0.55;
-export const GLIDE_LIFT_SPEED = 62;
+export const GLIDE_LIFT_MAX = 0.35;
+export const GLIDE_LIFT_SPEED = 52;
 /** Downforce that keeps a diving bird glued through convex crests. */
-export const STICK_ACCEL_DIVE = 190;
-export const STICK_ACCEL_GLIDE = 13;
+export const STICK_ACCEL_DIVE = 210;
+export const STICK_ACCEL_GLIDE = 18;
 
-export const MAX_SPEED = 108;
-export const MAX_SPEED_FEVER = 128;
+export const MAX_SPEED = 118;
+export const MAX_SPEED_FEVER = 142;
 export const BIRD_RADIUS = 0.9;
-export const MIN_KEEP_SPEED = 6;
+export const MIN_KEEP_SPEED = 10;
 
 /* Sunflower bounce pads — land on a bloom and spring straight back into the
- * sky. Gentler than the balloon (an airborne rare), so they reward line
- * choices without trivialising the ramps. */
-export const SUNFLOWER_VY = 30;
-export const SUNFLOWER_VX = 30;
+ * sky. Bumped for more fun: a good line should feel like a trampoline, not a speed bump. */
+export const SUNFLOWER_VY = 36;
+export const SUNFLOWER_VX = 36;
 
 /* Landing quality: how much speed survives touching down.
  * alignment = 1 - |v·n| / |v|   (1 = perfectly tangential kiss) */
 export const LAND_PERFECT = 0.985;
 export const LAND_GOOD = 0.94;
-export const LAND_PERFECT_GAIN = 1.03;
-export const LAND_GOOD_KEEP = 1.0;
-export const LAND_BAD_MIN_KEEP = 0.55;
+export const LAND_PERFECT_GAIN = 1.04;
+export const LAND_GOOD_KEEP = 1.02;
+export const LAND_BAD_MIN_KEEP = 0.7;
 export const LAND_FEATHER_FLOOR = 0.88;
 
 /* ---------------- launch rating ---------------- */
@@ -57,6 +63,7 @@ export const LAUNCH_COMBO_STEP = 0.012;
 export const LAUNCH_COMBO_MAX = 0.09;
 export const COMBO_GRACE = 9;
 
+<<<<<<< HEAD
 /* ---------------- altitude zones (world units above terrain) ---------------- */
 export const ALT_SKY = 30;
 export const ALT_CLOUDS = 72;
@@ -91,12 +98,28 @@ export const ALT_CEILING_FADE = 50;
  */
 export const ZENITH_THERMAL_VY = 110;
 export const ALT_STRATO = 230;
+=======
+/* ---------------- altitude zones (world units above terrain) ----------------
+ * Lowered again v2: sky 26, clouds 52, high 88, strato 140 — player stays in
+ * readable terrain, not 200m hangtime. High rewards still exist but require
+ * perfect launches + thermals, not just holding.
+ */
+export const ALT_SKY = 26;
+export const ALT_CLOUDS = 52;
+export const ALT_HIGH = 88;
+export const ALT_STRATO = 140;
+>>>>>>> origin/main
 
-export const ISLAND_PERIOD = 1100;
-export const DROP_START = 710;
-export const DROP_BLEND_START = 630;
-export const RAMP_START = 845;
-export const GAP_START = 928;
+/* ---------------- island rhythm — TIGHTER = LESS BOREDOM ----------------
+ * ISLAND_PERIOD 1100→920: islands every 920 units, not 1100 → 20% more hills
+ * GAP_START 928→760: ocean starts earlier but is SHORTER (920-760=160 vs 172)
+ * DROP/RAMP earlier so you launch sooner, less flat cruising.
+ */
+export const ISLAND_PERIOD = 920;
+export const DROP_START = 600;
+export const DROP_BLEND_START = 520;
+export const RAMP_START = 700;
+export const GAP_START = 760;
 export const OCEAN_FLOOR = -18;
 export const WATER_Y = 0.4;
 
@@ -192,24 +215,13 @@ export const ZENITH_DURATION = 0.55;
 export const PICKUP_SUN_TIME = 6;
 export const MAGNET_TIME = 12;
 export const BOOST_TIME = 1.6;
-export const BOOST_EXTRA_SPEED = 42;
-/** Manual double-tap burst: short, readable, and capped so it cannot replace
- * the hill timing loop. */
-export const MANUAL_BOOST_TIME = 1.1;
-export const MANUAL_BOOST_SPEED = 30;
-export const MANUAL_BOOST_COOLDOWN = 3.5;
-export const STALL_SPEED = 8;
+export const BOOST_EXTRA_SPEED = 52;
+/** Manual double-tap burst: bumped so it actually saves a bad uphill, not just decorates it. */
+export const MANUAL_BOOST_TIME = 1.35;
+export const MANUAL_BOOST_SPEED = 38;
+export const MANUAL_BOOST_COOLDOWN = 2.8;
+export const STALL_SPEED = 6.5;
 export const HEADSTART_DISTANCE = 300;
-
-/* ---------- Stripe (see .env.example) ---------- */
-// import.meta.env only exists under Vite — plain Node runners (tsx harnesses
-// like scripts/physcheck.ts) import this module too, so read it defensively.
-const ENV: Record<string, string | undefined> = (import.meta as unknown as { env?: Record<string, string> }).env ?? {};
-export const STRIPE_PUBLISHABLE_KEY = ENV.VITE_STRIPE_PUBLISHABLE_KEY ?? "";
-export const STRIPE_GOLD_LINK = ENV.VITE_STRIPE_GOLD_LINK ?? "";
-export const STRIPE_VIP_LINK = ENV.VITE_STRIPE_VIP_LINK ?? "";
-export const STRIPE_STARTER_LINK = ENV.VITE_STRIPE_STARTER_LINK ?? "";
-export const STRIPE_RETURN_KEY = "sunbird_stripe";
 
 export const VIP_DAYS = 30;
 export const ADS_PER_DAY = 4;

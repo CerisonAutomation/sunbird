@@ -35,9 +35,133 @@
   --sky: #5eb7ea;
   --paper: #fff4e4;
   --shadow: rgba(42, 28, 40, 0.18);
-  /* Display face for titles/numerals/buttons; Atkinson Hyperlegible for readable body text. */
-  --display: Fredoka, "Trebuchet MS", "Segoe UI", sans-serif;
-  --body: "Atkinson Hyperlegible", "Trebuchet MS", "Segoe UI", sans-serif;
+
+  /* ── Palette core ─────────────────────────────────────────────────────────
+     1,938 hex declarations across 939 unique colours is not a palette, it is an
+     accident per rule (docs/audits/BRUTAL_REPO_AUDIT_2026-09-24.md §4). These
+     tokens are the 17 most-repeated colours — 21 % of every declaration — and
+     each is defined as *exactly* the hex it replaces, so adopting them changes
+     no pixel. What it changes: the colour has one name, one place to edit, and
+     css-tokens.test.ts fails if a raw copy creeps back or a var() is undefined.
+     --bark is the dark parchment ink that once painted the flight-HUD distance
+     readout at 0.8:1 against the dusk sky; it must never be used on a
+     transparent surface. On sky, the only ink is --text-on-sky. */
+  --pure-white: #fff;
+  --bark: #2c1f14;
+  --clay: #8a6a62;
+  --coin-gold: #ffd76a;
+  --brass: #d4aa44;
+  --amber: #ffb020;
+  --ivory: #fffef8;
+  --khaki: #9a7b4e;
+  --tan: #a07860;
+  --umber: #5a3a00;
+  --butter: #ffecaa;
+  --sand: #d4c090;
+  --bronze: #c98a10;
+  --cocoa: #71574c;
+  --bronze-deep: #7a5c30;
+  /* The flight HUD floats on Sky.ts zeniths with nothing opaque behind it. */
+  --text-on-sky: #fff;
+  --halo-on-sky: 14, 10, 26;
+
+  /* ---- 36-language font coverage (zero bytes shipped) -------------------
+     Both webfonts are LATIN SUBSETS. Every non-Latin locale the game ships —
+     Arabic, Hebrew, Greek, Cyrillic, Devanagari, Bengali, Thai, Chinese,
+     Japanese, Korean — would otherwise fall back to the browser's default
+     serif/sans for those glyphs, which on a fair share of devices means tofu
+     boxes (□□□) or a jarring serif mismatch mid-button.
+
+     Bundling real CJK/Arabic/Devanagari webfonts is not an option: a single
+     CJK face is 2–8 MB, portals gate the whole build at 8 MB, and Poki's
+     external-resources policy forbids loading them from a CDN. So instead the
+     stacks below name the *system* faces that actually exist per platform —
+     a font list costs nothing and the browser picks per character, so the
+     first family in the list that owns a glyph renders it.
+
+     Order within each stack: Apple → Windows → Android/ChromeOS → generic,
+     which is the order those platforms are likely to have the family. */
+  --font-cyrillic: "Segoe UI", "Noto Sans", "DejaVu Sans", "Arial Unicode MS", sans-serif;
+  --font-greek: "Segoe UI", "Noto Sans", "Arial Unicode MS", sans-serif;
+  --font-arabic: "Segoe UI", "Noto Sans Arabic", "Tahoma", "Geeza Pro", "Al Bayan", "Arial Unicode MS", sans-serif;
+  --font-hebrew: "Segoe UI", "Noto Sans Hebrew", "Arial Hebrew", "David", "Arial Unicode MS", sans-serif;
+  --font-devanagari: "Noto Sans Devanagari", "Nirmala UI", "Kohinoor Devanagari", "Mangal", "Arial Unicode MS", sans-serif;
+  --font-bengali: "Noto Sans Bengali", "Nirmala UI", "Bangla Sangam MN", "Vrinda", "Arial Unicode MS", sans-serif;
+  --font-thai: "Noto Sans Thai", "Leelawadee UI", "Thonburi", "Tahoma", "Arial Unicode MS", sans-serif;
+  --font-han: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", sans-serif;
+  --font-kana: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", "Meiryo", "Noto Sans JP", sans-serif;
+  --font-hangul: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+
+  /* One combined tail appended to both stacks: the browser resolves glyphs
+     per character, so a Latin string never touches these families and a
+     Bengali string skips straight to the one that has the glyph. */
+  --font-fallbacks: var(--font-cyrillic), var(--font-greek), var(--font-arabic),
+    var(--font-hebrew), var(--font-devanagari), var(--font-bengali),
+    var(--font-thai), var(--font-han), var(--font-kana), var(--font-hangul);
+
+  /* Display face for titles/numerals/buttons; Atkinson Hyperlegible for
+     readable body text. Both end in the per-script system families because
+     neither webfont carries non-Latin glyphs — the names stay the same, so the
+     40+ call sites gain 36-language coverage without changing. */
+  --display: Fredoka, "Trebuchet MS", "Segoe UI", var(--font-fallbacks), sans-serif;
+  --body: "Atkinson Hyperlegible", "Trebuchet MS", "Segoe UI", var(--font-fallbacks), sans-serif;
+}
+
+/* CJK has no bold weight in most system faces and reads heavier already; Thai
+   and Devanagari have tall combining marks that clip in tight line boxes.
+   `data-script` is published on <html> by src/i18n/index.ts. */
+:root[data-script="han"] body,
+:root[data-script="kana"] body,
+:root[data-script="hangul"] body { letter-spacing: 0.01em; }
+:root[data-script="thai"] body,
+:root[data-script="devanagari"] body,
+:root[data-script="bengali"] body { line-height: 1.55; }
+
+/* ---- Right-to-left (Arabic, Hebrew) --------------------------------------
+   `document.dir="rtl"` already mirrors flex row order and inline flow, which
+   is most of the layout for free. What it does NOT mirror is anything written
+   with a physical property — `text-align: left`, `padding-left`, `left:` — and
+   the UI CSS uses ~176 of those. Rather than migrate every declaration (high
+   risk, no visual gain in LTR), the rules below correct the classes that
+   actually read wrong when mirrored. */
+[dir="rtl"] .screen-head { flex-direction: row-reverse; }
+[dir="rtl"] .screen-head h2 { text-align: right; }
+[dir="rtl"] .back-btn { transform: scaleX(-1); }
+[dir="rtl"] .setting-row,
+[dir="rtl"] .setting-row.setting-select,
+[dir="rtl"] .setting-row.setting-volume,
+[dir="rtl"] .sheet-row,
+[dir="rtl"] .destination { text-align: right; }
+[dir="rtl"] .setting-row > span:first-child,
+[dir="rtl"] .setting-row > label { text-align: right; }
+[dir="rtl"] .toggle-group,
+[dir="rtl"] .volume-control { direction: rtl; }
+[dir="rtl"] .fineprint,
+[dir="rtl"] .settings-intro,
+[dir="rtl"] .tagline,
+[dir="rtl"] .policy-lede,
+[dir="rtl"] .policy-section p,
+[dir="rtl"] .policy-rows dd { text-align: right; }
+[dir="rtl"] .policy-rows dt { text-align: right; }
+/* Numerals stay LTR inside RTL text — a score reads "1 234 m" either way, and
+   letting the bidi algorithm reverse a mixed number/unit string is how you get
+   "m 1 234". */
+[dir="rtl"] .stat-value,
+[dir="rtl"] output,
+[dir="rtl"] b { unicode-bidi: plaintext; }
+
+/* ---- The in-game privacy screen ---------------------------------------- */
+.policy-lede { font-size: 14px; line-height: 1.55; color: #4a3a34; margin: 0 0 10px; }
+.policy-section { margin: 0 0 14px; }
+.policy-section h3 { font-family: var(--display); font-size: 14px; letter-spacing: 0.02em; margin: 0 0 6px; color: var(--ink); }
+.policy-section p { font-size: 13px; line-height: 1.55; margin: 0 0 6px; color: #4a3a34; }
+.policy-rows { display: grid; grid-template-columns: minmax(110px, 34%) 1fr; gap: 4px 10px; margin: 6px 0 0; font-size: 12.5px; }
+.policy-rows dt { font-weight: 700; color: var(--ink); }
+.policy-rows dd { margin: 0; color: #4a3a34; line-height: 1.45; }
+.policy-url { word-break: break-all; user-select: text; -webkit-user-select: text; }
+@media (max-width: 480px) {
+  .policy-rows { grid-template-columns: 1fr; gap: 2px 0; }
+  .policy-rows dd { margin-bottom: 6px; }
 }
 
 /* Atkinson Hyperlegible enables slashed-zero by default via its OpenType
@@ -118,7 +242,7 @@ textarea {
 
 ::selection {
   background: #ffb35a;
-  color: #2a1c28;
+  color: var(--ink);
 }
 
 .game-root {
@@ -260,7 +384,7 @@ textarea {
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #fff;
+  color: var(--pure-white);
   text-shadow: 0 1px 4px rgba(20, 20, 40, 0.45);
   opacity: 0.9;
 }
@@ -268,11 +392,12 @@ textarea {
 .stat-value {
   font-size: 28px;
   font-weight: 700;
-  color: #fff;
+  color: var(--pure-white);
   text-shadow: 0 2px 0 rgba(42, 28, 40, 0.18), 0 8px 18px rgba(20, 20, 40, 0.25);
   line-height: 1.1;
 }
 
+<<<<<<< HEAD
 /* The coin counter's glyph is the SAME inline SVG the menus use, injected in
    HUD.ts. It used to be a ::before radial-gradient dot built here, which made
    the flight counter the one coin in the game drawn with different art. No
@@ -281,6 +406,25 @@ textarea {
   /* Inline flow, not flex: .coin-glyph is aligned with vertical-align, and
      the pair must never break mid-number on a narrow screen. */
   white-space: nowrap;
+=======
+.stat-value.coin::before {
+  /* Coins counter in the flight HUD — use the same inline-SVG coin glyph
+     as the menus so the bullet-● blob never appears there either. */
+  content: "";
+  display: inline-block;
+  width: 0.8em;
+  height: 0.8em;
+  vertical-align: -0.08em;
+  margin-right: 0.18em;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 32%, rgba(255,255,255,0.75) 0%, rgba(255,255,255,0.1) 38%, transparent 50%),
+    radial-gradient(circle at center, var(--coin-gold) 0%, var(--amber) 70%, var(--bronze) 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(0,0,0,0.25),
+    0 1px 0 rgba(0,0,0,0.15);
+  color: var(--gold);
+>>>>>>> origin/main
 }
 
 .stat-sub {
@@ -345,7 +489,7 @@ textarea {
   font-size: 10px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: #fff;
+  color: var(--pure-white);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 
@@ -364,6 +508,24 @@ textarea {
   font-size: 12px;
   font-weight: 600;
   box-shadow: 0 3px 0 rgba(42, 28, 40, 0.12);
+  position: relative;
+  overflow: hidden;
+}
+.island-chip i {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 100%;
+  background: rgba(0,0,0,0.12);
+  display: block;
+}
+.island-chip i b {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #4aa85c, #86dc7e);
+  width: 0%;
+  transition: width 0.2s linear;
 }
 
 .fever-wrap {
@@ -415,7 +577,7 @@ textarea {
 .ring-chain b {
   font-size: 17px;
   font-weight: 800;
-  color: #ffd76a;
+  color: var(--coin-gold);
   text-shadow: 0 1px 0 #7a4200;
   font-variant-numeric: tabular-nums;
 }
@@ -432,7 +594,7 @@ textarea {
 .ring-chain s {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #ffd76a, #ff9a3a);
+  background: linear-gradient(90deg, var(--coin-gold), #ff9a3a);
   text-decoration: none;
 }
 
@@ -465,7 +627,7 @@ textarea {
 .fever-fill {
   height: 100%;
   width: 0%;
-  background: linear-gradient(90deg, #ff6b4a, #ffc14a, #fff1a0);
+  background: linear-gradient(90deg, var(--coral), var(--gold), #fff1a0);
   box-shadow: 0 0 12px #ffb030;
 }
 
@@ -536,7 +698,7 @@ textarea {
   transform: translate(-50%, -50%);
   font-size: 28px;
   font-weight: 700;
-  color: #fff;
+  color: var(--pure-white);
   text-shadow: 0 3px 0 rgba(42, 28, 40, 0.25), 0 10px 24px rgba(20, 20, 40, 0.25);
   letter-spacing: 0.04em;
   opacity: 0;
@@ -752,7 +914,7 @@ textarea {
 .menu-quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 10px 10px; }
 .quick-action { appearance: none; border: 1px solid rgba(42,28,40,.12); border-radius: 12px; background: rgba(255,255,255,.58); color: #3e2b32; min-height: 42px; padding: 7px 9px; text-align: left; display: grid; grid-template-columns: auto 1fr; column-gap: 6px; align-items: center; cursor: pointer; }
 .quick-action b { font-size: 11px; letter-spacing: .08em; }
-.quick-action span { grid-column: 2; font-size: 10px; color: #8a6a62; }
+.quick-action span { grid-column: 2; font-size: 10px; color: var(--clay); }
 
 /* Mobile touch target contract: keep the compact two-up actions easy to hit. */
 @media (max-width: 640px) {
@@ -836,9 +998,9 @@ textarea {
 }
 
 .nav-btn.gold {
-  background: linear-gradient(135deg, #ffd76a, #ffb020);
-  color: #5a3a00;
-  box-shadow: 0 3px 0 #c98a10;
+  background: linear-gradient(135deg, var(--coin-gold), var(--amber));
+  color: var(--umber);
+  box-shadow: 0 3px 0 var(--bronze);
 }
 
 @media (hover: hover) {
@@ -869,8 +1031,8 @@ textarea {
   height: 58px;
   margin: 0 auto 10px;
   border-radius: 19px;
-  background: linear-gradient(145deg, #ffb24a, #ff6b4a);
-  color: #fff;
+  background: linear-gradient(145deg, #ffb24a, var(--coral));
+  color: var(--pure-white);
   display: grid;
   place-items: center;
   font-size: 30px;
@@ -1031,7 +1193,7 @@ h2 {
 .seed {
   margin: 0 0 16px;
   font-size: 13px;
-  color: #a07860;
+  color: var(--tan);
 }
 
 /* ── Section title / dividers ── */
@@ -1043,7 +1205,7 @@ h2 {
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #a07860;
+  color: var(--tan);
   margin: 16px 0 8px;
 }
 .section-title small {
@@ -1078,7 +1240,7 @@ h2 {
   padding: 8px 12px;
 }
 .fr-name { flex: 1; font-weight: 600; font-size: 14px; }
-.fr-code { font-size: 11px; color: #a07860; }
+.fr-code { font-size: 11px; color: var(--tan); }
 
 /* ── Squad quest cards ── */
 .squad-quests { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
@@ -1092,12 +1254,12 @@ h2 {
 }
 .sq-info { flex: 1; min-width: 0; }
 .sq-info b { display: block; font-size: 13px; font-weight: 700; }
-.sq-info span { font-size: 11px; color: #8a6a62; display: block; margin-top: 2px; }
+.sq-info span { font-size: 11px; color: var(--clay); display: block; margin-top: 2px; }
 .sq-action { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .sq-prog-label {
   font-size: 12px;
   font-weight: 600;
-  color: #a07860;
+  color: var(--tan);
   min-width: 40px;
   text-align: right;
 }
@@ -1115,7 +1277,7 @@ h2 {
 .squad-invite-art { font-size: 24px; flex-shrink: 0; }
 .squad-invite > div { flex: 1; }
 .squad-invite > div b { display: block; font-weight: 700; font-size: 13px; }
-.squad-invite > div p { margin: 2px 0 0; font-size: 11px; color: #8a6a62; }
+.squad-invite > div p { margin: 2px 0 0; font-size: 11px; color: var(--clay); }
 
 /* ── Club card ── */
 fieldset.squad-fields {
@@ -1132,7 +1294,7 @@ fieldset.squad-fields {
 .daily-icon { font-size: 28px; flex-shrink: 0; }
 .daily-head > div { flex: 1; }
 .daily-head > div b { display: block; font-weight: 700; font-size: 14px; }
-.daily-head > div em { display: block; font-size: 12px; color: #8a6a62; font-style: normal; }
+.daily-head > div em { display: block; font-size: 12px; color: var(--clay); font-style: normal; }
 
 /* ── Club list ── */
 .club-list { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
@@ -1146,7 +1308,7 @@ fieldset.squad-fields {
 }
 .club-row > div { flex: 1; }
 .club-row b { display: block; font-size: 13px; font-weight: 700; }
-.club-row em { display: block; font-size: 11px; color: #8a6a62; font-style: normal; }
+.club-row em { display: block; font-size: 11px; color: var(--clay); font-style: normal; }
 
 /* ── Redeem / add-code rows ── */
 .redeem {
@@ -1170,7 +1332,7 @@ fieldset.squad-fields {
 .empty-note {
   text-align: center;
   font-size: 13px;
-  color: #a07860;
+  color: var(--tan);
   padding: 12px 0;
 }
 
@@ -1189,7 +1351,7 @@ fieldset.squad-fields {
   justify-content: center;
   gap: 10px;
   font-size: 13px;
-  color: #8a6a62;
+  color: var(--clay);
   margin: 6px 0;
 }
 
@@ -1211,7 +1373,7 @@ fieldset.squad-fields {
 
 .tip {
   font-size: 13px;
-  color: #8a6a62;
+  color: var(--clay);
   margin: 0 0 18px;
 }
 
@@ -1229,7 +1391,7 @@ fieldset.squad-fields {
 .primary-btn {
   width: 100%;
   background: linear-gradient(180deg, #ff8a4a, #ff5a3a);
-  color: #fff;
+  color: var(--pure-white);
   box-shadow: 0 6px 0 #d44528;
   margin-bottom: 10px;
 }
@@ -1242,7 +1404,7 @@ fieldset.squad-fields {
 .ghost-btn {
   width: 100%;
   background: transparent;
-  color: #8a6a62;
+  color: var(--clay);
 }
 
 .menu-stats {
@@ -1266,6 +1428,18 @@ fieldset.squad-fields {
   margin-bottom: 6px;
 }
 
+/* Session goals — 3 desktop, 2 mobile (Jetpack Joyride pattern: 3 active, skip for coins) */
+.quests { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.quest { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.6); border-radius: 12px; padding: 6px 10px; font-size: 13px; }
+.quest.done { opacity: 0.6; text-decoration: line-through; }
+.quest .qb { flex: 1; height: 4px; background: rgba(0,0,0,0.12); border-radius: 2px; overflow: hidden; margin-top: 2px; }
+.quest .qb i { display: block; height: 100%; background: linear-gradient(90deg,#ffb020,#ff8a00); transition: width 0.3s; }
+.quest .qr { font-weight: 700; color: #8a6a30; }
+@media (max-width: 600px) {
+  /* Mobile: show 2 missions to avoid clutter, third hidden but still tracked */
+  .quests .quest:nth-child(n+4) { display: none; } /* 1st child is head, so 4th = 3rd quest */
+}
+
 .mission {
   display: grid;
   grid-template-columns: 22px 1fr auto;
@@ -1282,7 +1456,7 @@ fieldset.squad-fields {
 }
 
 .mission.fresh {
-  outline: 2px solid #ffc14a;
+  outline: 2px solid var(--gold);
 }
 
 .mission .check {
@@ -1307,12 +1481,12 @@ fieldset.squad-fields {
 
 .md {
   font-size: 11px;
-  color: #8a6a62;
+  color: var(--clay);
 }
 
 .mp {
   font-size: 12px;
-  color: #a07860;
+  color: var(--tan);
 }
 
 .over-stats {
@@ -1333,7 +1507,7 @@ fieldset.squad-fields {
   font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #a07860;
+  color: var(--tan);
 }
 
 .over-stats b {
@@ -1467,7 +1641,7 @@ fieldset.squad-fields {
   display: inline-flex;
   align-items: center;
   background: var(--pc-title, #333);
-  color: #fff;
+  color: var(--pure-white);
   font-family: var(--display);
   font-size: 11px;
   font-weight: 700;
@@ -1564,7 +1738,7 @@ fieldset.squad-fields {
 .score-table .row.empty {
   display: block;
   text-align: center;
-  color: #a07860;
+  color: var(--tan);
 }
 
 .zzz {
@@ -1630,8 +1804,8 @@ fieldset.squad-fields {
 }
 
 .toast.fever {
-  background: #ff6b4a;
-  color: #fff;
+  background: var(--coral);
+  color: var(--pure-white);
 }
 
 .toast.island {
@@ -1639,7 +1813,7 @@ fieldset.squad-fields {
 }
 
 .toast.cloud {
-  background: #fff;
+  background: var(--pure-white);
 }
 
 /* The most-used toast kinds were previously unstyled and fell back to cream —
@@ -1652,28 +1826,28 @@ fieldset.squad-fields {
 
 .toast.warn {
   background: #ff6b3d;
-  color: #fff;
+  color: var(--pure-white);
 }
 
 .toast.info {
   background: rgba(52, 58, 84, 0.92);
-  color: #fff;
+  color: var(--pure-white);
 }
 
 .toast.power {
   background: linear-gradient(135deg, #8a5cff, #6a3df0);
-  color: #fff;
+  color: var(--pure-white);
   box-shadow: 0 6px 0 rgba(60, 20, 120, 0.3), 0 0 18px rgba(140, 90, 255, 0.45);
 }
 
 .toast.quest {
   background: linear-gradient(135deg, #34d0b4, #16a085);
-  color: #fff;
+  color: var(--pure-white);
 }
 
 .toast.vip {
   background: linear-gradient(135deg, #3a2a55, #221733);
-  color: #ffd76a;
+  color: var(--coin-gold);
   box-shadow: 0 6px 0 rgba(20, 12, 32, 0.4), 0 0 18px rgba(200, 150, 255, 0.35);
 }
 
@@ -1794,6 +1968,7 @@ fieldset.squad-fields {
 .hud-header .sun-meter { width: 100%; min-width: 0; }
 .hud-controls { display: flex; gap: 8px; }
 .hud-controls .icon-btn { position: static; width: 44px; height: 44px; min-width: 44px; }
+<<<<<<< HEAD
 .hud-header .mid-meta { margin: 0; flex-wrap: wrap; gap: 5px; }
 /* The top bar owns the top-right corner: the ×N ring counter and the mute /
    pause pair live in it. The active-booster pills belong in that same corner,
@@ -1803,8 +1978,21 @@ fieldset.squad-fields {
    breakpoint. They are right-aligned to sit under the buttons. */
 .hud-header .power-chips,
 .hud-header .power-strip {
+=======
+/* Powerups appear UNDER pause and mute — dedicated row below top-bar, right-aligned, aware of controls */
+.hud-header .mid-meta { margin: 0; flex-wrap: wrap; gap: 5px; order: 2; }
+.hud-header .power-chips {
+>>>>>>> origin/main
   position: static; transform: none; margin: 0;
   flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px;
+  order: 3;
+}
+.hud-header .power-strip {
+  position: static; transform: none; margin: 2px 0 0 auto;
+  flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 5px;
+  order: 4;
+  max-width: 100%;
+  pointer-events: none;
 }
 .hud-header .power-strip {
   align-self: flex-end; justify-content: flex-end;
@@ -1812,7 +2000,11 @@ fieldset.squad-fields {
 }
 .hud-header .power-chips:empty,
 .hud-header .power-strip:empty { display: none; }
-.hud-header .roster-bar { position: static; transform: none; width: min(620px, 100%); align-self: center; margin-top: 6px; }
+.hud-header .roster-bar { position: static; transform: none; width: min(620px, 100%); align-self: center; margin-top: 6px; order: 5; }
+/* Mult chip pop when chaining — chaos-free feedback */
+.hud-header .mult-chip.combo-active { background: linear-gradient(135deg, var(--amber), var(--coral)); color: var(--pure-white); animation: mult-pop .28s cubic-bezier(.34,1.56,.64,1); }
+@keyframes mult-pop { 0% { transform: scale(.9); } 50% { transform: scale(1.15); } 100% { transform: scale(1); } }
+.hud-header .mult-chip.pop { animation: mult-pop .28s cubic-bezier(.34,1.56,.64,1); }
 .play-hud .standings { top: calc(var(--hud-header-height, 110px) + 30px + env(safe-area-inset-top)); }
 .flight-messages {
   position: absolute;
@@ -1901,7 +2093,21 @@ fieldset.squad-fields {
   .hud-header .stat-value { font-size: 20px; }
   .hud-header .mid-meta > * { font-size: 10px; padding: 2px 6px; }
   .hud-header { gap: 4px; }
-  .flight-footer .goal-strip { display: none; }
+  /* Was `display: none` — which hid the only in-flight progress readout on every
+     viewport under 500px tall: a phone in landscape, and most embedded portal
+     iframes. Progression the player cannot see does not register as progression
+     however real it is, so the strip condenses to its lead goal (the closest one,
+     since the HUD ranks them) instead of disappearing. */
+  .flight-footer .goal-strip { font-size: 10px; }
+  .flight-footer .goal-strip .gs:not(:first-child) { display: none; }
+  .flight-footer .goal-strip .gs { padding: 3px 8px 5px; }
+  .flight-footer .goal-strip .gs em { font-size: 10px; margin-bottom: 3px; }
+  .flight-footer .goal-strip .gs i { height: 4px; }
+  .flight-footer .goal-strip .gs u { margin-top: 2px; font-size: 9px; }
+  /* Shrink the banner to the band the measured lanes leave (`bannerBudget()`),
+     never reposition and never hide it: its top already comes from the lanes, so
+     moving it here would be guessing over a measurement. */
+  .rank-up { font-size: 14px; padding: 4px 12px 6px; max-width: min(320px, calc(100% - 24px)); }
   .flight-footer { gap: 4px; bottom: calc(8px + env(safe-area-inset-bottom)); }
   /* Same rule on short landscape: the chain pills still occupy H+4 .. H+66,
      so the coaching band keeps its clearance instead of snapping back up. */
@@ -1982,7 +2188,18 @@ fieldset.squad-fields {
   .hud-header .pu { padding: 3px 5px; gap: 3px; min-width: 0; }
   .hud-header .pu u { max-width: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; }
   .hud-header .pu i { font-size: 12px; }
-  .flight-footer .goal-strip { display: none; }
+  /* Was `display: none` — which hid the only in-flight progress readout on every
+     viewport under 500px tall: a phone in landscape, and most embedded portal
+     iframes. Progression the player cannot see does not register as progression
+     however real it is, so the strip condenses to its lead goal (the closest one,
+     since the HUD ranks them) instead of disappearing. */
+  .flight-footer .goal-strip { font-size: 10px; }
+  .rank-up { font-size: 14px; padding: 4px 12px 6px; max-width: min(320px, calc(100% - 24px)); }
+  .flight-footer .goal-strip .gs:not(:first-child) { display: none; }
+  .flight-footer .goal-strip .gs { padding: 3px 8px 5px; }
+  .flight-footer .goal-strip .gs em { font-size: 10px; margin-bottom: 3px; }
+  .flight-footer .goal-strip .gs i { height: 4px; }
+  .flight-footer .goal-strip .gs u { margin-top: 2px; font-size: 9px; }
   .flight-messages > .hint, .flight-messages > .launch-banner { font-size: 18px; }
 }
 @media (max-height: 600px) {
@@ -2176,7 +2393,7 @@ fieldset.squad-fields {
   font-family: var(--display);
   font-size: 22px;
   font-weight: 700;
-  color: #2a1c28;
+  color: var(--ink);
   margin: 0 0 4px;
   letter-spacing: -0.3px;
 }
@@ -2184,7 +2401,7 @@ fieldset.squad-fields {
 .name-entry-sub {
   font-family: var(--body);
   font-size: 14px;
-  color: #8a6a62;
+  color: var(--clay);
   margin: 0;
   font-style: italic;
 }
@@ -2226,8 +2443,8 @@ fieldset.squad-fields {
   font-family: var(--body);
   border: 2px solid rgba(220, 180, 150, 0.7);
   border-radius: 14px;
-  background: linear-gradient(160deg, #fff 0%, #fffaf6 100%);
-  color: #2a1c28;
+  background: linear-gradient(160deg, var(--pure-white) 0%, #fffaf6 100%);
+  color: var(--ink);
   transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s;
   box-shadow: 0 2px 0 #e8cbb8, 0 4px 12px rgba(42, 28, 40, 0.07);
 }
@@ -2267,7 +2484,7 @@ fieldset.squad-fields {
   width: 50px;
   border: 2px solid rgba(220, 180, 150, 0.7);
   border-radius: 14px;
-  background: linear-gradient(160deg, #fff 0%, #fffaf6 100%);
+  background: linear-gradient(160deg, var(--pure-white) 0%, #fffaf6 100%);
   font-size: 20px;
   cursor: pointer;
   transition: transform 0.12s, box-shadow 0.12s, border-color 0.15s;
@@ -2415,7 +2632,7 @@ fieldset.squad-fields {
 
   /* Simplify gradients to flat colors */
   .menu-hero .home-launch { background: #e78342; border-color: #ad602e; box-shadow: 0 3px 0 #9d482d; }
-  .primary-btn.hero { background: linear-gradient(115deg, #ff6b4a, #e85a3a); }
+  .primary-btn.hero { background: linear-gradient(115deg, var(--coral), #e85a3a); }
 
   /* Remove filter effects */
   button { filter: none !important; }

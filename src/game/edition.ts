@@ -18,6 +18,7 @@ export const PORTAL_EDITION_NOTE = "Portal edition";
 export const LEADERBOARD_CLOUD_LABEL = "☁️ cloud";
 
 /**
+<<<<<<< HEAD
  * True only in the Poki build.
  *
  * Runtime `portalName === "poki"` comparisons embed the literal "poki" in EVERY
@@ -27,6 +28,19 @@ export const LEADERBOARD_CLOUD_LABEL = "☁️ cloud";
  * the branch (and the literal) inside the one build that owns it.
  */
 export const POKI_EDITION = false;
+=======
+ * Words for a leaderboard with no cloud backend in this edition.
+ *
+ * An edition export, not a runtime `portalName === "…"` ternary: a shared
+ * ternary embeds EVERY portal's name in EVERY bundle, which fails the
+ * cross-portal isolation gate (`scripts/portal-markers.mjs`) and tells a player
+ * about a portal they are not on. Each build carries only its own sentence.
+ */
+export const LEADERBOARD_LOCAL: { chip: string; sentence: string } = {
+  chip: "\u{1F4BE} local",
+  sentence: "Rankings are stored on this device. Fly well to climb!",
+};
+>>>>>>> origin/main
 
 /** True only in the Poki build (Poki's netlib multiplayer transport). */
 export const POKI_MULTIPLAYER = false;
@@ -58,6 +72,7 @@ export const CUSTOM_PILOT_NAMES = true;
  */
 // Read from the Vite define so cross-module usage is constant-folded by Rollup,
 // enabling dead-code elimination of IAP UI (e.g. "Remove breaks" button) in
+<<<<<<< HEAD
 // portal builds. VITE_SELL_AD_REMOVAL is set in vite.config.ts; portal editions
 // override this to false via their own export — but the define wins for DCE.
 // Typed in src/vite-env.d.ts, so no cast and no lint suppression are needed.
@@ -71,3 +86,30 @@ export const SELL_AD_REMOVAL: boolean = !!import.meta.env.VITE_SELL_AD_REMOVAL;
  * failure, not a hypothetical one.
  */
 export const RESERVED_PILOT_NAMES: readonly string[] = ["sunbird"];
+=======
+// portal builds. VITE_SELL_AD_REMOVAL is pinned in vite.config.ts to a boolean
+// literal (`PORTAL === "none"`), so no cast is needed and the fold is exact;
+// portal editions override this to false via their own export, but the define
+// wins for DCE.
+export const SELL_AD_REMOVAL: boolean = !!import.meta.env.VITE_SELL_AD_REMOVAL;
+
+/**
+ * Does this build rehearse sponsored breaks with `MockAdProvider`?
+ *
+ * DEFAULT FALSE — and that default is the fix for a long-standing honesty bug:
+ * the direct build has no ad network, so a "simulated" break interrupted a run
+ * to show "Your ad is loading… Skip in 3" that never became an ad, while the
+ * Gold pitch ("No sponsored breaks, ever") sold the removal of that non-ad.
+ * Turning this on brings the whole surface back together — the break overlay,
+ * the continue card's second-wind offer, the Account screen's daily cap copy
+ * and the Gold ad-removal bullet — so the pitch and the product can never
+ * disagree. Portal editions are unaffected: Poki/Crazy supply real
+ * `commercialBreak` / `rewardedBreak` calls and own ad frequency (REQ-20).
+ *
+ * Enable with `VITE_SIM_BREAKS=true` (ad-flow rehearsal, or wiring a real
+ * provider later). Keep every use site gated on this flag rather than on
+ * `SELL_AD_REMOVAL`: the latter also drives the paywall/VIP UI, which is a
+ * direct-build feature whether or not breaks exist.
+ */
+export const SIMULATED_BREAKS: boolean = !!import.meta.env.VITE_SIM_BREAKS;
+>>>>>>> origin/main

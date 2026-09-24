@@ -14,7 +14,12 @@
  *   index.html   the whole game (JS + CSS + fonts inlined by vite-singlefile)
  *   icons/       favicons / apple-touch-icon (referenced by the head)
  *   fonts/       self-hosted woff2 (kept for host-side/offline tooling)
- *   i18n/        the locale barrel (kept for host-side tooling)
+ *
+ * `i18n/` used to ride along "for host-side tooling". Nothing fetched it: the
+ * runtime lazy-loads per-locale packs that vite-singlefile inlines into
+ * index.html, so the barrel in the zip was ~100 KB of dead weight inside an
+ * 8 MB portal budget — and it grew with every language added. It is gone from
+ * the package; the barrel still lives in `src/i18n/` where the tooling reads it.
  *
  * Stripped at this step, because portals run the game in a cross-origin iframe:
  *   • `<link rel="manifest">` (not installable, and a 404 inside the frame)
@@ -96,7 +101,7 @@ function stageHtml() {
  * into every build; `pnpm gen-icons` still generates it there for hand-submission
  * to a portal, it just does not ship inside the game package any more.
  */
-const ENTRY_DIRS = ["icons", "fonts", "i18n"];
+const ENTRY_DIRS = ["icons", "fonts"];
 const ENTRIES = ["index.html", ...ENTRY_DIRS];
 
 /** Write a staged bundle into `target` (fresh every run). */

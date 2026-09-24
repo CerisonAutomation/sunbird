@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { ALT_CLOUDS, ALT_HIGH, ALT_SKY, ALT_STRATO, CAMERA_BASE_Z, CAMERA_LOOKAHEAD, MAX_SPEED } from "./constants";
 import { clamp, lerp, smoothstep } from "./math";
+import { diveKick } from "./SpeedFeel";
 import type { Bird } from "./Bird";
 
 /**
@@ -191,8 +192,19 @@ export class CameraRig {
     // Dynamic FOV: widens with speed, kicks +8 in fever (spec: FOV+8 fever),
     // and counter-narrows during a dolly-zoom so the subject holds size
     // while the background stretches.
+    //
+    // On top of that, a hard dive at speed gets its own kick (SpeedFeel.ts
+    // owns the curve): falling is where players *feel* acceleration, and a
+    // plain speed ramp cannot show it because speed alone barely changes
+    // during a dive. The lens widening by a few degrees as the bird drops
+    // sells the fall far better than any particle could. Skipped entirely
+    // under reduced motion, where the FOV budget is already halved.
     const targetFov =
-      this.baseFov + sNorm * (this.reduceMotion ? 4 : 18) + (fever && !this.reduceMotion ? 8 : 0) - this.dolly * 9;
+      this.baseFov +
+      sNorm * (this.reduceMotion ? 4 : 18) +
+      (fever && !this.reduceMotion ? 8 : 0) +
+      (this.reduceMotion ? 0 : diveKick(bird.vy, sNorm)) -
+      this.dolly * 9;
     this.fov = lerp(this.fov, targetFov, 1 - Math.pow(0.06, dt));
     if (Math.abs(this.camera.fov - this.fov) > 0.01) {
       this.camera.fov = this.fov;

@@ -1,5 +1,7 @@
 # Ralph Loop — Task Checklist
 
+> **Status:** archived — completed task checklist from an automated iteration loop (2026-09). Every box is ticked; nothing here is outstanding.
+
 ## Tasks
 - [x] Iter 0: lint gate red (12x no-explicit-any in tests) → typed helpers, green
 - [x] Iter 1 (Portal Officer): CrazyGames Full — muteAudio support + happytime on new best

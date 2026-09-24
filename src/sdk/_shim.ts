@@ -24,7 +24,13 @@ class StubAdapter implements PlatformAdapter {
   gameplayStart(): void {}
   gameplayStop(): void {}
   pause(): void {}
+<<<<<<< HEAD
   happyTime(): void {}
+=======
+  happyTime(_intensity: number): void {}
+  portalLanguage(): string | null { return null; }
+  movePill(_topPercent: number, _topPx: number): void {}
+>>>>>>> origin/main
   async commercialBreak(): Promise<void> {}
   async rewardedBreak(): Promise<boolean> { return false; }
   async showMidgameAd(): Promise<void> {}
@@ -62,7 +68,7 @@ class StubAdapter implements PlatformAdapter {
   async inviteFriends(_params: InviteParams): Promise<string | null> { return null; }
   updateRoom(_opts: { roomId?: string; isJoinable?: boolean; inviteParams?: InviteParams }): void {}
   leftRoom(): void {}
-  measure(_category: string, _label: string, _action: string): void {}
+  measure(_category: string, _what: string, _action: string): void {}
   async share(_message: string, _params?: InviteParams): Promise<boolean> { return false; }
   syncSettings(): void {}
   isMuted(): boolean { return false; }

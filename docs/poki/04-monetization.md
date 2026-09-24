@@ -65,7 +65,7 @@ Inspector and reviewers check.
 | `MON-18` | Skins, trails, biomes and UI-side cosmetics are earned with coins; nothing is bought with real money in a portal build. |
 | `MON-19` | The offer is context-triggered (only after a crash that ended a meaningful run) and its framing is chosen from the run's context (near-best run, streak at risk, long-run momentum) instead of being a static always-on button. |
 | `MON-20` | Seasonal/event content exists (season pass, weekly cups, festivals, daily/weekly challenge rotation). |
-| `MON-21` | Continue availability is bounded by the run (one offer per crash) and the economy is audited for infinite coin faucets — see the fix log in `POKI_COMPLIANCE_AUDIT.md`. |
+| `MON-21` | Continue availability is bounded by the run (one offer per crash) and the economy is audited for infinite coin faucets — see the fix log in `../audits/POKI_COMPLIANCE_AUDIT.md`. |
 | `MON-22` | Fake ad affordances were removed during the compliance pass: the old "Ad Multiplier!" card (no ad behind it) and the wheel button advertising a video option are gone. |
 
 ### Placement analytics required with the offer

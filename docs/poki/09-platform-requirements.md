@@ -3,7 +3,7 @@
 Sources: Poki's **Requirements & policies**, **HTML5 SDK / game events**, **external
 resources policy**, **content & player safety**, **user accounts** and **release
 workflow** documentation, as extracted during the compliance passes recorded in
-[`../../POKI_COMPLIANCE_AUDIT.md`](../../POKI_COMPLIANCE_AUDIT.md).
+[`../audits/POKI_COMPLIANCE_AUDIT.md`](../audits/POKI_COMPLIANCE_AUDIT.md).
 
 > **Provenance note.** This file is the *normative checklist* the build is gated
 > against. It compiles the platform pages that are not part of the guide's
@@ -87,4 +87,4 @@ Every rule above maps to either (a) a build-time gate (`verify-portal`,
 submission action. The authoritative status table for the whole list is
 generated into [`COMPLIANCE.md`](./COMPLIANCE.md) by `pnpm poki:audit`; the
 narrative version with the fixes that came out of these rules is
-[`../../POKI_COMPLIANCE_AUDIT.md`](../../POKI_COMPLIANCE_AUDIT.md).
+[`../audits/POKI_COMPLIANCE_AUDIT.md`](../audits/POKI_COMPLIANCE_AUDIT.md).
