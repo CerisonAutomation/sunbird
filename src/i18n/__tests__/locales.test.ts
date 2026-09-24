@@ -189,10 +189,10 @@ describe("runtime packs (generated from the barrel)", () => {
       expect(bytes, `${code} pack is ${bytes} bytes`).toBeLessThan(12_000);
       total += bytes;
     }
-    // The whole 36-language payload. At 137 keys it is ~127 KB; this is the
+    // The whole 36-language payload. At 218 keys it is ~295 KB; this is the
     // budget line that decides how many more strings the barrel can carry
     // (see docs/archive/GAME_BACKLOG_2026-09-23.md §2).
-    expect(total, `i18n payload is ${total} bytes`).toBeLessThan(260_000);
+    expect(total, `i18n payload is ${total} bytes`).toBeLessThan(310_000);
   });
 });
 

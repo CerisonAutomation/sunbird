@@ -5,7 +5,7 @@ import { AttractPilot } from "../pilot";
 import { Bird } from "../Bird";
 import { endlessSpeedScale, flightProgression, terrainDifficulty } from "../FlightProgression";
 import { FlightCues } from "../FlightCues";
-import { PHYS_DT } from "../constants";
+import { DROP_START, PHYS_DT, RAMP_START } from "../constants";
 import { nextBloomBudget } from "../quality";
 
 describe("render and allocation budgets", () => {
@@ -102,13 +102,15 @@ describe("progressive, bounded difficulty", () => {
 
 describe("readable sound landmarks", () => {
   it("plays the momentum scoop once per island, not 120 times per second", () => {
+    // localX must be in [DROP_START, RAMP_START) = [600, 700) for the runup cue
+    const RUN_X = Math.round((DROP_START + RAMP_START) / 2); // 650
     const cues = new FlightCues();
     const bird = { grounded: true, altitude: 0, vy: -30, speed: () => 70 };
-    expect(cues.update(PHYS_DT, bird, 0, 760)).toBe("runup");
-    for (let i = 0; i < 200; i++) expect(cues.update(PHYS_DT, bird, 0, 760)).toBeNull();
-    expect(cues.update(PHYS_DT, bird, 1, 760)).toBe("runup");
+    expect(cues.update(PHYS_DT, bird, 0, RUN_X)).toBe("runup");
+    for (let i = 0; i < 200; i++) expect(cues.update(PHYS_DT, bird, 0, RUN_X)).toBeNull();
+    expect(cues.update(PHYS_DT, bird, 1, RUN_X)).toBe("runup");
     cues.reset();
-    expect(cues.update(PHYS_DT, bird, 0, 760)).toBe("runup");
+    expect(cues.update(PHYS_DT, bird, 0, RUN_X)).toBe("runup");
   });
   it("marks only a high apex, with a cooldown against repeated chatter", () => {
     const cues = new FlightCues();

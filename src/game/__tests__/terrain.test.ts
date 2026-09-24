@@ -24,7 +24,9 @@ describe("terrain: heightAt", () => {
   it("differs for different seeds", () => {
     const t1 = new TerrainSystem("2026-09-12");
     const t2 = new TerrainSystem("2026-09-13");
-    expect(t1.heightAt(750)).not.toBe(t2.heightAt(750));
+    // x=400 is in the hills zone (localX 400 < DROP_BLEND_START 520), which
+    // uses seed-driven fbm noise — unlike the authored launch ramp (700-760).
+    expect(t1.heightAt(400)).not.toBe(t2.heightAt(400));
     t1.dispose();
     t2.dispose();
   });

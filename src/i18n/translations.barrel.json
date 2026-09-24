@@ -9808,8 +9808,7 @@
       },
       "placeholders": [
         "cost",
-        "have",
-        "s"
+        "have"
       ],
       "translations": {
         "en": "Need ●{{cost}} — you have ●{{have}}",
@@ -9857,8 +9856,6 @@
         "context": "inflight"
       },
       "placeholders": [
-        "cost",
-        "have",
         "s"
       ],
       "translations": {
@@ -9907,8 +9904,6 @@
         "context": "inflight"
       },
       "placeholders": [
-        "cost",
-        "have",
         "s"
       ],
       "translations": {
@@ -9957,8 +9952,6 @@
         "context": "inflight"
       },
       "placeholders": [
-        "cost",
-        "have",
         "s"
       ],
       "translations": {
@@ -10007,8 +10000,6 @@
         "context": "inflight"
       },
       "placeholders": [
-        "cost",
-        "have",
         "s"
       ],
       "translations": {

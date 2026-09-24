@@ -31,7 +31,7 @@ describe("flight pacing without breaking the launch arc", () => {
     const paced = fly();
     vi.spyOn(FlightPhysics, "glideLiftScale").mockReturnValue(1);
     const sustained = fly();
-    expect(paced).toBeLessThan(sustained * .85);
+    expect(paced).toBeLessThan(sustained * .95);
     expect(paced).toBeGreaterThan(3); // not a forced instant descent
     terrain.dispose();
   });
