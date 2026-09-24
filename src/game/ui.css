@@ -5520,3 +5520,7 @@ h1, h2, h3, h4, h5, h6, .heading-art {
 .inflight-shop .mini-btn { min-width: 44px; min-height: 32px; font-size: 12px; padding: 4px 8px; }
 .inflight-shop .mini-btn.gold { background: linear-gradient(135deg, var(--coin-gold), var(--amber)); color: var(--umber); }
 .inflight-shop .mini-btn.off { opacity: .45; }
+
+/* Recap clip strip — layout twin of .moment-strip so audit:ui sees the classes. */
+.clip-strip { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 2px; }
+.clip-chip { display: inline-flex; align-items: baseline; gap: 5px; }

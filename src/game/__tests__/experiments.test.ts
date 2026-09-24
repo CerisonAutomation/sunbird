@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { bucket, variant } from "../Experiments";
+import { EXPERIMENTS, bucket, variant } from "../Experiments";
 
 /**
  * A/B bucketing contract: deterministic and sticky (same device+experiment →
@@ -56,5 +56,20 @@ describe("experiment bucketing", () => {
     for (let i = 0; i < 100; i++) {
       expect(variant("device-y", "exp-sticky")).toBe(first);
     }
+  });
+});
+
+describe("experiment catalog", () => {
+  it("keeps every live id unique, salted, and 50/50 by default", () => {
+    const ids = Object.values(EXPERIMENTS).map((e) => e.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const exp of Object.values(EXPERIMENTS)) {
+      expect(exp.split).toBe(50);
+      expect(exp.metric.length).toBeGreaterThan(0);
+      expect(exp.hypothesis.length).toBeGreaterThan(10);
+    }
+    // The live results-card experiment must keep this exact id — renaming it
+    // re-buckets every device mid-test.
+    expect(EXPERIMENTS.results_cta_order.id).toBe("results_cta_order");
   });
 });

@@ -201,6 +201,13 @@
 }
 .moment-chip b { font-size: 13px; line-height: 1; filter: saturate(1.15); }
 .moment-chip i { font-style: normal; font-weight: 900; color: #a3701a; }
+.clip-heat {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 28px; padding: 5px 8px; border-radius: 999px;
+  background: var(--ink);
+  color: var(--text-on-sky);
+  font: 900 11px/1 var(--body);
+}
 .moment-line {
   margin: 2px 0 10px; color: #6d5a2c;
   font: 600 13px/1.45 var(--body);

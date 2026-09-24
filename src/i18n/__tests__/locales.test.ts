@@ -338,6 +338,15 @@ describe("the auto preference", () => {
     expect(tIn("en", "no.such.key")).toBe("no.such.key");
   });
 
+  it("fills both {{var}} and {var} (pace-ghost toast uses single braces)", () => {
+    expect(t("toast.pace.ghost", { name: "Skye" }, "👻 {name} on these hills — catch it")).toBe(
+      "👻 Skye on these hills — catch it",
+    );
+    expect(t("no.such.key", { name: "Ozzy", place: 3 }, "Overtook {{name}} for #{{place}}!")).toBe(
+      "Overtook Ozzy for #3!",
+    );
+  });
+
   it("interpolates placeholders in every locale that has them", () => {
     for (const [key, entry] of entries) {
       if (!entry.placeholders.length) continue;

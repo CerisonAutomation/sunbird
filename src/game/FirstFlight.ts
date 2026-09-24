@@ -1,10 +1,11 @@
 /**
- * First-flight coach: a 30-second interactive tutorial that teaches THE
+ * First-flight coach: a ~15-second interactive tutorial that teaches THE
  * mechanic — dive on the downslope, release on the upslope, soar.
  *
- * Not a video, not a modal wall: three steps verified by real play signals.
- * Runs once ever (per save), pays 50 coins on completion, and gets out of
- * the way the moment the player demonstrates each skill.
+ * Not a video, not a modal wall: three steps verified by real play signals
+ * (Poki: hook understood in 10 seconds, no text wall). Runs once ever
+ * (per save), pays 50 coins on completion, and gets out of the way the
+ * moment the player demonstrates each skill.
  */
 
 import { t } from "../i18n";
@@ -47,7 +48,7 @@ export class FirstFlight {
       case 0:
         // Teach the dive: hold on a meaningful downslope for a cumulative beat.
         if (sig.diving && (sig.slope < -0.05 || !sig.grounded)) this.diveHeld += dt;
-        if (this.diveHeld >= 0.9) this.step = 1;
+        if (this.diveHeld >= 0.55) this.step = 1;
         break;
       case 1:
         // Teach the launch: an actual ramp launch, not a timer.
@@ -57,7 +58,7 @@ export class FirstFlight {
         // Teach the soar: stay airborne long enough to feel the glide.
         if (sig.airborne) this.airTime += dt;
         else this.airTime = 0;
-        if (this.airTime >= 2.5) {
+        if (this.airTime >= 1.4) {
           this.active = false;
           this.completed = true;
           this.celebration = 3;

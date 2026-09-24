@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildChallengeUrl } from "../Challenge";
+import { buildChallengeUrl, packChallengeToken, unpackChallengeToken } from "../Challenge";
 
 /**
  * The rival-link payload is `seed.distance.encodedName` inside
@@ -66,5 +66,31 @@ describe("mode-aware challenge links (real builder)", () => {
     const url = buildChallengeUrl("seed-1", 500, "Ace", "zenith");
     const payload = url.split("#rival=")[1]!.split("&")[0]!;
     expect(payload.split(".").length).toBe(3); // seed.distance.name only
+  });
+});
+
+describe("compact challenge tokens", () => {
+  it("round-trips seed, distance, name and mode", () => {
+    const token = packChallengeToken({ seed: "2026-09-24", distance: 1840, name: "Pilot 7Q2F", mode: "race" });
+    expect(token.startsWith("sb1:")).toBe(true);
+    const c = unpackChallengeToken(token)!;
+    expect(c.seed).toBe("2026-09-24");
+    expect(c.distance).toBe(1840);
+    expect(c.name).toBe("Pilot 7Q2F");
+    expect(c.mode).toBe("race");
+  });
+
+  it("survives names with spaces and rejects hostile payloads", () => {
+    const token = packChallengeToken({ seed: "wild-abc123", distance: 500, name: "j r hawk" });
+    expect(unpackChallengeToken(token)!.name).toBe("j r hawk");
+    expect(unpackChallengeToken("sb1:bad$seed:100:x")).toBeNull();
+    expect(unpackChallengeToken("sb1:ok:-5:x")).toBeNull();
+    expect(unpackChallengeToken("not-a-token")).toBeNull();
+    expect(unpackChallengeToken("rival=ok.100.x")).toBeNull();
+  });
+
+  it("strips script-y names instead of rejecting the challenge", () => {
+    const token = packChallengeToken({ seed: "2026-09-24", distance: 100, name: "<img onerror=x>" });
+    expect(unpackChallengeToken(token)!.name).not.toContain("<");
   });
 });

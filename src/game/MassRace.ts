@@ -8,6 +8,26 @@ import { generatePilotName } from "./pilotNameGenerator";
 
 export const MAX_RIVALS = 40;
 
+/** Metres behind the player before catch-up starts. Casual only. */
+export const PACK_CATCHUP_START = 350;
+export const PACK_CATCHUP_END = 800;
+export const PACK_CATCHUP_RAMP = 150;
+export const PACK_CATCHUP_RATE = 3.5;
+export const PACK_CATCHUP_CAP = 195;
+
+/** Extra vx this frame for a rival `lagMetres` behind the player. */
+export function packCatchupDelta(lagMetres: number, dt: number, intensity = 1): number {
+  if (!Number.isFinite(lagMetres) || !Number.isFinite(dt) || dt <= 0) return 0;
+  if (lagMetres <= PACK_CATCHUP_START || lagMetres >= PACK_CATCHUP_END) return 0;
+  const amp = clamp(Number.isFinite(intensity) ? intensity : 1, 0.5, 1.6);
+  return dt * clamp((lagMetres - PACK_CATCHUP_START) / PACK_CATCHUP_RAMP, 0, 1) * PACK_CATCHUP_RATE * amp;
+}
+
+export function applyPackCatchup(vx: number, lagMetres: number, dt: number, intensity = 1): number {
+  if (!Number.isFinite(vx)) return 0;
+  return Math.min(PACK_CATCHUP_CAP, vx + packCatchupDelta(lagMetres, dt, intensity));
+}
+
 const OPTIMAL_LEAD = 70;
 
 export type RivalKind = "local" | "remote";
@@ -157,6 +177,8 @@ export class MassRace {
    * people. Public because the UI has to be able to say which one is true.
    */
   private packBalancing = true;
+  /** Casual FlowTuner intensity on catch-up. 1 = shipped feel. */
+  private packIntensity = 1;
 
   constructor() {
     this.bodyMesh = new THREE.InstancedMesh(this.bodyGeo, this.bodyMat, 1);
@@ -373,6 +395,11 @@ export class MassRace {
     return this.packBalancing;
   }
 
+  /** Casual-only intensity on the catch-up push. Ranked races never call this. */
+  setPackIntensity(mult: number): void {
+    this.packIntensity = clamp(mult, 0.5, 1.6);
+  }
+
   setFieldSkill(mult: number): void {
     for (const r of this.rivals) {
       r.skill = Math.min(1, Math.max(0.1, r.skill * mult));
@@ -536,8 +563,7 @@ export class MassRace {
         // (see `renderRaceLobby`). An assist the player was never told about is
         // not a difficulty curve, it is a lie with a velocity vector.
         if (this.packBalancing && lag > 350 && lag < 800) {
-          const boost = dt * clamp((lag - 350) / 150, 0, 1) * 3.5;
-          r.bird.vx = Math.min(195, r.bird.vx + boost);
+          r.bird.vx = applyPackCatchup(r.bird.vx, lag, dt, this.packIntensity);
         }
         // Berserker pushes even harder when trailing
         if (r.archetype === "berserker" && lag > 100 && lag < 600) {

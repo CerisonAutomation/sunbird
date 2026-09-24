@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { CameraRig } from "../CameraRig";
+import { CameraRig, CHASE_POSE, CLIP_SHOTS, clipPose, clipShotFor, mixClipPose } from "../CameraRig";
+import { CLIP_KINDS } from "../Moments";
 import { Bird } from "../Bird";
 import { TerrainSystem } from "../TerrainSystem";
 
@@ -25,6 +26,30 @@ function rigAt(speedTarget = 60): { rig: CameraRig; bird: Bird; terrain: Terrain
 function settle(rig: CameraRig, bird: Bird, frames: number, fever: boolean, attract = false): void {
   for (let i = 0; i < frames; i++) rig.update(1 / 60, bird, true, 0, attract, fever);
 }
+
+describe("clip overlay", () => {
+  it("does not change the chase cam until pulseClip is called", () => {
+    const { rig, bird, terrain } = rigAt();
+    settle(rig, bird, 60, false);
+    const x = rig.camera.position.x;
+    settle(rig, bird, 60, false);
+    expect(Math.abs(rig.camera.position.x - x)).toBeLessThan(8);
+    terrain.dispose();
+  });
+
+  it("pulses a finite overlay and decays back toward chase", () => {
+    const { rig, bird, terrain } = rigAt();
+    settle(rig, bird, 60, false);
+    const before = rig.camera.position.clone();
+    rig.pulseClip("finish", 1, 40);
+    rig.update(1 / 60, bird, true, 0, false, false);
+    expect(Number.isFinite(rig.camera.position.x)).toBe(true);
+    expect(rig.camera.position.distanceTo(before)).toBeGreaterThan(0.2);
+    settle(rig, bird, 240, false);
+    expect(rig.camera.fov).toBeGreaterThan(40);
+    terrain.dispose();
+  });
+});
 
 describe("fever FOV kick", () => {
   it("widens the lens ~8° in fever and relaxes after", () => {
@@ -107,5 +132,36 @@ describe("attract framing", () => {
     expect(attractZ).toBeGreaterThan(b.rig.camera.position.z + 8);
     a.terrain.dispose();
     b.terrain.dispose();
+  });
+});
+
+describe("clip camera poses", () => {
+  it("maps every clip kind onto a known shot", () => {
+    for (const kind of CLIP_KINDS) {
+      expect(CLIP_SHOTS).toContain(clipShotFor(kind));
+    }
+    expect(clipShotFor("last_second")).toBe("finish");
+    expect(clipShotFor("crash")).toBe("crash");
+    expect(clipShotFor("overtake")).toBe("overtake");
+  });
+
+  it("keeps FOV and roll inside the compose-with-SpeedFeel budget", () => {
+    for (const shot of CLIP_SHOTS) {
+      const pose = clipPose(shot, 1.2, 200);
+      expect(pose.fovDelta).toBeGreaterThanOrEqual(-8);
+      expect(pose.fovDelta).toBeLessThanOrEqual(8);
+      expect(pose.roll).toBeGreaterThanOrEqual(-0.12);
+      expect(pose.roll).toBeLessThanOrEqual(0.12);
+    }
+  });
+
+  it("chase is the identity pose", () => {
+    expect(clipPose("chase", 0, 0)).toEqual(CHASE_POSE);
+  });
+
+  it("mixes toward the overlay and back", () => {
+    const hero = clipPose("hero", 0.5, 20);
+    expect(mixClipPose(CHASE_POSE, hero, 0)).toEqual(CHASE_POSE);
+    expect(mixClipPose(CHASE_POSE, hero, 1)).toEqual(hero);
   });
 });

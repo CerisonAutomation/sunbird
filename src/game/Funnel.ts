@@ -174,3 +174,66 @@ export function visitKind(firstPlayed: string, today: string): VisitKind {
   if (days < 7) return "d2_6";
   return "d7plus";
 }
+
+/* ============================================================ viral KPIs */
+
+/**
+ * Closed set of share / rematch / clip event names. Portal builds send no
+ * telemetry of ours; the local bus and Poki `measure()` still need a closed
+ * set so a dashboard query cannot be poisoned by a typo.
+ */
+export const VIRAL_EVENT_NAMES = [
+  "clip_moment",
+  "challenge_share",
+  "challenge_open",
+  "ghost_rematch",
+  "clip_export",
+  "one_more_run",
+] as const;
+
+export type ViralEventName = (typeof VIRAL_EVENT_NAMES)[number];
+
+export type ViralEventProps = {
+  kind?: string;
+  mode?: string;
+  distance?: number;
+  score?: number;
+};
+
+const VIRAL_NAME_SET = new Set<string>(VIRAL_EVENT_NAMES);
+
+export function isViralEvent(name: string): name is ViralEventName {
+  return VIRAL_NAME_SET.has(name);
+}
+
+export function viralEventProps(name: ViralEventName, props: ViralEventProps = {}): ViralEventProps {
+  const out: ViralEventProps = {};
+  if (typeof props.kind === "string" && props.kind.length > 0 && props.kind.length <= 24) {
+    out.kind = props.kind.replace(/[^a-z0-9_]/gi, "").slice(0, 24);
+  }
+  if (typeof props.mode === "string" && props.mode.length > 0 && props.mode.length <= 24) {
+    out.mode = props.mode.replace(/[^a-z0-9-]/gi, "").slice(0, 24);
+  }
+  if (typeof props.distance === "number" && Number.isFinite(props.distance)) {
+    out.distance = Math.max(0, Math.round(props.distance));
+  }
+  if (typeof props.score === "number" && Number.isFinite(props.score)) {
+    out.score = Math.max(0, Math.min(100, Math.round(props.score)));
+  }
+  void name;
+  return out;
+}
+
+export type ViralCounts = Partial<Record<ViralEventName, number>>;
+
+/** On-device K-factor proxy for A/B-ing the share CTA. Not a real cohort K. */
+export function viralCoefficient(counts: ViralCounts): number {
+  const shares = (counts.challenge_share ?? 0) + (counts.clip_export ?? 0);
+  const rematches = counts.ghost_rematch ?? 0;
+  const opens = counts.challenge_open ?? 0;
+  const retries = counts.one_more_run ?? 0;
+  if (shares + rematches + opens + retries === 0) return 0;
+  const k = (shares * 0.6 + rematches * 0.3 + retries * 0.1) / Math.max(1, opens + shares);
+  if (!Number.isFinite(k) || k < 0) return 0;
+  return Math.min(3, Math.round(k * 100) / 100);
+}

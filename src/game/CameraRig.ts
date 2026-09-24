@@ -2,7 +2,70 @@ import * as THREE from "three";
 import { ALT_CLOUDS, ALT_HIGH, ALT_SKY, ALT_STRATO, CAMERA_BASE_Z, CAMERA_LOOKAHEAD, MAX_SPEED } from "./constants";
 import { clamp, lerp, smoothstep } from "./math";
 import { diveKick } from "./SpeedFeel";
+import type { ClipKind } from "./Moments";
 import type { Bird } from "./Bird";
+
+/** Replay-angle overlay for shareable beats. Mixes on top of the chase cam. */
+export const CLIP_SHOTS = ["chase", "hero", "finish", "crash", "overtake"] as const;
+export type ClipShot = (typeof CLIP_SHOTS)[number];
+
+export type ClipPose = {
+  offsetX: number;
+  offsetY: number;
+  offsetZ: number;
+  fovDelta: number;
+  roll: number;
+};
+
+const CLIP_POSES: Record<ClipShot, ClipPose> = {
+  chase: { offsetX: 0, offsetY: 0, offsetZ: 0, fovDelta: 0, roll: 0 },
+  hero: { offsetX: -4.5, offsetY: 3.2, offsetZ: 6, fovDelta: -4, roll: -0.04 },
+  finish: { offsetX: 8, offsetY: 1.4, offsetZ: -3, fovDelta: 5, roll: 0.03 },
+  crash: { offsetX: 2.2, offsetY: 1.1, offsetZ: -5, fovDelta: 6, roll: 0.08 },
+  overtake: { offsetX: -2.4, offsetY: 0.6, offsetZ: 3.5, fovDelta: 3, roll: -0.06 },
+};
+
+export const CHASE_POSE: ClipPose = { ...CLIP_POSES.chase };
+
+export function clipShotFor(kind: ClipKind): ClipShot {
+  switch (kind) {
+    case "near_miss":
+      return "hero";
+    case "overtake":
+      return "overtake";
+    case "last_second":
+      return "finish";
+    case "crash":
+      return "crash";
+    case "perfect_run":
+      return "hero";
+  }
+}
+
+export function clipPose(shot: ClipShot, speedNorm: number, altitude: number): ClipPose {
+  const base = CLIP_POSES[shot] ?? CLIP_POSES.chase;
+  const speed = clamp(Number.isFinite(speedNorm) ? speedNorm : 0, 0, 1.4);
+  const alt = clamp(Number.isFinite(altitude) ? altitude : 0, 0, 400);
+  const pull = 1 + speed * 0.35 + Math.min(alt, 80) / 240;
+  return {
+    offsetX: base.offsetX * pull,
+    offsetY: base.offsetY * pull,
+    offsetZ: base.offsetZ * pull,
+    fovDelta: clamp(base.fovDelta * (0.7 + speed * 0.4), -8, 8),
+    roll: clamp(base.roll * (0.6 + speed * 0.5), -0.12, 0.12),
+  };
+}
+
+export function mixClipPose(from: ClipPose, to: ClipPose, t: number): ClipPose {
+  const k = clamp(t, 0, 1);
+  return {
+    offsetX: from.offsetX + (to.offsetX - from.offsetX) * k,
+    offsetY: from.offsetY + (to.offsetY - from.offsetY) * k,
+    offsetZ: from.offsetZ + (to.offsetZ - from.offsetZ) * k,
+    fovDelta: from.fovDelta + (to.fovDelta - from.fovDelta) * k,
+    roll: from.roll + (to.roll - from.roll) * k,
+  };
+}
 
 /**
  * Dynamic chase camera.
@@ -38,6 +101,11 @@ export class CameraRig {
   private rollTilt = 0;
   private orbit = 0;
   private orbitTarget = 0;
+  /** Short mix of a clip overlay on top of the live chase. */
+  private clipMix = 0;
+  private clipShot: ClipShot | null = null;
+  private clipSpeed = 0;
+  private clipAlt = 0;
 
   constructor(aspect: number) {
     this.camera = new THREE.PerspectiveCamera(50, aspect, 0.1, 1400);
@@ -81,6 +149,18 @@ export class CameraRig {
   tilt(amount: number): void {
     if (this.reduceMotion) return;
     this.orbitTarget = clamp(amount, -0.32, 0.32);
+  }
+
+  /**
+   * Pulse a clip-camera overlay for a shareable beat. Reduce-motion skips it;
+   * the chase cam is never replaced, only mixed for ~0.55 s.
+   */
+  pulseClip(shot: ClipShot, speedNorm = 0.6, altitude = 20): void {
+    if (this.reduceMotion) return;
+    this.clipShot = shot;
+    this.clipMix = 1;
+    this.clipSpeed = speedNorm;
+    this.clipAlt = altitude;
   }
 
   snapTo(bird: Bird): void {
@@ -211,6 +291,12 @@ export class CameraRig {
       this.camera.updateProjectionMatrix();
     }
 
+    this.clipMix *= Math.pow(0.012, dt);
+    if (this.clipMix < 0.02) {
+      this.clipMix = 0;
+      this.clipShot = null;
+    }
+
     this.shake *= Math.pow(0.04, dt);
     // Sine-sum shake for organic, non-repeating motion instead of random jitter.
     const t = performance.now() * 0.001;
@@ -226,9 +312,20 @@ export class CameraRig {
   }
 
   private apply(): void {
-    this.camera.position.set(this.camX + this.shakeX, this.camY + this.shakeY, this.camZ);
+    const overlay: ClipPose = this.clipShot && this.clipMix > 0
+      ? mixClipPose(CHASE_POSE, clipPose(this.clipShot, this.clipSpeed, this.clipAlt), this.clipMix)
+      : CHASE_POSE;
+    this.camera.position.set(
+      this.camX + this.shakeX + overlay.offsetX,
+      this.camY + this.shakeY + overlay.offsetY,
+      this.camZ + overlay.offsetZ,
+    );
     this.camera.lookAt(this.lookX, this.lookY, 0);
-    this.camera.rotation.z = this.shakeX * 0.01 + this.orbit;
+    this.camera.rotation.z = this.shakeX * 0.01 + this.orbit + overlay.roll;
     this.camera.rotation.x += this.rollTilt;
+    if (overlay.fovDelta !== 0 && Math.abs(this.clipMix) > 0) {
+      this.camera.fov = this.fov + overlay.fovDelta * this.clipMix;
+      this.camera.updateProjectionMatrix();
+    }
   }
 }

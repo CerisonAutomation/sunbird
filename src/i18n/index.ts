@@ -494,7 +494,10 @@ export function t(key: string, params?: Record<string, string | number>, default
     let result = rawText;
     for (const [k, v] of Object.entries(params)) {
       const strVal = String(v);
-      result = result.split(`{{${k}}}`).join(strVal).split(`{${k}}}`).join(strVal);
+      // `{{var}}` first so `{var}` cannot nibble the inner of a double-brace
+      // token. The previous `{${k}}}` pattern was `{name}}` and never matched
+      // `{name}` — which is why the pace-ghost toast printed the placeholder.
+      result = result.split(`{{${k}}}`).join(strVal).split(`{${k}}`).join(strVal);
     }
     return result;
   } catch {
