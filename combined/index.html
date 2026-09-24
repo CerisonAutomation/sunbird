@@ -1,0 +1,1922 @@
+<!doctype html>
+<title>Sunbird — Golden Flight</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#4aa0e8">
+<meta name="description" content="Sunbird — a one-button arcade glider. Hold to dive, release to soar, chase the daylight.">
+<script src="https://game-cdn.poki.com/scripts/v2/poki-sdk.js"></script>
+<style>
+:root {
+  --ink: #1a1510;
+  --paper: #fff9f0;
+  --paper2: #fff0d8;
+  --accent: #ff6b4a;
+  --gold: #ffc14d;
+  --bad: #d6453b;
+  --blue: #4a90e8;
+  --green: #42b862;
+  --mid: #888;
+  --r: 14px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: #f0e8d8;
+    --paper: #1a1510;
+    --paper2: #221c15;
+    --mid: #aaa;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ink: #f0e8d8;
+  --paper: #1a1510;
+  --paper2: #221c15;
+  --mid: #aaa;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; touch-action: none; user-select: none; }
+body { background: var(--paper); color: var(--ink); font: 14px/1.4 system-ui, sans-serif; }
+
+#canvas { position: fixed; inset: 0; display: block; width: 100%; height: 100%; }
+
+/* Speed-feel overlays */
+#vignette {
+  position: fixed; inset: 0; pointer-events: none; z-index: 3;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.7) 100%);
+  opacity: 0; transition: opacity 0.05s;
+}
+#streaks {
+  position: fixed; inset: 0; pointer-events: none; z-index: 3;
+  background: repeating-linear-gradient(90deg, transparent 0, transparent 48%, rgba(255,255,255,0.03) 49%, rgba(255,255,255,0.03) 51%, transparent 52%);
+  opacity: 0;
+}
+#altimeter {
+  position: fixed; right: 16px; top: calc(env(safe-area-inset-top,0px) + 16px);
+  z-index: 10; display: flex; flex-direction: column; align-items: flex-end; gap: 3px;
+  font-variant-numeric: tabular-nums; pointer-events: none;
+}
+#alt-bar-wrap { width: 6px; height: 64px; background: rgba(0,0,0,0.2); border-radius: 3px; overflow: hidden; }
+#alt-bar { width: 100%; height: 0%; background: linear-gradient(180deg,#ffec80,#ff9830); border-radius: 3px; transition: height 0.1s; }
+
+/* HUD */
+#hud {
+  position: fixed; inset: 0; pointer-events: none; z-index: 10;
+  display: flex; flex-direction: column; justify-content: space-between;
+  padding: env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px);
+}
+#hud-top {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 12px 16px 0;
+}
+#score-box { display: flex; flex-direction: column; gap: 2px; }
+#score { font-size: 32px; font-weight: 800; letter-spacing: -1px; line-height: 1; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+#best-line { font-size: 11px; color: rgba(255,255,255,0.7); font-weight: 600; }
+#combo-badge {
+  font-size: 13px; font-weight: 800; color: var(--gold);
+  text-shadow: 0 1px 6px rgba(0,0,0,0.6); opacity: 0;
+  transition: opacity 0.2s; letter-spacing: 0.5px;
+}
+#daylight-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+#daylight-bar-bg {
+  width: 120px; height: 8px; background: rgba(0,0,0,0.3);
+  border-radius: 4px; overflow: hidden;
+}
+#daylight-bar {
+  height: 100%; width: 100%;
+  background: linear-gradient(90deg, #ff9530 0%, #ffe030 50%, #fff080 100%);
+  border-radius: 4px; transition: width 0.2s;
+}
+#daylight-label { font-size: 10px; color: rgba(255,255,255,0.8); font-weight: 700; letter-spacing: 0.3px; }
+#coins-row { display: flex; align-items: center; gap: 6px; font-size: 13px; color: rgba(255,255,255,0.9); font-weight: 700; }
+#coins-icon { font-size: 14px; }
+
+#feedback {
+  position: fixed; left: 50%; top: 30%;
+  transform: translate(-50%,-50%);
+  font-size: 22px; font-weight: 900; letter-spacing: 0.5px;
+  color: #fff; text-shadow: 0 2px 12px rgba(0,0,0,0.6);
+  pointer-events: none; z-index: 20;
+  opacity: 0; transition: opacity 0.15s;
+}
+#feedback.show { opacity: 1; }
+
+#boost-indicator {
+  position: fixed; bottom: calc(env(safe-area-inset-bottom,0px) + 80px);
+  left: 50%; transform: translateX(-50%);
+  z-index: 10; pointer-events: none;
+  display: flex; gap: 6px;
+}
+.boost-pip {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: rgba(255,255,255,0.25);
+  transition: background 0.2s;
+}
+.boost-pip.ready { background: var(--gold); box-shadow: 0 0 8px var(--gold); }
+
+#biome-name {
+  position: fixed; left: 50%; top: 52px;
+  transform: translateX(-50%);
+  font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+  text-transform: uppercase; color: rgba(255,255,255,0.6);
+  pointer-events: none; z-index: 10;
+}
+
+/* Screens */
+.screen {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: var(--paper); color: var(--ink);
+  padding: 24px 20px calc(env(safe-area-inset-bottom,0px) + 24px);
+  overflow-y: auto; gap: 16px;
+}
+.screen[hidden] { display: none !important; }
+
+/* Boot */
+#s-boot { background: #0a0a14; color: #fff; gap: 12px; }
+#boot-logo { font-size: 40px; font-weight: 900; letter-spacing: -2px; color: var(--gold); }
+#boot-sub { font-size: 13px; color: rgba(255,255,255,0.5); letter-spacing: 2px; }
+#boot-bar-bg { width: 200px; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
+#boot-bar { height: 100%; width: 0%; background: var(--gold); border-radius: 2px; transition: width 0.3s; }
+
+/* Menu */
+#s-menu { background: linear-gradient(160deg, #1a3a5c 0%, #0d1f3c 100%); color: #fff; }
+#menu-bird { font-size: 64px; }
+#menu-title { font-size: 38px; font-weight: 900; letter-spacing: -2px; }
+#menu-sub { font-size: 13px; color: rgba(255,255,255,0.6); letter-spacing: 1px; }
+#menu-best { font-size: 16px; font-weight: 700; color: var(--gold); }
+#menu-btns { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 300px; margin-top: 8px; }
+.btn {
+  padding: 14px 24px; border: none; border-radius: var(--r);
+  font: 700 15px system-ui; cursor: pointer;
+  background: var(--accent); color: #fff;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  transition: transform 0.1s, box-shadow 0.1s;
+  letter-spacing: 0.3px;
+}
+.btn:active { transform: scale(0.97); box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+.btn.secondary { background: rgba(255,255,255,0.15); }
+.btn.gold { background: linear-gradient(135deg, var(--gold), #ffaa30); color: #1a0a00; }
+.btn.small { padding: 10px 18px; font-size: 13px; }
+#biome-picker { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; width: 100%; max-width: 340px; }
+.biome-btn {
+  padding: 10px 6px; border: 2px solid rgba(255,255,255,0.15); border-radius: 10px;
+  background: rgba(255,255,255,0.08); color: #fff; font: 700 11px system-ui;
+  cursor: pointer; text-align: center; gap: 4px; display: flex; flex-direction: column;
+  align-items: center; transition: border-color 0.15s, background 0.15s;
+}
+.biome-btn:active { background: rgba(255,255,255,0.2); }
+.biome-btn.sel { border-color: var(--gold); background: rgba(255,193,77,0.15); }
+.biome-btn .bi-emoji { font-size: 20px; }
+.biome-btn .bi-name { font-size: 10px; opacity: 0.9; }
+
+/* Pause */
+#s-pause { background: rgba(0,0,0,0.85); color: #fff; }
+#pause-dist { font-size: 48px; font-weight: 900; color: var(--gold); }
+#pause-label { font-size: 12px; letter-spacing: 2px; color: rgba(255,255,255,0.5); }
+
+/* Over / Revive */
+#s-over { background: linear-gradient(160deg,#1e0808,#3c1818); color: #fff; }
+#s-revive { background: linear-gradient(160deg,#1a1f0a,#2c3a0d); color: #fff; }
+#over-dist { font-size: 56px; font-weight: 900; letter-spacing: -2px; color: var(--gold); }
+#over-label { font-size: 12px; letter-spacing: 3px; color: rgba(255,255,255,0.5); text-transform: uppercase; }
+#over-best { font-size: 15px; font-weight: 700; color: var(--green); }
+#over-coins { font-size: 20px; font-weight: 800; color: var(--gold); }
+#revive-timer { font-size: 36px; font-weight: 900; color: var(--gold); }
+#revive-cost { font-size: 14px; color: rgba(255,255,255,0.7); }
+
+/* Nest / Shop */
+#s-nest { background: var(--paper); }
+#nest-coins { font-size: 28px; font-weight: 900; color: var(--gold); }
+.upg-card {
+  width: 100%; max-width: 320px;
+  padding: 14px 16px; border-radius: var(--r);
+  background: var(--paper2); border: 2px solid transparent;
+  display: flex; flex-direction: column; gap: 6px;
+  transition: border-color 0.2s;
+}
+.upg-card.maxed { opacity: 0.5; }
+.upg-card-top { display: flex; justify-content: space-between; align-items: center; }
+.upg-name { font-weight: 800; font-size: 15px; }
+.upg-cost { font-size: 13px; font-weight: 700; color: var(--gold); }
+.upg-desc { font-size: 12px; color: var(--mid); }
+.upg-dots { display: flex; gap: 4px; }
+.upg-dot { width: 10px; height: 10px; border-radius: 50%; background: rgba(0,0,0,0.12); }
+.upg-dot.filled { background: var(--accent); }
+
+/* Achievements */
+#s-goals .ach-row {
+  display: flex; gap: 10px; align-items: center;
+  padding: 10px 0; border-bottom: 1px solid rgba(0,0,0,0.07); width: 100%; max-width: 360px;
+}
+.ach-icon { font-size: 22px; width: 32px; text-align: center; }
+.ach-info { flex: 1; }
+.ach-name { font-weight: 700; font-size: 13px; }
+.ach-desc { font-size: 11px; color: var(--mid); }
+.ach-done { font-size: 16px; }
+
+/* Skins */
+#s-skins .skin-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; width: 100%; max-width: 360px; }
+.skin-card {
+  padding: 12px; border-radius: var(--r); border: 2px solid transparent;
+  background: var(--paper2); text-align: center; cursor: pointer;
+  transition: border-color 0.15s;
+}
+.skin-card.sel { border-color: var(--accent); }
+.skin-card.locked { opacity: 0.5; }
+.skin-icon { font-size: 28px; }
+.skin-name { font-size: 11px; font-weight: 700; margin-top: 4px; }
+.skin-price { font-size: 10px; color: var(--gold); }
+
+/* Header row for nav screens */
+.screen-header {
+  width: 100%; max-width: 380px; display: flex; align-items: center;
+  justify-content: space-between; margin-bottom: 4px;
+}
+.back-btn {
+  background: none; border: none; font-size: 22px; cursor: pointer;
+  color: var(--ink); padding: 4px;
+}
+.screen-title { font-size: 18px; font-weight: 900; letter-spacing: -0.5px; }
+
+/* Thermal indicator */
+#thermal-ring {
+  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom,0px) + 110px);
+  transform: translateX(-50%);
+  font-size: 22px; z-index: 10; pointer-events: none;
+  opacity: 0; transition: opacity 0.3s;
+}
+</style>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<!-- Bootstrap: Safe Store + Crash Journal + Poki SDK gate -->
+<script>
+(function(){
+  'use strict';
+  const PREFIX = 'poki_ignore.';
+  const mem = {};
+  const Store = window.Store = {
+    get(k, d=null) {
+      try { const v = localStorage.getItem(PREFIX+k); return v==null?d:JSON.parse(v); }
+      catch { return mem[k]??d; }
+    },
+    set(k, v) {
+      try { localStorage.setItem(PREFIX+k, JSON.stringify(v)); }
+      catch {}
+      mem[k] = v;
+    },
+    remove(k) {
+      try { localStorage.removeItem(PREFIX+k); } catch {}
+      delete mem[k];
+    }
+  };
+
+  // Crash Journal
+  const CJ_KEY = 'crash_journal';
+  const CJ_MAX = 5;
+  const _fp = {};
+  const CJ = window.CrashJournal = {
+    log(err) {
+      try {
+        const msg = (err?.message||String(err)).replace(/https?:\/\/\S+/g,'[url]').slice(0,200);
+        const key = msg.slice(0,60);
+        const now = Date.now();
+        if (_fp[key] && now - _fp[key] < 30000) return;
+        _fp[key] = now;
+        const entries = Store.get(CJ_KEY, []);
+        entries.unshift({ ts: now, msg, stack: (err?.stack||'').slice(0,300).replace(/https?:\/\/\S+/g,'[url]') });
+        Store.set(CJ_KEY, entries.slice(0, CJ_MAX));
+      } catch {}
+    },
+    get() { return Store.get(CJ_KEY, []); }
+  };
+  window.addEventListener('error', e => CJ.log(e.error||e.message));
+  window.addEventListener('unhandledrejection', e => CJ.log(e.reason));
+
+  // Poki SDK
+  const P = window.Poki = {
+    _ready: false, _resolvers: [],
+    ready(fn) { this._ready ? fn() : this._resolvers.push(fn); },
+    _resolve() { this._ready=true; this._resolvers.forEach(f=>f()); this._resolvers=[]; },
+    gameplayStart() { try { PokiSDK?.gameplayStart(); } catch{} },
+    gameplayStop() { try { PokiSDK?.gameplayStop(); } catch{} },
+    happyTime(f=1) { try { PokiSDK?.happyTime(f); } catch{} },
+    commercialBreak() { return new Promise(r => { try { (PokiSDK?.commercialBreak()||Promise.resolve()).then(r).catch(r); } catch{r();} }); },
+    rewardedBreak() { return new Promise(r => { try { (PokiSDK?.rewardedBreak?.()||Promise.resolve()).then(b=>r(!!b)).catch(()=>r(false)); } catch{r(false);} }); }
+  };
+  if (typeof PokiSDK !== 'undefined') {
+    PokiSDK.init().then(()=>P._resolve()).catch(()=>P._resolve());
+  } else {
+    P._resolve();
+  }
+})();
+</script>
+
+<!-- Screens -->
+<canvas id="canvas"></canvas>
+
+<div id="vignette"></div>
+<div id="streaks"></div>
+
+<div id="hud" hidden>
+  <div id="hud-top">
+    <div id="score-box">
+      <div id="score">0</div>
+      <div id="best-line">BEST 0</div>
+      <div id="combo-badge"></div>
+    </div>
+    <div id="daylight-wrap">
+      <div id="daylight-bar-bg"><div id="daylight-bar"></div></div>
+      <div id="daylight-label">☀ DAYLIGHT</div>
+      <div id="coins-row"><span id="coins-icon">🪙</span><span id="coins-hud">0</span></div>
+    </div>
+  </div>
+</div>
+<div id="feedback"></div>
+<div id="biome-name"></div>
+<div id="thermal-ring">🌀</div>
+<div id="boost-indicator">
+  <div class="boost-pip ready" id="pip0"></div>
+</div>
+
+<div id="altimeter" hidden>
+  <div id="alt-bar-wrap"><div id="alt-bar"></div></div>
+</div>
+
+<!-- Boot screen -->
+<section class="screen" id="s-boot">
+  <div id="boot-logo">SUNBIRD</div>
+  <div id="boot-sub">GOLDEN FLIGHT</div>
+  <div id="boot-bar-bg"><div id="boot-bar"></div></div>
+</section>
+
+<!-- Menu -->
+<section class="screen" id="s-menu" hidden>
+  <div id="menu-bird">🐦</div>
+  <div id="menu-title">SUNBIRD</div>
+  <div id="menu-sub">TAP &amp; HOLD TO DIVE</div>
+  <div id="menu-best"></div>
+  <div id="biome-picker" id="biome-picker"></div>
+  <div id="menu-btns">
+    <button class="btn" id="btn-play">FLY NOW</button>
+    <button class="btn secondary" id="btn-daily">☀ DAILY CHALLENGE</button>
+    <div style="display:flex;gap:8px;width:100%">
+      <button class="btn secondary" id="btn-nest" style="flex:1">🪺 NEST</button>
+      <button class="btn secondary" id="btn-skins" style="flex:1">🎨 SKINS</button>
+      <button class="btn secondary" id="btn-goals" style="flex:1">🏆 GOALS</button>
+    </div>
+  </div>
+</section>
+
+<!-- Pause -->
+<section class="screen" id="s-pause" hidden>
+  <div id="pause-dist">0</div>
+  <div id="pause-label">METRES FLOWN</div>
+  <div id="menu-btns" style="margin-top:16px">
+    <button class="btn" id="btn-resume">CONTINUE</button>
+    <button class="btn secondary" id="btn-quit-pause">QUIT RUN</button>
+  </div>
+</section>
+
+<!-- Revive -->
+<section class="screen" id="s-revive" hidden>
+  <div style="font-size:40px">🌅</div>
+  <div style="font-size:22px;font-weight:900">KEEP FLYING?</div>
+  <div id="revive-timer">15</div>
+  <div id="revive-cost"></div>
+  <div id="menu-btns" style="margin-top:8px">
+    <button class="btn gold" id="btn-revive-watch">📺 WATCH AD</button>
+    <button class="btn secondary" id="btn-revive-skip">NO THANKS</button>
+  </div>
+</section>
+
+<!-- Game Over -->
+<section class="screen" id="s-over" hidden>
+  <div style="font-size:36px">🌇</div>
+  <div id="over-label">DISTANCE</div>
+  <div id="over-dist">0</div>
+  <div id="over-best"></div>
+  <div id="over-coins"></div>
+  <div id="menu-btns" style="margin-top:8px">
+    <button class="btn" id="btn-retry">FLY AGAIN</button>
+    <button class="btn secondary" id="btn-menu-from-over">MENU</button>
+  </div>
+</section>
+
+<!-- Nest (upgrades) -->
+<section class="screen" id="s-nest" hidden>
+  <div class="screen-header">
+    <button class="back-btn" id="btn-nest-back">←</button>
+    <div class="screen-title">🪺 NEST</div>
+    <div id="nest-coins">0🪙</div>
+  </div>
+  <div id="upg-list" style="display:flex;flex-direction:column;gap:10px;width:100%;max-width:360px"></div>
+</section>
+
+<!-- Skins -->
+<section class="screen" id="s-skins" hidden>
+  <div class="screen-header">
+    <button class="back-btn" id="btn-skins-back">←</button>
+    <div class="screen-title">🎨 SKINS</div>
+    <div id="skins-coins">0🪙</div>
+  </div>
+  <div class="skin-grid" id="skin-grid"></div>
+</section>
+
+<!-- Goals / Achievements -->
+<section class="screen" id="s-goals" hidden>
+  <div class="screen-header">
+    <button class="back-btn" id="btn-goals-back">←</button>
+    <div class="screen-title">🏆 GOALS</div>
+    <div id="goals-done" style="font-size:13px;font-weight:700;color:var(--accent)"></div>
+  </div>
+  <div id="ach-list" style="display:flex;flex-direction:column;width:100%;max-width:360px"></div>
+</section>
+
+<script type="module">
+import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+// ─── Constants ───────────────────────────────────────────────────────────────
+const STEP = 1/120, G = 24, G_DIVE = 98, G_GROUND = 18, G_GROUND_DIVE = 58;
+const DRAG_GLIDE = 0.00062, DRAG_DIVE = 0.00014, GROUND_FRICTION = 0.024;
+const LIFT_MAX = 0.35, LIFT_SPEED = 52;
+const STICK_DIVE = 210, STICK_GLIDE = 18;
+const VMAX = 118, VMAX_FEVER = 142, R = 0.9;
+const SUNFLOWER_VY = 36, SUNFLOWER_VX = 36;
+const LAND_PERFECT = 0.985, LAND_GOOD = 0.94, LAND_GOOD_KEEP = 1.02, LAND_BAD_MIN = 0.70;
+const LAUNCH_WINDOW = 1.35, BOOST_PERFECT = 1.145, BOOST_GREAT = 1.07, BOOST_GOOD = 1.02;
+const RATING_PERFECT = 0.84, RATING_GREAT = 0.68, RATING_GOOD = 0.42;
+const MANUAL_BOOST_SPEED = 38, MANUAL_BOOST_TIME = 1.35, MANUAL_BOOST_CD = 2.8;
+const ZENITH_ALT = 42, ZENITH_SLOWMO = 0.22, ZENITH_DURATION = 0.55;
+const ALT_SKY = 26, ALT_CLOUDS = 52, ALT_HIGH = 88;
+const ISL = 920, DROP_START = 600, GAP_START = 760, OCEAN_FLOOR = -18;
+const CELL = 72, CELL_RES = 1.8, TZ = 11;
+const DAYLIGHT_MAX = 52, DAY_ISLAND = 15, DAY_OCEAN = 4.5;
+const FEVER_NEED = 3, FEVER_DURATION = 9;
+const COIN_VALUE = 1, MAGNET_R = 15, MAGNET_R_NORMAL = 1.7;
+const SKEY = 'sunbird.save.v4';
+const TN = 28, PN = 520, COIN_CAP = 240, TREE_CAP = 110, ROCK_CAP = 70, TUFT_CAP = 130;
+
+// ─── Biomes ──────────────────────────────────────────────────────────────────
+const BIOMES = [
+  { id:'green',    name:'Green Hills',     emoji:'🌿', tagline:'Quick rollers — learn dive→release, sunflower trampolines',
+    amp:0.82, wave:0.82, top:0x86dc7e, ridge:0x4aa85c, mid:0x2f7d5b, deep:0x1d4d4a, sand:0xd8b681,
+    farA:0x6bb87a, farB:0x4d8aaa, farC:0x4a68a0, skyTop:0x2a9af0, skyHorizon:0xb4dff0,
+    cloudTint:0xffffff, cloudDensity:0.12, deco:'tree', thermals:2, hazard:'none', glow:false },
+  { id:'tropical', name:'Tropical Atoll',  emoji:'🏝', tagline:'Turquoise thermals — chain updrafts, never touch ground',
+    amp:0.88, wave:0.78, top:0x7ff0b0, ridge:0x35c48a, mid:0x1f8f80, deep:0x14555e, sand:0xfff0c0,
+    farA:0x54d6b0, farB:0x2f9ec0, farC:0x2a6ea8, skyTop:0x30d0e8, skyHorizon:0xd8fbff,
+    cloudTint:0xe8ffff, cloudDensity:0.42, deco:'palm', thermals:6, hazard:'none', glow:false },
+  { id:'reef',     name:'Coral Reach',     emoji:'🐚', tagline:'Pastel lagoons, tall thermals — surf, don\'t glide',
+    amp:0.92, wave:0.84, top:0xffc9d8, ridge:0xf09ab8, mid:0x2fb4a8, deep:0x14707a, sand:0xffe8d0,
+    farA:0x62c8c0, farB:0x4a9ec8, farC:0x4a68a0, skyTop:0x3ab8e8, skyHorizon:0xffd8e8,
+    cloudTint:0xfff0f6, cloudDensity:0.36, deco:'palm', thermals:7, hazard:'none', glow:false },
+  { id:'sunset',   name:'Sunset Ridge',    emoji:'🌇', tagline:'Violet speed valleys — dive hard, release late for 2× distance',
+    amp:1.02, wave:0.92, top:0xd98ac0, ridge:0x9a5a9e, mid:0x5f3a7a, deep:0x33224e, sand:0xe8a877,
+    farA:0xc46a8a, farB:0x8a4a80, farC:0x4a3060, skyTop:0xf0784a, skyHorizon:0xffc79a,
+    cloudTint:0xffc8a0, cloudDensity:0.34, deco:'pine', thermals:3, hazard:'none', glow:false },
+  { id:'desert',   name:'Dune Sea',        emoji:'🏜', tagline:'Big ramps, sand thermals — huge air but thermals catch you',
+    amp:1.15, wave:1.05, top:0xf2cf7a, ridge:0xdc9a4a, mid:0xb0603a, deep:0x6a3524, sand:0xf7e6b8,
+    farA:0xd8a86a, farB:0xb46a4a, farC:0x8a4a52, skyTop:0xf0a850, skyHorizon:0xffe6b0,
+    cloudTint:0xffe8c8, cloudDensity:0.42, deco:'cactus', thermals:7, hazard:'none', glow:false },
+  { id:'night',    name:'Midnight Coast',  emoji:'🌙', tagline:'Glowing rings under moon — storm clouds chase you',
+    amp:0.95, wave:0.88, top:0x3f5a8a, ridge:0x2c3f68, mid:0x1d2848, deep:0x10162c, sand:0x54648a,
+    farA:0x2a3c66, farB:0x1e2a4c, farC:0x141c34, skyTop:0x0d1030, skyHorizon:0x2a2f60,
+    cloudTint:0x8090c8, cloudDensity:0.32, deco:'pine', thermals:3, hazard:'storm', glow:true },
+  { id:'aurora',   name:'Aurora Peaks',    emoji:'🔮', tagline:'Ice lips + gust walls — tuck to punch, release to soar',
+    amp:1.25, wave:0.92, top:0xe6f7ff, ridge:0x9fd0ee, mid:0x5a7fc0, deep:0x2c3a72, sand:0xdcebff,
+    farA:0x7a9ed8, farB:0x5a68b8, farC:0x3a3f80, skyTop:0x1b2a68, skyHorizon:0x62e8c8,
+    cloudTint:0xd8fff4, cloudDensity:0.34, deco:'crystal', thermals:5, hazard:'gust', glow:true },
+  { id:'volcano',  name:'Cinder Forge',    emoji:'🌋', tagline:'Black glass + ash storms — low, fast, dodge or dive',
+    amp:1.32, wave:0.78, top:0x5a4448, ridge:0x3c2a30, mid:0x281a20, deep:0x140c10, sand:0x6a5248,
+    farA:0x4a3038, farB:0x38222c, farC:0x241418, skyTop:0x2a1418, skyHorizon:0xff7a3a,
+    cloudTint:0x9a6858, cloudDensity:0.28, deco:'spire', thermals:8, hazard:'storm', glow:true },
+  { id:'canyon',   name:'Skyreach Canyon', emoji:'🏔', tagline:'Red walls, monster lips — biggest launches, gust crosswinds',
+    amp:1.45, wave:1.02, top:0xe08a5a, ridge:0xb85c3c, mid:0x8a3c2c, deep:0x501f18, sand:0xf0c090,
+    farA:0xc07850, farB:0x94503c, farC:0x63302a, skyTop:0x3a78c8, skyHorizon:0xffd8a8,
+    cloudTint:0xffeedd, cloudDensity:0.38, deco:'cactus', thermals:6, hazard:'gust', glow:false },
+];
+
+// ─── Skins ────────────────────────────────────────────────────────────────────
+const SKINS = [
+  { id:'default', name:'Sunrise',    emoji:'☀️', cost:0,    body:0xf7b84c, wing:0xe87a30, belly:0xfff0c0, beak:0xff8c30, crest:0xff6b4a },
+  { id:'ocean',   name:'Deep Blue',  emoji:'🌊', cost:200,  body:0x4a90e8, wing:0x2060c0, belly:0xe8f4ff, beak:0xffcc40, crest:0x80d0ff },
+  { id:'mint',    name:'Fresh Mint', emoji:'🌿', cost:300,  body:0x42c87a, wing:0x2a8a50, belly:0xeafff0, beak:0xffcc40, crest:0x80ffb8 },
+  { id:'rose',    name:'Rose Petal', emoji:'🌸', cost:400,  body:0xe87aa8, wing:0xb84878, belly:0xfff0f6, beak:0xffcc40, crest:0xffb0d8 },
+  { id:'gold',    name:'Golden',     emoji:'✨', cost:800,  body:0xffd700, wing:0xc8960a, belly:0xfff8d0, beak:0xff9020, crest:0xffec80 },
+  { id:'void',    name:'Void',       emoji:'🌑', cost:1200, body:0x1a1020, wing:0x080810, belly:0x2a1840, beak:0x8040ff, crest:0x5030b0 },
+];
+
+// ─── Upgrades ─────────────────────────────────────────────────────────────────
+const UPG = [
+  { id:'tw', name:'Tailwind',      emoji:'💨', desc:'Passive speed bonus',         costs:[80,160,320],  max:3 },
+  { id:'lf', name:'Lucky Feathers',emoji:'🪶', desc:'Coins multiply on combos',     costs:[120,240,480], max:3 },
+  { id:'cc', name:'Coin Charm',    emoji:'🪙', desc:'Wider magnet pull',            costs:[100,200,400], max:3 },
+  { id:'sb', name:'Sun Blessing',  emoji:'🌞', desc:'More daylight from islands',   costs:[150,300,600], max:3 },
+];
+
+// ─── Achievements ─────────────────────────────────────────────────────────────
+const ACH = [
+  { id:'first',    name:'First Flight',   emoji:'🐣', desc:'Complete your first run',        req:d=>d.runs>=1 },
+  { id:'dist500',  name:'500 Metres',     emoji:'📏', desc:'Fly 500m in one run',            req:d=>d.best>=500 },
+  { id:'dist1k',   name:'1 Kilometre',    emoji:'🏅', desc:'Fly 1000m in one run',           req:d=>d.best>=1000 },
+  { id:'dist3k',   name:'3 Kilometres',   emoji:'🥈', desc:'Fly 3000m in one run',           req:d=>d.best>=3000 },
+  { id:'dist5k',   name:'5 Kilometres',   emoji:'🥇', desc:'Fly 5000m in one run',           req:d=>d.best>=5000 },
+  { id:'dist10k',  name:'10K Soarer',     emoji:'🏆', desc:'Fly 10000m in one run',          req:d=>d.best>=10000 },
+  { id:'fever1',   name:'Fever Pitch',    emoji:'🔥', desc:'Trigger fever mode',             req:d=>d.feverCount>=1 },
+  { id:'fever10',  name:'Fever Master',   emoji:'🌋', desc:'Trigger fever mode 10 times',    req:d=>d.feverCount>=10 },
+  { id:'combo5',   name:'Combo King',     emoji:'⚡', desc:'Get a 5-combo launch',           req:d=>d.maxCombo>=5 },
+  { id:'perfland', name:'Feather Touch',  emoji:'🪶', desc:'10 perfect landings',            req:d=>d.perfectLands>=10 },
+  { id:'coins500', name:'Coin Hoarder',   emoji:'💰', desc:'Collect 500 total coins',        req:d=>d.totalCoins>=500 },
+  { id:'coins2k',  name:'Treasure Trove', emoji:'🪙', desc:'Collect 2000 total coins',       req:d=>d.totalCoins>=2000 },
+  { id:'runs10',   name:'Flock of 10',    emoji:'🐦', desc:'Complete 10 runs',               req:d=>d.runs>=10 },
+  { id:'runs50',   name:'Migration',      emoji:'🌍', desc:'Complete 50 runs',               req:d=>d.runs>=50 },
+  { id:'biome3',   name:'Biome Explorer', emoji:'🗺', desc:'Fly in 3 different biomes',      req:d=>Object.keys(d.biomesFlown||{}).length>=3 },
+  { id:'biome9',   name:'World Traveller',emoji:'✈️', desc:'Fly in all 9 biomes',            req:d=>Object.keys(d.biomesFlown||{}).length>=9 },
+  { id:'allskins', name:'Wardrobe',       emoji:'👗', desc:'Unlock all skins',               req:d=>d.unlockedSkins?.length>=6 },
+  { id:'allupg',   name:'Fully Upgraded', emoji:'⚙️', desc:'Max out all upgrades',           req:d=>Object.values(d.upgrades||{}).every(v=>v>=3) },
+  { id:'zenith',   name:'Zenith Rider',   emoji:'🌤', desc:'Reach zenith altitude',          req:d=>d.zenithCount>=1 },
+  { id:'thermal5', name:'Thermal Chain',  emoji:'🌀', desc:'Catch 5 thermals in one run',    req:d=>d.maxThermalsRun>=5 },
+  { id:'daily',    name:'Daily Devotion', emoji:'📅', desc:'Complete a daily challenge',     req:d=>d.dailyCompleted>=1 },
+];
+
+// ─── Music ─────────────────────────────────────────────────────────────────────
+const CHORDS = [
+  [261,329,392,523], [293,370,440,587], [349,440,523,698],
+  [392,493,587,784], [329,415,493,659], [261,311,392,523],
+];
+// Melody sequences for each chord (MIDI semitones above root, 0=skip)
+const MELODIES = [
+  [0,4,7,12,7,4,0,7, 12,7,4,0,4,7,0,4, 7,12,0,7,4,7,4,0, 7,4,12,7,0,4,7,4],
+  [0,5,9,12,9,5,0,9, 12,9,5,0,5,9,0,5, 9,12,0,9,5,9,5,0, 9,5,12,9,0,5,9,5],
+  [0,3,7,10,7,3,0,7, 10,7,3,0,3,7,0,3, 7,10,0,7,3,7,3,0, 7,3,10,7,0,3,7,3],
+];
+
+// ─── RNG ──────────────────────────────────────────────────────────────────────
+function mulberry32(s) {
+  return function() {
+    s|=0; s=s+0x6D2B79F5|0;
+    let t=Math.imul(s^s>>>15,1|s);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return ((t^t>>>14)>>>0)/4294967296;
+  };
+}
+
+// ─── Save data ────────────────────────────────────────────────────────────────
+const DEFAULT_SAVE = {
+  coins:0, totalCoins:0, best:0, runs:0, feverCount:0, maxCombo:0,
+  perfectLands:0, zenithCount:0, dailyCompleted:0, maxThermalsRun:0,
+  skin:'default', unlockedSkins:['default'],
+  upgrades:{tw:0,lf:0,cc:0,sb:0},
+  achievements:{},
+  biomesFlown:{},
+  daily:{date:'',score:0,done:false},
+};
+let save = { ...DEFAULT_SAVE, ...Store.get(SKEY, {}) };
+// ensure nested structures exist
+save.upgrades = { ...DEFAULT_SAVE.upgrades, ...(save.upgrades||{}) };
+save.biomesFlown = save.biomesFlown||{};
+save.unlockedSkins = save.unlockedSkins||['default'];
+save.achievements = save.achievements||{};
+
+function savePersist() { Store.set(SKEY, save); }
+function upgLevel(id) { return save.upgrades[id]||0; }
+
+// ─── Terrain height ───────────────────────────────────────────────────────────
+let _biome = BIOMES[0];
+function hillY(x, amp=_biome.amp, wave=_biome.wave) {
+  const base = amp * (
+    14 * Math.sin(x * 0.0220 * wave) +
+    8  * Math.sin(x * 0.0470 * wave + 1.3) +
+    5  * Math.sin(x * 0.0910 * wave + 2.7) +
+    3  * Math.sin(x * 0.1730 * wave + 0.8)
+  );
+  // Island blending
+  const iOff = x % ISL;
+  const iFrac = iOff / ISL;
+  if (iOff < 0 || iFrac > (GAP_START/ISL)) {
+    // ocean gap
+    const gapFrac = Math.max(0, (iOff - GAP_START) / (ISL - GAP_START));
+    const blend = Math.max(0, Math.min(1, gapFrac * 3));
+    return base * (1-blend) + OCEAN_FLOOR * blend;
+  }
+  if (iFrac < (DROP_START/ISL) * 0.6) {
+    // entry ramp
+    const t = Math.min(1, iOff / (DROP_START * 0.5));
+    return base * (0.3 + 0.7 * t);
+  }
+  return base;
+}
+function slopeAt(x) { return (hillY(x+0.5)-hillY(x-0.5)); }
+
+// ─── SpeedFeel ────────────────────────────────────────────────────────────────
+const CRUISE=0.40, RUSH=0.65, WARP=0.82;
+function warpT(norm) {
+  if (!isFinite(norm)) return 0;
+  return Math.max(0,Math.min(1,(norm-CRUISE)/(WARP-CRUISE)));
+}
+function glideLiftScale(airSecs) {
+  if (airSecs < 2.5) return 1;
+  const t = Math.max(0, Math.min(1, (airSecs-2.5)/4.0));
+  return 1*(1-t)+0.32*t;
+}
+
+// ─── Three.js setup ──────────────────────────────────────────────────────────
+const canvas = document.getElementById('canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = false;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(62, 1, 0.5, 800);
+camera.position.set(0, 14, 24);
+
+// ─── Sky dome ─────────────────────────────────────────────────────────────────
+const skyGeo = new THREE.SphereGeometry(500, 16, 8);
+skyGeo.scale(-1,1,1);
+const skyMat = new THREE.ShaderMaterial({
+  uniforms: {
+    uTop:     { value: new THREE.Color(0x2a9af0) },
+    uHorizon: { value: new THREE.Color(0xb4dff0) },
+    uNight:   { value: new THREE.Color(0x05080c) },
+    uSunDir:  { value: new THREE.Vector3(0.6,0.3,-0.8) },
+    uDayT:    { value: 1.0 },
+  },
+  vertexShader: `
+    varying vec3 vPos;
+    void main() { vPos = position; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1); }
+  `,
+  fragmentShader: `
+    uniform vec3 uTop, uHorizon, uNight, uSunDir;
+    uniform float uDayT;
+    varying vec3 vPos;
+    void main() {
+      float h = clamp(normalize(vPos).y, 0.0, 1.0);
+      vec3 day = mix(uHorizon, uTop, pow(h, 0.6));
+      vec3 col = mix(uNight, day, uDayT);
+      float sun = max(0., dot(normalize(vPos), uSunDir));
+      col += vec3(1,.95,.6) * pow(sun, 80.) * uDayT;
+      col += vec3(.5,.4,.15) * pow(sun, 8.) * uDayT * 0.3;
+      // stars at night
+      if (uDayT < 0.6) {
+        float starT = 1.0 - uDayT/0.6;
+        float sp = fract(sin(dot(normalize(vPos),vec3(127.,311.,97.)))*43758.5);
+        col += step(0.995, sp) * starT * vec3(1.0,0.95,0.8);
+      }
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `,
+  side: THREE.BackSide,
+  depthWrite: false,
+});
+const sky = new THREE.Mesh(skyGeo, skyMat);
+scene.add(sky);
+
+// ─── Ambient + sun light ──────────────────────────────────────────────────────
+const ambLight = new THREE.AmbientLight(0xffeedd, 0.8);
+scene.add(ambLight);
+const sunLight = new THREE.DirectionalLight(0xfffaec, 1.4);
+sunLight.position.set(60, 80, -30);
+scene.add(sunLight);
+
+// ─── Terrain ─────────────────────────────────────────────────────────────────
+const CHUNKS_BACK = 4, CHUNKS_FWD = 14, CHUNKS_TOTAL = CHUNKS_BACK+CHUNKS_FWD+1;
+const terrainGroup = new THREE.Group();
+scene.add(terrainGroup);
+
+function makeChunkMesh(cx) {
+  const segs = Math.ceil(CELL/CELL_RES);
+  const geo = new THREE.PlaneGeometry(CELL, TZ*2, segs, 1);
+  geo.rotateX(-Math.PI/2);
+  const pos = geo.attributes.position;
+  const col = new Float32Array(pos.count*3);
+  for (let i=0;i<pos.count;i++) {
+    const x = pos.getX(i)+cx*CELL;
+    const y = hillY(x);
+    pos.setY(i, y);
+    // colour by height & biome
+    const norm = Math.max(0,Math.min(1,(y+5)/28));
+    const c = new THREE.Color(norm<0.35?_biome.mid:norm<0.65?_biome.ridge:_biome.top);
+    col[i*3]=c.r; col[i*3+1]=c.g; col[i*3+2]=c.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(col,3));
+  pos.needsUpdate = true;
+  geo.computeVertexNormals();
+  const mat = new THREE.MeshLambertMaterial({ vertexColors:true });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.userData.cx = cx;
+  return mesh;
+}
+
+let chunkPool = [];
+let leadChunk = 0;
+function initTerrain() {
+  terrainGroup.clear();
+  chunkPool = [];
+  for (let i=-CHUNKS_BACK; i<=CHUNKS_FWD; i++) {
+    const m = makeChunkMesh(i);
+    terrainGroup.add(m);
+    chunkPool.push(m);
+    leadChunk = Math.max(leadChunk, i);
+  }
+}
+
+function updateTerrain(camX) {
+  const camCX = Math.floor(camX/CELL);
+  for (const m of chunkPool) {
+    const cx = m.userData.cx;
+    if (cx < camCX - CHUNKS_BACK) {
+      // recycle to front
+      const newCX = cx + CHUNKS_TOTAL;
+      m.userData.cx = newCX;
+      m.position.x = 0;
+      // rebuild verts
+      const pos = m.geometry.attributes.position;
+      const col = m.geometry.attributes.color;
+      const segs = Math.ceil(CELL/CELL_RES);
+      for (let i=0;i<pos.count;i++) {
+        const lx = pos.getX(i);
+        const x = lx + newCX*CELL;
+        const y = hillY(x);
+        pos.setY(i,y);
+        const norm = Math.max(0,Math.min(1,(y+5)/28));
+        const c = new THREE.Color(norm<0.35?_biome.mid:norm<0.65?_biome.ridge:_biome.top);
+        col.setXYZ(i,c.r,c.g,c.b);
+      }
+      pos.needsUpdate = true;
+      col.needsUpdate = true;
+      m.geometry.computeVertexNormals();
+    }
+  }
+}
+
+// ─── Backdrop parallax hills ──────────────────────────────────────────────────
+function makeBackdropLayer(yBase, depth, color, count) {
+  const group = new THREE.Group();
+  for (let i=0; i<count; i++) {
+    const w = 60+Math.random()*80, h = 8+Math.random()*16;
+    const geo = new THREE.PlaneGeometry(w,h);
+    const mat = new THREE.MeshBasicMaterial({ color, transparent:true, opacity:0.7 });
+    const m = new THREE.Mesh(geo,mat);
+    m.position.set(i*100-200, yBase+Math.random()*6, -depth);
+    group.add(m);
+  }
+  return group;
+}
+const backdropA = makeBackdropLayer(10, 120, new THREE.Color(_biome.farA), 8);
+const backdropB = makeBackdropLayer(6,  160, new THREE.Color(_biome.farB), 6);
+const backdropC = makeBackdropLayer(3,  200, new THREE.Color(_biome.farC), 5);
+scene.add(backdropA); scene.add(backdropB); scene.add(backdropC);
+
+// ─── Clouds ───────────────────────────────────────────────────────────────────
+const cloudMeshes = [];
+for (let i=0;i<9;i++) {
+  const geo = new THREE.SphereGeometry(6+Math.random()*10, 5, 4);
+  geo.scale(1+Math.random()*0.5, 0.5+Math.random()*0.3, 0.8);
+  const mat = new THREE.MeshLambertMaterial({ color:_biome.cloudTint||0xffffff, transparent:true, opacity:0.55+Math.random()*0.25 });
+  const m = new THREE.Mesh(geo,mat);
+  m.position.set(-100+Math.random()*400, 30+Math.random()*30, -60-Math.random()*80);
+  cloudMeshes.push(m);
+  scene.add(m);
+}
+
+// ─── Bird ─────────────────────────────────────────────────────────────────────
+function makeBirdMesh(sk) {
+  const s = SKINS.find(s=>s.id===sk)||SKINS[0];
+  const g = new THREE.Group();
+  // body
+  const bodyGeo = new THREE.SphereGeometry(1,8,6); bodyGeo.scale(1.4,0.8,0.9);
+  g.add(new THREE.Mesh(bodyGeo, new THREE.MeshLambertMaterial({color:s.body})));
+  // belly
+  const bellyGeo = new THREE.SphereGeometry(0.7,6,4); bellyGeo.scale(1.2,0.6,0.8);
+  const bm = new THREE.Mesh(bellyGeo, new THREE.MeshLambertMaterial({color:s.belly}));
+  bm.position.set(0,-0.25,0); g.add(bm);
+  // beak
+  const beakGeo = new THREE.ConeGeometry(0.22,0.7,4); beakGeo.rotateZ(-Math.PI/2);
+  const beak = new THREE.Mesh(beakGeo, new THREE.MeshLambertMaterial({color:s.beak}));
+  beak.position.set(1.3,0.05,0); g.add(beak);
+  // crest
+  const crestGeo = new THREE.ConeGeometry(0.15,0.5,3);
+  const crest = new THREE.Mesh(crestGeo, new THREE.MeshLambertMaterial({color:s.crest}));
+  crest.position.set(0.3,0.7,0); g.add(crest);
+  // eye
+  const eyeGeo = new THREE.SphereGeometry(0.12,4,4);
+  const eyeL = new THREE.Mesh(eyeGeo, new THREE.MeshBasicMaterial({color:0xffffff}));
+  eyeL.position.set(0.9,0.25,0.45); g.add(eyeL);
+  const pupilGeo = new THREE.SphereGeometry(0.07,4,4);
+  const pupilL = new THREE.Mesh(pupilGeo, new THREE.MeshBasicMaterial({color:0x111111}));
+  pupilL.position.set(1.0,0.25,0.48); g.add(pupilL);
+  // wings (left/right)
+  for (const side of [-1,1]) {
+    const wGeo = new THREE.PlaneGeometry(1.8,0.7); wGeo.rotateY(Math.PI/2);
+    const wm = new THREE.Mesh(wGeo, new THREE.MeshLambertMaterial({color:s.wing,side:THREE.DoubleSide}));
+    wm.position.set(0,0.1,side*1.1); wm.userData.wing=true; wm.userData.side=side;
+    g.add(wm);
+  }
+  g.scale.setScalar(0.8);
+  return g;
+}
+
+let birdGroup = makeBirdMesh(save.skin);
+scene.add(birdGroup);
+
+// Shield bubble
+const shieldGeo = new THREE.SphereGeometry(1.6,16,12);
+const shieldMat = new THREE.MeshPhongMaterial({color:0x88ccff,transparent:true,opacity:0,side:THREE.FrontSide});
+const shieldMesh = new THREE.Mesh(shieldGeo,shieldMat);
+birdGroup.add(shieldMesh);
+
+// Magnet torus
+const magGeo = new THREE.TorusGeometry(MAGNET_R,0.3,8,24);
+const magMat = new THREE.MeshBasicMaterial({color:0xff88ff,transparent:true,opacity:0,wireframe:true});
+const magMesh = new THREE.Mesh(magGeo,magMat);
+magMesh.rotation.x = Math.PI/2;
+birdGroup.add(magMesh);
+
+// ─── Trail ────────────────────────────────────────────────────────────────────
+const trailPositions = new Float32Array(TN*3);
+const trailColors = new Float32Array(TN*3);
+const trailGeo = new THREE.BufferGeometry();
+trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPositions,3));
+trailGeo.setAttribute('color', new THREE.BufferAttribute(trailColors,3));
+const trailMat = new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.6});
+const trailLine = new THREE.Line(trailGeo, trailMat);
+scene.add(trailLine);
+
+const trailNodes = Array.from({length:TN},()=>new THREE.Vector3());
+function pushTrail(x,y,z,fever,boost) {
+  for (let i=TN-1;i>0;i--) trailNodes[i].copy(trailNodes[i-1]);
+  trailNodes[0].set(x,y,z);
+  for (let i=0;i<TN;i++) {
+    trailPositions[i*3]=trailNodes[i].x;
+    trailPositions[i*3+1]=trailNodes[i].y;
+    trailPositions[i*3+2]=trailNodes[i].z;
+    const f = 1-i/TN;
+    if (fever) { trailColors[i*3]=1; trailColors[i*3+1]=0.5*f; trailColors[i*3+2]=0; }
+    else if (boost) { trailColors[i*3]=0.8; trailColors[i*3+1]=1; trailColors[i*3+2]=0.2*f; }
+    else { trailColors[i*3]=1*f; trailColors[i*3+1]=0.8*f; trailColors[i*3+2]=0.2*f; }
+  }
+  trailGeo.attributes.position.needsUpdate=true;
+  trailGeo.attributes.color.needsUpdate=true;
+}
+
+// ─── Particles ───────────────────────────────────────────────────────────────
+const ptPos = new Float32Array(PN*3);
+const ptCol = new Float32Array(PN*3);
+const ptGeo = new THREE.BufferGeometry();
+ptGeo.setAttribute('position',new THREE.BufferAttribute(ptPos,3));
+ptGeo.setAttribute('color',new THREE.BufferAttribute(ptCol,3));
+const ptMat = new THREE.PointsMaterial({vertexColors:true,size:0.5,sizeAttenuation:true,transparent:true,opacity:0.8});
+const particles = new THREE.Points(ptGeo,ptMat);
+scene.add(particles);
+const ptVel = Array.from({length:PN},()=>({x:0,y:0,z:0,life:0,maxLife:1}));
+
+function spawnParticle(x,y,z,vx,vy,r,g,b) {
+  let idx = -1;
+  for (let i=0;i<PN;i++) if (ptVel[i].life<=0){idx=i;break;}
+  if (idx<0) idx=Math.floor(Math.random()*PN);
+  const p = ptVel[idx];
+  p.x=x; p.y=y; p.z=z; p.vx=vx+(Math.random()-0.5)*3; p.vy=vy+(Math.random()-0.5)*3;
+  p.vz=(Math.random()-0.5)*3; p.life=p.maxLife=0.5+Math.random()*0.5;
+  ptPos[idx*3]=x; ptPos[idx*3+1]=y; ptPos[idx*3+2]=z;
+  ptCol[idx*3]=r; ptCol[idx*3+1]=g; ptCol[idx*3+2]=b;
+}
+
+function updateParticles(dt) {
+  for (let i=0;i<PN;i++) {
+    const p = ptVel[i];
+    if (p.life<=0) { ptPos[i*3+1]=-9999; continue; }
+    p.life -= dt;
+    p.x+=p.vx*dt; p.y+=p.vy*dt; p.z+=p.vz*dt; p.vy-=8*dt;
+    ptPos[i*3]=p.x; ptPos[i*3+1]=p.y; ptPos[i*3+2]=p.z;
+    const a = p.life/p.maxLife;
+    ptCol[i*3]*=1; ptCol[i*3+1]*=1; ptCol[i*3+2]*=1;
+    // fade alpha via color dim
+    ptCol[i*3]=ptCol[i*3]*a; ptCol[i*3+1]=ptCol[i*3+1]*a; ptCol[i*3+2]=ptCol[i*3+2]*a;
+  }
+  ptGeo.attributes.position.needsUpdate=true;
+  ptGeo.attributes.color.needsUpdate=true;
+}
+
+// ─── Coins ────────────────────────────────────────────────────────────────────
+const coinGeo = new THREE.CylinderGeometry(0.5,0.5,0.2,8);
+const coinMat = new THREE.MeshLambertMaterial({color:0xffd700});
+const coinIM = new THREE.InstancedMesh(coinGeo, coinMat, COIN_CAP);
+coinIM.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+scene.add(coinIM);
+const coinDummy = new THREE.Object3D();
+const coinData = Array.from({length:COIN_CAP},()=>({x:0,y:0,z:0,active:false,id:0}));
+let coinCount = 0;
+
+function spawnCoin(x,y) {
+  for (let i=0;i<COIN_CAP;i++) {
+    if (!coinData[i].active) {
+      coinData[i].x=x; coinData[i].y=y+1; coinData[i].z=(Math.random()-0.5)*6;
+      coinData[i].active=true; coinData[i].id=i;
+      coinDummy.position.set(coinData[i].x,coinData[i].y,coinData[i].z);
+      coinDummy.rotation.y=Math.random()*Math.PI*2;
+      coinDummy.updateMatrix();
+      coinIM.setMatrixAt(i,coinDummy.matrix);
+      coinCount++;
+      return;
+    }
+  }
+}
+
+function deactivateCoin(i) {
+  coinData[i].active=false;
+  coinDummy.position.set(0,-9999,0); coinDummy.updateMatrix();
+  coinIM.setMatrixAt(i,coinDummy.matrix);
+  coinCount--;
+}
+
+// ─── Powerups ─────────────────────────────────────────────────────────────────
+const PU_TYPES = ['magnet','shield','feather','longglide','goldenwings','boost','sun'];
+const puPool = Array.from({length:7},()=>({
+  x:0,y:0,active:false,type:'magnet',
+  mesh: (() => {
+    const g=new THREE.Group();
+    const o=new THREE.Mesh(new THREE.OctahedronGeometry(0.8),new THREE.MeshLambertMaterial({color:0xff88ff}));
+    g.add(o); g.visible=false; scene.add(g); return g;
+  })()
+}));
+const PU_COLORS={magnet:0xff44ff,shield:0x44aaff,feather:0xeeffcc,longglide:0x44ffaa,goldenwings:0xffdd44,boost:0xff8844,sun:0xffee00};
+
+function spawnPowerup(x,y) {
+  for (const pu of puPool) if (!pu.active) {
+    pu.x=x; pu.y=y+2; pu.active=true;
+    pu.type=PU_TYPES[Math.floor(Math.random()*PU_TYPES.length)];
+    pu.mesh.children[0].material.color.setHex(PU_COLORS[pu.type]||0xffffff);
+    pu.mesh.position.set(pu.x,pu.y,0); pu.mesh.visible=true; return;
+  }
+}
+
+// ─── Rings ────────────────────────────────────────────────────────────────────
+const ringPool = Array.from({length:5},()=>({
+  x:0,y:0,active:false,
+  mesh:(() => {
+    const m=new THREE.Mesh(new THREE.TorusGeometry(2.5,0.2,8,24),new THREE.MeshLambertMaterial({color:0xffee44,transparent:true,opacity:0.8}));
+    m.visible=false; scene.add(m); return m;
+  })()
+}));
+
+function spawnRing(x,y) {
+  for (const r of ringPool) if (!r.active) {
+    r.x=x; r.y=y+2; r.active=true;
+    r.mesh.position.set(r.x,r.y,0); r.mesh.visible=true; return;
+  }
+}
+
+// ─── Thermals ─────────────────────────────────────────────────────────────────
+const thermalPool = Array.from({length:6},()=>({
+  x:0,y:0,str:0,active:false,
+  mesh:(() => {
+    const m=new THREE.Mesh(
+      new THREE.CylinderGeometry(2,3,20,8,1,true),
+      new THREE.MeshBasicMaterial({color:0x88ffcc,transparent:true,opacity:0.12,side:THREE.DoubleSide,wireframe:false})
+    );
+    m.visible=false; scene.add(m); return m;
+  })()
+}));
+
+function spawnThermal(x,y,str) {
+  for (const t of thermalPool) if (!t.active) {
+    t.x=x; t.y=y; t.str=str; t.active=true;
+    t.mesh.position.set(x,y+10,0); t.mesh.visible=true; return;
+  }
+}
+
+// ─── Thorns ───────────────────────────────────────────────────────────────────
+const thornPool = Array.from({length:10},()=>({
+  x:0,y:0,active:false,
+  mesh:(() => {
+    const m=new THREE.Mesh(new THREE.ConeGeometry(0.4,1.5,4),new THREE.MeshLambertMaterial({color:0xcc4444}));
+    m.visible=false; scene.add(m); return m;
+  })()
+}));
+
+function spawnThorn(x,y) {
+  for (const t of thornPool) if (!t.active) {
+    t.x=x; t.y=y+0.8; t.active=true;
+    t.mesh.position.set(t.x,t.y,0); t.mesh.visible=true; return;
+  }
+}
+
+// ─── Audio ────────────────────────────────────────────────────────────────────
+let _actx = null;
+function ac() {
+  if (!_actx) { try { _actx = new (window.AudioContext||window.webkitAudioContext)(); } catch{} }
+  return _actx;
+}
+function resumeAC() { try { ac()?.resume(); } catch{} }
+
+let _musicChordIdx = 0, _musicTime = 0, _musicSched = 0;
+const _musicGain = { node: null };
+function ensureMusicGain() {
+  const a = ac(); if (!a) return null;
+  if (!_musicGain.node) { _musicGain.node = a.createGain(); _musicGain.node.gain.value=0.2; _musicGain.node.connect(a.destination); }
+  return _musicGain.node;
+}
+function playNote(freq, start, dur, gain=0.12, type='sine') {
+  const a = ac(); if (!a) return;
+  const mg = ensureMusicGain(); if (!mg) return;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type=type; o.frequency.value=freq;
+  g.gain.setValueAtTime(0,start);
+  g.gain.linearRampToValueAtTime(gain,start+0.02);
+  g.gain.exponentialRampToValueAtTime(0.001,start+dur);
+  o.connect(g); g.connect(mg);
+  o.start(start); o.stop(start+dur+0.05);
+}
+function scheduleMusic(t) {
+  const a = ac(); if (!a) return;
+  const now = a.currentTime;
+  while (_musicSched < now + 2.0) {
+    const chord = CHORDS[_musicChordIdx % CHORDS.length];
+    const step = _musicSched;
+    const beat = 0.4;
+    // Arpeggio
+    chord.forEach((f,i) => playNote(f, step+i*beat*0.25, beat*0.6, 0.06));
+    // Bass
+    playNote(chord[0]/2, step, beat*1.5, 0.08, 'triangle');
+    // Melody note
+    const mel = MELODIES[_musicChordIdx%MELODIES.length];
+    if (mel) {
+      const noteIdx = Math.floor((_musicSched - _musicTime) / beat * 2) % mel.length;
+      const semi = mel[noteIdx]||0;
+      if (semi>0) {
+        const baseFreq = chord[0];
+        playNote(baseFreq * Math.pow(2, semi/12), step+beat*0.5, beat*0.4, 0.05, 'sine');
+      }
+    }
+    _musicSched += beat * chord.length * 0.5;
+    _musicChordIdx++;
+  }
+}
+function playSfx(freq, dur, type='square', vol=0.1) {
+  const a = ac(); if (!a) return;
+  const o = a.createOscillator(), g = a.createGain();
+  const now = a.currentTime;
+  o.type=type; o.frequency.value=freq;
+  g.gain.setValueAtTime(vol,now);
+  g.gain.exponentialRampToValueAtTime(0.001,now+dur);
+  o.connect(g); g.connect(a.destination);
+  o.start(now); o.stop(now+dur+0.05);
+}
+function playLandSfx(quality) {
+  if (quality==='perfect') { playSfx(880,0.15,'sine',0.08); playSfx(1320,0.1,'sine',0.05); }
+  else if (quality==='good') { playSfx(660,0.12,'sine',0.06); }
+  else { playSfx(200,0.2,'sawtooth',0.08); }
+}
+function playLaunchSfx(rating) {
+  if (rating==='perfect') { playSfx(1046,0.2,'sine',0.1); playSfx(1318,0.15,'sine',0.08); }
+  else if (rating==='great') { playSfx(880,0.15,'sine',0.08); }
+  else { playSfx(660,0.1,'sine',0.06); }
+}
+
+// ─── Game state ───────────────────────────────────────────────────────────────
+let state = 'boot'; // boot|menu|play|pause|revive|over
+let selectedBiome = 0;
+let bx=0, by=14, bvx=30, bvy=0;
+let onGround=false, airSecs=0;
+let distance=0, runCoins=0, daylight=DAYLIGHT_MAX;
+let score=0, combo=0, comboT=0;
+let feverMeter=0, fever=false, feverT=0;
+let shimmerCount=0; // thermals caught this run
+let manualBoostT=0, manualBoostCD=0;
+let zenithAchieved=false;
+let held=false, justTapped=false, lastTap=0;
+let launchT=0, launchArmed=false, launchStartVX=0;
+let puActive={}, puTimers={};
+let prevOnGround=false;
+let reviveT=0, reviveTicker=null;
+let isDaily=false;
+let _rng = mulberry32(0);
+let spawnX = 300;
+let thermalsThisRun = 0;
+let perfectLandsRun = 0;
+let fevers = 0;
+
+// ─── Ghost ────────────────────────────────────────────────────────────────────
+let ghostSnaps = [], ghostRec = [], ghostPlayIdx = 0, ghostPlaying = false;
+let ghostBird = null;
+{
+  const g = makeBirdMesh('default');
+  g.traverse(m => { if (m.isMesh) { m.material = m.material.clone(); m.material.transparent=true; m.material.opacity=0.35; m.material.color.multiplyScalar(1.2); if(m.material.color){ m.material.color.r*=1.2; m.material.color.g*=1.3; m.material.color.b*=0.4; } } });
+  g.visible=false; scene.add(g); ghostBird=g;
+}
+let ghostRecT=0;
+function recordGhost(x,y) { if(ghostRecT>0.09){ghostRec.push({x,y});ghostRecT=0;} }
+
+// ─── Resize ───────────────────────────────────────────────────────────────────
+function resize() {
+  const W=innerWidth, H=innerHeight;
+  renderer.setSize(W,H);
+  camera.aspect=W/H;
+  camera.updateProjectionMatrix();
+}
+resize(); window.addEventListener('resize',resize);
+
+// ─── Input ────────────────────────────────────────────────────────────────────
+function onDown(e) {
+  e.preventDefault();
+  resumeAC();
+  if (state==='menu'||state==='boot') return;
+  if (state==='over'||state==='revive') return;
+  if (state==='pause') return;
+  if (state!=='play') return;
+  const now = performance.now();
+  if (now-lastTap < 300 && !held) {
+    // double-tap = manual boost
+    if (manualBoostCD<=0 && !fever) {
+      manualBoostT = MANUAL_BOOST_TIME;
+      manualBoostCD = MANUAL_BOOST_CD;
+      playSfx(880,0.2,'sawtooth',0.1);
+    }
+    lastTap=0;
+  } else {
+    lastTap=now;
+  }
+  held=true;
+  justTapped=true;
+  // launch arm
+  if (onGround) { launchArmed=true; launchT=0; launchStartVX=bvx; }
+}
+function onUp(e) {
+  e.preventDefault();
+  if (!held) return;
+  held=false;
+  if (state==='play' && launchArmed && onGround) {
+    // rate launch quality
+    const frac = Math.min(1,(bvx - launchStartVX)/(VMAX*0.5));
+    let rating='normal';
+    if (frac>=RATING_PERFECT) rating='perfect';
+    else if (frac>=RATING_GREAT) rating='great';
+    else if (frac>=RATING_GOOD) rating='good';
+    applyLaunchRating(rating);
+    launchArmed=false;
+  }
+}
+function applyLaunchRating(r) {
+  const mult = r==='perfect'?BOOST_PERFECT:r==='great'?BOOST_GREAT:r==='good'?BOOST_GOOD:1.0;
+  if (mult>1) { bvx*=mult; showFeedback(r==='perfect'?'✨ PERFECT!':r==='great'?'⚡ GREAT!':'👍 GOOD!',r==='perfect'?'#ffd700':r==='great'?'#88ff88':'#aaaaff'); }
+  playLaunchSfx(r);
+  combo++;
+  comboT = 4;
+  if (combo>2) showCombo();
+  if (combo > save.maxCombo) { save.maxCombo=combo; }
+}
+
+canvas.addEventListener('pointerdown',onDown,{passive:false});
+canvas.addEventListener('pointerup',onUp,{passive:false});
+window.addEventListener('keydown',e=>{if(e.code==='Space'||e.code==='ArrowDown'){e.preventDefault();onDown(e);}});
+window.addEventListener('keyup',e=>{if(e.code==='Space'||e.code==='ArrowDown'){e.preventDefault();onUp(e);}});
+
+// ─── Pause via back button / Escape ──────────────────────────────────────────
+window.addEventListener('keydown',e=>{
+  if (e.code==='Escape'&&state==='play') setPause(true);
+});
+
+// ─── Screen management ────────────────────────────────────────────────────────
+const screens = {
+  boot:document.getElementById('s-boot'),
+  menu:document.getElementById('s-menu'),
+  pause:document.getElementById('s-pause'),
+  revive:document.getElementById('s-revive'),
+  over:document.getElementById('s-over'),
+  nest:document.getElementById('s-nest'),
+  skins:document.getElementById('s-skins'),
+  goals:document.getElementById('s-goals'),
+};
+function showScreen(id) {
+  Object.values(screens).forEach(s=>s.hidden=true);
+  if (id && screens[id]) screens[id].hidden=false;
+}
+const hud = document.getElementById('hud');
+const altim = document.getElementById('altimeter');
+
+// ─── Boot sequence ────────────────────────────────────────────────────────────
+showScreen('boot');
+const bootBar = document.getElementById('boot-bar');
+let bootPct = 0;
+function bootStep(pct, delay) {
+  return new Promise(r => setTimeout(()=>{bootBar.style.width=pct+'%';r();},delay));
+}
+
+async function boot() {
+  await bootStep(20,100);
+  initTerrain();
+  await bootStep(60,200);
+  await bootStep(90,300);
+  await new Promise(r => Poki.ready(r));
+  await bootStep(100,200);
+  await new Promise(r=>setTimeout(r,300));
+  initMenu();
+}
+boot();
+
+// ─── Menu ─────────────────────────────────────────────────────────────────────
+function initMenu() {
+  state='menu';
+  showScreen('menu');
+  // biome picker
+  const picker = document.getElementById('biome-picker');
+  picker.innerHTML='';
+  BIOMES.forEach((b,i)=>{
+    const btn = document.createElement('button');
+    btn.className='biome-btn'+(i===selectedBiome?' sel':'');
+    btn.innerHTML=`<span class="bi-emoji">${b.emoji}</span><span class="bi-name">${b.name}</span>`;
+    btn.onclick=()=>{
+      selectedBiome=i;
+      picker.querySelectorAll('.biome-btn').forEach((b,j)=>b.classList.toggle('sel',j===i));
+    };
+    picker.appendChild(btn);
+  });
+  // best
+  document.getElementById('menu-best').textContent = save.best>0?`Best: ${save.best}m`:'';
+  document.getElementById('btn-play').onclick=()=>startRun(false);
+  document.getElementById('btn-daily').onclick=()=>startDailyRun();
+  document.getElementById('btn-nest').onclick=()=>openNest();
+  document.getElementById('btn-skins').onclick=()=>openSkins();
+  document.getElementById('btn-goals').onclick=()=>openGoals();
+  document.getElementById('btn-resume')?.addEventListener('click',()=>setPause(false));
+  document.getElementById('btn-quit-pause')?.addEventListener('click',()=>endRun());
+  document.getElementById('btn-retry').onclick=()=>startRun(isDaily);
+  document.getElementById('btn-menu-from-over').onclick=()=>{ Poki.commercialBreak().then(()=>initMenu()); };
+  document.getElementById('btn-revive-watch').onclick=()=>doReviveWatch();
+  document.getElementById('btn-revive-skip').onclick=()=>endRun();
+}
+
+// ─── Start run ────────────────────────────────────────────────────────────────
+async function startRun(daily=false) {
+  isDaily=daily;
+  // Ad between runs (not first run)
+  if (save.runs>0) await Poki.commercialBreak();
+  // Reset state
+  _biome = BIOMES[selectedBiome];
+  _rng = mulberry32(Date.now()|0);
+  bx=0; by=hillY(0)+4; bvx=20; bvy=0;
+  onGround=false; airSecs=0;
+  distance=0; runCoins=0; daylight=DAYLIGHT_MAX+upgLevel('sb')*3;
+  score=0; combo=0; comboT=0;
+  feverMeter=0; fever=false; feverT=0;
+  manualBoostT=0; manualBoostCD=0;
+  zenithAchieved=false; thermalsThisRun=0; perfectLandsRun=0; fevers=0;
+  launchArmed=false; launchT=0;
+  ghostRec=[]; ghostRecT=0;
+  spawnX=300;
+  held=false;
+  // reset pickups
+  coinData.forEach(c=>{ c.active=false; });
+  coinIM.count=COIN_CAP;
+  for(let i=0;i<COIN_CAP;i++){coinDummy.position.set(0,-9999,0);coinDummy.updateMatrix();coinIM.setMatrixAt(i,coinDummy.matrix);}
+  coinIM.instanceMatrix.needsUpdate=true;
+  puPool.forEach(p=>{ p.active=false; p.mesh.visible=false; });
+  ringPool.forEach(r=>{ r.active=false; r.mesh.visible=false; });
+  thornPool.forEach(t=>{ t.active=false; t.mesh.visible=false; });
+  thermalPool.forEach(t=>{ t.active=false; t.mesh.visible=false; });
+  // reset trail
+  trailNodes.forEach(n=>n.set(0,-9999,0));
+  // biome colors
+  updateBiomeVisuals();
+  showScreen(null); hud.hidden=false; altim.hidden=false;
+  state='play';
+  Poki.gameplayStart();
+  _musicChordIdx=0; _musicSched=0; _musicTime=0;
+  if (_actx) _musicSched=_actx.currentTime;
+  updateHUD();
+}
+
+function startDailyRun() {
+  const today = new Date().toISOString().slice(0,10);
+  if (save.daily.date===today && save.daily.done) {
+    showFeedback('Already done today!','#ff8844'); return;
+  }
+  selectedBiome = (new Date().getDate()%BIOMES.length);
+  startRun(true);
+}
+
+function updateBiomeVisuals() {
+  // sky
+  skyMat.uniforms.uTop.value.set((_biome.skyTop>>16&255)/255,(_biome.skyTop>>8&255)/255,(_biome.skyTop&255)/255);
+  skyMat.uniforms.uHorizon.value.set((_biome.skyHorizon>>16&255)/255,(_biome.skyHorizon>>8&255)/255,(_biome.skyHorizon&255)/255);
+  // backdrop
+  backdropA.children.forEach(m=>m.material.color.setHex(_biome.farA));
+  backdropB.children.forEach(m=>m.material.color.setHex(_biome.farB));
+  backdropC.children.forEach(m=>m.material.color.setHex(_biome.farC));
+  // clouds
+  cloudMeshes.forEach(m=>m.material.color.setHex(_biome.cloudTint||0xffffff));
+  // biome label
+  document.getElementById('biome-name').textContent=_biome.emoji+' '+_biome.name.toUpperCase();
+}
+
+// ─── Physics update ───────────────────────────────────────────────────────────
+let _acc = 0;
+function physicsStep() {
+  const gndY = hillY(bx);
+  const onGndNow = by <= gndY + R + 0.15;
+
+  // Landing detection
+  if (!prevOnGround && onGndNow && bvy<0) {
+    const slope = slopeAt(bx);
+    const nLen = Math.sqrt(slope*slope+1);
+    const vLen = Math.sqrt(bvx*bvx+bvy*bvy);
+    if (vLen>0) {
+      const dot = Math.abs((-bvy+bvx*slope) / (vLen*nLen));
+      const align = dot;
+      let quality='bad', keep=LAND_BAD_MIN;
+      if (align>=LAND_PERFECT) { quality='perfect'; keep=LAND_GOOD_KEEP; perfectLandsRun++; }
+      else if (align>=LAND_GOOD) { quality='good'; keep=LAND_GOOD_KEEP; }
+      if (quality!=='bad') {
+        feverMeter++;
+        if (feverMeter>=FEVER_NEED && !fever) triggerFever();
+      }
+      bvx*=keep; bvy=0;
+      onLanding(quality);
+    }
+  }
+  prevOnGround=onGndNow;
+  onGround=onGndNow;
+
+  if (onGround) {
+    airSecs=0;
+    by=gndY+R;
+    const slope=slopeAt(bx);
+    const norm=1/Math.sqrt(slope*slope+1);
+    // Sunflower trampoline check
+    const onSunflower = (bx%180>175||bx%240>235) && _biome.id==='green';
+    if (onSunflower && bvy>=-1) {
+      bvy=SUNFLOWER_VY; bvx+=SUNFLOWER_VX;
+      showFeedback('🌻 BOING!','#ffee44');
+      playSfx(660,0.3,'sine',0.12);
+    } else {
+      const gG = held ? G_GROUND_DIVE : G_GROUND;
+      bvx -= gG*slope*norm*STEP;
+      const fr = held ? 0.008 : GROUND_FRICTION;
+      bvx *= (1-fr);
+      bvy=slope*bvx;
+    }
+  } else {
+    airSecs += STEP;
+    const liftScale = glideLiftScale(airSecs);
+    const grav = held ? G_DIVE : G;
+    const drag = held ? DRAG_DIVE : DRAG_GLIDE;
+    const spd = Math.sqrt(bvx*bvx+bvy*bvy);
+    // lift (only when gliding, not held)
+    let lift=0;
+    if (!held) {
+      lift = Math.min(G*LIFT_MAX, G*LIFT_MAX*(spd/LIFT_SPEED)*(spd/LIFT_SPEED)) * liftScale;
+    }
+    // stick force
+    const stick = held ? STICK_DIVE : STICK_GLIDE;
+    const gndY2=hillY(bx);
+    const dist2gnd = by - gndY2;
+    const stickyF = held && dist2gnd < 4 ? stick : 0;
+    bvy -= (grav - lift + stickyF) * STEP;
+    bvx -= drag * bvx * Math.abs(bvx) * STEP;
+    bvy -= drag * bvy * Math.abs(bvy) * STEP;
+  }
+
+  // Thermals
+  for (const t of thermalPool) {
+    if (!t.active) continue;
+    const dx=bx-t.x, dy=by-t.y;
+    if (Math.abs(dx)<3 && Math.abs(dy)<15) {
+      bvy += t.str * 4 * STEP;
+      if (!t._triggered) {
+        t._triggered=true; thermalsThisRun++;
+        showFeedback('🌀 THERMAL!','#88ffcc');
+        playSfx(440,0.4,'sine',0.07);
+        for(let i=0;i<8;i++) spawnParticle(bx,by,0,0,5+_rng()*3,0.2,1,0.6);
+        document.getElementById('thermal-ring').style.opacity='1';
+        setTimeout(()=>document.getElementById('thermal-ring').style.opacity='0',800);
+      }
+    } else t._triggered=false;
+    if (bx-t.x > 20) { t.active=false; t.mesh.visible=false; }
+  }
+
+  // Manual boost
+  if (manualBoostT>0) {
+    manualBoostT-=STEP;
+    bvx = Math.max(bvx, MANUAL_BOOST_SPEED);
+  }
+  if (manualBoostCD>0) manualBoostCD-=STEP;
+
+  // Zenith slow-mo (when very high)
+  const altAboveTerrain = by - hillY(bx);
+  if (altAboveTerrain > ZENITH_ALT && !zenithAchieved) {
+    zenithAchieved=true;
+    save.zenithCount=(save.zenithCount||0)+1;
+    showFeedback('🌤 ZENITH!','#ffee44');
+    playSfx(1320,0.5,'sine',0.1);
+    for(let i=0;i<12;i++) spawnParticle(bx,by,0,(Math.random()-0.5)*8,(Math.random()-0.5)*8,1,0.9,0.4);
+  }
+
+  // Fever
+  if (fever) {
+    feverT -= STEP;
+    if (feverT<=0) { fever=false; feverMeter=0; }
+    bvx = Math.min(bvx*1.002, VMAX_FEVER);
+  }
+
+  // Speed cap
+  const vmax = fever?VMAX_FEVER:VMAX;
+  const tailwind = 1+(upgLevel('tw')*0.04);
+  bvx = Math.max(4, Math.min(vmax*tailwind, bvx));
+
+  // Advance x
+  bx += bvx*STEP;
+  by += bvy*STEP;
+
+  // Terrain collision safety
+  const gy2=hillY(bx);
+  if (by<gy2+R) { by=gy2+R; if(bvy<0)bvy=0; }
+}
+
+function onLanding(quality) {
+  playLandSfx(quality);
+  if (quality==='perfect') {
+    showFeedback('🪶 PERFECT LAND!','#ffd700');
+    for(let i=0;i<6;i++) spawnParticle(bx,by,0,(Math.random()-0.5)*4,4+Math.random()*2,1,0.9,0.4);
+  } else if (quality==='good') {
+    for(let i=0;i<3;i++) spawnParticle(bx,by,0,(Math.random()-0.5)*3,3,0.6,1,0.5);
+  }
+}
+
+function triggerFever() {
+  fever=true; feverT=FEVER_DURATION;
+  fevers++;
+  save.feverCount=(save.feverCount||0)+1;
+  showFeedback('🔥 FEVER!','#ff6600');
+  playSfx(880,0.5,'sawtooth',0.15);
+  for(let i=0;i<16;i++) spawnParticle(bx,by,0,(Math.random()-0.5)*10,5+Math.random()*5,1,0.5+Math.random()*0.5,0);
+  Poki.happyTime(0.8);
+}
+
+// ─── Pickups ───────────────────────────────────────────────────────────────────
+function spawnPickups() {
+  if (bx>spawnX) {
+    const gY=hillY(spawnX);
+    // Coins scattered
+    for(let i=0;i<3+_rng()*3|0;i++) spawnCoin(spawnX+i*6,gY);
+    // Occasional powerup
+    if (_rng()<0.12) spawnPowerup(spawnX+20,gY);
+    // Ring
+    if (_rng()<0.06) spawnRing(spawnX+30,gY+8);
+    // Thorn (hazard)
+    if (_rng()<0.08 && _biome.hazard!=='none') spawnThorn(spawnX+10,gY);
+    // Thermal (per biome density)
+    if (_rng()<_biome.thermals*0.015) spawnThermal(spawnX+25, gY, 1+_biome.thermals*0.1);
+    spawnX+=60+_rng()*40;
+  }
+}
+
+function checkPickups() {
+  const mr = puActive.magnet ? MAGNET_R : MAGNET_R_NORMAL * (1+(upgLevel('cc')*0.3));
+  // Coins
+  for (let i=0;i<COIN_CAP;i++) {
+    const c=coinData[i];
+    if (!c.active) continue;
+    const dx=bx-c.x, dy=by-c.y;
+    if (dx*dx+dy*dy < mr*mr) {
+      deactivateCoin(i);
+      const mult = 1+(upgLevel('lf')*0.15)*(combo>1?Math.min(combo,5):1);
+      runCoins+=COIN_VALUE*mult|0;
+      score+=10;
+      for(let j=0;j<2;j++) spawnParticle(c.x,c.y,c.z,(Math.random()-0.5)*3,2+Math.random()*2,1,0.85,0.1);
+    }
+    if (c.x<bx-80) deactivateCoin(i);
+  }
+  // Powerups
+  for (const pu of puPool) {
+    if (!pu.active) continue;
+    const dx=bx-pu.x, dy=by-pu.y;
+    if (dx*dx+dy*dy<4) {
+      pu.active=false; pu.mesh.visible=false;
+      activatePowerup(pu.type);
+    }
+    if (pu.x<bx-80) { pu.active=false; pu.mesh.visible=false; }
+    pu.mesh.rotation.y+=0.05;
+  }
+  // Rings
+  for (const r of ringPool) {
+    if (!r.active) continue;
+    const dx=bx-r.x, dy=by-r.y;
+    if (Math.abs(dx)<3&&Math.abs(dy)<3) {
+      r.active=false; r.mesh.visible=false;
+      score+=50; daylight+=3;
+      showFeedback('💍 RING +50','#ffee44');
+      playSfx(1046,0.3,'sine',0.1);
+    }
+    if (r.x<bx-80){r.active=false;r.mesh.visible=false;}
+    r.mesh.rotation.y+=0.04;
+  }
+  // Thorns
+  for (const t of thornPool) {
+    if (!t.active) continue;
+    const dx=bx-t.x, dy=by-t.y;
+    if (dx*dx+dy*dy<1.5&&!puActive.shield) {
+      t.active=false; t.mesh.visible=false;
+      bvx*=0.6; daylight-=3;
+      showFeedback('🌵 OUCH!','#ff4444');
+      playSfx(180,0.3,'sawtooth',0.12);
+    }
+    if (t.x<bx-80){t.active=false;t.mesh.visible=false;}
+  }
+  // Cull distant
+  coinIM.instanceMatrix.needsUpdate=true;
+}
+
+function activatePowerup(type) {
+  const dur = {magnet:12,shield:8,feather:12,longglide:9,goldenwings:10,boost:2,sun:6}[type]||8;
+  puActive[type]=true;
+  puTimers[type]=(puTimers[type]||0)+dur;
+  const labels={magnet:'🧲 MAGNET',shield:'🛡 SHIELD',feather:'🪶 FEATHER',longglide:'🌬 LONG GLIDE',goldenwings:'✨ GOLDEN WINGS',boost:'⚡ BOOST',sun:'☀ SUN'};
+  showFeedback(labels[type]||type.toUpperCase(),'#88ffcc');
+  playSfx(660,0.3,'sine',0.1);
+  if (type==='boost') { bvx+=52; }
+  if (type==='goldenwings') { fever=true; feverT=Math.max(feverT,dur); }
+}
+
+function tickPowerups(dt) {
+  for (const k of Object.keys(puTimers)) {
+    puTimers[k]-=dt;
+    if (puTimers[k]<=0) { delete puTimers[k]; delete puActive[k]; }
+  }
+  shieldMat.opacity = puActive.shield?0.25:0;
+  magMesh.material.opacity = puActive.magnet?0.18:0;
+}
+
+// ─── Daylight ─────────────────────────────────────────────────────────────────
+function tickDaylight(dt) {
+  const gndY = hillY(bx);
+  const onIsland = (bx%ISL < GAP_START);
+  if (onIsland) {
+    const refill = DAY_ISLAND + upgLevel('sb');
+    daylight = Math.min(DAYLIGHT_MAX+upgLevel('sb')*3, daylight+refill*dt);
+  } else {
+    daylight -= DAY_OCEAN*dt;
+  }
+  if (daylight<=0) {
+    daylight=0;
+    endRun();
+  }
+}
+
+// ─── Combo ────────────────────────────────────────────────────────────────────
+function tickCombo(dt) {
+  if (combo>0) {
+    comboT-=dt;
+    if (comboT<=0) combo=0;
+  }
+}
+
+// ─── Main loop ────────────────────────────────────────────────────────────────
+let prevTime = performance.now();
+let paused=false;
+
+function gameLoop(ts) {
+  requestAnimationFrame(gameLoop);
+  const now=ts, dt=Math.min((now-prevTime)/1000, 0.05);
+  prevTime=now;
+
+  if (state!=='play') {
+    renderer.render(scene,camera);
+    return;
+  }
+
+  // Fixed physics
+  _acc+=dt;
+  ghostRecT+=dt;
+  let phySteps=0;
+  while (_acc>=STEP && phySteps<5) { physicsStep(); _acc-=STEP; phySteps++; }
+
+  // Game ticks
+  tickDaylight(dt);
+  tickCombo(dt);
+  tickPowerups(dt);
+  spawnPickups();
+  checkPickups();
+  updateParticles(dt);
+
+  // Distance & score
+  distance = bx|0;
+  score = distance + runCoins*3;
+
+  // Ghost record
+  recordGhost(bx,by);
+
+  // Camera follow
+  const targetX = bx+bvx*0.22;
+  const targetY = by+6;
+  camera.position.x += (targetX - camera.position.x)*0.08;
+  camera.position.y += (targetY - camera.position.y)*0.06;
+  camera.position.z = 24;
+  camera.lookAt(bx+8, by+2, 0);
+
+  // FOV speed kick
+  const spdNorm = Math.min(1.2, bvx/VMAX);
+  const diveVel = Math.min(0,bvy);
+  const diveKick = Math.max(0,-diveVel/26)*warpT(spdNorm)*6;
+  camera.fov = 62 + warpT(spdNorm)*10 + diveKick;
+  camera.updateProjectionMatrix();
+
+  // Terrain scroll
+  updateTerrain(bx);
+
+  // Backdrop parallax
+  backdropA.position.x = camera.position.x*0.2;
+  backdropB.position.x = camera.position.x*0.12;
+  backdropC.position.x = camera.position.x*0.06;
+
+  // Bird rotation
+  const targetAngle = onGround ? Math.atan2(bvy,bvx) : Math.atan2(bvy,bvx)*0.7;
+  birdGroup.rotation.z = targetAngle;
+  birdGroup.position.set(bx,by,0);
+
+  // Wing flap
+  const flapT = performance.now()*0.004;
+  const flapAmp = onGround?0.1:held?0.8:0.4;
+  birdGroup.children.forEach(m=>{
+    if (m.userData?.wing) m.rotation.x = Math.sin(flapT)*flapAmp * m.userData.side * -0.5;
+  });
+
+  // Trail
+  pushTrail(bx,by,0,fever,manualBoostT>0);
+
+  // Ghost bird
+  if (ghostSnaps.length>0 && ghostBird) {
+    if (!ghostBird.visible) ghostBird.visible=true;
+    if (ghostPlayIdx<ghostSnaps.length) {
+      const gs=ghostSnaps[ghostPlayIdx];
+      ghostBird.position.set(gs.x,gs.y,0.5);
+      if (bx>gs.x+50) ghostPlayIdx++;
+    } else ghostBird.visible=false;
+  }
+
+  // Speed feel overlays
+  const vign = document.getElementById('vignette');
+  const strk = document.getElementById('streaks');
+  const vigV = warpT(spdNorm)*0.55*(1+warpT(spdNorm)*0.45);
+  vign.style.opacity=vigV.toFixed(3);
+  strk.style.opacity=(warpT(spdNorm)*0.7).toFixed(3);
+
+  // Altimeter
+  const alt = Math.max(0,Math.min(1,(by-hillY(bx))/ALT_HIGH));
+  document.getElementById('alt-bar').style.height=(alt*100)+'%';
+
+  // Sky day/night (daylight fraction)
+  const dT=Math.min(1,daylight/DAYLIGHT_MAX);
+  skyMat.uniforms.uDayT.value+=(dT-skyMat.uniforms.uDayT.value)*dt*0.5;
+  ambLight.intensity = 0.4+0.6*dT;
+  sunLight.intensity = 0.5+1.1*dT;
+
+  // Music
+  scheduleMusic();
+
+  // HUD
+  updateHUD();
+
+  renderer.render(scene,camera);
+}
+
+function updateHUD() {
+  document.getElementById('score').textContent=distance+'m';
+  document.getElementById('best-line').textContent='BEST '+save.best+'m';
+  const dPct=Math.max(0,daylight/DAYLIGHT_MAX)*100;
+  document.getElementById('daylight-bar').style.width=dPct+'%';
+  document.getElementById('coins-hud').textContent=runCoins;
+  // boost pip
+  document.getElementById('pip0').classList.toggle('ready',manualBoostCD<=0);
+}
+
+function showCombo() {
+  const cb=document.getElementById('combo-badge');
+  cb.textContent=combo+'× COMBO';
+  cb.style.opacity='1';
+  setTimeout(()=>cb.style.opacity='0',1200);
+}
+
+// ─── Feedback ─────────────────────────────────────────────────────────────────
+let _fbTimer=null;
+function showFeedback(txt, color='#ffffff') {
+  const el=document.getElementById('feedback');
+  el.textContent=txt; el.style.color=color;
+  el.classList.add('show');
+  if (_fbTimer) clearTimeout(_fbTimer);
+  _fbTimer=setTimeout(()=>el.classList.remove('show'),900);
+}
+
+// ─── Pause ────────────────────────────────────────────────────────────────────
+function setPause(p) {
+  if (p) {
+    paused=true; state='pause';
+    Poki.gameplayStop();
+    showScreen('pause');
+    document.getElementById('pause-dist').textContent=distance+'m';
+    hud.hidden=true; altim.hidden=true;
+  } else {
+    paused=false; state='play';
+    Poki.gameplayStart();
+    showScreen(null); hud.hidden=false; altim.hidden=false;
+    prevTime=performance.now();
+  }
+}
+
+// ─── Revive ───────────────────────────────────────────────────────────────────
+function offerRevive() {
+  state='revive';
+  Poki.gameplayStop();
+  showScreen('revive');
+  hud.hidden=true; altim.hidden=true;
+  reviveT=15;
+  document.getElementById('revive-timer').textContent=reviveT;
+  document.getElementById('revive-cost').textContent='Watch an ad to keep flying!';
+  if (reviveTicker) clearInterval(reviveTicker);
+  reviveTicker=setInterval(()=>{
+    reviveT--;
+    document.getElementById('revive-timer').textContent=reviveT;
+    if (reviveT<=0) { clearInterval(reviveTicker); endRun(); }
+  },1000);
+}
+
+async function doReviveWatch() {
+  clearInterval(reviveTicker);
+  const granted=await Poki.rewardedBreak();
+  if (granted) {
+    bvx=20; bvy=10; daylight=Math.min(DAYLIGHT_MAX,daylight+16);
+    state='play';
+    showScreen(null); hud.hidden=false; altim.hidden=false;
+    Poki.gameplayStart();
+    prevTime=performance.now();
+  } else {
+    endRun();
+  }
+}
+
+// ─── End run ─────────────────────────────────────────────────────────────────
+function endRun() {
+  if (reviveTicker) { clearInterval(reviveTicker); reviveTicker=null; }
+  Poki.gameplayStop();
+  // Save ghost
+  if (distance>save.best) {
+    ghostSnaps=[...ghostRec];
+  }
+  // Update save
+  save.runs++;
+  save.totalCoins=(save.totalCoins||0)+runCoins;
+  save.coins+=runCoins;
+  const prevBest=save.best;
+  if (distance>save.best) save.best=distance;
+  if (isDaily) {
+    const today=new Date().toISOString().slice(0,10);
+    save.daily={date:today,score:distance,done:true};
+    save.dailyCompleted=(save.dailyCompleted||0)+1;
+  }
+  save.biomesFlown[_biome.id]=true;
+  save.maxThermalsRun=Math.max(save.maxThermalsRun||0,thermalsThisRun);
+  save.perfectLands=(save.perfectLands||0)+perfectLandsRun;
+  checkAchievements();
+  savePersist();
+  state='over';
+  showScreen('over');
+  hud.hidden=true; altim.hidden=true;
+  document.getElementById('over-dist').textContent=distance+'m';
+  document.getElementById('over-label').textContent='DISTANCE';
+  document.getElementById('over-best').textContent=distance>prevBest?'✨ NEW BEST!':('Best: '+save.best+'m');
+  document.getElementById('over-coins').textContent='🪙 +'+runCoins;
+  if (distance>prevBest) { playSfx(1046,0.8,'sine',0.15); Poki.happyTime(1); }
+}
+
+// ─── Achievements ─────────────────────────────────────────────────────────────
+function checkAchievements() {
+  for (const a of ACH) {
+    if (!save.achievements[a.id] && a.req(save)) {
+      save.achievements[a.id]=true;
+      showFeedback('🏆 '+a.name,'#ffd700');
+    }
+  }
+}
+
+// ─── Nest (upgrades) ─────────────────────────────────────────────────────────
+function openNest() {
+  showScreen('nest');
+  document.getElementById('nest-coins').textContent=save.coins+'🪙';
+  const list=document.getElementById('upg-list');
+  list.innerHTML='';
+  for (const u of UPG) {
+    const lvl=upgLevel(u.id);
+    const card=document.createElement('div');
+    card.className='upg-card'+(lvl>=u.max?' maxed':'');
+    const cost=u.costs[lvl]||0;
+    card.innerHTML=`
+      <div class="upg-card-top">
+        <span class="upg-name">${u.emoji} ${u.name}</span>
+        <span class="upg-cost">${lvl>=u.max?'MAX':cost+'🪙'}</span>
+      </div>
+      <div class="upg-desc">${u.desc}</div>
+      <div class="upg-dots">${Array.from({length:u.max},(_,i)=>`<div class="upg-dot${i<lvl?' filled':''}"></div>`).join('')}</div>
+    `;
+    if (lvl<u.max) {
+      card.style.cursor='pointer';
+      card.onclick=()=>{
+        if (save.coins>=cost) {
+          save.coins-=cost;
+          save.upgrades[u.id]=(save.upgrades[u.id]||0)+1;
+          savePersist();
+          openNest();
+          playSfx(880,0.2,'sine',0.1);
+        } else {
+          showFeedback('Not enough coins','#ff6644');
+        }
+      };
+    }
+    list.appendChild(card);
+  }
+  document.getElementById('btn-nest-back').onclick=()=>initMenu();
+}
+
+// ─── Skins ────────────────────────────────────────────────────────────────────
+function openSkins() {
+  showScreen('skins');
+  document.getElementById('skins-coins').textContent=save.coins+'🪙';
+  const grid=document.getElementById('skin-grid');
+  grid.innerHTML='';
+  for (const s of SKINS) {
+    const owned=save.unlockedSkins.includes(s.id);
+    const selected=save.skin===s.id;
+    const card=document.createElement('div');
+    card.className='skin-card'+(selected?' sel':'')+(owned?'':' locked');
+    card.innerHTML=`<div class="skin-icon">${s.emoji}</div><div class="skin-name">${s.name}</div><div class="skin-price">${owned?'✓':s.cost+'🪙'}</div>`;
+    card.onclick=()=>{
+      if (!owned) {
+        if (save.coins>=s.cost) {
+          save.coins-=s.cost;
+          save.unlockedSkins.push(s.id);
+          save.skin=s.id;
+          savePersist();
+          checkAchievements();
+          rebuildBird();
+          openSkins();
+          playSfx(1046,0.3,'sine',0.1);
+        } else showFeedback('Not enough coins','#ff6644');
+      } else {
+        save.skin=s.id; savePersist();
+        rebuildBird(); openSkins();
+      }
+    };
+    grid.appendChild(card);
+  }
+  document.getElementById('btn-skins-back').onclick=()=>initMenu();
+}
+
+function rebuildBird() {
+  scene.remove(birdGroup);
+  birdGroup=makeBirdMesh(save.skin);
+  birdGroup.add(shieldMesh); birdGroup.add(magMesh);
+  scene.add(birdGroup);
+}
+
+// ─── Goals / Achievements ─────────────────────────────────────────────────────
+function openGoals() {
+  showScreen('goals');
+  const done=Object.keys(save.achievements).length;
+  document.getElementById('goals-done').textContent=done+'/'+ACH.length;
+  const list=document.getElementById('ach-list');
+  list.innerHTML='';
+  for (const a of ACH) {
+    const achieved=!!save.achievements[a.id];
+    const row=document.createElement('div');
+    row.className='ach-row';
+    row.style.opacity=achieved?'1':'0.5';
+    row.innerHTML=`
+      <div class="ach-icon">${a.emoji}</div>
+      <div class="ach-info">
+        <div class="ach-name">${a.name}</div>
+        <div class="ach-desc">${a.desc}</div>
+      </div>
+      <div class="ach-done">${achieved?'✅':''}</div>
+    `;
+    list.appendChild(row);
+  }
+  document.getElementById('btn-goals-back').onclick=()=>initMenu();
+}
+
+// ─── Start ────────────────────────────────────────────────────────────────────
+initTerrain();
+requestAnimationFrame(gameLoop);
+</script>
