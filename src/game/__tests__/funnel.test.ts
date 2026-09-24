@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FUNNEL_STAGES, Funnel, daysBetween, visitKind } from "../Funnel";
+import { FUNNEL_STAGES, Funnel, daysBetween, visitKind, VIRAL_EVENT_NAMES, isViralEvent, viralCoefficient, viralEventProps } from "../Funnel";
 
 /** A clock the test drives, so timings are exact and never flaky. */
 class Clock {
@@ -156,5 +156,38 @@ describe("retention cohort", () => {
 
   it("treats a clock that went backwards as a same-day visit", () => {
     expect(visitKind("2026-09-25", "2026-09-23")).toBe("new");
+  });
+});
+
+describe("viral event schema", () => {
+  it("is a closed set", () => {
+    expect(VIRAL_EVENT_NAMES).toContain("challenge_share");
+    expect(isViralEvent("challenge_share")).toBe(true);
+    expect(isViralEvent("run_end")).toBe(false);
+  });
+
+  it("drops unknown keys and sanitises the rest", () => {
+    const props = viralEventProps("clip_moment", {
+      kind: "near_miss!",
+      mode: "daytrip",
+      distance: 1840.6,
+      score: 77.2,
+      // @ts-expect-error — proving extra keys never survive
+      path: "/secret",
+    });
+    expect(props).toEqual({ kind: "near_miss", mode: "daytrip", distance: 1841, score: 77 });
+    expect(props).not.toHaveProperty("path");
+  });
+
+  it("is 0 when nothing viral happened", () => {
+    expect(viralCoefficient({})).toBe(0);
+  });
+
+  it("rises with shares and rematches, falls with unconverted opens", () => {
+    const hot = viralCoefficient({ challenge_share: 4, ghost_rematch: 2, one_more_run: 6, challenge_open: 1 });
+    const cold = viralCoefficient({ challenge_open: 8, challenge_share: 0 });
+    expect(hot).toBeGreaterThan(cold);
+    expect(hot).toBeGreaterThan(0);
+    expect(hot).toBeLessThanOrEqual(3);
   });
 });

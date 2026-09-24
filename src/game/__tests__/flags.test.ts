@@ -15,12 +15,18 @@ describe("feature flags", () => {
     setFlag("challengeShare", true);
     setFlag("nativeShare", true);
     setFlag("modeAwareChallenge", true);
+    setFlag("adaptiveDifficulty", true);
+    setFlag("clipWorthy", true);
+    setFlag("oneMoreRun", true);
   });
 
   it("defaults on", () => {
     expect(flag("challengeShare")).toBe(true);
     expect(flag("nativeShare")).toBe(true);
     expect(flag("modeAwareChallenge")).toBe(true);
+    expect(flag("adaptiveDifficulty")).toBe(true);
+    expect(flag("clipWorthy")).toBe(true);
+    expect(flag("oneMoreRun")).toBe(true);
   });
 
   it("round-trips a persisted override", () => {

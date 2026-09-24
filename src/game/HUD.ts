@@ -1,6 +1,6 @@
 import { browseSkins, newShopBrowse, nextBird, type ShopBrowse } from "./ShopBrowse";
 import { flightTakeaway } from "./FlightGuidance";
-import { MOMENTS, type MomentTally } from "./Moments";
+import { MOMENTS, type MomentTally, type ClipTally } from "./Moments";
 import { growthLedger } from "./GrowthLedger";
 import { type BeatView, type CelebrationView } from "./ProgressBeats";
 import { streakOpacity, vignetteIntensity } from "./SpeedFeel";
@@ -291,6 +291,13 @@ export type HudSnapshot = {
    * a run full of BONKs sells a shield and a record run asks to be shared.
    */
   moments: MomentTally[];
+  /**
+   * Clip-worthy beats this flight (see `Moments.ts` clip table). Independent of
+   * `moments` so a comedy ledger cannot be rewritten by a new shareable kind.
+   */
+  clips: ClipTally[];
+  /** 0..100 share heat for this recap. 0 while flying. */
+  viralScore: number;
   /**
    * True while trailing AI rivals get a catch-up push in this race. Disclosed
    * wherever a race is offered or reported: an assist nobody mentioned is not a
@@ -3895,6 +3902,7 @@ function renderGameOver(s: HudSnapshot): string {
     ${renderGrowthLedger(s)}
 
     ${renderMomentStrip(s.moments)}
+    ${renderClipStrip(s.clips, s.viralScore)}
 
     ${renderCoinMultiplierCard(s.coins, s.multiplierClaimed, s.portalName !== "none")}
 
@@ -3949,6 +3957,18 @@ function renderGameOver(s: HudSnapshot): string {
  * them the flight was a *story*, which is the thing worth flying again for and
  * the thing worth sharing.
  */
+function renderClipStrip(clips: ClipTally[] | undefined, score: number): string {
+  if (!clips?.length) return "";
+  const chips = clips
+    .map(
+      (c) =>
+        `<span class="moment-chip clip-chip" title="${escapeHtml(c.label)}"><b aria-hidden="true">${c.icon}</b>${escapeHtml(c.label)}<i>×${c.count}</i></span>`,
+    )
+    .join("");
+  const heat = Number.isFinite(score) && score > 0 ? `<i class="clip-heat">${Math.round(score)}</i>` : "";
+  return `<div class="moment-strip clip-strip" role="list">${chips}${heat}</div>`;
+}
+
 function renderMomentStrip(moments: MomentTally[]): string {
   if (!moments.length) return "";
   const chips = moments

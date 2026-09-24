@@ -22,7 +22,7 @@
  *
  * Run: node scripts/verify-isolation.mjs   (also part of `poki:preflight`)
  */
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 
 const ROOT = process.cwd();
@@ -128,6 +128,38 @@ for (const mod of POKI_MODULES) {
   }
 }
 notes.push(`4. ${POKI_MODULES.length} Poki-only modules, 0 self-hosted references`);
+
+/* 5 — one game. No parallel stacks, no R3F/Zustand rewrite. ---------------- */
+const FORBIDDEN_MODULES = [
+  ["src/game/Viral.ts", "Moments.ts (clip table + ClipLedger)"],
+  ["src/game/ViralEvents.ts", "Funnel.ts (viral event schema)"],
+  ["src/game/AdaptiveDifficulty.ts", "Engagement.ts (tuneDifficulty on FlowTuner)"],
+  ["src/game/ClipCamera.ts", "CameraRig.ts (pulseClip / clipPose)"],
+  ["src/game/OneMoreRun.ts", "Moments.ts (pickCta)"],
+  ["src/game/PackBalance.ts", "MassRace.ts (applyPackCatchup)"],
+  ["src/game/Haptics.ts", "Moments.ts haptic patterns + Game.haptic()"],
+  ["src/game/Game.tsx", "Game.ts (imperative Three loop, not R3F)"],
+  ["src/game/GameScene.tsx", "Game.ts"],
+  ["src/ui/HUD.tsx", "src/game/HUD.ts"],
+];
+for (const [file, instead] of FORBIDDEN_MODULES) {
+  if (existsSync(path.join(ROOT, file))) {
+    failures.push(`${file} exists — that is a second copy of a job already owned by ${instead}. Enhance the existing module.`);
+  }
+}
+for (const dir of ["src/game/ecs", "src/game/store", "src/game/entities"]) {
+  if (existsSync(path.join(ROOT, dir))) {
+    failures.push(`${dir}/ exists — Sunbird is vanilla Three + Game.ts, not an R3F/Zustand/ECS rewrite`);
+  }
+}
+const pkg = JSON.parse(read(path.join(ROOT, "package.json")));
+const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
+for (const dep of ["zustand", "@react-three/fiber", "@react-three/drei"]) {
+  if (allDeps[dep]) {
+    failures.push(`package.json depends on ${dep} — that is the R3F/Zustand template, not this Poki game`);
+  }
+}
+notes.push("5. one-game gate: no parallel Viral/ECS/R3F modules");
 
 /* --------------------------------------------------------------- report -- */
 for (const note of notes) console.log(`✓ ${note}`);

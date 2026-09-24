@@ -90,6 +90,15 @@ until proven otherwise. This file exists so the commit log can't overclaim.
 2. Add score rate limiting, idempotency, and deterministic replay validation
    before ranked seasons accept public submissions.
 
+## ✅ Shipped this pass (viral Poki loop, existing modules)
+- Clip-worthy ledger + viral score + recap CTA in `Moments.ts`
+- Casual-only adaptive pack / daylight / magnet / ridge skim in `Engagement.ts` + `MassRace.ts` + `Game.ts` (identity on rated)
+- Clip-camera overlay on `CameraRig.pulseClip`
+- Compact `sb1:` challenge tokens (`Challenge.ts`) for hash-stripping messengers
+- Named experiment catalog + `clipWorthy` / `oneMoreRun` / `adaptiveDifficulty` flags
+- FirstFlight coach tightened to ~15 s of required input
+- Isolation gate forbids a second Viral/ECS/R3F stack
+
 See `docs/archive/ARCHITECTURE_REVIEW-tmultiworlds-2026-09.md` for the full comparison against the proposed
 Bevy/Replicon rewrite, including what was rejected and why.
 

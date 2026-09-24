@@ -248,3 +248,103 @@ export function evaluateNearMiss(
   }
   return { kind: "none", gap: 0, text: "" };
 }
+
+/* ================================================= adaptive contest feel */
+
+/**
+ * Casual-only helping hand / spice. FlowTuner already bends *terrain*;
+ * this bends the *feel of the contest* (daylight, pack catch-up, skim
+ * forgiveness). Rated / duel / live races always get the identity tune —
+ * hidden assistance that touches a ranked outcome is the trust failure
+ * this game cannot survive.
+ */
+export type DifficultySignals = {
+  runsPlayed: number;
+  skill: number;
+  lastDistance: number;
+  lastDurationSec: number;
+  recentPlaces: number[];
+};
+
+export type DifficultyReason = "ease" | "neutral" | "spice";
+
+export type DifficultyTune = {
+  daylightMult: number;
+  packCatchupMult: number;
+  ridgeForgiveness: number;
+  magnetBonus: number;
+  reason: DifficultyReason;
+};
+
+export const IDENTITY_TUNE: DifficultyTune = {
+  daylightMult: 1,
+  packCatchupMult: 1,
+  ridgeForgiveness: 0,
+  magnetBonus: 0,
+  reason: "neutral",
+};
+
+const EASE: DifficultyTune = {
+  daylightMult: 0.9,
+  packCatchupMult: 1.28,
+  ridgeForgiveness: 2.4,
+  magnetBonus: 0.18,
+  reason: "ease",
+};
+
+const SPICE: DifficultyTune = {
+  daylightMult: 1.06,
+  packCatchupMult: 0.82,
+  ridgeForgiveness: 0,
+  magnetBonus: 0,
+  reason: "spice",
+};
+
+function mean(values: number[]): number {
+  if (!values.length) return 0;
+  return values.reduce((a, b) => a + b, 0) / values.length;
+}
+
+function mixTune(a: DifficultyTune, b: DifficultyTune, t: number): DifficultyTune {
+  const k = clamp(t, 0, 1);
+  return {
+    daylightMult: lerp(a.daylightMult, b.daylightMult, k),
+    packCatchupMult: lerp(a.packCatchupMult, b.packCatchupMult, k),
+    ridgeForgiveness: lerp(a.ridgeForgiveness, b.ridgeForgiveness, k),
+    magnetBonus: lerp(a.magnetBonus, b.magnetBonus, k),
+    reason: k <= 0 ? a.reason : b.reason,
+  };
+}
+
+export function tuneDifficulty(signals: DifficultySignals, rated: boolean): DifficultyTune {
+  if (rated) return IDENTITY_TUNE;
+
+  const runs = Math.max(0, Math.floor(Number(signals.runsPlayed) || 0));
+  const skill = clamp(Number(signals.skill) || 0, 0, 1);
+  const lastDist = Math.max(0, Number(signals.lastDistance) || 0);
+  const lastDur = Math.max(0, Number(signals.lastDurationSec) || 0);
+  const places = (signals.recentPlaces ?? []).filter((n) => Number.isFinite(n) && n > 0);
+  const placeMean = mean(places);
+
+  if (runs < 3) return EASE;
+
+  const velocity = lastDur > 0.5 ? lastDist / lastDur : 0;
+  const struggling = skill < 0.32 || lastDist < 400 || (places.length >= 2 && placeMean > 8);
+  const bored = skill > 0.74 && lastDist > 1400 && velocity > 18 && (places.length === 0 || placeMean <= 4);
+
+  if (struggling && !bored) {
+    const t = clamp(0.45 + (0.32 - skill) * 0.8, 0.35, 1);
+    return mixTune(IDENTITY_TUNE, EASE, t);
+  }
+  if (bored) {
+    const t = clamp((skill - 0.74) * 2.2, 0.25, 0.85);
+    return mixTune(IDENTITY_TUNE, SPICE, t);
+  }
+  return IDENTITY_TUNE;
+}
+
+/** Pace-ghost skill: slightly above the player, never a humiliation. */
+export function paceSkillFor(playerSkill: number): number {
+  const s = clamp(Number(playerSkill) || 0, 0, 1);
+  return clamp(s * 0.72 + 0.22, 0.22, 0.88);
+}
