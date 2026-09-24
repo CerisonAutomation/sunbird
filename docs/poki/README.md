@@ -35,6 +35,7 @@ carries an obligation was dropped.
 | `developers.poki.com/guide/player-device-report` | [`07-player-device-report.md`](./07-player-device-report.md) |
 | `developers.poki.com/guide/game-dev-tools` | [`08-game-dev-tools.md`](./08-game-dev-tools.md) |
 | `developers.poki.com/guide` (requirements, policies, events, release) | [`09-platform-requirements.md`](./09-platform-requirements.md) |
+| `developers.poki.com/guide/sdk-html5`, `/guide/game-events`, `/guide/sdk-defold` + `@poki/sdk@0.0.5` typings + the live CDN loader | [`SDK_CANON.md`](./SDK_CANON.md) — the exact `PokiSDK` surface, and the invented members it replaced |
 
 ## Files
 
@@ -43,6 +44,7 @@ carries an obligation was dropped.
 | `00-guide-overview.md` … `09-platform-requirements.md` | The extracted guide, one page per topic, every rule numbered |
 | [`requirements.json`](./requirements.json) | Machine-readable rule list: `id`, `section`, `kind`, `rule`, `verify`, `evidence`, `status` |
 | [`COMPLIANCE.md`](./COMPLIANCE.md) | **Generated** — the audit result per rule (`pnpm poki:audit`) |
+| [`SDK_CANON.md`](./SDK_CANON.md) | **Researched** — every canonical `PokiSDK` member with provenance, what is wired and what is deliberately not, the `measure()` argument rules, and the invented members that were removed (`REQ-71`…`REQ-76`) |
 | [`REBUILD_REPORT.md`](./REBUILD_REPORT.md) | What this extraction changed in the game, why, and the evidence |
 
 ## Using the spec

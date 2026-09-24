@@ -8,10 +8,12 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("flight pacing without breaking the launch arc", () => {
   it("preserves early lift, then smoothly reduces long passive glides", () => {
+    // TUNED 2026-09-24: earlier decay (2.5s vs 3s) and deeper (0.32 vs 0.4) for lower ceiling
     expect(FlightPhysics.glideLiftScale(0)).toBe(1);
-    expect(FlightPhysics.glideLiftScale(3)).toBe(1);
-    expect(FlightPhysics.glideLiftScale(5)).toBeCloseTo(.76);
-    expect(FlightPhysics.glideLiftScale(100)).toBeCloseTo(.4);
+    expect(FlightPhysics.glideLiftScale(2.5)).toBe(1);
+    expect(FlightPhysics.glideLiftScale(3)).toBeCloseTo(0.915, 2);
+    expect(FlightPhysics.glideLiftScale(5)).toBeCloseTo(0.575, 2);
+    expect(FlightPhysics.glideLiftScale(100)).toBeCloseTo(0.32, 2);
   });
   it("lands a powered, high launch sooner than the previous sustained-lift model", () => {
     const terrain = new TerrainSystem("airtime-check");

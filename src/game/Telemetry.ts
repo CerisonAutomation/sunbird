@@ -3,6 +3,45 @@ import { isPortalBuild } from "../sdk/platform";
 type Props = Record<string, string | number | boolean>;
 type Entry = { name: string; props: Props; t: number };
 
+/**
+ * The only shape allowed to leave the device. Every field is a coarse counter:
+ * an event name, a mode, whole kilometres, and — for the two funnel events — a
+ * stage id plus its index in the fixed path. No timestamps, no durations, no
+ * path strings, no identity beyond the random local device id the backend
+ * already uses as a denominator.
+ */
+export type CoarseEvent = { k: string; mode?: string; km?: number; st?: string; si?: number };
+
+/** Stage ids are lowercase words (digits and underscores allowed, matching the
+ * sink's own regex); anything else is refused rather than sent. */
+const STAGE_RE = /^[a-z][a-z0-9_]{0,23}$/;
+
+/** Events allowed to carry a funnel position. Whitelisted by name, so a new
+ * event cannot leak a stage-shaped string by accident. */
+const FUNNEL_EVENTS = new Set(["funnel_stage", "funnel_summary"]);
+
+/**
+ * Project one rich in-game event onto the coarse beacon shape.
+ *
+ * Pure and exported so the privacy contract is a unit test rather than a review
+ * comment: what a beacon carries is exactly what this function returns.
+ */
+export function coarseEvent(name: string, props: Props): CoarseEvent {
+  const out: CoarseEvent = { k: name };
+  if (typeof props.mode === "string") out.mode = props.mode;
+  if (typeof props.distance === "number") out.km = Math.floor(props.distance / 1000);
+  if (FUNNEL_EVENTS.has(name)) {
+    // `funnel_stage` carries `stage`; `funnel_summary` carries where it stalled.
+    const raw = typeof props.stage === "string" ? props.stage : props.stalledAt;
+    const stage = typeof raw === "string" ? raw : "";
+    if (STAGE_RE.test(stage)) out.st = stage;
+    if (typeof props.step === "number" && Number.isFinite(props.step)) {
+      out.si = Math.max(0, Math.min(31, Math.round(props.step)));
+    }
+  }
+  return out;
+}
+
 const ENV = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
 
 /** Backend telemetry endpoint. Empty string = no sink configured = network
@@ -31,7 +70,7 @@ export function endpointUrl(): string {
  */
 export class Telemetry {
   private readonly buffer: Entry[] = [];
-  private readonly outbox: { k: string; mode?: string; km?: number }[] = [];
+  private readonly outbox: CoarseEvent[] = [];
   private deviceId = "";
   private hookInstalled = false;
   private readonly debug =
@@ -56,10 +95,7 @@ export class Telemetry {
     if (this.debug) console.debug("[telemetry]", name, props);
     // Queue a coarse copy for the aggregate backend counter (hard-capped).
     if (endpointUrl() && this.outbox.length < 64) {
-      const out: { k: string; mode?: string; km?: number } = { k: name };
-      if (typeof props.mode === "string") out.mode = props.mode;
-      if (typeof props.distance === "number") out.km = Math.floor(props.distance / 1000);
-      this.outbox.push(out);
+      this.outbox.push(coarseEvent(name, props));
     }
   }
 

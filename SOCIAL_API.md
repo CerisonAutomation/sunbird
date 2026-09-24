@@ -5,7 +5,7 @@
 > saving is now one-way. Existing unauthenticated profiles require trusted
 > administrator migration, not automatic claiming by device ID. Frontend and
 > backend must be deployed together. See
-> [deployment and migration limits](docs/CONSOLIDATION_AUDIT.md).
+> [deployment and migration limits](docs/audits/CONSOLIDATION_AUDIT.md).
 > The older examples below must be used with these authentication requirements.
 
 # Sunbird social server (friends · clubs · chat)

@@ -27,7 +27,7 @@ thing a player sees before deciding to click.
 
 These are not statements from this page but are required by the submission
 workflow as captured in the earlier compliance pass
-(`POKI_COMPLIANCE_AUDIT.md` §"Remaining human/submission actions"):
+(`../audits/POKI_COMPLIANCE_AUDIT.md` §"Remaining human/submission actions"):
 
 | ID | Kind | Rule |
 |---|---|---|

@@ -232,7 +232,13 @@ export class ParticleFX {
     }
   }
 
-  emitConfetti(x: number, y: number): void {
+  /**
+   * Confetti burst. `scale` (0..1) is the celebration's loudness: a lifetime
+   * rank-up or a personal best gets the full 40 flakes, a mastery level-up gets
+   * a third of them, so the particles say what the audio says.
+   */
+  emitConfetti(x: number, y: number, scale = 1): void {
+    const count = Math.max(6, Math.round(40 * (Number.isFinite(scale) ? Math.min(1, Math.max(0, scale)) : 1)));
     const colors = [
       [1, 0.45, 0.3],
       [1, 0.85, 0.3],
@@ -240,7 +246,7 @@ export class ParticleFX {
       [0.5, 1, 0.55],
       [1, 0.5, 0.8],
     ];
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < count; i++) {
       const c = colors[i % colors.length]!;
       this.spawn({
         x,

@@ -20,15 +20,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * See platform-failsafe.test.ts for the adapter-path guard.)
  */
 const calls: string[] = [];
+/** Every member the net reached for on the global, canonical or not. */
+const accessed: string[] = [];
 
 describe("poki loading net", () => {
   beforeEach(() => {
     calls.length = 0;
+    accessed.length = 0;
     vi.resetModules();
-    (window as unknown as { PokiSDK: unknown }).PokiSDK = {
-      gameLoadingFinished: () => calls.push("gameLoadingFinished"),
-      signalGameReady: () => calls.push("signalGameReady"),
-    };
+    // A recording Proxy rather than a hand-written double: the old double
+    // declared `signalGameReady`, a member Poki's SDK does not have, so the net
+    // "worked" in the test and silently did nothing in production. The Proxy
+    // logs every member the code reaches for, canonical or not, and only really
+    // implements the documented one.
+    const real = { gameLoadingFinished: () => calls.push("gameLoadingFinished") };
+    (window as unknown as { PokiSDK: unknown }).PokiSDK = new Proxy(real, {
+      get(target, key) {
+        accessed.push(String(key));
+        return (target as unknown as Record<string | symbol, unknown>)[key];
+      },
+    });
   });
 
   afterEach(() => {
@@ -44,7 +55,9 @@ describe("poki loading net", () => {
     runLoadingNet(); // idempotent calls are allowed; the adapter dedupes its own
 
     expect(calls.filter((c) => c === "gameLoadingFinished")).toHaveLength(2);
-    expect(calls.filter((c) => c === "signalGameReady")).toHaveLength(2);
+    // The net touches exactly one member, and it is the documented conversion
+    // marker. Anything else in `accessed` would be an invented SDK method.
+    expect(new Set(accessed)).toEqual(new Set(["gameLoadingFinished"]));
   });
 
   it("never throws when the SDK never arrived (blocked script, CSP)", async () => {

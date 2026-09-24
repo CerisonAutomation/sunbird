@@ -172,6 +172,16 @@ export const V1_ROUTES: Route[] = [
     auth: "optional",
     handler: (ctx) => ctx.telemetry.snapshot(),
   },
+  {
+    // Ops view: the first-run funnel — how far sessions got, step-to-step
+    // conversion, and the worst step. Folded from the same anonymous counters;
+    // no session ids exist here to aggregate on.
+    method: "GET",
+    re: /^\/mp\/v1\/telemetry\/funnel$/,
+    rl: "read",
+    auth: "optional",
+    handler: (ctx) => ctx.telemetry.funnel(),
+  },
 
   /* -------------------------------------------------------------- identity */
 

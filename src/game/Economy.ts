@@ -59,7 +59,7 @@ const BASE_SKINS: SkinDef[] = [
     id: "bluejay",
     name: "Bluejay",
     perk: "+6% top speed",
-    price: 200,
+    price: 75,
     body: 0x3d8bf2,
     wing: 0x7fb8ff,
     belly: 0xeaf4ff,
@@ -74,7 +74,7 @@ const BASE_SKINS: SkinDef[] = [
     id: "ember",
     name: "Ember",
     perk: "Fever lasts +4 s",
-    price: 450,
+    price: 160,
     body: 0xe0392a,
     wing: 0xff9a1f,
     belly: 0xffe2a8,
@@ -89,7 +89,7 @@ const BASE_SKINS: SkinDef[] = [
     id: "owl",
     name: "Dusk Owl",
     perk: "+10 s of daylight",
-    price: 700,
+    price: 240,
     body: 0x5d4f86,
     wing: 0x8f7fc0,
     belly: 0xf1eaff,
@@ -104,7 +104,7 @@ const BASE_SKINS: SkinDef[] = [
     id: "robin",
     name: "Robin",
     perk: "+3% top speed",
-    price: 150,
+    price: 45,
     body: 0xb2543a,
     wing: 0xd97b52,
     belly: 0xffd9b0,
@@ -119,7 +119,7 @@ const BASE_SKINS: SkinDef[] = [
     id: "canary",
     name: "Canary",
     perk: "+4 s of daylight",
-    price: 180,
+    price: 45,
     body: 0xffd53d,
     wing: 0xffe57a,
     belly: 0xfff8d6,
@@ -134,7 +134,7 @@ const BASE_SKINS: SkinDef[] = [
     id: "swift",
     name: "Storm Swift",
     perk: "+5% top speed",
-    price: 260,
+    price: 100,
     body: 0x4a5568,
     wing: 0x718096,
     belly: 0xe2e8f0,
@@ -149,7 +149,7 @@ const BASE_SKINS: SkinDef[] = [
     id: "kingfisher",
     name: "Kingfisher",
     perk: "Fever lasts +2 s · +2% speed",
-    price: 320,
+    price: 125,
     body: 0x00a3c4,
     wing: 0x0bc5ea,
     belly: 0xfefcbf,
@@ -164,7 +164,7 @@ const BASE_SKINS: SkinDef[] = [
     id: "cardinal",
     name: "Cardinal",
     perk: "Fever lasts +3 s",
-    price: 380,
+    price: 160,
     body: 0xc53030,
     wing: 0xe53e3e,
     belly: 0xfed7d7,
@@ -179,7 +179,7 @@ const BASE_SKINS: SkinDef[] = [
     id: "magpie",
     name: "Magpie",
     perk: "+6 s of daylight",
-    price: 420,
+    price: 180,
     body: 0x1a202c,
     wing: 0x5a6b8c,
     belly: 0xf7fafc,
@@ -194,7 +194,7 @@ const BASE_SKINS: SkinDef[] = [
     id: "heron",
     name: "Grey Heron",
     perk: "+4% speed · +3 s daylight",
-    price: 520,
+    price: 240,
     body: 0x8ba2b5,
     wing: 0xb8c9d9,
     belly: 0xf0f5fa,
@@ -209,7 +209,7 @@ const BASE_SKINS: SkinDef[] = [
     id: "lorikeet",
     name: "Lorikeet",
     perk: "Fever +3 s · +3 s daylight",
-    price: 560,
+    price: 295,
     body: 0x2f855a,
     wing: 0x38b2ac,
     belly: 0xfff3d6,
@@ -224,7 +224,7 @@ const BASE_SKINS: SkinDef[] = [
     id: "falcon",
     name: "Peregrine",
     perk: "+7% top speed",
-    price: 640,
+    price: 330,
     body: 0x2c5282,
     wing: 0x2b6cb0,
     belly: 0xebf8ff,
@@ -239,7 +239,7 @@ const BASE_SKINS: SkinDef[] = [
     id: "ibis",
     name: "Scarlet Ibis",
     perk: "+8 s of daylight",
-    price: 720,
+    price: 360,
     body: 0xe53e3e,
     wing: 0xfc8181,
     belly: 0xfff5f5,
@@ -254,7 +254,7 @@ const BASE_SKINS: SkinDef[] = [
     id: "quetzal",
     name: "Quetzal",
     perk: "Fever +4 s · +2% speed",
-    price: 780,
+    price: 410,
     body: 0x276749,
     wing: 0x38b2ac,
     belly: 0xd6f5e6,
@@ -269,7 +269,7 @@ const BASE_SKINS: SkinDef[] = [
     id: "harpy",
     name: "Harpy Eagle",
     perk: "+6% speed · +4 s daylight",
-    price: 850,
+    price: 445,
     body: 0x4a5568,
     wing: 0x718096,
     belly: 0xedf2f7,
@@ -284,7 +284,7 @@ const BASE_SKINS: SkinDef[] = [
     id: "raven",
     name: "Midnight Raven",
     perk: "Fever +5 s",
-    price: 900,
+    price: 465,
     body: 0x171923,
     wing: 0x2d3748,
     belly: 0x4a5568,
@@ -299,7 +299,7 @@ const BASE_SKINS: SkinDef[] = [
     id: "condor",
     name: "Sun Condor",
     perk: "+5% speed · fever +3 s · +3 s daylight",
-    price: 950,
+    price: 475,
     body: 0x975a16,
     wing: 0xd69e2e,
     belly: 0xfffff0,
@@ -410,7 +410,7 @@ const BASE_SKINS: SkinDef[] = [
     id: "jet",
     name: "Jet",
     perk: "+8% top speed",
-    price: 350,
+    price: 190,
     body: 0x2d2d2d,
     wing: 0xff4444,
     belly: 0xffcccc,
@@ -425,7 +425,7 @@ const BASE_SKINS: SkinDef[] = [
     id: "cloudwalker",
     name: "Cloudwalker",
     perk: "+6 s daylight",
-    price: 500,
+    price: 245,
     body: 0xe8f4fd,
     wing: 0xb8d8f8,
     belly: 0xffffff,
@@ -440,7 +440,7 @@ const BASE_SKINS: SkinDef[] = [
     id: "stormchaser",
     name: "Stormchaser",
     perk: "+3 s fever duration",
-    price: 600,
+    price: 385,
     body: 0x4a6fa5,
     wing: 0x8ab4d8,
     belly: 0xd4e8f5,
@@ -455,7 +455,7 @@ const BASE_SKINS: SkinDef[] = [
     id: "snowowl",
     name: "Snow Owl",
     perk: "+8 s daylight",
-    price: 550,
+    price: 270,
     body: 0xf0f0f8,
     wing: 0xc8d0e8,
     belly: 0xffffff,
@@ -470,7 +470,7 @@ const BASE_SKINS: SkinDef[] = [
     id: "ruby",
     name: "Ruby",
     perk: "+5% speed · +2 s fever",
-    price: 400,
+    price: 215,
     body: 0xcc2244,
     wing: 0xff5577,
     belly: 0xffddee,
@@ -485,7 +485,7 @@ const BASE_SKINS: SkinDef[] = [
     id: "golden",
     name: "Golden Eagle",
     perk: "+4% speed · +4 s daylight",
-    price: 800,
+    price: 501,
     body: 0xdaa520,
     wing: 0xffd700,
     belly: 0xfff8dc,
@@ -501,7 +501,7 @@ const BASE_SKINS: SkinDef[] = [
   { id: "ember_wren", name: "Ember Wren", perk: "+3% speed · ember trail", price: 400, body: 0xcc4400, wing: 0xff8844, belly: 0xffddaa, beak: 0xffcc00, speedMult: 1.03, feverBonus: 0, daylightBonus: 0, magnetAlways: false, rarity: "common", collection: "elements" },
   { id: "snow_owl", name: "Boreal Owl", perk: "+8 s daylight", price: 550, body: 0x2fd6a0, wing: 0x8affd8, belly: 0xeafffa, beak: 0xffb020, speedMult: 1, feverBonus: 0, daylightBonus: 8, magnetAlways: false, rarity: "rare", collection: "elements" },
   { id: "storm_rider", name: "Storm Rider", perk: "Weather immunity", price: 700, body: 0x2a3a5a, wing: 0x5a7a9a, belly: 0xd0e0f0, beak: 0xffa040, speedMult: 1.01, feverBonus: 1, daylightBonus: 0, magnetAlways: false, weatherProof: true, rarity: "rare", collection: "elements" },
-  { id: "crystal", name: "Crystal Wing", perk: "+5% speed · +2 s daylight", price: 600, body: 0x88ccff, wing: 0xaaeeff, belly: 0xffffff, beak: 0xffd700, speedMult: 1.05, feverBonus: 0, daylightBonus: 2, magnetAlways: false, rarity: "rare", collection: "elements" },
+  { id: "crystal", name: "Crystal Wing", perk: "+5% speed · +2 s daylight", price: 301, body: 0x88ccff, wing: 0xaaeeff, belly: 0xffffff, beak: 0xffd700, speedMult: 1.05, feverBonus: 0, daylightBonus: 2, magnetAlways: false, rarity: "rare", collection: "elements" },
   { id: "nebula", name: "Nebula", perk: "+3% speed · +3 s fever", price: 750, body: 0x6a3a8a, wing: 0xaa66cc, belly: 0xeeddff, beak: 0xffaa44, speedMult: 1.03, feverBonus: 3, daylightBonus: 0, magnetAlways: false, rarity: "epic", collection: "cosmic" },
   { id: "comet", name: "Comet", perk: "+6% speed", price: 500, body: 0x2244aa, wing: 0x66aaff, belly: 0xccddff, beak: 0xffcc00, speedMult: 1.06, feverBonus: 0, daylightBonus: 0, magnetAlways: false, rarity: "common", collection: "cosmic" },
   { id: "supernova", name: "Supernova", perk: "+4% speed · +4 s fever", price: 800, body: 0xff4400, wing: 0xff8800, belly: 0xffeecc, beak: 0xffdd00, speedMult: 1.04, feverBonus: 4, daylightBonus: 0, magnetAlways: false, rarity: "legendary", collection: "cosmic" },
@@ -569,14 +569,32 @@ export type BoostDef = {
 };
 
 const BASE_BOOSTS: BoostDef[] = [
-  { id: "shield", name: "Sea Shield", desc: "Bounce off the ocean once", price: 60, icon: "🛡" },
-  { id: "magnet", name: "Coin Magnet", desc: "Take off with 15 s of magnet", price: 40, icon: "🧲" },
-  { id: "sunflask", name: "Sun Flask", desc: "+12 s daylight at takeoff", price: 50, icon: "☀" },
-  { id: "headstart", name: "Head Start", desc: "Launch from 300 m at full speed", price: 90, icon: "🚀" },
-  { id: "stormward", name: "Storm Ward", desc: "Ash clouds and gusts barely touch you", price: 70, icon: "🌩" },
-  { id: "hotwings", name: "Hot Wings", desc: "Take off already in Fever", price: 80, icon: "🔥" },
-  { id: "doubletap", name: "Sunburst Trigger", desc: "Double-tap in flight for a powerful burst", price: 420, icon: "⚡", permanent: true },
+  { id: "shield", name: "Sea Shield", desc: "Bounce off the ocean once", price: 48, icon: "🛡" },
+  { id: "magnet", name: "Coin Magnet", desc: "Take off with 15 s of magnet", price: 32, icon: "🧲" },
+  { id: "sunflask", name: "Sun Flask", desc: "+12 s daylight at takeoff", price: 24, icon: "☀" },
+  { id: "headstart", name: "Head Start", desc: "Launch from 300 m at full speed", price: 48, icon: "🚀" },
+  { id: "stormward", name: "Storm Ward", desc: "Ash clouds and gusts barely touch you", price: 32, icon: "🌩" },
+  { id: "hotwings", name: "Hot Wings", desc: "Take off already in Fever", price: 40, icon: "🔥" },
+  { id: "doubletap", name: "Sunburst Trigger", desc: "Double-tap in flight for a powerful burst", price: 224, icon: "⚡", permanent: true },
+
+  /* ---- 2026 hangar expansion — rebalanced for snack pricing (CostCritique audit) -----
+     Early boosts now 1/2 run, permanent sinks 6 runs not 12. Every SKU drives an existing mechanic via Game.applyBoost(). */
+  { id: "tailwind", name: "Tailwind Launch", desc: "A burst of speed the moment you leave the ground", price: 28, icon: "\u{1F4A8}" },
+  { id: "daybreak", name: "Daybreak Lantern", desc: "+20 s of daylight at takeoff", price: 36, icon: "\u{1F3EE}" },
+  { id: "luckycoin", name: "Lucky Coin", desc: "Double coins for the first 20 s of the flight", price: 44, icon: "\u{1F340}" },
+  { id: "fullhouse", name: "Full House", desc: "Shield + Magnet + Sun Flask in one takeoff", price: 72, icon: "\u{1F0CF}" },
+  { id: "goldenfeather", name: "Golden Feather", desc: "+10% coins from every flight, forever", price: 280, icon: "\u{1FAB6}", permanent: true },
 ];
+
+/**
+ * Permanent coin multipliers, by upgrade id. Applied inside `SaveData.addCoins`
+ * — the single funnel every coin award in the game goes through — so a bonus
+ * can never be missed by one of the twenty award sites, and can never be
+ * applied twice by two of them.
+ */
+export const COIN_MULTIPLIER_UPGRADES: Record<string, number> = {
+  goldenfeather: 1.1,
+};
 
 /** Consumables rise modestly; daily deals remain a valuable return visit. */
 export const BOOSTS: BoostDef[] = BASE_BOOSTS.map((boost) => ({
@@ -596,21 +614,21 @@ export type ShopTrailDef = {
 };
 
 const BASE_SHOP_TRAILS: ShopTrailDef[] = [
-  { id: "trail_ember", label: "Emberline", desc: "A streak of live coals", price: 300, css: ["#ff8a3a", "#ff4a2a", "#ffd27a"] },
-  { id: "trail_tide", label: "Tideglass", desc: "Cool sea-green ribbon", price: 350, css: ["#3ae0c8", "#2a9ad8", "#c8fff2"] },
-  { id: "trail_bloom", label: "Petalfall", desc: "Drifting pink petals", price: 350, css: ["#ff9ac8", "#ff6a9a", "#ffe0ee"] },
-  { id: "trail_gold", label: "Goldleaf", desc: "Pure molten gold", price: 500, css: ["#ffd76a", "#ffb020", "#fff2c8"] },
-  { id: "trail_void", label: "Voidwake", desc: "Deep-space violet wake", price: 420, css: ["#6a3aff", "#2a1a6a", "#c8a8ff"] },
-  { id: "trail_mint", label: "Mintcloud", desc: "Fresh mint vapor", price: 280, css: ["#7affc8", "#3ad89a", "#e0fff2"] },
-  { id: "trail_rose", label: "Rosewind", desc: "Warm rose-gold shimmer", price: 380, css: ["#ffb0a0", "#ff7a6a", "#ffe8d8"] },
-  { id: "trail_neon",    label: "Neonpulse",  desc: "Electric arcade glow",      price: 450, css: ["#3affff", "#ff3aff", "#ffff3a"] },
-  { id: "trail_spark",   label: "Sparklejet", desc: "Glittering stardust burst",  price: 380, css: ["#fff176", "#ffe57f", "#ffffff"] },
-  { id: "trail_aurora",  label: "Aurorawave", desc: "Northern lights ribbon",     price: 490, css: ["#40e0d0", "#7b68ee", "#98fb98"] },
-  { id: "trail_lava",    label: "Lavaflow",   desc: "Molten rock and cinders",    price: 420, css: ["#ff4500", "#ff8c00", "#ffd700"] },
-  { id: "trail_crystal", label: "Crystaline", desc: "Shattered ice shards",       price: 400, css: ["#b0e0ff", "#e8f4ff", "#6ec6ff"] },
-  { id: "trail_shadow",  label: "Shadowrift", desc: "Dark matter in your wake",   price: 460, css: ["#1a0030", "#4a0080", "#9060c8"] },
-  { id: "trail_cherry",  label: "Sakuradrift",desc: "Cherry blossom flurry",      price: 360, css: ["#ffb7c5", "#ff85a1", "#fff0f5"] },
-  { id: "trail_cosmic",  label: "Cosmicray",  desc: "Supernova particle stream",  price: 500, css: ["#ff6ec7", "#845ef7", "#4cc9f0"] },
+  { id: "trail_ember", label: "Emberline", desc: "A streak of live coals", price: 120, css: ["#ff8a3a", "#ff4a2a", "#ffd27a"] },
+  { id: "trail_tide", label: "Tideglass", desc: "Cool sea-green ribbon", price: 160, css: ["#3ae0c8", "#2a9ad8", "#c8fff2"] },
+  { id: "trail_bloom", label: "Petalfall", desc: "Drifting pink petals", price: 160, css: ["#ff9ac8", "#ff6a9a", "#ffe0ee"] },
+  { id: "trail_gold", label: "Goldleaf", desc: "Pure molten gold", price: 210, css: ["#ffd76a", "#ffb020", "#fff2c8"] },
+  { id: "trail_void", label: "Voidwake", desc: "Deep-space violet wake", price: 185, css: ["#6a3aff", "#2a1a6a", "#c8a8ff"] },
+  { id: "trail_mint", label: "Mintcloud", desc: "Fresh mint vapor", price: 120, css: ["#7affc8", "#3ad89a", "#e0fff2"] },
+  { id: "trail_rose", label: "Rosewind", desc: "Warm rose-gold shimmer", price: 170, css: ["#ffb0a0", "#ff7a6a", "#ffe8d8"] },
+  { id: "trail_neon",    label: "Neonpulse",  desc: "Electric arcade glow",      price: 190, css: ["#3affff", "#ff3aff", "#ffff3a"] },
+  { id: "trail_spark",   label: "Sparklejet", desc: "Glittering stardust burst",  price: 170, css: ["#fff176", "#ffe57f", "#ffffff"] },
+  { id: "trail_aurora",  label: "Aurorawave", desc: "Northern lights ribbon",     price: 210, css: ["#40e0d0", "#7b68ee", "#98fb98"] },
+  { id: "trail_lava",    label: "Lavaflow",   desc: "Molten rock and cinders",    price: 185, css: ["#ff4500", "#ff8c00", "#ffd700"] },
+  { id: "trail_crystal", label: "Crystaline", desc: "Shattered ice shards",       price: 185, css: ["#b0e0ff", "#e8f4ff", "#6ec6ff"] },
+  { id: "trail_shadow",  label: "Shadowrift", desc: "Dark matter in your wake",   price: 190, css: ["#1a0030", "#4a0080", "#9060c8"] },
+  { id: "trail_cherry",  label: "Sakuradrift",desc: "Cherry blossom flurry",      price: 145, css: ["#ffb7c5", "#ff85a1", "#fff0f5"] },
+  { id: "trail_cosmic",  label: "Cosmicray",  desc: "Supernova particle stream",  price: 210, css: ["#ff6ec7", "#845ef7", "#4cc9f0"] },
 ];
 
 export const SHOP_TRAILS: ShopTrailDef[] = BASE_SHOP_TRAILS.map((trail) => ({
@@ -637,20 +655,23 @@ export function dailyFlashBird(dateStr: string): { id: string; price: number; or
 }
 
 /**
- * The Gold pitch. The ad-removal bullet only exists in editions that are
- * allowed to sell ad removal (`SELL_AD_REMOVAL`): portal editions let the
- * platform own ad frequency and forbid in-app purchases (Poki REQ-20), so
- * there the ternary folds to `[]` and the claim never reaches the bundle —
- * `scripts/portal-markers.mjs` fails the build if that ever regresses.
+ * The Gold pitch. The ad-removal bullet only exists in builds that actually
+ * schedule breaks (`SIMULATED_BREAKS`): portal editions let the platform own ad
+ * frequency and forbid in-app purchases (Poki REQ-20), and the shipped direct
+ * build has no ad network — so in both cases the ternary folds to `[]` and the
+ * claim never reaches the bundle. `scripts/portal-markers.mjs` fails the build
+ * if "No sponsored breaks" ever leaks into a portal zip, and selling the removal
+ * of a break a build never shows would be a fake ad state either way.
  */
 const GOLD_FEATURES = [
   "Phoenix skin — permanent coin magnet & ember trail",
   "2× coins on every flight",
   "+10 s longer days",
-  // Use import.meta.env directly so Vite's define folds this to false in portal
-  // builds, letting Rollup DCE the string ("No sponsored breaks") from the bundle.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ...((import.meta.env.VITE_SELL_AD_REMOVAL as any) ? ["No sponsored breaks, ever"] : []),
+  // Use import.meta.env directly so Vite's define folds this to `false` in every
+  // build that cannot serve a break (all portals, plus the shipped direct build),
+  // letting Rollup DCE the string ("No sponsored breaks") out of the bundle. The
+  // define is a boolean literal, so the ternary folds exactly.
+  ...(import.meta.env.VITE_SIM_BREAKS ? ["No sponsored breaks, ever"] : []),
   // NOTE: On portal builds (Poki) SELL_AD_REMOVAL=false and the continue screen
   // always shows the rewarded ad path (portal owns monetisation). The "free second
   // wind" perk is architecturally correct but invisible on Poki — don't try to

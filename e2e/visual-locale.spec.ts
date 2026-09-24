@@ -9,16 +9,25 @@ import {
 /**
  * Per-language visual invariants.
  *
- * A DOM spec can confirm `#language-select` has 20 options; it cannot see that
- * the Thai menu overflows its button or that Arabic lost its direction. Each
- * test here covers one phase of Poki's localization rollout, switching language
- * in-page (the same path a player uses) instead of rebooting per locale.
+ * A DOM spec can confirm `#language-select` has 37 options; it cannot see that
+ * the Thai menu overflows its button or that Hebrew lost its direction. Each
+ * test here covers one phase of the rollout, switching language in-page (the
+ * same path a player uses) instead of rebooting per locale.
+ *
+ * Phases follow Poki's localization order (`LOC-04`) and then the rest of the
+ * platform's 34-language list, grouped by *script* — because what breaks a
+ * layout is the writing system, not the language: a new Latin locale inherits
+ * every fix its group already has, while a new script needs its own pass.
  */
 const PHASES: { label: string; codes: SupportedLocale[] }[] = [
   { label: "phase 1 — EFIGS + Turkish", codes: ["en", "es", "de", "fr", "it", "tr"] },
-  { label: "phase 2 — CJK", codes: ["zh-CN", "ja", "ko"] },
-  { label: "phase 3 — pt-BR, Russian, Arabic", codes: ["pt-BR", "ru", "ar"] },
-  { label: "phase 4 — long tail", codes: ["nl", "pl", "sv", "hi", "id", "vi", "th", "mt"] },
+  { label: "phase 2 — CJK", codes: ["zh", "ja", "ko"] },
+  { label: "phase 3 — Portuguese + Russian", codes: ["pt", "ru"] },
+  { label: "phase 4 — RTL (Arabic, Hebrew)", codes: ["ar", "he"] },
+  { label: "phase 5 — Indic + Thai scripts", codes: ["hi", "bn", "th"] },
+  { label: "phase 6 — Greek + Cyrillic", codes: ["el", "bg", "uk", "sr"] },
+  { label: "phase 7 — Latin long tail", codes: ["nl", "pl", "sv", "cs", "sk", "da", "fi", "no", "hu", "ro"] },
+  { label: "phase 8 — Southeast Asian + bonus", codes: ["id", "ms", "tl", "uz", "vi", "mt"] },
 ];
 
 test("every shipped locale is selectable", () => {
@@ -50,7 +59,8 @@ for (const phase of PHASES) {
       expect(await page.evaluate(() => document.documentElement.lang), `${code} lang`).toBe(code);
       expect(await page.evaluate(() => document.documentElement.dir), `${code} dir`).toBe(meta.rtl ? "rtl" : "ltr");
       await expect(page.locator("#language-select")).toHaveValue(code);
-      await expect(page.locator("#language-select option")).toHaveCount(SUPPORTED_LOCALES.length);
+      // +1: the "Browser language" (auto-detect) option sits above the locales.
+      await expect(page.locator("#language-select option")).toHaveCount(SUPPORTED_LOCALES.length + 1);
 
       const settings = await visualDefects(page);
       if (settings.length) problems.push(`${code} settings: ${settings.join(" | ")}`);

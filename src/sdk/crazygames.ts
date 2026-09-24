@@ -250,8 +250,15 @@ export class CrazyGamesAdapter implements PlatformAdapter {
     this.game?.pause?.();
   }
 
-  /** Site-wide celebration for a special moment (personal best). Best-effort. */
-  happytime(): void {
+  /**
+   * CrazyGames' canonical spelling is `game.happytime()` (all lowercase, no
+   * argument) and its docs say to use it sparingly — "the celebration should
+   * remain a special moment". The shared interface speaks Poki's
+   * `happyTime(intensity)`, so this maps down and only fires for a genuinely
+   * big moment.
+   */
+  happyTime(intensity: number): void {
+    if (!Number.isFinite(intensity) || intensity < 0.75) return;
     try {
       const r = this.game?.happytime?.();
       if (r instanceof Promise) r.catch(() => undefined);
@@ -259,6 +266,14 @@ export class CrazyGamesAdapter implements PlatformAdapter {
       /* celebration must never break the game */
     }
   }
+
+  /** CrazyGames exposes no language signal to the game. */
+  portalLanguage(): string | null {
+    return null;
+  }
+
+  /** No portal pill on CrazyGames. */
+  movePill(_topPercent: number, _topPx: number): void {}
 
   /* -------------------------------------------------------------- ads */
 

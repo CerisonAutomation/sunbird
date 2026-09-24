@@ -95,16 +95,15 @@ for (const portal of PORTALS) {
     const m = line.match(/^\s*\d+\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+(\S.*)$/);
     if (m) files.push(m[1].trim());
   }
-  // Allowed anatomy: the single-file game, its icons and fonts, plus the
-  // bundled locale barrel (`i18n/`, ~12 KB). The barrel is the artifact the
-  // poki-upload folder and the host-side tooling consume, it is loaded from a
-  // relative path, and shipping it inside the zip keeps the bundle
-  // self-contained in the guide's sense (no external resource requests). Any
-  // OTHER entry is a packaging mistake.
+  // Allowed anatomy: the single-file game, its icons and its fonts. The locale
+  // barrel used to be a fourth entry; nothing in the runtime fetched it (the
+  // per-locale packs are inlined into index.html by vite-singlefile), so it was
+  // dead weight that grew with every language shipped. Any other entry is a
+  // packaging mistake.
   const badFile = files.find(
-    (f) => !f.startsWith("icons/") && !f.startsWith("fonts/") && !f.startsWith("i18n/") && f !== "index.html",
+    (f) => !f.startsWith("icons/") && !f.startsWith("fonts/") && f !== "index.html",
   );
-  if (badFile) fail(portal, `unexpected zip entry "${badFile}" (portals want ONLY index.html + icons/ + fonts/ + i18n/).`);
+  if (badFile) fail(portal, `unexpected zip entry "${badFile}" (portals want ONLY index.html + icons/ + fonts/).`);
   const icons = files.filter((f) => f.startsWith("icons/")).length;
   const fonts = files.filter((f) => f.startsWith("fonts/")).length;
   if (!files.includes("index.html")) fail(portal, "index.html missing from zip.");
@@ -222,6 +221,12 @@ for (const portal of PORTALS) {
   const KNOWN_OK = [
     "https://game-cdn.poki.com/scripts/v2/poki-sdk.js",
     "https://sdk.crazygames.com/crazygames-sdk-v3.js",
+    // The hosted privacy policy, shown as text on the in-game Privacy screen.
+    // Required by the external-resources policy ("hosted on a live webpage
+    // accessible to all players, linked inside the game") and never fetched:
+    // portals sandbox the iframe, so the game renders the policy itself rather
+    // than navigating away. See src/game/legal.ts.
+    "https://sunbird-snowy.vercel.app/privacy",
   ];
   const suspicious = urls.filter((u) => !KNOWN_OK.includes(u) && !/w3\.org|schema\.org|xmlns/.test(u));
   if (suspicious.length) {

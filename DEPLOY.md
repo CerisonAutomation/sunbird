@@ -133,11 +133,22 @@ this is deliberate and tested; do not make the font link render-blocking.
 | `VITE_MULTIPLAYER_URL` | `/mp` (dev) or verified `wss://…` | unset until portal-safe WSS is approved | unset until portal Full Launch multiplayer is approved |
 | `VITE_PORTAL_BANNER_ID` | — | — | optional |
 
-## 5. Stripe webhook entitlements (server-authoritative purchases)
+## 5. Stripe webhook entitlements (server-authoritative; the client loads no processor)
 
 The backend ships a verified webhook route — `POST /stripe/webhook` — so paid
 entitlements are owned by the server, not by a client-side "I paid" button
 (closes REPO_TRUTH_AUDIT #12).
+
+> **State of the client today:** no processor is wired into the game. `Payments.ts`
+> returns `null` from `ensureStripeJs`, `stripeLinkFor` and `consumeStripeReturn`,
+> `@stripe/stripe-js` is not a dependency, and the shipped CSP permits no
+> processor origin — the economy is coins. What *is* wired is the restore half:
+> `fetchServerEntitlements()` calls `GET /entitlements?device=…` on the configured
+> leaderboard base, so a purchase completed through any channel you operate
+> grants in-game. If you add a client-side checkout, declare its origin in
+> `src/game/legal.edition.ts` in the same commit: that is what publishes it on the
+> privacy page, in `docs/poki/CSP_REQUEST.md`, and (via the `legal-editions` test)
+> keeps the deployed CSP honest.
 
 Setup (once, ~5 minutes):
 
@@ -152,16 +163,17 @@ cd backend && npx wrangler secret put STRIPE_WEBHOOK_SECRET
 
 How it works end to end:
 
-1. The game opens your Payment Link with `client_reference_id=<deviceId>`
-   (already wired in `Payments.ts`).
+1. The player reaches your Payment Link with `client_reference_id=<deviceId>`
+   through whatever channel you operate (the game does not open it — see the
+   note above).
 2. Stripe calls the webhook; the worker verifies the `Stripe-Signature`
    header (HMAC-SHA256 over `t.rawBody`, 5-minute replay window — see
    `backend/src/entitlements.ts`, pinned by `entitlements.test.ts`).
 3. `amount_total` maps to the SKU: 299→gold, 199→vip, 99→starter. The grant
    is stored per deviceId in the leaderboard DO.
-4. The game syncs on Stripe return + on "Restore purchases" via
+4. The game syncs on "Restore purchases" (and at boot) via
    `GET /entitlements?device=…` and grants with source `stripe_webhook`.
 
-Unset secret ⇒ the endpoint answers 503 and the game falls back to the
-labelled manual-confirm flow, exactly as before. If you change prices in
+Unset secret ⇒ the endpoint answers 503 and the client simply sees no
+entitlements (`fetchServerEntitlements` returns `[]` on any non-OK response). If you change prices in
 Stripe, update `AMOUNT_TO_SKU` in `backend/src/entitlements.ts`.

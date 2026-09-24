@@ -27,6 +27,29 @@ export const WINGS: WingsTier[] = [
   { id: "aurora", name: "Aurora Wings", icon: "🌈", min: 2_500_000 },
 ];
 
+/**
+ * Pure: is this flight crossing into the next rung *right now*?
+ *
+ * Lifetime distance only commits when the run lands (`recordRun`), so mid-flight
+ * the rung is earned the instant this flight's metres cover the gap to it. This
+ * is deliberately separate from `wingsProximity()`: that one reports how close the
+ * stretch is and turns itself off at the crossing (`visible: remaining > 0`), so
+ * it cannot be the thing that notices the crossing happened.
+ *
+ * `alreadyCued` makes the moment fire once per flight — a banner that re-fires
+ * every frame for the rest of the run is not a moment, it is a stuck overlay.
+ */
+export function wingsCrossing(opts: {
+  flownMetres: number;
+  nextNeeded: number;
+  alreadyCued: boolean;
+}): boolean {
+  const flown = Number.isFinite(opts.flownMetres) ? Math.max(0, opts.flownMetres) : 0;
+  const needed = Number.isFinite(opts.nextNeeded) ? opts.nextNeeded : 0;
+  if (opts.alreadyCued || needed <= 0) return false;
+  return flown >= needed;
+}
+
 /** The tier a lifetime distance has earned. */
 export function wingsFor(lifetimeDistance: number): WingsTier {
   const d = Math.max(0, lifetimeDistance);

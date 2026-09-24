@@ -22,7 +22,15 @@
  *   fever → + clap + snare backbeat, whistle lead, brighter, faster
  *   storm → same band, pulled a minor third down, extra kick
  *   sleep → music-box lullaby
+ *
+ * On top of those modes sits the *arrangement* — which instruments are in the
+ * band at this point of a flight (`MusicArrangement.ts`): a take-off breath with
+ * the kit held back, the tuned mix in cruise, a brightened and thinned band at
+ * the apex, and a landing cadence with the rhythm section removed. Intensity
+ * rides one arrangement louder; the arrangement changes who is playing.
  */
+import { arrangement, arrangementGlide, runPhase, type RunPhase } from "./MusicArrangement";
+
 export type MusicMode = "off" | "menu" | "play" | "fever" | "sleep" | "storm";
 export type BiomeMusicStyle = "bright" | "warm" | "airy" | "wide" | "night" | "crystal" | "reef" | "ember" | "canyon";
 
@@ -88,18 +96,42 @@ const UKE: Record<string, Voicing> = {
 
 const BASS_ROOT: Record<string, number> = { C: 48, G: 43, Am: 45, F: 41, Em: 40, Dm: 38, Gm: 43 };
 
-const PROG_A = ["C", "G", "Am", "F", "C", "G", "F", "G"];
-// PROG_K: Zimmer-style cinematic minor. Am → F → C → G mirrors "Time" / Inception.
-const PROG_K = ["Am", "F", "C", "G", "Am", "F", "C", "G"];
-const PROG_B = ["Am", "F", "C", "G", "Am", "F", "C", "G"];
-const PROG_C = ["F", "G", "Em", "Am", "F", "G", "C", "C"];
-const PROG_D = ["Dm", "G", "C", "Am", "F", "G", "C", "G"];
-const PROG_E = ["C", "Am", "F", "G", "C", "Am", "F", "G"];
-const PROG_F = ["Am", "Em", "F", "C", "Am", "Em", "F", "C"];
-const PROG_G = ["C", "G", "Dm", "Am", "C", "G", "Dm", "Am"];
-const PROG_H = ["G", "C", "Am", "F", "G", "C", "Am", "F"];
-const PROG_I = ["F", "C", "Dm", "G", "F", "C", "Dm", "G"];
-const PROG_J = ["Am", "C", "G", "F", "Am", "C", "G", "F"];
+/* Progressions — REWRITTEN 2026-09-24 as real 8-bar periods.
+ *
+ * Eleven of these were a 4-chord loop stated twice: `PROG_B` and `PROG_K` were
+ * byte-identical under two names, and almost every set ended where it began or
+ * on a dominant that never resolved, so an eight-minute flight was one four-bar
+ * idea repeated ~120 times with no cadence anywhere in it. Texture changed (the
+ * arrangement phases do that well); harmony never went anywhere.
+ *
+ * Each progression is now an antecedent (bars 1–4, unchanged — the melodies were
+ * written against them and their phrase arrivals are pinned by
+ * `music-brief.test.ts`) and a consequent (bars 5–8) that departs and *lands*:
+ * a ii–V–I, a plagal IV–I, or in the minor tracks a modal v–i / ♭VII–i. Roman
+ * numerals are in the comments because "C G Am F" does not tell you whether a
+ * loop closes. `music-harmony.test.ts` enforces the theory: a cadence must exist
+ * (in the bars or across the loop seam), the tonic must be reached more than
+ * once, and no two progressions may be identical.
+ *
+ * Known limit, honestly: the chord table has no E major, so the minor tracks
+ * cannot produce a true harmonic-minor V–i (the G# leading tone). They cadence
+ * modally instead — v–i and ♭VII–i — which is a *choice* with a flatter, colder
+ * feel. Adding E means letting G# into the melodic contract, which is a key
+ * change, not a data edit: see docs/audits/MUSIC_AND_HUD_CRITIQUE_2026-09-24.md.
+ */
+const PROG_A = ["C", "G", "Am", "F", "Dm", "G", "C", "C"];   // I V vi IV | ii V I I
+const PROG_B = ["C", "G", "Am", "Em", "F", "C", "Dm", "G"];  // I V vi iii | IV I ii V (resolves across the seam)
+// PROG_K: Zimmer-style cinematic minor — "Time" / Inception for four bars, then
+// a modal cadence home instead of a second copy of the loop.
+const PROG_K = ["Am", "F", "C", "G", "Am", "F", "G", "Am"];  // i VI III ♭VII | i VI ♭VII i
+const PROG_C = ["F", "G", "Em", "Am", "F", "G", "C", "C"];   // IV V iii vi | IV V I I
+const PROG_D = ["Dm", "G", "C", "Am", "F", "G", "C", "C"];   // ii V I vi | IV V I I
+const PROG_E = ["C", "Am", "F", "G", "Am", "F", "G", "C"];   // I vi IV V | vi IV V I
+const PROG_F = ["Am", "Em", "F", "C", "Am", "F", "Em", "Am"];// i v VI III | i VI v i
+const PROG_G = ["C", "G", "Dm", "Am", "F", "Dm", "G", "C"];  // I V ii vi | IV ii V I
+const PROG_H = ["G", "C", "Am", "F", "Dm", "G", "C", "C"];   // V I vi IV | ii V I I
+const PROG_I = ["F", "C", "Dm", "G", "Am", "F", "G", "C"];   // IV I ii V | vi IV V I
+const PROG_J = ["Am", "C", "G", "F", "F", "G", "Em", "Am"];  // i III ♭VII VI | VI VII v i
 // PROG_TRON: Daft Punk / Tron Legacy dark electronic. Am → Dm → Gm → Em — all minor,
 // no major relief. Creates the claustrophobic Grid tension.
 const PROG_TRON = ["Am", "Dm", "Am", "Em", "Am", "Dm", "Gm", "Em"];
@@ -307,6 +339,10 @@ const MEL_O = [
 ];
 
 // Track 16 — Fever Dream: paired-note fever hook. Twice as busy, still melodic.
+// The last bar used to land on B5, the third of the G that bar 8 held when the
+// progression was a I–vi–IV–V loop stated twice. Bar 8 is now the tonic (the
+// period cadences V→I), so the tune does what a cadence always wanted: the
+// leading tone resolves up to C. D6 → C6 → C6, same rhythm, one semitone.
 const MEL_P = [
   72, 0, 76, 76, 79, 0, 84, -1,
   83, 0, 81, 81, 79, 0, 76, -1,
@@ -315,7 +351,7 @@ const MEL_P = [
   88, 0, 84, 84, 79, 0, 84, -1,
   86, 0, 84, 84, 81, 0, 79, -1,
   81, 0, 84, 84, 86, 0, 88, -1,
-  86, -1, 84, 0, 83, -1, -1, 0,
+  86, -1, 84, 0, 84, -1, -1, 0,
 ];
 
 // Track 17 — Inception Drop: hypnotic build that never sits still — rising pairs.
@@ -388,7 +424,10 @@ const PROG_CHIP_1 = ["C", "G", "Am", "F", "C", "G", "Am", "F"]; // I–V–vi–
 const PROG_CHIP_2 = ["C", "F", "G", "F", "C", "F", "G", "G"];  // I–IV–V–IV
 const PROG_CHIP_3 = ["C", "Am", "F", "G", "C", "Am", "F", "G"]; // I–vi–IV–V
 const PROG_CHIP_5 = ["C", "F", "Am", "G", "C", "F", "Am", "G"]; // I–IV–vi–V
-const PROG_CHIP_6 = ["Dm", "G", "C", "F", "Dm", "G", "C", "F"]; // ii–V–I–IV
+// ii–V–I–IV, then the same period landing on the tonic: bar 8 used to be F, so
+// the loop restarted IV→ii and never came home anywhere (the cadence test in
+// music-harmony.test.ts is what caught it).
+const PROG_CHIP_6 = ["Dm", "G", "C", "F", "Dm", "G", "C", "C"]; // ii V I IV | ii V I I
 
 // Flappy Rush: staccato rising arp → peak hold → falling resolve. The bounce
 // of a coin-tap game: C5–E5–G5–C6 on the downbeat of bar 1.
@@ -616,6 +655,28 @@ export class Music {
   private intensity = 0;
   private intensityTarget = 0;
 
+  /**
+   * Music pass 3 — arrangement sections. Which phase of a flight the band is
+   * arranged for, and the run clock the phase is derived from. `cruise` and
+   * `menu` are neutral by construction (every multiplier is exactly 1), so a
+   * flight that never leaves the middle of its intensity range sounds exactly
+   * like the score that shipped before this existed.
+   */
+  private phase: RunPhase = "menu";
+  private inRun = false;
+  private runClock = 0;
+  private runEndedAt: number | null = null;
+  /** Set for one `apply()` when the change is a phase change, so the whole band
+   * re-arranges as a single gesture instead of thirteen unrelated fades. */
+  private arrGlide: number | null = null;
+  /** What the game last asked for, before any moment boost — kept so a
+   * temporary push can decay back to the real value instead of to zero. */
+  private intensityRaw = 0;
+  /** Short-lived offset added by `pushIntensity` (moment reactions). */
+  private intensityBoost = 0;
+  private boostTimer: ReturnType<typeof setTimeout> | null = null;
+  private underwaterTimer: ReturnType<typeof setTimeout> | null = null;
+
   private readonly bus: GainNode;
   private readonly filter: BiquadFilterNode;
   private readonly duckGain: GainNode;
@@ -717,7 +778,77 @@ export class Music {
 
   /** Continuous intensity — opens the filter, speeds up tempo, and adds a tension hat layer. */
   setIntensity(v: number): void {
-    const t = Math.max(0, Math.min(1, v));
+    this.intensityRaw = Math.max(0, Math.min(1, v));
+    this.applyIntensity();
+  }
+
+  /**
+   * Music pass 3 — arrangement sections: tell the score where the flight is and
+   * the band re-arranges itself around it.
+   *
+   * Intensity alone could only ride one arrangement louder, which is why
+   * adaptive game music so often reads as "the same loop, turned up". This is
+   * the other half: the take-off gets a breath with the kit held back, the top
+   * of a flight brightens and thins the bed, and a landing loses its rhythm
+   * section so the run resolves on a cadence instead of a cut. The decision is
+   * pure and lives in `MusicArrangement.ts`; this method only carries the run
+   * clock and applies the result.
+   *
+   * Cheap enough to call every frame: it returns without touching the graph
+   * unless the phase actually changed.
+   */
+  setRunPhase(inRun: boolean, runSeconds: number): void {
+    const now = this.ctx.currentTime;
+    if (inRun) {
+      this.runEndedAt = null;
+    } else if (this.inRun && this.runEndedAt === null) {
+      this.runEndedAt = now; // just landed — open the cadence window
+    }
+    this.inRun = inRun;
+    this.runClock = Number.isFinite(runSeconds) ? Math.max(0, runSeconds) : 0;
+    const m = this.targetMode;
+    const next = runPhase({
+      context: m === "sleep" ? "sleep" : m === "menu" || m === "off" ? "menu" : "flight",
+      inRun,
+      runSeconds: this.runClock,
+      sinceEnd: this.runEndedAt === null ? Number.POSITIVE_INFINITY : Math.max(0, now - this.runEndedAt),
+      intensity: this.intensityTarget,
+      previous: this.phase,
+    });
+    if (next === this.phase) return;
+    this.arrGlide = arrangementGlide(this.phase, next);
+    this.phase = next;
+    this.apply();
+  }
+
+  /** Which arrangement phase the band is in — read by tests and diagnostics,
+   * never by the mixer itself. */
+  getRunPhase(): RunPhase {
+    return this.phase;
+  }
+
+  /**
+   * Moment reaction: a temporary intensity offset that decays back to whatever
+   * the game is asking for. BOING and PANIC push up, PHEW pulls down. The boost
+   * never changes the underlying tempo floor of an arcade track beyond the same
+   * 10% surge intensity already owns, so a comedy beat cannot make the flight
+   * feel slower — it can only make the band lean in.
+   */
+  pushIntensity(delta: number, seconds: number): void {
+    if (this.baseLevel <= 0) return;
+    const s = Math.max(0.2, Math.min(4, seconds));
+    this.intensityBoost = Math.max(-0.5, Math.min(0.6, delta));
+    this.applyIntensity();
+    if (this.boostTimer !== null) clearTimeout(this.boostTimer);
+    this.boostTimer = setTimeout(() => {
+      this.intensityBoost = 0;
+      this.boostTimer = null;
+      this.applyIntensity();
+    }, s * 1000);
+  }
+
+  private applyIntensity(): void {
+    const t = Math.max(0, Math.min(1, this.intensityRaw + this.intensityBoost));
     if (Math.abs(t - this.intensityTarget) < 0.01) return;
     this.intensityTarget = t;
     const now = this.ctx.currentTime;
@@ -730,7 +861,14 @@ export class Music {
       ? (this.mode === "fever" ? 184 : 164)
       : (this.mode === "fever" ? style.fever : style.bpm);
     this.bpm = Math.round(baseBpm * (1 + t * 0.10));
-    this.tensionGain.gain.setTargetAtTime(t * 0.24 * style.perc, now, t > this.intensity ? 0.1 : 0.4);
+    // The hats are part of the rhythm section: a resolve that keeps an offbeat
+    // hi-hat ticking under a ringing pad is the mistake the arrangement exists
+    // to prevent, so this layer follows the phase like every other family.
+    this.tensionGain.gain.setTargetAtTime(
+      t * 0.24 * style.perc * arrangement(this.phase).tension,
+      now,
+      t > this.intensity ? 0.1 : 0.4,
+    );
     this.recomputeCutoff(0.3);
   }
 
@@ -774,6 +912,83 @@ export class Music {
       this.transpose = originalTranspose;
       this.viralGlissandoTimer = null;
     }, 1400);
+  }
+
+  /**
+   * BONK. The cartoon face-plant: one hard pump to clear the mix, then a
+   * descending sawtooth sag through a closing lowpass — the "wah-wah-waaaah"
+   * the band has been holding in since the first crash. Pitch falls a perfect
+   * fifth over 0.7 s, which is the interval a slide whistle uses for a joke.
+   */
+  faceplant(): void {
+    if (this.baseLevel <= 0) return;
+    const t = this.ctx.currentTime;
+    this.sidechainPump(0.55, 0.28);
+    const osc = this.ctx.createOscillator();
+    const lp = this.ctx.createBiquadFilter();
+    const gain = this.ctx.createGain();
+    osc.type = "sawtooth";
+    lp.type = "lowpass";
+    lp.Q.value = 6;
+    lp.frequency.setValueAtTime(1200, t);
+    lp.frequency.exponentialRampToValueAtTime(320, t + 0.75);
+    const base = mtof(67 + this.transpose); // G4, following the track's key
+    osc.frequency.setValueAtTime(base, t);
+    osc.frequency.exponentialRampToValueAtTime(base * Math.pow(2, -7 / 12), t + 0.7);
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.28, t + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);
+    osc.connect(lp);
+    lp.connect(gain);
+    gain.connect(this.bus);
+    osc.start(t);
+    osc.stop(t + 0.85);
+  }
+
+  /**
+   * SPLOSH. The whole bus goes underwater — the filter drops toward 340 Hz,
+   * which is roughly where a submerged ear loses the melody — then surfaces
+   * back to the cutoff the biome, night value and intensity actually want.
+   * Restoring to a *computed* target (not to a remembered number) means a
+   * splash during a fever still comes up bright.
+   */
+  underwater(seconds = 0.9): void {
+    if (this.baseLevel <= 0) return;
+    const s = Math.max(0.25, Math.min(2.5, seconds));
+    const t = this.ctx.currentTime;
+    const target = musicCutoff(
+      BIOME_MIX[this.biome].cutoff, this.night, this.intensityTarget, this.ctx.sampleRate,
+    );
+    this.filter.frequency.cancelScheduledValues(t);
+    this.filter.frequency.setValueAtTime(Math.max(200, this.filter.frequency.value), t);
+    this.filter.frequency.exponentialRampToValueAtTime(340, t + s * 0.35);
+    this.filter.frequency.exponentialRampToValueAtTime(target, t + s);
+    // Keep the bookkeeping honest: `recomputeCutoff` skips updates within 12 Hz
+    // of `lastCutoff`, and a manual sweep would otherwise leave it stale.
+    this.lastCutoff = target;
+    if (this.underwaterTimer !== null) clearTimeout(this.underwaterTimer);
+    this.underwaterTimer = setTimeout(() => {
+      this.underwaterTimer = null;
+      this.recomputeCutoff(0.25);
+    }, s * 1000 + 40);
+  }
+
+  /**
+   * PERFECT / RECORD. A rising glockenspiel run on the shimmer bus — six notes
+   * up a major arpeggio, each slightly softer than the last so it reads as a
+   * lift rather than a fanfare, and scheduled against the audio clock so a
+   * throttled timer cannot bunch them.
+   */
+  sparkle(seconds = 0.6): void {
+    if (this.baseLevel <= 0) return;
+    const s = Math.max(0.2, Math.min(1.6, seconds));
+    const t0 = this.ctx.currentTime + 0.02;
+    const steps = [0, 4, 7, 12, 16, 19];
+    const base = mtof(84 + this.transpose); // C6
+    const gap = s / steps.length;
+    steps.forEach((semi, i) => {
+      this.glock(t0 + i * gap, base * Math.pow(2, semi / 12), 0.5 - i * 0.04, this.sparkGain);
+    });
   }
 
   private recomputeCutoff(ramp: number): void {
@@ -885,6 +1100,14 @@ export class Music {
       clearTimeout(this.viralGlissandoTimer);
       this.viralGlissandoTimer = null;
     }
+    if (this.boostTimer !== null) {
+      clearTimeout(this.boostTimer);
+      this.boostTimer = null;
+    }
+    if (this.underwaterTimer !== null) {
+      clearTimeout(this.underwaterTimer);
+      this.underwaterTimer = null;
+    }
     if (this.timer !== null) window.clearInterval(this.timer);
     this.timer = null;
     this.bus.disconnect();
@@ -898,6 +1121,14 @@ export class Music {
 
   private apply(): void {
     const t = this.ctx.currentTime;
+    const arr = arrangement(this.phase);
+    const glide = this.arrGlide;
+    /** Every family gain goes through here so a phase change can move the whole
+     * band on one time constant (`arrangementGlide`) while any other `apply()`
+     * keeps the constants this mix was tuned with. */
+    const mix = (param: AudioParam, value: number, tc: number): void => {
+      param.setTargetAtTime(value, t, glide === null ? tc : Math.max(0.05, glide));
+    };
     const m = this.targetMode;
     const on = this.baseLevel > 0 && m !== "off";
     this.bus.gain.setTargetAtTime(on ? this.baseLevel : 0, t, 0.5);
@@ -912,47 +1143,47 @@ export class Music {
     // the mix, with the glock shimmer on top.
     // Ukulele / pad / organ are island colours: silent under the arcade chiptune.
     const island = this.isChipTrack ? 0 : 1;
-    this.ukeGain.gain.setTargetAtTime(song ? (m === "menu" ? 0.30 : m === "fever" ? 0.26 : 0.32) * style.uke * island : 0, t, 0.4);
+    mix(this.ukeGain.gain, (song ? (m === "menu" ? 0.30 : m === "fever" ? 0.26 : 0.32) * style.uke * island : 0) * arr.uke, 0.4);
     // The glock is the lead voice — on EVERY family. It used to be gated to
     // the island tracks (gain 0 on the arcade ten, which left the square wave
     // carrying the tune there and made those tracks sound cheap).
-    this.glockGain.gain.setTargetAtTime(
-      song
+    mix(
+      this.glockGain.gain,
+      (song
         ? this.isChipTrack
           ? m === "menu" ? 0.38 : m === "fever" ? 0.50 : 0.46
           : (m === "menu" ? 0.42 : m === "fever" ? 0.50 : 0.46) * style.glock
-        : 0,
-      t,
+        : 0) * arr.glock,
       0.4,
     );
-    this.bassGain.gain.setTargetAtTime(song ? (m === "fever" ? 0.48 : 0.42) * style.bass : 0, t, 0.4);
+    mix(this.bassGain.gain, (song ? (m === "fever" ? 0.48 : 0.42) * style.bass : 0) * arr.bass, 0.4);
     // Kit: every family gets drums in the menu, because a silent menu reads as
     // "something is broken". Arcade keeps the busier pattern below.
     const percBase = m === "play" ? (this.isChipTrack ? 0.22 : 0.18) : m === "fever" ? 0.36 : m === "storm" ? 0.46 : m === "menu" ? (this.isChipTrack ? 0.30 : 0.14) : 0;
-    this.percGain.gain.setTargetAtTime(percBase * style.perc, t, 0.3);
+    mix(this.percGain.gain, percBase * style.perc * arr.perc, 0.3);
     // Whistle: the soaring counter-line. Fever is its solo, play gives it a
     // gentle harmony line, menu leaves it out.
-    this.whistleGain.gain.setTargetAtTime((m === "fever" ? 0.30 : m === "play" ? 0.18 : m === "menu" ? 0.10 : 0) * style.whistle * island, t, 0.3);
-    this.arpGain.gain.setTargetAtTime((m === "fever" ? 0.18 : m === "play" ? 0.09 : m === "menu" ? 0.05 : 0) * style.glock * island, t, 0.5);
+    mix(this.whistleGain.gain, (m === "fever" ? 0.30 : m === "play" ? 0.18 : m === "menu" ? 0.10 : 0) * style.whistle * island * arr.whistle, 0.3);
+    mix(this.arpGain.gain, (m === "fever" ? 0.18 : m === "play" ? 0.09 : m === "menu" ? 0.05 : 0) * style.glock * island * arr.arp, 0.5);
     // Organ: deep pad under play and fever only — never a drone on the menu.
-    this.organGain.gain.setTargetAtTime((m === "play" ? 0.10 : m === "fever" ? 0.18 : m === "menu" ? 0.05 : 0) * island, t, 1.2);
+    mix(this.organGain.gain, (m === "play" ? 0.10 : m === "fever" ? 0.18 : m === "menu" ? 0.05 : 0) * island * arr.organ, 1.2);
     // Warm pad bed: strongest on the menu, subtle underneath play.
     // Sleep keeps a warm bed under the lullaby bells, so the dozing-off screen
     // is the same band playing quietly rather than a different, thinner one.
-    this.padGain.gain.setTargetAtTime(
-      m === "sleep" ? 0.18 : (m === "menu" ? 0.16 : m === "play" ? 0.06 : 0) * island,
-      t,
+    mix(
+      this.padGain.gain,
+      (m === "sleep" ? 0.18 : (m === "menu" ? 0.16 : m === "play" ? 0.06 : 0) * island) * arr.pad,
       0.8,
     );
     // Tron synth: the dark bed under the bell now, not the lead it once was.
-    this.tronGain.gain.setTargetAtTime(this.isTronTrack && song ? (m === "fever" ? 0.28 : 0.22) : 0, t, 0.4);
+    mix(this.tronGain.gain, (this.isTronTrack && song ? (m === "fever" ? 0.28 : 0.22) : 0) * arr.tron, 0.4);
     // Arcade chiptune lead: a supporting halo under the glock melody.
-    this.chipGain.gain.setTargetAtTime(this.isChipTrack && song ? (m === "menu" ? 0.15 : m === "fever" ? 0.21 : 0.17) : 0, t, 0.4);
+    mix(this.chipGain.gain, (this.isChipTrack && song ? (m === "menu" ? 0.15 : m === "fever" ? 0.21 : 0.17) : 0) * arr.chip, 0.4);
     // Glock shimmer: octave doubling on the arcade family and the melody
     // sparkle on everything, so the bells are always part of the mix.
-    this.sparkGain.gain.setTargetAtTime(
-      song ? (this.isChipTrack ? (m === "fever" ? 0.22 : 0.17) : (m === "fever" ? 0.34 : 0.26) * style.glock) : 0,
-      t,
+    mix(
+      this.sparkGain.gain,
+      (song ? (this.isChipTrack ? (m === "fever" ? 0.22 : 0.17) : (m === "fever" ? 0.34 : 0.26) * style.glock) : 0) * arr.spark,
       0.45,
     );
     this.lullabyGain.gain.setTargetAtTime(m === "sleep" ? 0.3 : 0, t, 0.6);
@@ -961,6 +1192,7 @@ export class Music {
     this.lastCutoff = cutoff;
     this.bpm = chipBpm;
 
+    this.arrGlide = null;
     this.mode = m;
     if (on && this.timer === null) this.start();
     if (!on && this.timer !== null) {

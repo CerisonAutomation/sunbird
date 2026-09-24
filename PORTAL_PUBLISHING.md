@@ -2,12 +2,12 @@
 
 Sunbird ships four explicit build targets through `VITE_PORTAL_TARGET`:
 
-| Target | Monetization path | Direct Stripe / VIP UI | Notes |
+| Target | Monetization path | Payments in this target | Notes |
 | --- | --- | --- | --- |
-| `none` | Standalone/PWA model | Enabled | Default local and self-hosted build. |
+| `none` | Standalone/PWA model | Coins only; no processor wired | Default local and self-hosted build. |
 | `poki` | Poki SDK commercial + rewarded breaks | Coin-only VIP progression; no IAP | No banner integration; Poki rules prohibit IAP. |
 | `crazy` | CrazyGames SDK midgame + rewarded breaks | Coin-only VIP progression; no IAP | Optional dashboard banner slot; live multiplayer requires Full Launch approval. |
-| `generic` | None (clean build) | Disabled | For every other HTML5 portal — see matrix below. |
+| `generic` | None (clean build) | Coins only | For every other HTML5 portal — see matrix below. |
 
 ## Build commands
 
@@ -27,8 +27,8 @@ of any CDN — verified by serving the zip from a deep subpath and playing it.
 
 | Requirement | Enforced by | How Sunbird complies |
 | --- | --- | --- |
-| No external payment providers | Poki, CrazyGames, GD, Yandex | Stripe is imported via `@stripe/stripe-js/pure` (no script injection at import) **and** `ensureStripeJs()` refuses to run in any portal build. Web checkout is absent; portal VIP is earned with coins/rewarded ads. Verified: zero requests to `js.stripe.com` from portal zips. |
-| No external links out of the iframe | All portals | The only `window.open` is the Stripe tab — hard-gated behind `!isPortalBuild()`. No `<a href>` to external sites anywhere in the UI. |
+| No external payment providers | Poki, CrazyGames, GD, Yandex | No build loads one: `@stripe/stripe-js` is not a dependency, `Payments.ts` / `Payments.portal.ts` return `null` from every processor entry point, and VIP is earned with coins (plus optional host rewarded ads). Tripwire: `scripts/verify-portal.mjs` fails any zip containing `js.stripe.com`, `api.stripe.com`, `hooks.stripe.com`, `upstash` or a `pk_live_`/`pk_test_` key. |
+| No external links out of the iframe | All portals | There is no `window.open` anywhere in `src/`. The one outbound link — the hosted privacy policy, which Poki requires before it stores a custom CSP — goes through the platform API (`PokiSDK.openExternalLink`), is rendered only when the host advertises the `externalLink` capability, and `scripts/audit-zips.mjs` fails a zip containing `window.open(`, `location.href =` or an external `<a href>`. |
 | Relative asset paths (served from CDN subpaths) | All portals | `base: "./"` in vite config; no absolute `/asset` references (grep-verified in built html). |
 | Silent when tab is hidden | CrazyGames QA, Poki QA | `visibilitychange` pauses gameplay **and** hard-mutes the master audio bus (`setHiddenMuted`). |
 | Silent + input-locked during ads | Poki, CrazyGames | `onAdOpened` → input disabled + master mute; `onAdClosed` restores. |

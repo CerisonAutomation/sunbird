@@ -33,11 +33,43 @@ describe("edition policy flags", () => {
     expect(directEdition.SELL_AD_REMOVAL).toBe(true);
   });
 
-  // Poki now allows free-text pilot names with profanity filtering (isPilotNameClean).
-  // crazy/generic still forbid them (no filter shipped there).
-  it("poki edition allows free-text names (profanity-filtered) but forbids ad-removal sales", () => {
-    expect(pokiEdition.CUSTOM_PILOT_NAMES).toBe(true);
+  // The direct build has no ad network wired in, so it must not rehearse
+  // sponsored breaks by default: a simulated break is a fake ad state that
+  // interrupts a run to show nothing. `VITE_SIM_BREAKS=true` opts in (ad-flow
+  // rehearsal / a future real provider); tests run with it unset, which is the
+  // shipped configuration and the one this guard protects.
+  it("direct build does not rehearse ad breaks unless VITE_SIM_BREAKS opts in", () => {
+    expect(directEdition.SIMULATED_BREAKS).toBe(false);
+  });
+
+  // Every portal edition is read-only now, Poki included. It used to allow
+  // free text behind `isPilotNameClean`, but the name is broadcast to strangers
+  // over P2P netlib rooms, `scripts/portal-markers.mjs` treats a
+  // `data-ref="pilotName"` surface as forbidden in ANY portal bundle, and the
+  // gate was failing the Poki zip because of it. Generated name + 🎲 reroll
+  // keeps identity without player-authored text — and it also takes a keyboard
+  // out of the first-run path, which the onboarding rules want gone anyway.
+  it("poki edition forbids free-text names and ad-removal sales", () => {
+    expect(pokiEdition.CUSTOM_PILOT_NAMES).toBe(false);
     expect(pokiEdition.SELL_AD_REMOVAL).toBe(false);
+    expect(pokiEdition.SIMULATED_BREAKS).toBe(false);
+  });
+
+  it("every edition carries its own no-cloud leaderboard wording", () => {
+    for (const edition of [directEdition, pokiEdition, crazyEdition, genericEdition]) {
+      expect(edition.LEADERBOARD_LOCAL.chip.length).toBeGreaterThan(2);
+      expect(edition.LEADERBOARD_LOCAL.sentence.length).toBeGreaterThan(10);
+    }
+  });
+
+  it("never names a foreign portal in another portal's copy", () => {
+    // The whole reason these strings are edition exports: a shared ternary put
+    // every portal's name into every bundle.
+    const text = (e: { PORTAL_DISPLAY_NAME: string; LEADERBOARD_LOCAL: { chip: string; sentence: string } }): string =>
+      `${e.PORTAL_DISPLAY_NAME} ${e.LEADERBOARD_LOCAL.chip} ${e.LEADERBOARD_LOCAL.sentence}`;
+    expect(text(crazyEdition)).not.toMatch(/poki/i);
+    expect(text(genericEdition)).not.toMatch(/poki|crazygames/i);
+    expect(text(pokiEdition)).not.toMatch(/crazygames/i);
   });
 
   it.each([
@@ -46,6 +78,8 @@ describe("edition policy flags", () => {
   ] as const)("%s edition forbids free-text names and ad-removal sales", (_portal, edition) => {
     expect(edition.CUSTOM_PILOT_NAMES).toBe(false);
     expect(edition.SELL_AD_REMOVAL).toBe(false);
+    // Portals serve real breaks; a simulated one would be a fake ad state.
+    expect(edition.SIMULATED_BREAKS).toBe(false);
   });
 });
 
@@ -65,18 +99,33 @@ describe("GOLD.features", () => {
     const join = (await import("node:path")).join;
     const src = fs.readFileSync(join(process.cwd(), "src", "game", "Economy.ts"), "utf8");
 
+    // Exactly the env read, no cast: VITE_SIM_BREAKS is typed `boolean` in
+    // src/vite-env.d.ts and pinned to a boolean literal by vite.config's define
+    // (true only for PORTAL === "none" with VITE_SIM_BREAKS=true), so `as any`
+    // was only ever hiding a missing type (and `verify:prod` bans the
+    // eslint-disable it needed).
     expect(src).toMatch(
-      /\.\.\.\(\(import\.meta\.env\.VITE_SELL_AD_REMOVAL as any\) \? \["No sponsored breaks, ever"\] : \[\]\)/,
+      /\.\.\.\(import\.meta\.env\.VITE_SIM_BREAKS \? \["No sponsored breaks, ever"\] : \[\]\)/,
     );
     // The string must never be reachable via a plain imported const, which
-    // Rollup would not constant-fold across modules.
-    expect(src).not.toMatch(/SELL_AD_REMOVAL \? \["No sponsored breaks/);
+    // Rollup would not constant-fold across modules. (`[^.\w]` keeps this from
+    // matching the `import.meta.env.VITE_`-prefixed read asserted above.)
+    expect(src).not.toMatch(/(?:^|[^.\w])SIMULATED_BREAKS \? \["No sponsored breaks/);
+    expect(src).not.toMatch(/(?:^|[^.\w])SELL_AD_REMOVAL \? \["No sponsored breaks/);
   });
 
-  it("keeps the bullet in the direct build", async () => {
+  // The shipped direct build has no ad network, so Gold must not claim to remove
+  // breaks — that pitch would sell the removal of a break the build never shows
+  // (a fake ad state, and a refund-shaped complaint). The bullet comes back with
+  // VITE_SIM_BREAKS=true, i.e. only in a build that actually schedules breaks;
+  // the source-shape guard above pins how it is gated.
+  it("drops the ad-removal bullet from the shipped direct build's Gold pitch", async () => {
     const { GOLD } = await import("../Economy");
 
-    expect(GOLD.features.some((f) => /sponsored breaks/i.test(f))).toBe(true);
-    expect(GOLD.features).toHaveLength(7);
+    expect(GOLD.features.some((f) => /sponsored breaks/i.test(f))).toBe(false);
+    expect(GOLD.features).toHaveLength(6);
+    // The rest of the pitch must survive the gate untouched.
+    expect(GOLD.features.some((f) => /2× coins/i.test(f))).toBe(true);
+    expect(GOLD.features.some((f) => /free second winds/i.test(f))).toBe(true);
   });
 });

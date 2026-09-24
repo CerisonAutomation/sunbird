@@ -114,10 +114,13 @@ export class Weather {
       if (inside && airborne) {
         this.inThermal = true;
         if (!diving) {
-          bird.vy += 24 * dt;
-          bird.vx += 3 * dt;
+          // Stronger lift — thermals are the anti-bore: release to ride, not just float
+          bird.vy += 32 * dt;
+          bird.vx += 5 * dt;
+          // Slight upward draft even when sinking fast
+          if (bird.vy < 0) bird.vy += 18 * dt;
         } else {
-          bird.vy += 6 * dt;
+          bird.vy += 8 * dt;
         }
       }
     }
