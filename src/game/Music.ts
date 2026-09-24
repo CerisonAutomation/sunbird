@@ -402,6 +402,233 @@ const MEL_T = [
   71, 0, 0, 74, 0, 71, -1, 0,
 ];
 
+/* Apex/chorus melody variants — used during `apex` RunPhase so the melody
+ * actually changes at high intensity instead of only getting louder. Each is
+ * a higher-register, more active version of the corresponding verse line: same
+ * key, same 8-bar period, but the peak notes push up and the rests fill in,
+ * so a player who reaches apex hears a different tune, not the same one turned
+ * up. Chip tracks rely on the arrangement multipliers and don't need a mel2. */
+
+const MEL_A2 = [
+  76, 0, 81, 0, 84, -1, -1, 0,
+  84, 0, 81, 0, 76, -1, 79, 0,
+  76, 0, 81, 0, 86, -1, 84, 0,
+  81, 0, 79, 0, 76, -1, -1, 0,
+  81, 0, 84, 0, 88, -1, 86, 0,
+  88, 0, 86, 0, 84, -1, 81, 0,
+  83, 0, 86, 0, 88, -1, 86, 0,
+  84, -1, 81, 0, 79, -1, -1, 0,
+];
+
+const MEL_B2 = [
+  76, 0, 79, 0, 81, -1, 84, 0,
+  81, 0, 79, 0, 76, -1, 79, 0,
+  81, 0, 84, 0, 88, -1, 86, 0,
+  84, 0, 81, 0, 77, -1, -1, 0,
+  86, 0, 88, 0, 86, -1, 84, 0,
+  86, 0, 84, 0, 81, -1, 79, 0,
+  81, 0, 84, 0, 86, -1, 88, 0,
+  86, -1, -1, 0, 84, -1, -1, 0,
+];
+
+const MEL_C2 = [
+  81, 0, 84, 0, 86, -1, -1, 0,
+  84, 0, 88, 0, 86, -1, 84, 0,
+  86, 0, 84, 0, 81, -1, 79, 0,
+  81, 0, 79, 0, 76, -1, -1, 0,
+  84, 0, 88, 0, 86, -1, 84, 0,
+  86, 0, 84, 0, 81, -1, 86, 0,
+  88, -1, 86, 0, 84, -1, 81, 0,
+  79, -1, -1, -1, 0, 0, 0, 0,
+];
+
+const MEL_D2 = [
+  77, 0, 81, 0, 86, -1, 84, 0,
+  84, 0, 81, 0, 79, -1, -1, 0,
+  76, 0, 81, 0, 84, -1, 88, 0,
+  86, 0, 84, 0, 81, -1, 76, 0,
+  81, 0, 84, 0, 88, -1, 86, 0,
+  86, 0, 84, 0, 81, -1, 77, 0,
+  81, 0, 84, 0, 88, -1, 86, 0,
+  88, -1, 86, 0, 81, -1, -1, 0,
+];
+
+const MEL_E2 = [
+  72, 0, 72, 0, 76, -1, 81, 0,
+  79, 0, 79, 0, 83, -1, 86, 0,
+  81, 0, 76, 0, 72, -1, -1, 0,
+  71, 0, 74, 0, 79, -1, 83, 0,
+  86, 0, 84, 0, 81, -1, 76, 0,
+  79, 0, 83, 0, 88, -1, 86, 0,
+  84, 0, 81, 0, 79, -1, 74, 0,
+  74, -1, -1, 0, 71, -1, -1, 0,
+];
+
+const MEL_F2 = [
+  76, 0, 79, 0, 83, -1, -1, 0,
+  81, 0, 79, 0, 74, -1, 76, 0,
+  77, 0, 81, 0, 86, -1, 84, 0,
+  81, 0, 76, 0, 81, -1, -1, 0,
+  84, 0, 86, 0, 88, -1, 86, 0,
+  88, 0, 84, 0, 81, -1, 79, 0,
+  83, 0, 84, 0, 86, -1, 88, 0,
+  88, -1, 86, 0, 81, -1, -1, 0,
+];
+
+const MEL_G2 = [
+  88, 0, 84, 0, 81, 0, 84, -1,
+  88, 0, 84, 0, 79, 0, 83, -1,
+  86, 0, 81, 0, 79, 0, 81, -1,
+  86, 0, 81, 0, 76, 0, 81, -1,
+  88, 0, 86, 0, 84, -1, 86, 0,
+  88, 0, 86, 0, 84, -1, 81, 0,
+  84, 0, 88, 0, 88, -1, 86, 0,
+  88, -1, 86, 0, 84, -1, -1, 0,
+];
+
+const MEL_H2 = [
+  79, 0, 84, 0, 88, -1, 86, 0,
+  84, 0, 81, 0, 76, -1, 81, 0,
+  86, 0, 81, 0, 76, -1, 74, 0,
+  76, 0, 81, 0, 86, -1, 84, 0,
+  88, 0, 86, 0, 84, -1, 88, 0,
+  88, 0, 84, 0, 81, -1, 77, 0,
+  81, 0, 84, 0, 86, -1, 88, 0,
+  86, -1, 84, 0, 81, -1, -1, 0,
+];
+
+const MEL_I2 = [
+  81, 0, 86, 0, 88, -1, 86, 0,
+  84, 0, 81, 0, 76, -1, 79, 0,
+  81, 0, 79, 0, 74, -1, 79, 0,
+  79, 0, 84, 0, 88, -1, -1, 0,
+  88, 0, 86, 0, 81, -1, 84, 0,
+  81, 0, 84, 0, 88, -1, 86, 0,
+  84, 0, 81, 0, 77, -1, 81, 0,
+  83, -1, -1, 0, 79, -1, -1, 0,
+];
+
+const MEL_J2 = [
+  81, 0, 86, 0, 88, -1, 86, 0,
+  88, 0, 84, 0, 81, -1, 84, 0,
+  79, 0, 84, 0, 88, -1, 86, 0,
+  88, 0, 86, 0, 81, -1, -1, 0,
+  86, 0, 88, 0, 86, -1, 84, 0,
+  88, 0, 86, 0, 84, -1, 81, 0,
+  84, 0, 88, 0, 86, -1, 84, 0,
+  84, -1, -1, 0, 81, -1, -1, 0,
+];
+
+const MEL_K2 = [
+  72, 0, 76, 0, 72, 0, 76, 0,
+  79, 0, 76, 0, 79, 0, 83, 0,
+  81, 0, 76, 0, 72, -1, -1, 0,
+  74, 0, 71, 0, 74, -1, 79, 0,
+  86, 0, 84, 0, 81, 0, 76, 0,
+  83, 0, 79, 0, 83, -1, 86, 0,
+  84, 0, 81, 0, 79, -1, 74, 0,
+  74, -1, 77, 0, 74, -1, -1, 0,
+];
+
+const MEL_L2 = [
+  72, 0, 76, 0, 81, 0, 86, -1,
+  84, 0, 81, 0, 76, 0, 81, -1,
+  81, 0, 86, 0, 88, -1, 86, 0,
+  84, 0, 81, 0, 79, -1, 74, 0,
+  81, 0, 84, 0, 88, 0, 86, -1,
+  88, 0, 86, 0, 84, 0, 81, -1,
+  86, 0, 88, 0, 86, -1, 84, 0,
+  86, -1, 84, 0, 81, -1, -1, 0,
+];
+
+const MEL_M2 = [
+  76, 0, 81, 0, 86, -1, 84, 0,
+  81, 0, 76, 0, 81, -1, 84, 0,
+  81, 0, 86, 0, 88, -1, 86, 0,
+  88, 0, 84, 0, 79, -1, -1, 0,
+  88, 0, 86, 0, 81, -1, 86, 0,
+  84, 0, 81, 0, 76, -1, 79, 0,
+  81, 0, 79, 0, 81, -1, 86, 0,
+  84, -1, -1, -1, 0, 0, 0, 0,
+];
+
+const MEL_N2 = [
+  72, 0, 76, 0, 81, -1, 84, 0,
+  86, 0, 84, 0, 81, -1, 79, 0,
+  76, 0, 81, 0, 84, -1, 88, 0,
+  86, 0, 84, 0, 81, -1, 77, 0,
+  86, 0, 88, 0, 86, -1, 84, 0,
+  88, 0, 86, 0, 81, -1, 86, 0,
+  84, 0, 81, 0, 84, -1, 88, 0,
+  86, -1, -1, -1, 0, 0, 0, 0,
+];
+
+const MEL_O2 = [
+  74, 0, 79, 0, 84, -1, 88, 0,
+  88, 0, 84, 0, 81, -1, 84, 0,
+  86, 0, 81, 0, 76, -1, 81, 0,
+  81, 0, 86, 0, 88, -1, 86, 0,
+  88, 0, 86, 0, 84, -1, 88, 0,
+  88, 0, 86, 0, 84, -1, 81, 0,
+  84, 0, 86, 0, 88, -1, 86, 0,
+  88, -1, 84, 0, 81, -1, -1, 0,
+];
+
+const MEL_P2 = [
+  76, 0, 81, 81, 84, 0, 88, -1,
+  86, 0, 84, 84, 81, 0, 79, -1,
+  81, 0, 86, 86, 88, 0, 86, -1,
+  88, 0, 86, 86, 81, 0, 79, -1,
+  88, 0, 86, 86, 84, 0, 88, -1,
+  88, 0, 86, 86, 84, 0, 81, -1,
+  84, 0, 88, 88, 86, 0, 88, -1,
+  88, -1, 86, 0, 84, -1, -1, 0,
+];
+
+const MEL_Q2 = [
+  72, -1, -1, 0, 76, 0, 81, -1,
+  83, -1, -1, 0, 86, 0, 88, -1,
+  86, -1, -1, 0, 84, 0, 81, -1,
+  79, -1, -1, 0, 84, 0, 88, -1,
+  88, -1, -1, 0, 86, 0, 81, -1,
+  81, -1, -1, 0, 86, 0, 88, -1,
+  88, -1, -1, 0, 86, 0, 84, -1,
+  88, -1, -1, -1, 0, 0, 0, 0,
+];
+
+const MEL_R2 = [
+  86, 0, 86, 0, 88, 0, 86, 0,
+  84, 0, 84, 0, 88, 0, 84, 0,
+  79, 0, 79, 0, 84, 0, 79, 0,
+  76, 0, 76, 0, 81, 0, 86, -1,
+  88, 0, 88, 0, 86, 0, 81, 0,
+  84, 0, 84, 0, 88, 0, 86, 0,
+  88, 0, 86, 0, 84, 0, 79, 0,
+  81, -1, -1, 0, 76, -1, -1, 0,
+];
+
+const MEL_S2 = [
+  76, 0, 84, 0, 81, -1, 76, 0,
+  81, 0, 86, 0, 88, -1, 86, 0,
+  84, -1, -1, 0, 81, 0, 76, 0,
+  79, 0, 83, 0, 88, -1, 84, 0,
+  84, 0, 88, 0, 86, -1, 84, 0,
+  81, 0, 86, 0, 88, -1, 86, 0,
+  84, 0, 81, 0, 79, -1, 74, 0,
+  79, -1, -1, 0, 74, -1, -1, 0,
+];
+
+const MEL_T2 = [
+  72, 72, 0, 76, 0, 72, 76, 0,
+  79, 79, 0, 83, 0, 79, 83, 0,
+  81, 81, 0, 76, 0, 72, -1, 0,
+  74, 74, 0, 79, 0, 84, 0, 0,
+  86, 86, 0, 88, 0, 86, 84, 0,
+  88, 88, 0, 86, 0, 84, 81, 0,
+  84, 84, 0, 81, 0, 79, 74, 0,
+  74, 0, 0, 79, 0, 74, -1, 0,
+];
+
 /* The hand-authored WHISTLE / WHISTLE_B counter-lines lived here. They were
  * written against an older melody set and, once measured against the current
  * one, collided with the lead on 183 eighths — semitone clashes included. The
@@ -412,7 +639,7 @@ const MEL_T = [
 // Strum pattern per eighth: 1 = down, 2 = up, 0 = none (island strum D _ D U _ U D U)
 const STRUM = [1, 0, 1, 2, 0, 2, 1, 2];
 
-export type Track = { name: string; prog: string[]; mel: number[]; mood: BiomeMusicStyle; /** Arcade chiptune family: square lead, driving 8th bass, backbeat, fast tempo. */ chip?: boolean };
+export type Track = { name: string; prog: string[]; mel: number[]; /** Higher-register apex/chorus variant — played during the apex RunPhase. */ mel2?: number[]; mood: BiomeMusicStyle; /** Arcade chiptune family: square lead, driving 8th bass, backbeat, fast tempo. */ chip?: boolean };
 
 /* ============================ ARCADE CHIP FAMILY =========================
  * Bouncy, hook-first 8-bit-style bangers — the "viral game" sound:
@@ -577,26 +804,26 @@ export const TRACKS: Track[] = [
   { name: "Neon Tail",       prog: PROG_CHIP_6, mel: MEL_CHIP_8,  mood: "night",  chip: true },
   { name: "Turbo Finch",     prog: PROG_CHIP_5, mel: MEL_CHIP_9,  mood: "warm",   chip: true },
   { name: "Moon Arcade",     prog: PROG_CHIP_7, mel: MEL_CHIP_10, mood: "ember",  chip: true },
-  { name: "Ascent",            prog: PROG_A, mel: MEL_A, mood: "bright"  },
-  { name: "Voyage",            prog: PROG_B, mel: MEL_B, mood: "airy"    },
-  { name: "Cathedral",         prog: PROG_C, mel: MEL_C, mood: "bright"  },
-  { name: "Pendulum",          prog: PROG_D, mel: MEL_D, mood: "wide"    },
-  { name: "The Grid",          prog: PROG_TRON, mel: MEL_E, mood: "night" },
-  { name: "Eventide",          prog: PROG_F, mel: MEL_F, mood: "night"   },
-  { name: "Glass & Stars",     prog: PROG_G, mel: MEL_G, mood: "crystal" },
-  { name: "Trade Winds",       prog: PROG_H, mel: MEL_H, mood: "wide"    },
-  { name: "Golden Hour",       prog: PROG_I, mel: MEL_I, mood: "warm"    },
-  { name: "Starfall",          prog: PROG_J, mel: MEL_J, mood: "night"   },
-  { name: "Derezzed",          prog: PROG_TRON, mel: MEL_K, mood: "ember" },
-  { name: "Magma",             prog: PROG_F, mel: MEL_L, mood: "ember"   },
-  { name: "Mesa",              prog: PROG_I, mel: MEL_M, mood: "canyon"  },
-  { name: "Time's Light",      prog: PROG_K, mel: MEL_N, mood: "wide"    },
-  { name: "Horizon Chase",     prog: PROG_H, mel: MEL_O, mood: "bright"  },
-  { name: "Fever Dream",       prog: PROG_E, mel: MEL_P, mood: "reef"    },
-  { name: "Inception Drop",    prog: PROG_K, mel: MEL_Q, mood: "night"   },
-  { name: "Dunkirk Clock",     prog: PROG_J, mel: MEL_R, mood: "ember"   },
-  { name: "End of Line",       prog: PROG_TRON, mel: MEL_S, mood: "night" },
-  { name: "Rinzler",           prog: PROG_TRON, mel: MEL_T, mood: "ember" },
+  { name: "Ascent",            prog: PROG_A,    mel: MEL_A, mel2: MEL_A2, mood: "bright"  },
+  { name: "Voyage",            prog: PROG_B,    mel: MEL_B, mel2: MEL_B2, mood: "airy"    },
+  { name: "Cathedral",         prog: PROG_C,    mel: MEL_C, mel2: MEL_C2, mood: "bright"  },
+  { name: "Pendulum",          prog: PROG_D,    mel: MEL_D, mel2: MEL_D2, mood: "wide"    },
+  { name: "The Grid",          prog: PROG_TRON, mel: MEL_E, mel2: MEL_E2, mood: "night"   },
+  { name: "Eventide",          prog: PROG_F,    mel: MEL_F, mel2: MEL_F2, mood: "night"   },
+  { name: "Glass & Stars",     prog: PROG_G,    mel: MEL_G, mel2: MEL_G2, mood: "crystal" },
+  { name: "Trade Winds",       prog: PROG_H,    mel: MEL_H, mel2: MEL_H2, mood: "wide"    },
+  { name: "Golden Hour",       prog: PROG_I,    mel: MEL_I, mel2: MEL_I2, mood: "warm"    },
+  { name: "Starfall",          prog: PROG_J,    mel: MEL_J, mel2: MEL_J2, mood: "night"   },
+  { name: "Derezzed",          prog: PROG_TRON, mel: MEL_K, mel2: MEL_K2, mood: "ember"   },
+  { name: "Magma",             prog: PROG_F,    mel: MEL_L, mel2: MEL_L2, mood: "ember"   },
+  { name: "Mesa",              prog: PROG_I,    mel: MEL_M, mel2: MEL_M2, mood: "canyon"  },
+  { name: "Time's Light",      prog: PROG_K,    mel: MEL_N, mel2: MEL_N2, mood: "wide"    },
+  { name: "Horizon Chase",     prog: PROG_H,    mel: MEL_O, mel2: MEL_O2, mood: "bright"  },
+  { name: "Fever Dream",       prog: PROG_E,    mel: MEL_P, mel2: MEL_P2, mood: "reef"    },
+  { name: "Inception Drop",    prog: PROG_K,    mel: MEL_Q, mel2: MEL_Q2, mood: "night"   },
+  { name: "Dunkirk Clock",     prog: PROG_J,    mel: MEL_R, mel2: MEL_R2, mood: "ember"   },
+  { name: "End of Line",       prog: PROG_TRON, mel: MEL_S, mel2: MEL_S2, mood: "night"   },
+  { name: "Rinzler",           prog: PROG_TRON, mel: MEL_T, mel2: MEL_T2, mood: "ember"   },
 ];
 
 /** Track titles for the settings picker — keep in lockstep with TRACKS. */
@@ -1313,7 +1540,10 @@ export class Music {
     // Melody: the glockenspiel lead on every family (island tracks play it
     // straight; the Tron tracks hand the same line to the synth; arcade tracks
     // put the square-wave hook in front with the bells doubling it).
-    const note = sec.mel[idx] ?? 0;
+    // In apex phase the score switches to mel2 — a higher-register chorus line
+    // so the tune itself changes at peak intensity, not just the mix levels.
+    const melArr = (this.phase === "apex" && sec.mel2) ? sec.mel2 : sec.mel;
+    const note = melArr[idx] ?? 0;
     if (note > 0) {
       const noteFreq = mtof(note + this.transpose + stormShift);
       const vel = this.step === 0 ? 1 : this.step % 4 === 0 ? 0.9 : 0.8;
