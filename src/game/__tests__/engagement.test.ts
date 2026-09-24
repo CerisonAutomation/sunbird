@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { FlowTuner, SessionGoals, evaluateNearMiss } from "../Engagement";
+import { FlowTuner, SessionGoals, evaluateNearMiss, IDENTITY_TUNE, paceSkillFor, tuneDifficulty, type DifficultySignals } from "../Engagement";
 import { SaveData } from "../SaveData";
 
 describe("FlowTuner", () => {
@@ -157,5 +157,49 @@ describe("SessionGoals first-session mode", () => {
     const rookie = build(false, 0.1).goals[0]!;
     const ace = build(false, 0.95).goals[0]!;
     expect(ace.target).toBeGreaterThan(rookie.target);
+  });
+});
+
+describe("tuneDifficulty", () => {
+  const base = (over: Partial<DifficultySignals> = {}): DifficultySignals => ({
+    runsPlayed: 10,
+    skill: 0.5,
+    lastDistance: 900,
+    lastDurationSec: 40,
+    recentPlaces: [],
+    ...over,
+  });
+
+  it("returns the identity tune for any rated race", () => {
+    const struggling = base({ runsPlayed: 0, skill: 0.05, lastDistance: 80 });
+    expect(tuneDifficulty(struggling, true)).toEqual(IDENTITY_TUNE);
+  });
+
+  it("eases the first three flights so the hook is a joke, not a bounce", () => {
+    const tune = tuneDifficulty(base({ runsPlayed: 0, skill: 0.1 }), false);
+    expect(tune.reason).toBe("ease");
+    expect(tune.daylightMult).toBeLessThan(1);
+    expect(tune.packCatchupMult).toBeGreaterThan(1);
+    expect(tune.ridgeForgiveness).toBeGreaterThan(0);
+  });
+
+  it("eases a struggling casual pilot", () => {
+    const tune = tuneDifficulty(base({ skill: 0.15, lastDistance: 220, recentPlaces: [12, 11, 14] }), false);
+    expect(tune.reason).toBe("ease");
+    expect(tune.packCatchupMult).toBeGreaterThan(IDENTITY_TUNE.packCatchupMult);
+  });
+
+  it("spices a bored expert without touching ranked identity", () => {
+    const signals = base({ skill: 0.9, lastDistance: 2400, lastDurationSec: 70, recentPlaces: [2, 1, 3] });
+    const casual = tuneDifficulty(signals, false);
+    expect(casual.reason).toBe("spice");
+    expect(casual.packCatchupMult).toBeLessThan(1);
+    expect(tuneDifficulty(signals, true)).toEqual(IDENTITY_TUNE);
+  });
+
+  it("aims a pace ghost slightly above the player", () => {
+    expect(paceSkillFor(0)).toBeGreaterThan(0.2);
+    expect(paceSkillFor(1)).toBeLessThan(0.9);
+    expect(paceSkillFor(0.5)).toBeGreaterThan(0.5);
   });
 });

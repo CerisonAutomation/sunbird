@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { MassRace } from "../MassRace";
+import {
+  MassRace,
+  PACK_CATCHUP_CAP,
+  PACK_CATCHUP_END,
+  PACK_CATCHUP_RATE,
+  PACK_CATCHUP_START,
+  applyPackCatchup,
+  packCatchupDelta,
+} from "../MassRace";
 import { TerrainSystem } from "../TerrainSystem";
 
 /**
@@ -88,5 +96,41 @@ describe("emote visibility", () => {
     mr.step(4, terrain, 1500, 4, 100, 40); // past the 2.5 s bubble lifetime
     const row = mr.roster(100, 0, 1500, "Pilot").find((r) => r.you);
     expect(row?.emote).toBe("");
+  });
+});
+
+describe("pack catch-up (casual rubber-band)", () => {
+  const DT = 1 / 60;
+
+  it("does nothing inside the pack or beyond the shot", () => {
+    expect(packCatchupDelta(0, DT)).toBe(0);
+    expect(packCatchupDelta(PACK_CATCHUP_START, DT)).toBe(0);
+    expect(packCatchupDelta(PACK_CATCHUP_END, DT)).toBe(0);
+    expect(packCatchupDelta(2000, DT)).toBe(0);
+  });
+
+  it("preserves the shipped MassRace curve at intensity 1", () => {
+    const full = packCatchupDelta(500, DT, 1);
+    expect(full).toBeCloseTo(DT * PACK_CATCHUP_RATE, 8);
+    const half = packCatchupDelta(425, DT, 1);
+    expect(half).toBeCloseTo(DT * PACK_CATCHUP_RATE * 0.5, 8);
+  });
+
+  it("never exceeds the catch-up cap", () => {
+    expect(applyPackCatchup(194, 500, DT)).toBeLessThanOrEqual(PACK_CATCHUP_CAP);
+    expect(applyPackCatchup(PACK_CATCHUP_CAP, 500, DT)).toBe(PACK_CATCHUP_CAP);
+  });
+
+  it("scales with intensity and clamps it", () => {
+    const base = packCatchupDelta(500, DT, 1);
+    expect(packCatchupDelta(500, DT, 1.28)).toBeCloseTo(base * 1.28, 8);
+    expect(packCatchupDelta(500, DT, 99)).toBeCloseTo(base * 1.6, 8);
+    expect(packCatchupDelta(500, DT, 0)).toBeCloseTo(base * 0.5, 8);
+  });
+
+  it("rejects non-finite inputs", () => {
+    expect(packCatchupDelta(Number.NaN, DT)).toBe(0);
+    expect(packCatchupDelta(500, 0)).toBe(0);
+    expect(applyPackCatchup(Number.NaN, 500, DT)).toBe(0);
   });
 });

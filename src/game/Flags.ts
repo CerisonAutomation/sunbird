@@ -14,12 +14,21 @@
  */
 import { storage } from "./Storage";
 
-export type FlagKey = "challengeShare" | "nativeShare" | "modeAwareChallenge";
+export type FlagKey =
+  | "challengeShare"
+  | "nativeShare"
+  | "modeAwareChallenge"
+  | "adaptiveDifficulty"
+  | "clipWorthy"
+  | "oneMoreRun";
 
 const DEFAULTS: Record<FlagKey, boolean> = {
   challengeShare: true,
   nativeShare: true,
   modeAwareChallenge: true,
+  adaptiveDifficulty: true,
+  clipWorthy: true,
+  oneMoreRun: true,
 };
 
 const LS_KEY = "sunbird.flags";

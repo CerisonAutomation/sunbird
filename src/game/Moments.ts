@@ -395,3 +395,245 @@ export function momentRepeatGap(count: number): number {
 export function momentShouldReact(count: number, secondsSinceLast: number): boolean {
   return secondsSinceLast >= momentRepeatGap(count);
 }
+
+/* ============================================================ share / clips */
+
+/**
+ * Clip-worthy beats for a 6-second Poki creative. Lives *in this file* so
+ * there is one classification layer — `MOMENT_KINDS` stays append-only (a new
+ * comedy kind rewrites every recap already recorded); clip kinds are a second
+ * table that can grow without that tax.
+ */
+export const CLIP_KINDS = [
+  "near_miss",
+  "overtake",
+  "last_second",
+  "crash",
+  "perfect_run",
+] as const;
+
+export type ClipKind = (typeof CLIP_KINDS)[number];
+
+export type ClipDef = {
+  kind: ClipKind;
+  icon: string;
+  label: string;
+  shout: string;
+  weight: number;
+};
+
+export const CLIPS: Record<ClipKind, ClipDef> = {
+  near_miss: { kind: "near_miss", icon: "\u{1F62E}\u200D\u{1F4A8}", label: "NEAR MISS", shout: "PHEW!", weight: 14 },
+  overtake: { kind: "overtake", icon: "\u{1F3C1}", label: "OVERTAKE", shout: "PASSED!", weight: 16 },
+  last_second: { kind: "last_second", icon: "\u{1F3C6}", label: "PHOTO FINISH", shout: "PHOTO!", weight: 28 },
+  crash: { kind: "crash", icon: "\u{1F4A5}", label: "CRASH", shout: "BONK!", weight: 8 },
+  perfect_run: { kind: "perfect_run", icon: "\u2728", label: "PERFECT RUN", shout: "CLEAN!", weight: 32 },
+};
+
+export type ClipTally = { kind: ClipKind; icon: string; label: string; count: number };
+
+export function clipFromMoment(kind: MomentKind): ClipKind | null {
+  switch (kind) {
+    case "phew":
+    case "wee":
+      return "near_miss";
+    case "bonk":
+    case "splash":
+      return "crash";
+    case "record":
+      return "perfect_run";
+    default:
+      return null;
+  }
+}
+
+/** HappyTime intensity — Poki asks we use this sparingly. Crashes stay silent. */
+export function clipHappyTime(kind: ClipKind): number {
+  switch (kind) {
+    case "last_second":
+      return 1;
+    case "perfect_run":
+      return 0.85;
+    case "overtake":
+      return 0.55;
+    case "near_miss":
+      return 0.35;
+    case "crash":
+      return 0;
+  }
+}
+
+export class ClipLedger {
+  private counts: Record<ClipKind, number> = {
+    near_miss: 0,
+    overtake: 0,
+    last_second: 0,
+    crash: 0,
+    perfect_run: 0,
+  };
+  private order: ClipKind[] = [];
+  private seenEver = new Set<ClipKind>();
+  private total = 0;
+
+  record(kind: ClipKind): number {
+    const before = this.counts[kind];
+    this.counts[kind] = before + 1;
+    if (before === 0) this.order.push(kind);
+    this.total += 1;
+    return this.counts[kind];
+  }
+
+  count(kind: ClipKind): number {
+    return this.counts[kind];
+  }
+
+  get length(): number {
+    return this.total;
+  }
+
+  isFirstEver(kind: ClipKind): boolean {
+    if (this.seenEver.has(kind)) return false;
+    this.seenEver.add(kind);
+    return true;
+  }
+
+  resetRun(): void {
+    for (const kind of CLIP_KINDS) this.counts[kind] = 0;
+    this.order = [];
+    this.total = 0;
+  }
+
+  resetAll(): void {
+    this.resetRun();
+    this.seenEver.clear();
+  }
+
+  tally(max = 4): ClipTally[] {
+    const rows = this.order
+      .filter((kind) => this.counts[kind] > 0)
+      .map((kind, i) => ({ kind, i }))
+      .sort((a, b) => this.counts[b.kind] - this.counts[a.kind] || a.i - b.i)
+      .map(({ kind }) => {
+        const def = CLIPS[kind];
+        return { kind, icon: def.icon, label: def.label, count: this.counts[kind] };
+      });
+    return max > 0 ? rows.slice(0, max) : rows;
+  }
+
+  headline(): ClipKind | null {
+    const rows = this.tally(1);
+    return rows.length ? rows[0]!.kind : null;
+  }
+
+  toJSON(): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const kind of CLIP_KINDS) if (this.counts[kind] > 0) out[kind] = this.counts[kind];
+    return out;
+  }
+
+  recapLine(): string {
+    const rows = this.tally(3);
+    if (!rows.length) return "";
+    return rows.map((r) => `${r.count} ${CLIPS[r.kind].label}`).join(" \u00b7 ");
+  }
+}
+
+export type ViralRun = {
+  clips: Readonly<Record<string, number>>;
+  distance: number;
+  newBest: boolean;
+  nearMiss: boolean;
+  photoFinish: boolean;
+  perfects: number;
+  crashes: number;
+};
+
+export const CLIP_SHARE_THRESHOLD = 45;
+
+const CLIP_CAPS: Record<ClipKind, number> = {
+  near_miss: 3,
+  overtake: 3,
+  last_second: 1,
+  crash: 4,
+  perfect_run: 1,
+};
+
+/** 0..100 heat. Caps per kind so a beach of BONKs cannot outrank a photo finish. */
+export function viralScore(run: ViralRun): number {
+  let score = 0;
+  for (const kind of CLIP_KINDS) {
+    const n = Math.max(0, Math.floor(Number(run.clips[kind]) || 0));
+    if (n <= 0) continue;
+    score += CLIPS[kind].weight * Math.min(n, CLIP_CAPS[kind]);
+  }
+  if (run.newBest) score += 18;
+  if (run.nearMiss) score += 12;
+  if (run.photoFinish) score += 20;
+  if (run.perfects >= 4 && run.crashes === 0) score += 16;
+  if (run.distance < 250) score = Math.min(score, 20);
+  else if (run.distance >= 1500) score += 6;
+  if (!Number.isFinite(score) || score < 0) return 0;
+  return Math.min(100, Math.round(score));
+}
+
+export function isClipWorthy(score: number): boolean {
+  return Number.isFinite(score) && score >= CLIP_SHARE_THRESHOLD;
+}
+
+export function clipShareLine(score: number, recap: string, distance: number, name: string): string {
+  const metres = Math.max(0, Math.round(Number.isFinite(distance) ? distance : 0));
+  const who = (name || "A rival").replace(/[\r\n\t]+/g, " ").trim().slice(0, 14) || "A rival";
+  if (score < 20 || metres <= 0) return "";
+  const beat = recap ? ` (${recap})` : "";
+  return `${who} just flew ${metres.toLocaleString("en-US")} m${beat} — beat them on the same hills`;
+}
+
+export const CTA_IDS = ["retry", "share", "challenge", "continue", "shop"] as const;
+export type CtaId = (typeof CTA_IDS)[number];
+
+export type CtaContext = {
+  viralScore: number;
+  newBest: boolean;
+  nearMiss: boolean;
+  photoFinish: boolean;
+  runsPlayed: number;
+  challengeShareOn: boolean;
+  experimentShareFirst: boolean;
+};
+
+export type CtaPick = {
+  primary: CtaId;
+  secondary: CtaId;
+  shareFirst: boolean;
+  reason: "clip" | "near_miss" | "record" | "experiment" | "default";
+};
+
+const RETRY_SHARE: CtaPick = { primary: "retry", secondary: "share", shareFirst: false, reason: "default" };
+
+/** Results-card CTA. First recap always teaches Fly again. */
+export function pickCta(ctx: CtaContext): CtaPick {
+  const score = Number.isFinite(ctx.viralScore) ? ctx.viralScore : 0;
+  const runs = Math.max(0, Math.floor(Number(ctx.runsPlayed) || 0));
+  const clip = isClipWorthy(score) || ctx.photoFinish || (ctx.newBest && score >= CLIP_SHARE_THRESHOLD - 10);
+
+  if (runs < 1) return { ...RETRY_SHARE, reason: "default" };
+
+  if (clip && ctx.challengeShareOn) {
+    return {
+      primary: "challenge",
+      secondary: "share",
+      shareFirst: false,
+      reason: ctx.photoFinish ? "clip" : ctx.newBest ? "record" : "clip",
+    };
+  }
+  if (clip) {
+    return { primary: "share", secondary: "retry", shareFirst: true, reason: ctx.newBest ? "record" : "clip" };
+  }
+  if (ctx.nearMiss && !ctx.newBest) {
+    return { primary: "retry", secondary: "share", shareFirst: false, reason: "near_miss" };
+  }
+  if (ctx.experimentShareFirst) {
+    return { primary: "share", secondary: "challenge", shareFirst: true, reason: "experiment" };
+  }
+  return RETRY_SHARE;
+}

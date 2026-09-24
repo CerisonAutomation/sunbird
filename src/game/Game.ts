@@ -11,15 +11,15 @@ import { BIOMES, biomeForIsland } from "./Biomes";
 import { TRACK_NAMES } from "./Music";
 import { Bird, type BirdStepOpts } from "./Bird";
 import { AttractPilot } from "./pilot";
-import { CameraRig } from "./CameraRig";
+import { CameraRig, clipShotFor } from "./CameraRig";
 import { PICKUP_STYLE, Collectibles, type CloudKind, type PickupKind } from "./Collectibles";
-import { evaluateNearMiss, FlowTuner, SessionGoals, type NearMiss } from "./Engagement";
+import { evaluateNearMiss, FlowTuner, SessionGoals, IDENTITY_TUNE, type DifficultyTune, type NearMiss, tuneDifficulty } from "./Engagement";
 import { BIG_LAUNCH_QUIPS, BOP_QUIPS, FEVER_QUIPS, GEM_QUIPS, MILESTONE_QUIPS, SLEEP_QUIPS, SPLASH_QUIPS, SURRENDER_QUIPS, THUD_QUIPS, SurpriseEngine, quip } from "./Surprises";
-import { MOMENTS, MomentLedger, momentShouldReact, type MomentKind } from "./Moments";
+import { MOMENTS, MomentLedger, momentShouldReact, type MomentKind, ClipLedger, clipFromMoment, clipHappyTime, clipShareLine, viralScore, pickCta } from "./Moments";
 import { WEE_IDLE, fxScale, warpT, weeCheck, type WeeState } from "./SpeedFeel";
 import { arcShouldWrite, arcSmooth, arcTarget , runEnergy } from "./MusicArc";
 import { PRIVACY_POLICY_URL } from "./legal";
-import { Funnel, visitKind, type FunnelStage } from "./Funnel";
+import { Funnel, visitKind, type FunnelStage, viralEventProps } from "./Funnel";
 import type { Fx } from "./Fx";
 import { DPR_COOLDOWN_SECONDS, nextBloomBudget, nextDpr, QUALITY_WINDOW_SECONDS } from "./quality";
 import { LaunchSystem, ratingLabel, type LaunchResult } from "./LaunchSystem";
@@ -131,7 +131,7 @@ import { FlightCues } from "./FlightCues";
 import { endlessSpeedScale } from "./FlightProgression";
 import { buildChallengeUrl, readChallengeFromUrl, type RivalChallenge } from "./Challenge";
 import { flag } from "./Flags";
-import { variant } from "./Experiments";
+import { EXPERIMENTS, variant } from "./Experiments";
 import { buildRoomInviteUrl, normalizeRoomCode, readRoomInviteFromUrl } from "./RoomInvite";
 import { PORTAL_BANNER_ID, attachPortalErrorReporters, initPlatform, isCoarsePointer, isPortalBuild, portalTarget as getPortalTarget, type PlatformAdapter } from "../sdk/platform";
 import { CUSTOM_PILOT_NAMES, POKI_MULTIPLAYER, SELL_AD_REMOVAL, SIMULATED_BREAKS, SQUAD_CHAT } from "./edition";
@@ -409,6 +409,15 @@ export class Game {
    * one table drives popups, haptics, telemetry and the recap.
    */
   private readonly moments = new MomentLedger();
+  /** Share-layer ledger: near-miss / overtake / photo-finish / crash / clean. */
+  private readonly clips = new ClipLedger();
+  /** Previous finished run, for Engagement.tuneDifficulty (resetRun zeroes the bird). */
+  private lastFinishedDistance = 0;
+  private lastFinishedDuration = 0;
+  private recentPlaces: number[] = [];
+  private lastViralScore = 0;
+  /** Casual-only contest feel. Identity on rated / live rooms. */
+  private difficultyTune: DifficultyTune = IDENTITY_TUNE;
   /**
    * Retention funnel: when this session first saw a tap, a flight, a coin, a
    * laugh, a death and a retry. One beacon per stage, ever - see `Funnel.ts`.
@@ -939,6 +948,7 @@ export class Game {
         "quest",
       );
       this.telemetry.track("rival_received", { distance: rival.distance, mode: this.modeId });
+      this.telemetry.track("challenge_open", viralEventProps("challenge_open", { mode: this.modeId, distance: rival.distance }));
     }
 
     // Room invite links: #room=CODE → seat straight into that private room.
@@ -1756,6 +1766,15 @@ export class Game {
         const place = this.massRace.standings(this.bird.x, this.startX, this.pilotName, 8).place;
         if (this.lastPlace > 0 && place > 0 && place < this.lastPlace) {
           const gain = this.lastPlace - place;
+          if (flag("clipWorthy")) {
+            const first = this.clips.isFirstEver("overtake");
+            this.clips.record("overtake");
+            if (first) {
+              this.telemetry.track("clip_moment", viralEventProps("clip_moment", { kind: "overtake", mode: this.modeId }));
+              this.platform?.happyTime(clipHappyTime("overtake"));
+              this.camera.pulseClip(clipShotFor("overtake"), Math.min(1.2, this.bird.speed() / MAX_SPEED), this.bird.altitude);
+            }
+          }
           this.hud.toast(place === 1 ? "👑 LEAD! Hold it!" : `P${this.lastPlace} → P${place}!`, "gold");
           if (place === 1) {
             this.flash("perfect");
@@ -1837,11 +1856,12 @@ export class Game {
 
     // Ridge skim: airborne, fast, and hugging the hill — flow-state bonus.
     this.skimCd = Math.max(0, this.skimCd - dt);
+    const skimCeil = 3.2 + this.difficultyTune.ridgeForgiveness;
     const skimming =
       !this.bird.grounded &&
       !this.bird.inWater &&
       this.bird.altitude > 0.4 &&
-      this.bird.altitude < 3.2 &&
+      this.bird.altitude < skimCeil &&
       this.bird.speed() > 40;
     if (skimming) {
       this.skimTime += dt;
@@ -1999,7 +2019,7 @@ export class Game {
     }
 
     const magnetOn = this.feverOn || this.magnetTimer > 0 || this.gameplaySkin.magnetAlways || this.powers.magnetOn();
-    this.collect.update(dt, this.bird, this.terrain, magnetOn, this.elapsed, this.powers.magnetScale(), {
+    this.collect.update(dt, this.bird, this.terrain, magnetOn, this.elapsed, this.powers.magnetScale() * (1 + this.difficultyTune.magnetBonus), {
       onCoin: (x, y, gem) => {
         const base = gem ? 5 : 1;
         const value = Math.round(
@@ -2143,6 +2163,12 @@ export class Game {
           .sort((a, b) => Math.abs(a.distance - (you?.distance ?? 0)) - Math.abs(b.distance - (you?.distance ?? 0)))[0];
         if (rival && you && Math.abs(rival.distance - you.distance) < 25) {
           const won = you.distance > rival.distance;
+          if (flag("clipWorthy")) {
+            this.clips.record("last_second");
+            this.telemetry.track("clip_moment", viralEventProps("clip_moment", { kind: "last_second", mode: this.modeId }));
+            this.platform?.happyTime(clipHappyTime("last_second"));
+            this.camera.pulseClip(clipShotFor("last_second"), Math.min(1.2, this.bird.speed() / MAX_SPEED), this.bird.altitude);
+          }
           this.photoFinish = photoFinishMessage(won, rival.name, Math.abs(rival.distance - you.distance));
           if (!won) this.nemesis = rival.name;
           this.hud.toast(this.photoFinish, won ? "gold" : "warn");
@@ -2210,7 +2236,7 @@ export class Game {
     }
 
     if (this.mode.clock > 0) {
-      this.daylight -= dt;
+      this.daylight -= dt * this.difficultyTune.daylightMult;
       // GOLDEN HOUR — the last 22% of the day. The world turns amber, the
       // music opens, and every coin is worth double. Deep runs get a reason.
       const goldenNow = this.daylight > 0 && this.daylight < this.daylightMax() * 0.22;
@@ -3278,6 +3304,19 @@ export class Game {
     // (`fairRace`), the field's hidden catch-up push is stripped too. A ranked
     // result must not be decided by assistance on either side of the race.
     this.massRace.setPackBalancing(!this.fairRace);
+    if (flag("adaptiveDifficulty") && !this.fairRace) {
+      this.difficultyTune = tuneDifficulty({
+        runsPlayed: this.save.state.runsPlayed,
+        skill: this.flow.skill,
+        lastDistance: this.lastFinishedDistance,
+        lastDurationSec: this.lastFinishedDuration,
+        recentPlaces: this.recentPlaces,
+      }, false);
+      this.massRace.setPackIntensity(this.difficultyTune.packCatchupMult);
+    } else {
+      this.difficultyTune = IDENTITY_TUNE;
+      this.massRace.setPackIntensity(1);
+    }
     this.setState("playing");
     this.setScreen("main");
     this.camera.setIntro(0);
@@ -3528,6 +3567,7 @@ export class Game {
       moments: Object.entries(this.moments.toJSON())
         .map(([kind, n]) => `${kind}:${n}`)
         .join(","),
+      clips: this.clips.recapLine(),
       speedPeak: Math.round(this.speedPeak),
     });
 
@@ -3548,6 +3588,21 @@ export class Game {
       this.launch.best,
       this.save.state.bestCombo,
     );
+    this.lastFinishedDistance = stats.distance;
+    this.lastFinishedDuration = this.runTime;
+    if (this.racePlace > 0) {
+      this.recentPlaces.push(this.racePlace);
+      if (this.recentPlaces.length > 5) this.recentPlaces.shift();
+    }
+    this.lastViralScore = viralScore({
+      clips: this.clips.toJSON(),
+      distance: stats.distance,
+      newBest: this.newBest,
+      nearMiss: this.nearMiss.kind !== "none",
+      photoFinish: Boolean(this.photoFinish),
+      perfects: this.perfects,
+      crashes: this.clips.count("crash"),
+    });
     this.save.noteRecords(this.maxAltitude, this.launch.best);
     this.flow.noteRun(stats.distance, this.perfects, this.launch.goods + this.launch.greats + this.launch.perfects, this.save);
 
@@ -3784,6 +3839,8 @@ export class Game {
       zeniths: stats.zenith,
       xp,
       speedPeak: Math.round(this.speedPeak),
+      viral: this.lastViralScore,
+      clips: this.clips.recapLine(),
     });
 
     if (tierAfter > tierBefore) this.progressEvents.push({ kind: "pass", tier: tierAfter });
@@ -3942,6 +3999,9 @@ export class Game {
     this.thudCount = 0;
     this.bounceCount = 0;
     this.moments.resetRun();
+    this.clips.resetRun();
+    this.lastViralScore = 0;
+    this.difficultyTune = IDENTITY_TUNE;
     this.momentLastAt = {};
     this.weeState = WEE_IDLE;
     this.speedPeak = 0;
@@ -5179,9 +5239,11 @@ export class Game {
         const dist = Math.max(1, Math.round(this.lastRunDistance()));
         const mode = flag("modeAwareChallenge") ? this.modeId : undefined;
         const url = buildChallengeUrl(this.seed, dist, this.pilotName, mode);
-        const text = `Beat my ${dist} m flight on these hills 🐦 → ${url}`;
+        const recap = clipShareLine(this.lastViralScore, this.clips.recapLine(), dist, this.pilotName);
+        const text = recap ? `${recap} 🐦 → ${url}` : `Beat my ${dist} m flight on these hills 🐦 → ${url}`;
         this.shareText(text, `🥊 Challenge link copied — send it to a rival`);
         this.telemetry.track("rival_thrown", { distance: dist, mode: this.modeId });
+        this.telemetry.track("challenge_share", viralEventProps("challenge_share", { mode: this.modeId, distance: dist, score: this.lastViralScore }));
         break;
       }
       case "buy-powerup": {
@@ -5768,12 +5830,16 @@ export class Game {
         const handled = await platform.share(card.text);
         if (handled) {
           this.telemetry.track("share_run", { result: "shared" });
+          this.telemetry.track("clip_export", viralEventProps("clip_export", { mode: this.modeId, distance: dist, score: this.lastViralScore }));
           if (!this.disposed) this.hud.toast("Shared!", "gold");
           return;
         }
       }
       const result = await shareOrDownload(card, undefined, !this.portalEnabled());
       this.telemetry.track("share_run", { result });
+      if (result === "shared" || result === "copied") {
+        this.telemetry.track("clip_export", viralEventProps("clip_export", { mode: this.modeId, distance: dist, score: this.lastViralScore }));
+      }
       if (this.disposed) return;
       if (result === "unavailable") this.hud.offerCopy(card.text);
       else if (result !== "cancelled") this.hud.toast(result === "shared" ? "Shared!" : result === "copied" ? "Flight link copied" : "Image download requested", "info");
@@ -6247,6 +6313,17 @@ export class Game {
     if (!opts.always && !momentShouldReact(before, since)) return before;
     const n = this.moments.record(kind);
     this.momentLastAt[kind] = this.runTime;
+    if (flag("clipWorthy")) {
+      const clip = clipFromMoment(kind);
+      if (clip) {
+        const first = this.clips.isFirstEver(clip);
+        this.clips.record(clip);
+        if (first) {
+          this.telemetry.track("clip_moment", viralEventProps("clip_moment", { kind: clip, mode: this.modeId }));
+          this.camera.pulseClip(clipShotFor(clip), Math.min(1.2, this.bird.speed() / MAX_SPEED), this.bird.altitude);
+        }
+      }
+    }
     if (opts.popup !== false) this.popupAtBird(opts.shout ?? def.shout, def.popup);
     if (opts.toast) this.hud.toast(opts.toast, def.tone);
     this.haptic(def.haptic);
@@ -7205,6 +7282,30 @@ export class Game {
     return Math.max(0, this.bird.x - this.startX);
   }
 
+  /** Share leads the recap when the run is clip-worthy, else the A/B decides. */
+  private shareCtaLeads(): boolean {
+    if (this.state !== "gameover") return false;
+    const experimentShareFirst =
+      (this.expShareFirst ??= variant(
+        this.save.state.deviceId,
+        EXPERIMENTS.results_cta_order.id,
+        EXPERIMENTS.results_cta_order.split,
+        (v) => {
+          this.telemetry.track("experiment_exposure", { experiment: EXPERIMENTS.results_cta_order.id, variant: v });
+        },
+      )) === "treatment";
+    if (!flag("oneMoreRun")) return experimentShareFirst;
+    return pickCta({
+      viralScore: this.lastViralScore,
+      newBest: this.newBest,
+      nearMiss: this.nearMiss.kind !== "none",
+      photoFinish: Boolean(this.photoFinish),
+      runsPlayed: this.save.state.runsPlayed,
+      challengeShareOn: flag("challengeShare"),
+      experimentShareFirst,
+    }).shareFirst;
+  }
+
   private runStats(): RunStats {
     return {
       clouds: this.runClouds,
@@ -7665,12 +7766,7 @@ export class Game {
       cloudMessage: this.cloudMessage,
       canInstall: Boolean(this.deferredInstall) && !this.portalEnabled(),
       shareBusy: this.shareBusy,
-      expShareFirst:
-        this.state !== "gameover"
-          ? false
-          : (this.expShareFirst ??= variant(this.save.state.deviceId, "results_cta_order", 50, (v) => {
-              this.telemetry.track("experiment_exposure", { experiment: "results_cta_order", variant: v });
-            })) === "treatment",
+      expShareFirst: this.shareCtaLeads(),
       combo: Math.max(this.perfectChain, this.versus && this.p1 ? this.p1.launch.combo : this.launch.combo),
       ringChain: this.ringChain,
       ringChainFrac: RING_CHAIN_WINDOW > 0 ? this.ringChainTimer / RING_CHAIN_WINDOW : 0,
@@ -7725,6 +7821,8 @@ export class Game {
       bestCombo: this.save.state.bestCombo,
       runGems: this.runGems,
       moments: this.state === "playing" || this.state === "gameover" || this.state === "continue" ? this.moments.tally(4) : [],
+      clips: this.state === "gameover" || this.state === "continue" ? this.clips.tally(4) : [],
+      viralScore: this.state === "gameover" || this.state === "continue" ? this.lastViralScore : 0,
       packBalancing: this.massRace.packBalancingOn,
       pilotName: this.pilotName,
       board: this.boardPage,

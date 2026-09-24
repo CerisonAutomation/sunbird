@@ -22,6 +22,8 @@ export class Input {
   mutePressed = false;
   fullscreenPressed = false;
   boostPressed = false;
+  /** Last device that drove a dive — HUD shows matching control hints. */
+  lastDevice: "touch" | "mouse" | "keyboard" | "gamepad" = "keyboard";
   /** Player 2: Enter / right-half touch / second gamepad. */
   p2Key = false;
   p2Touch = false;
@@ -121,6 +123,7 @@ export class Input {
     };
     this.padP1 = pressed(0);
     this.padP2 = pressed(1);
+    if (this.padP1 || this.padP2) this.lastDevice = "gamepad";
   }
 
   consumePause(): boolean {
@@ -256,6 +259,7 @@ export class Input {
     // gameplay surface itself is taken over.
     if (this.ownsTouch(e.target)) e.preventDefault();
     this.markFirst();
+    this.lastDevice = e.pointerType === "touch" ? "touch" : "mouse";
 
     const now = performance.now();
     const timeSinceLastUp = now - this.lastTapUpAt;
@@ -356,6 +360,7 @@ export class Input {
       // Arrows would otherwise scroll the host page in embedded frames.
       e.preventDefault();
       this.markFirst();
+      this.lastDevice = "keyboard";
       this.keys.add(e.code);
       this.space = true;
     } else if (P2_CODE_SET.has(e.code)) {
