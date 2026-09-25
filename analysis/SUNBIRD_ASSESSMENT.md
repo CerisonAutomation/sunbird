@@ -262,7 +262,7 @@ Edition configuration (`edition.ts` / `edition.poki.ts`) controls portal-specifi
 |---|---|---|---|---|
 | 3 | `src/game/SongbookPlayer.ts:26-28` — **Duplicated scheduler constants** — `TICK_MS=25`, `LOOKAHEAD=0.16`, `MAX_STEPS_PER_TICK=8` copied from `Music.ts` (lines 42-45) | Identical values, separate code paths, no shared constant | If one changes and the other missed, audio scheduler drifts |
 | 4 | `src/game/constants.ts` | **Magic numbers with inconsistent documentation** — 228 LOC of raw config, some with 20-line comment explaining prior hardcoded values | `ALT_CEILING=260` (was hardcoded to 180), `ZENITH_THERMAL_VY=110` (was 180) | Balancing changes require hunting through unstructured dump |
-| 5 | `src/game/edition.ts:64` + `src/game/edition.poki.ts:36` | **env-var coupling at module scope** — `SELL_AD_REMOVAL` reads `import.meta.env` at evaluation time; inconsistent between editions | Generic: `!!import.meta.env.VITE_SELL_AD_REMOVAL`; Poki: hardcoded `false` | Misconfigured build variable silently enables features in wrong edition |
+| 5 | `src/game/edition.ts:64` | **Env-var coupling at module scope** — `SELL_AD_REMOVAL` reads `import.meta.env` at evaluation time, while `edition.poki.ts:36` hardcodes `false` | Generic: `!!import.meta.env.VITE_SELL_AD_REMOVAL`; Poki: hardcoded `false` | If VITE_SELL_AD_REMOVAL is misconfigured, IAP UI could leak into a portal build |
 
 ### Medium
 
@@ -270,7 +270,7 @@ Edition configuration (`edition.ts` / `edition.poki.ts`) controls portal-specifi
 |---|---|---|---|---|
 | 6 | `src/game/Game.ts:1309,4980` | **Production console.error** in game loop | Line 1309: frame error; Line 4980: world rebuild failure | Production error flooding; should use CrashReporter |
 | 7 | `src/game/Audio.ts:1` | **Magic frequency array** (`COIN_SCALE`) with inconsistent usage | Line 1: 10-element array; line 425: `COIN_SCALE.length-1`; line 665: `/2` (unexplained) | Tuning requires hunting raw frequencies |
-| 8 | `src/game/PokiMpUtils.ts` | **Deprecated export** — `POKI_NETLIB_GAME_ID` is `@deprecated use POKI_NETLIB_GAME_ID` (1,037 LOC module; all its consumers now import directly from `PokiNetlib.ts`) | `PokiMpUtils.ts:49` and PokiNetlib.ts:116 comment ("Removed rather than re-export... every consumer already imports from ./PokiMpUtils directly") | Dead-code smell; file could be trimmed to just `isPokiMultiplayerAvailable` |
+| 8 | `src/game/PokiMpUtils.ts` | **Stale comment at PokiNetlib.ts:116** — the comment claims "every consumer already imports from ./PokiMpUtils directly" and implies the module is dead, but `PokiNetlib.ts` imports `POKI_NETLIB_GAME_ID` (aliased as `NETLIB_GAME_ID`) 4 times, `isPokiMultiplayerAvailable`, and `makePokiRoomCode` from this module | `PokiMpUtils.ts:49` (`@deprecated` alias `NETLIB_GAME_ID`), `PokiNetlib.ts:28,237,990` | The module is active; only the `NETLIB_GAME_ID` alias at line 49 is deprecated |
 | 9 | 16 game modules | **Namespace import anti-pattern** — `import * as THREE` prevents tree-shaking | Collectibles.ts, CameraRig.ts, Fx.ts, HUD.ts, Bird.ts, Sky.ts, TerrainSystem.ts, Weather.ts, MassRace.ts, Racer.ts, Trail.ts, Ghost.ts, LivingBackground.ts, ParticleFX.ts, FinishGate.ts, Game.ts | Bundle bloat; implicit coupling |
 | 10 | `src/game/MassRace.ts:512` | **Hidden AI rubber-banding** — undocumented competitive advantage | Line 512 comment: "any rival 350+ m behind gets a hidden boost" | Player fairness concern; balance risk |
 | 11 | `src/game/Songbook.ts:110-703` | **Untestable inline data** — 703 LOC of nested song specs | Each song: 5+ lines, deeply nested; `parseNote` throws on bad input (line 102) | Zero compile-time validation of song data |
@@ -369,7 +369,7 @@ This is not a legacy system. The codebase is well-structured, actively maintaine
 3. Extract duplicated scheduler constants from `SongbookPlayer.ts` (which copied them from `Music.ts`) into a shared `audio-constants.ts`
 4. Convert `import * as THREE` (16 files in `src/game/`) to named imports — enables tree-shaking, makes dependencies explicit
 5. Centralize `import.meta.env` access — export `IS_PORTAL` from `boot.ts` instead of 4+ files re-reading env
-6. Remove deprecated `PokiMpUtils.ts` export; audit whether entire file is still needed
+6. Audit whether `PokiMpUtils.ts` can be trimmed now that all consumers import directly from `PokiNetlib.ts`
 7. Route `console.error` in `Game.ts` through `CrashReporter`
 
 **Phase 3: Data/tooling (1 sprint)**

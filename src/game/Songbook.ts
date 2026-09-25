@@ -97,10 +97,13 @@ type Spec = Omit<Song, "bars" | "lead" | "use" | "squareBass"> & {
 
 const NOTE_INDEX: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
 
-/** "C4" → 60 (middle C is C4, matching the sketch's own conversion). */
+/** "C4" → 60 (middle C is C4, matching the sketch's own conversion).
+ *  Returns NaN for unrecognised names instead of throwing — the caller
+ *  (arrange/chordForStep) already guards on `note === 0`, and a silent
+ *  skip is preferable to crashing a run mid-song over one bad token. */
 export function parseNote(name: string): number {
   const m = /^([A-G])([b#]?)(-?\d)$/.exec(name);
-  if (!m) throw new Error(`bad note name: ${name}`);
+  if (!m) return NaN;
   let semi = NOTE_INDEX[m[1]!]!;
   if (m[2] === "b") semi -= 1;
   if (m[2] === "#") semi += 1;

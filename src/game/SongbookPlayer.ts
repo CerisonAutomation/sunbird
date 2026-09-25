@@ -1,4 +1,5 @@
 import { clampSequencerTime } from "./Music";
+import { TICK_MS, LOOKAHEAD, MAX_STEPS_PER_TICK } from "./audio-constants";
 import {
   LOOPS_PER_SONG,
   SONGBOOK,
@@ -21,11 +22,6 @@ import {
   type Song,
   type SongRole,
 } from "./Songbook";
-
-/** Kept in step with `Music.ts`: same scheduler clock, same safety caps. */
-const TICK_MS = 25;
-const LOOKAHEAD = 0.16;
-const MAX_STEPS_PER_TICK = 8;
 
 /** Steps of closing snare roll at the end of a section's final bar. */
 const FILL_STEPS = 4;

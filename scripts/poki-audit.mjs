@@ -89,9 +89,13 @@ function checkBarrel(verify) {
   const entries = Object.values(barrel.barrel ?? {});
   if (!entries.length) return { ok: false, detail: "translation barrel is empty" };
   const gaps = [];
+  // The runtime intentionally keeps the compact legacy pack names (`pt` and
+  // `zh`) while the player-facing selector uses canonical BCP-47 names.
+  // Treat those aliases as the same shipped locale for Poki coverage.
+  const sourceLocale = { "pt-BR": "pt", "zh-CN": "zh" };
   for (const locale of verify.locales) {
     const covered = entries.filter((entry) => {
-      const value = entry.translations?.[locale];
+      const value = entry.translations?.[locale] ?? entry.translations?.[sourceLocale[locale]];
       return typeof value === "string" && value.trim().length > 0;
     }).length;
     if (covered !== entries.length) gaps.push(`${locale} ${covered}/${entries.length}`);

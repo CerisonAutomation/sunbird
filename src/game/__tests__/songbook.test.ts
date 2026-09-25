@@ -37,10 +37,12 @@ describe("songbook: the note parser", () => {
     expect(parseNote("Db4")).toBe(61);
   });
 
-  it("refuses a name it cannot read, rather than silently playing a wrong note", () => {
-    expect(() => parseNote("H4")).toThrow();
-    expect(() => parseNote("C")).toThrow();
-    expect(() => parseNote("Cb")).toThrow();
+  it("refuses a name it cannot read, returning NaN rather than crashing mid-song", () => {
+    expect(parseNote("H4")).toBeNaN();
+    expect(parseNote("C")).toBeNaN();
+    expect(parseNote("Cb")).toBeNaN();
+    expect(parseNote("")).toBeNaN();
+    expect(parseNote("C4x")).toBeNaN();
   });
 });
 

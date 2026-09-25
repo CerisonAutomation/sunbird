@@ -41,12 +41,6 @@ describe("portal loading failsafe", () => {
       },
       gameLoadingStart: () => calls.push("gameLoadingStart"),
       gameLoadingFinished: () => calls.push("gameLoadingFinished"),
-<<<<<<< HEAD
-=======
-      // The double deliberately has NO `signalGameReady`: Poki's SDK does not
-      // expose one, and a double that invented it would hide the regression
-      // this suite exists to catch.
->>>>>>> origin/main
       movePill: () => {},
     };
   });
@@ -84,14 +78,6 @@ describe("portal loading failsafe", () => {
     platform.preloadPortalSdk();
     await vi.advanceTimersByTimeAsync(10_000);
 
-    // The net fires the ONE documented conversion marker. It used to also call
-    // `signalGameReady()`, a member Poki does not have (it is CrazyGames'), so
-    // the call was a silent no-op and the test only passed because the double
-    // invented the method too.
     expect(calls.filter((c) => c === "gameLoadingFinished")).toHaveLength(1);
-<<<<<<< HEAD
-=======
-    expect(calls).not.toContain("signalGameReady");
->>>>>>> origin/main
   });
 });

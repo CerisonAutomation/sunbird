@@ -5,6 +5,7 @@ import { Component, type ErrorInfo, type ReactNode, useEffect, useRef, useState 
 import type { Game } from "./game/Game";
 import { bootStage } from "./game/BootProgress";
 import { crashReporter } from "./game/resilience/CrashReporter";
+import { GameShell } from "./GameShell";
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
   state = { error: null as string | null };
@@ -201,8 +202,7 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <div ref={ref} className="game-root" />
-      {bannerId ? <div id={bannerId} className="portal-banner" aria-hidden="true" /> : null}
+      <GameShell ref={ref} bannerId={bannerId} />
     </ErrorBoundary>
   );
 }

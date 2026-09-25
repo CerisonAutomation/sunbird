@@ -1,42 +1,24 @@
 import { browseSkins, newShopBrowse, nextBird, type ShopBrowse } from "./ShopBrowse";
 import { flightTakeaway } from "./FlightGuidance";
-import { MOMENTS, type MomentTally, type ClipTally } from "./Moments";
-import { growthLedger } from "./GrowthLedger";
-import { type BeatView, type CelebrationView } from "./ProgressBeats";
-import { streakOpacity, vignetteIntensity } from "./SpeedFeel";
 import { menuIcon, menuHorizon, arrowUpRightSvg, arrowRightSvg } from "./MenuIcons";
 import { paginate } from "./Pagination";
 import { flockLoadingMark } from "./FlockLoading";
 import { PLAY_DESTINATIONS, COLLECTION_DESTINATIONS, PROGRESS_DESTINATIONS, type MenuDestination } from "./MenuCatalog";
 import { OverlayNavigation } from "./OverlayNavigation";
-import { computeHudLayout, type HudElement } from "./hud/domain/HudDomain";
 import { MenuContinuity } from "./MenuContinuity";
 import { MenuSky } from "./MenuSky";
-import { BEAT_CUE_WINDOW } from "./BeatLines";
 import { feedbackSlot } from "./HudFeedback";
 import type { AchievementView } from "./Achievements";
 import type { ActivePower } from "./PowerUps";
 import type { SessionGoal } from "./Engagement";
 import { PVP_MODES, type ModeDef, type PvpWorldCourse, type ModeId } from "./Modes";
 import type { RacerStats } from "./Racer";
-<<<<<<< HEAD
 import { CUSTOM_PILOT_NAMES, LEADERBOARD_CLOUD_LABEL, POKI_EDITION, PORTAL_DISPLAY_NAME, PORTAL_EDITION_NOTE, SELL_AD_REMOVAL, SQUAD_CHAT } from "./edition";
-=======
-import { CUSTOM_PILOT_NAMES, LEADERBOARD_CLOUD_LABEL, LEADERBOARD_LOCAL, PORTAL_DISPLAY_NAME, PORTAL_EDITION_NOTE, SELL_AD_REMOVAL, SIMULATED_BREAKS, SQUAD_CHAT } from "./edition";
->>>>>>> origin/main
 import { leaderboardBackend } from "./Leaderboard";
 import type { BoardMetric, BoardPage, BoardScope } from "./Leaderboard";
 import type { TournamentView } from "./Tournaments";
 import type { RosterBird, Standing, RivalNameTag } from "./MassRace";
-<<<<<<< HEAD
 import { formatNumberLocalized, SUPPORTED_LOCALES, getLocale, t } from "../i18n";
-=======
-import {
-  AUTO_LOCALE, SUPPORTED_LOCALES, detectedLocale, getLocale, getLocalePreference, localeLabel, t,
-  type LocalePreference,
-} from "../i18n";
-import { PRIVACY_POLICY, PRIVACY_POLICY_URL } from "./legal";
->>>>>>> origin/main
 import * as THREE from "three";
 import { DAILY_STIPEND, PIGGY_BANK_CAP, PIGGY_BANK_MIN_SMASH, SHOP_AD_COINS, SHOP_AD_SESSION_CAP, VIP_DAILY_GIFT } from "./constants";
 import { COLLECTIONS, dailyFlashBird, GOLD, skinById, STARTER_PACK, VIP, type BoostView, type ShopTrailView, type SkinView } from "./Economy";
@@ -72,8 +54,19 @@ export type UiScreen =
   | "challenges"
   | "campaign"
   | "squad"
-  | "privacy"
   | "nameEntry";
+
+/** Stable screen identifiers used by automation, telemetry, and QA. */
+export const SCREEN = {
+  leaderboard: "scores", raceLobby: "live", aiPvp: "practice", challenges: "challenges",
+  campaign: "campaign", squad: "squad", rivalRank: "rank", tournaments: "cups",
+  gameModes: "modes", atlas: "atlas", shop: "shop", coinStore: "paywall",
+  confirmUnlock: "checkout", highGlides: "progress", nestPass: "pass",
+  trophyCase: "trophies", account: "account",
+} as const;
+export const SCREEN_TITLES: Readonly<Record<string, { key: string; en: string }>> = Object.fromEntries(
+  Object.entries(SCREEN).map(([key, value]) => [value, { key: `hud.screen.${key}.title`, en: key }]),
+);
 
 export type RivalCard = {
   rating: number;
@@ -117,7 +110,6 @@ export type HudSnapshot = {
   portalName: PortalName;
   version: number;
   distance: number;
-  runTime: number;
   coins: number;
   /** True once this run's 3× coin bonus has been claimed (one claim per run). */
   multiplierClaimed: boolean;
@@ -146,15 +138,7 @@ export type HudSnapshot = {
   adsLeftToday: number;
   /** True when the portal offers its own leaderboard overlay. */
   portalLeaderboard: boolean;
-  /**
-   * True only when the deployed portal SDK exposes a sanctioned way to open an
-   * external URL (`PokiSDK.openExternalLink`). The privacy screen renders the
-   * hosted-policy button only then — in a sandboxed portal iframe a plain anchor
-   * is a button that does nothing for exactly the players the policy protects.
-   */
-  portalExternalLink: boolean;
   ghostDelta: number | null;
-  timePressure: { kind: string; text: string; icon: string; tone: string } | null;
   /** True when this finished run beat the previous personal-best distance. */
   newBest: boolean;
   continueTimer: number;
@@ -258,68 +242,15 @@ export type HudSnapshot = {
   raceFinish: number;
   /* --- engagement --- */
   sessionGoals: SessionGoal[];
-  /**
-   * The single next thing to do, in one line. The results card already lists
-   * three session goals, three daily quests and ten lifetime missions; a list of
-   * nine ladders reads as no ladder at all, so this names the nearest one and its
-   * exact gap. Built by `nextActionLine()` in Missions.ts, empty when there is
-   * nothing worth saying.
-   */
-  nextAction: string;
-  /** Progressive onboarding tip — one at a time, contextual, never during flight */
-  onboardingTip: { id: string; title: string; body: string; target?: string } | null;
   goalPop: string;
-  /** Which ladder the pill is reporting, so a quest reads differently from a goal. */
   goalPopKind: "goal" | "quest";
-  /**
-   * A career rung crossed *during* this flight: `icon Name`, or "" when there is
-   * none. Its own banner rather than the pill, because the pill is one arbitrated
-   * slot (`feedbackSlot`) that the finish countdown owns for the last 900 m — and
-   * a long flight is precisely where a rank-up happens.
-   */
   rankUp: string;
-  /** Which banner it is, so a personal best does not read as a rank-up. */
-  rankUpKind: "rank" | "best";
-  /**
-   * The nearest "can you beat this?" mark ahead of the bird, or null when nothing
-   * is close enough to be worth counting down to (`BEAT_CUE_WINDOW`). The flag
-   * itself stands in the world (`BeatLine.ts`); this is the number under it.
-   */
-  beatLine: { kind: string; label: string; metres: string; gap: number } | null;
   nearMiss: string;
-  /**
-   * What this flight grew, ranked into one celebration by `ProgressBeats.ts`.
-   * `staged` reveals in order on the results card, `ledger` carries the rest as
-   * compact chips, so a run that moves four ladders shows four ladders instead of
-   * two — the toast layer's cap used to evict the rarest ones.
-   */
-  celebration: CelebrationView;
-  /** Career-wings proximity: the rung's last stretch, filling during the flight. */
-  proximity: { visible: boolean; fill: number; remaining: number; name: string };
   skillLabel: string;
   skill: number;
   bestAltitude: number;
   bestCombo: number;
   runGems: number;
-  /**
-   * This flight's moments, loudest first (see `Moments.ts`). The results card
-   * turns them into the "what was funny" strip and into the next-action CTA, so
-   * a run full of BONKs sells a shield and a record run asks to be shared.
-   */
-  moments: MomentTally[];
-  /**
-   * Clip-worthy beats this flight (see `Moments.ts` clip table). Independent of
-   * `moments` so a comedy ledger cannot be rewritten by a new shareable kind.
-   */
-  clips: ClipTally[];
-  /** 0..100 share heat for this recap. 0 while flying. */
-  viralScore: number;
-  /**
-   * True while trailing AI rivals get a catch-up push in this race. Disclosed
-   * wherever a race is offered or reported: an assist nobody mentioned is not a
-   * difficulty curve, and it must never be active in a rated race.
-   */
-  packBalancing: boolean;
   /* --- competitive --- */
   pilotName: string;
   board: BoardPage | null;
@@ -522,7 +453,6 @@ export class HUD {
   private coinsEl!: HTMLElement;
   private bestEl!: HTMLElement;
   private islandEl!: HTMLElement;
-  private islandFillEl!: HTMLElement;
   private multEl!: HTMLElement;
   private goldChip!: HTMLElement;
   private vipChip!: HTMLElement;
@@ -536,12 +466,7 @@ export class HUD {
   private ringChainCount!: HTMLElement;
   private ringChainFill!: HTMLElement;
   private slopeChainEl!: HTMLElement;
-  private inflightShopEl!: HTMLElement;
   private hintEl!: HTMLElement;
-  private onboardingEl!: HTMLElement;
-  private lastOnboarding = "";
-  private lastTimePressure = -1;
-  private hudToast(text: string, tone: string): void { this.toast(text, tone as "gold" | "power" | "info" | "warn" | "zenith"); }
   private menuEl!: HTMLElement;
   private menuCard!: HTMLElement;
   private pauseEl!: HTMLElement;
@@ -572,7 +497,6 @@ export class HUD {
   private comboEl!: HTMLElement;
   private biomeChip!: HTMLElement;
   private speedLines!: HTMLElement;
-  private warpVignette!: HTMLElement;
   private handEl!: HTMLElement;
   private altGauge!: HTMLElement;
   private altFill!: HTMLElement;
@@ -585,7 +509,6 @@ export class HUD {
   private goalStrip!: HTMLElement;
   private goalPop!: HTMLElement;
   private rankUp!: HTMLElement;
-  private lastRankUp = "";
   private standingsEl!: HTMLElement;
   private rosterBar!: HTMLElement;
   private matchmakingEl!: HTMLElement;
@@ -597,9 +520,6 @@ export class HUD {
   private matchmakingKeep!: HTMLElement;
   private matchmakingReady!: HTMLElement;
   private draftMeter!: HTMLElement;
-  private wingsNear!: HTMLElement;
-  /** Quantized proximity key, so a 60 fps flight does not churn the DOM. */
-  private lastWingsNear = "";
   private finishCd!: HTMLElement;
   private lastFinishCd = "";
   private emoteWheel!: HTMLElement;
@@ -653,6 +573,8 @@ export class HUD {
   private contTimerEl: HTMLElement | null = null;
   private adBarEl: HTMLElement | null = null;
   private adSkipEl: HTMLButtonElement | null = null;
+  private adHeaderEl: HTMLElement | null = null;
+  private adLabelEl: HTMLElement | null = null;
   private lastKey = "";
   private lastHint = "";
   private readonly shopBrowse = newShopBrowse();
@@ -679,7 +601,7 @@ export class HUD {
           <div class="sun-meter" title="Daylight">
             <div class="sun-track">
               <div class="sun-fill" data-ref="sunFill"></div>
-              <div class="sun-knob" data-ref="sunKnob">☀</div>
+              <div class="sun-knob" data-ref="sunKnob">${menuIcon("daily")}</div>
             </div>
             <div class="sun-caption">${t("hud.stat.daylight", undefined, "daylight")}</div>
           </div>
@@ -689,13 +611,12 @@ export class HUD {
           </div>
         </div>
         <div class="speedlines" data-ref="speedlines"></div>
-        <div class="warp-vignette" data-ref="warpVignette"></div>
         <div class="alt-gauge" data-ref="altGauge">
           <div class="alt-track">
             <span class="alt-zone z4"></span><span class="alt-zone z3"></span>
             <span class="alt-zone z2"></span><span class="alt-zone z1"></span>
             <i class="alt-fill" data-ref="altFill"></i>
-            <b class="alt-bird" data-ref="altBird">🐦</b>
+            <b class="alt-bird" data-ref="altBird">${menuIcon("bird")}</b>
           </div>
           <div class="alt-read" data-ref="altRead">0 m</div>
         </div>
@@ -703,8 +624,6 @@ export class HUD {
         <div class="power-strip" data-ref="powerStrip"></div>
         <div class="goal-strip" data-ref="goalStrip"></div>
         <div class="goal-pop" data-ref="goalPop" role="status" aria-live="polite" aria-atomic="true"></div>
-        <!-- Deliberately NOT in the flight-messages lane: that lane's children
-             share one arbitrated slot, and a rank-up must never lose it. -->
         <div class="rank-up" data-ref="rankUp" role="status" aria-live="polite" aria-atomic="true"></div>
         <div class="countdown" data-ref="countdown"></div>
         <div class="versus-bar hidden" data-ref="versusBar"></div>
@@ -712,7 +631,6 @@ export class HUD {
         <div class="roster-bar hidden" data-ref="rosterBar"></div>
         <div class="rival-nametag-container" data-ref="nametags"></div>
         <div class="draft-meter hidden" data-ref="draftMeter"><i></i><span>SLIPSTREAM</span></div>
-        <div class="wings-near hidden" data-ref="wingsNear"><i></i><span></span></div>
         <div class="finish-countdown hidden" data-ref="finishCd"></div>
         <div class="emote-bubble hidden" data-ref="emoteBubble" role="status" aria-live="polite" aria-atomic="true"></div>
         <div class="emote-wheel hidden" data-ref="emoteWheel">
@@ -720,7 +638,7 @@ export class HUD {
           <div class="emote-options hidden" id="flight-emotes">${[["👋", "Wave"], ["🔥", "Fire"], ["😂", "Laugh"], ["🙌", "Bravo"], ["👑", "Crown"], ["🤝", "GG"]].map(([icon, label]) => `<button data-ui data-action="emote" data-id="${icon}" aria-label="Send ${label}" title="Send ${label}">${icon} ${label}</button>`).join("")}</div>
         </div>
         <div class="mid-meta">
-          <div class="island-chip" data-ref="island">Island 1 <i><b data-ref="islandFill"></b></i></div>
+          <div class="island-chip" data-ref="island">Island 1</div>
           <div class="biome-chip" data-ref="biome"></div>
           <div class="mult-chip" data-ref="mult">×1.0</div>
           <div class="gold-chip hidden" data-ref="goldChip">✦ GOLD</div>
@@ -740,12 +658,11 @@ export class HUD {
           <div class="fever-label">FEVER</div>
           <div class="fever-bar"><div class="fever-fill" data-ref="feverFill"></div></div>
         </div>
-        <button class="icon-btn mute-btn" data-ui data-action="set-mute" data-ref="muteBtn" aria-label="Mute sound" title="Mute sound">🔊</button>
+        <button class="icon-btn mute-btn" data-ui data-action="set-mute" data-ref="muteBtn" aria-label="Mute sound" title="Mute sound"><span class="audio-glyph" aria-hidden="true"></span></button>
         <button class="icon-btn pause-btn" data-ui data-action="pause" data-ref="pauseBtn" aria-label="Pause">❙❙</button>
-        <div class="inflight-shop hidden" data-ref="inflightShop" data-hud-id="inFlightShop"></div>
         <div class="combo" data-ref="combo"></div>
         <div class="hint" data-ref="hint" role="status" aria-live="polite" aria-atomic="true"></div>
-        <div class="hand" data-ref="hand">☝<span class="hand-hint">${t("hud.hand.hint", undefined, "Tap · Space · ↑")}</span></div>
+        <div class="hand" data-ref="hand">☝<span class="hand-hint">Tap · Space · ↑</span></div>
       </div>
 
       <div class="overlay menu hidden" data-ref="menu"><div class="paper-card" data-ref="menuCard"></div></div>
@@ -761,43 +678,43 @@ export class HUD {
             <span class="prs"><em>Combo</em><b data-ref="pauseCombo">×1</b></span>
           </div>
           <div class="pause-actions">
-            <button class="primary-btn pause-resume" data-ui data-action="resume">▶ Keep flying</button>
+            <button class="primary-btn pause-resume" data-ui data-action="resume"><span class="pause-action-icon">${menuIcon("flight")}</span>Keep flying</button>
           </div>
           <div class="pause-quick-grid" role="group" aria-label="Quick access">
             <button class="pause-q pause-mute" data-ui data-action="set-mute" data-ref="pauseMute" aria-pressed="false">
-              <i data-ref="pauseMuteIco">🔊</i><span data-ref="pauseMuteLbl">Sound on</span>
+              <i data-ref="pauseMuteIco">${menuIcon("sound")}</i><span data-ref="pauseMuteLbl">Sound on</span>
             </button>
             <button class="pause-q" data-ui data-action="pause-to" data-id="settings">
-              <i>⚙</i><span>Settings</span>
+              <i>${menuIcon("settings")}</i><span>Settings</span>
             </button>
             <button class="pause-q" data-ui data-action="pause-to" data-id="shop">
-              <i>🛍</i><span>Shop</span>
+              <i>${menuIcon("shop")}</i><span>Shop</span>
             </button>
             <button class="pause-q" data-ui data-action="pause-to" data-id="board">
-              <i>🌐</i><span>Global Board</span>
+              <i>${menuIcon("board")}</i><span>Global Board</span>
             </button>
             <button class="pause-q" data-ui data-action="pause-to" data-id="scores">
-              <i>🏆</i><span>My Scores</span>
+              <i>${menuIcon("scores")}</i><span>My Scores</span>
             </button>
             <button class="pause-q" data-ui data-action="pause-to" data-id="pass">
-              <i>🎟</i><span>Nest Pass</span>
+              <i>${menuIcon("pass")}</i><span>Nest Pass</span>
             </button>
             <button class="pause-q" data-ui data-action="pause-to" data-id="squad">
-              <i>🐦</i><span>Squad</span>
+              <i>${menuIcon("squad")}</i><span>Squad</span>
             </button>
             <button class="pause-q" data-ui data-action="pause-to" data-id="trophies">
-              <i>🏅</i><span>Trophies</span>
+              <i>${menuIcon("medal")}</i><span>Trophies</span>
             </button>
             <button class="pause-q" data-ui data-action="pause-to" data-id="progress">
-              <i>📈</i><span>Progress</span>
+              <i>${menuIcon("progress")}</i><span>Progress</span>
             </button>
             <button class="pause-q" data-ui data-action="toggle-fullscreen">
-              <i>⛶</i><span>Fullscreen</span>
+              <i>${menuIcon("fullscreen")}</i><span>Fullscreen</span>
             </button>
           </div>
           <div class="pause-exit-row">
-            <button class="soft-btn" data-ui data-action="restart-flight">↻ Restart flight</button>
-            <button class="ghost-btn danger-btn" data-ui data-action="menu">✕ Exit to menu</button>
+            <button class="soft-btn" data-ui data-action="restart-flight"><span class="pause-inline-icon">${menuIcon("flight")}</span>Restart flight</button>
+            <button class="ghost-btn danger-btn" data-ui data-action="menu"><span class="pause-inline-icon">${menuIcon("daily")}</span>Exit to menu</button>
           </div>
           <p class="pause-exit-note">Resume keeps your momentum. Restart begins a fresh flight. Exit returns you to the launch pad.</p>
         </div>
@@ -807,7 +724,6 @@ export class HUD {
       <div class="overlay ad hidden" data-ref="ad"><div class="ad-card" data-ref="adCard"></div></div>
       <div class="overlay gameover hidden" data-ref="over"><div class="paper-card" data-ref="overCard"></div></div>
 
-      <div class="onboarding hidden" data-ref="onboarding" role="dialog" aria-modal="true" aria-live="polite"></div>
       <div class="toasts" data-ref="toasts"></div>
       <div class="flash" data-ref="flash"></div>
       <div class="impact-popups" data-ref="impactPopups"></div>
@@ -846,16 +762,12 @@ export class HUD {
     // to be kept in sync with the button row's height.
     const header = lane("hud-header", [".top-bar", ".power-strip", ".mid-meta", ".power-chips", ".roster-bar", ".versus-bar"]);
     lane("flight-messages", [".launch-banner", ".hint", ".goal-pop", ".finish-countdown", ".countdown"]);
-<<<<<<< HEAD
     // `.fever-wrap` stays in the footer lane: it is `position: static` there
     // (see `.flight-footer .fever-wrap`), so it is a flow child of the footer.
     // Moving it out made the absolutely-positioned base rule resolve against
     // `.play-hud` (`inset: 0`), which parked the meter at `top: 100%` — one
     // screen below the viewport, invisible while fever was active.
     const footer = lane("flight-footer", [".goal-strip", ".draft-meter", ".fever-wrap", ".emote-wheel"]);
-=======
-    const footer = lane("flight-footer", [".goal-strip", ".inflight-shop", ".draft-meter", ".fever-wrap", ".emote-wheel"]);
->>>>>>> origin/main
     // The menu backdrop is the LIVE 3D gameplay world (Game.menuTick attract
     // flight): the painted 2D sky canvas stays OUT of the DOM so it never
     // covers the world, and its loop never starts. The hero-bird overlay
@@ -1123,12 +1035,18 @@ export class HUD {
   updateNameTags(tags: RivalNameTag[], camera: THREE.Camera, width: number, height: number): void {
     const container = this.root.querySelector<HTMLElement>('[data-ref="nametags"]');
     if (!container) return;
+    // A root re-render (flushCaches) replaces the container's children — the
+    // cached elements are detached; drop the caches and start fresh.
     if (!container.childElementCount && this.nameTagEls.size > 0) {
       this.nameTagEls.clear();
       this.nameTagKeys.clear();
     }
-    // Hexagonal: layout engine prevents name overlap — chaos-free zero tolerance
-    const projected: { id: string; x: number; y: number; tag: RivalNameTag }[] = [];
+    // DOM reuse: positions are cheap style writes (composited), while the
+    // tag CONTENT is only re-parsed when rank/name/emote/draft actually
+    // changes. The old version rebuilt container.innerHTML 60x/second in a
+    // packed field — a full HTML parse + node churn on every frame, which is
+    // where mobile PVP frame times went to die.
+    const seen = new Set<string>();
     for (const tag of tags ?? []) {
       this.tmpNameTagVec.set(tag.worldX, tag.worldY, -3.5);
       this.tmpNameTagVec.project(camera);
@@ -1136,29 +1054,8 @@ export class HUD {
       const px = ((this.tmpNameTagVec.x + 1) * width) / 2;
       const py = ((-this.tmpNameTagVec.y + 1) * height) / 2;
       if (px < -60 || px > width + 60 || py < -60 || py > height + 60) continue;
-      projected.push({ id: tag.id, x: px, y: py, tag });
-    }
-    // Sort by place (leaders first) so overlap resolution keeps leaders visible
-    projected.sort((a, b) => a.tag.place - b.tag.place);
-    // Simple collision avoidance: if two tags within 80x28, offset second vertically
-    const placed: { x: number; y: number }[] = [];
-    for (const p of projected) {
-      let ny = p.y;
-      for (let attempt = 0; attempt < 4; attempt++) {
-        let collides = false;
-        for (const pl of placed) {
-          if (Math.abs(pl.x - p.x) < 80 && Math.abs(pl.y - ny) < 26) { collides = true; break; }
-        }
-        if (!collides) break;
-        ny -= 28; // stack upward
-      }
-      placed.push({ x: p.x, y: ny });
-      p.y = ny;
-    }
-    const seen = new Set<string>();
-    for (const proj of projected) {
-      const tag = proj.tag;
       seen.add(tag.id);
+
       let el = this.nameTagEls.get(tag.id);
       if (!el) {
         el = document.createElement("div");
@@ -1167,8 +1064,9 @@ export class HUD {
         this.nameTagEls.set(tag.id, el);
         this.nameTagKeys.set(tag.id, "");
       }
-      el.style.left = `${proj.x.toFixed(1)}px`;
-      el.style.top = `${proj.y.toFixed(1)}px`;
+      el.style.left = `${px.toFixed(1)}px`;
+      el.style.top = `${py.toFixed(1)}px`;
+
       const key = `${tag.place}|${tag.name}|${tag.emote}|${tag.drafting ? 1 : 0}`;
       if (this.nameTagKeys.get(tag.id) !== key) {
         this.nameTagKeys.set(tag.id, key);
@@ -1183,41 +1081,6 @@ export class HUD {
         el.remove();
         this.nameTagEls.delete(id);
         this.nameTagKeys.delete(id);
-      }
-    }
-  }
-
-  private layoutRaf = 0;
-  private lastLayoutW = 0;
-  private lastLayoutH = 0;
-
-  private ensureLayout(): void {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    if (w === this.lastLayoutW && h === this.lastLayoutH) return;
-    this.lastLayoutW = w;
-    this.lastLayoutH = h;
-    // Hexagonal: compute layout dynamically, aware of pause/mute, zero tolerance for overlap
-    const pauseEl = this.root.querySelector<HTMLElement>('[data-ref="pauseBtn"]');
-    const muteEl = this.root.querySelector<HTMLElement>('[data-ref="muteBtn"]');
-    const pauseRect = pauseEl?.getBoundingClientRect();
-    const muteRect = muteEl?.getBoundingClientRect();
-    const controls = {
-      pause: { x: pauseRect ? pauseRect.left : w - 60, y: pauseRect ? pauseRect.top : 12, w: pauseRect?.width ?? 44, h: pauseRect?.height ?? 44 },
-      mute: { x: muteRect ? muteRect.left : w - 112, y: muteRect ? muteRect.top : 12, w: muteRect?.width ?? 44, h: muteRect?.height ?? 44 },
-    };
-    const elements: HudElement[] = [
-      { id: "topBar", zone: "header", priority: 1, minWidth: 200, minHeight: 60, visible: true, wants: { width: w - 24, height: 64 } },
-      { id: "powerStrip", zone: "topRight", priority: 1, minWidth: 80, minHeight: 32, visible: true, wants: { width: w < 400 ? 140 : 200, height: 36 } },
-      { id: "goalStrip", zone: "footer", priority: 1, minWidth: 200, minHeight: 32, visible: true, wants: { width: Math.min(340, w * 0.74), height: 48 } },
-      { id: "inFlightShop", zone: "footer", priority: 2, minWidth: 200, minHeight: 40, visible: true, wants: { width: Math.min(360, w - 24), height: 44 } },
-    ];
-    const layout = computeHudLayout({ width: w, height: h, safeTop: 12, safeBottom: 12 }, elements, controls);
-    // Apply visibility from layout — chaos-free
-    for (const [id, pos] of layout.elements) {
-      const el = this.root.querySelector<HTMLElement>(`[data-hud-id="${id}"]`);
-      if (el) {
-        el.style.display = pos.visible ? "" : "none";
       }
     }
   }
@@ -1281,7 +1144,7 @@ export class HUD {
       if (this.pauseMuteShown !== muted) {
         this.pauseMuteShown = muted;
         this.pauseMuteBtn.setAttribute("aria-pressed", String(muted));
-        this.pauseMuteIco.textContent = muted ? "🔇" : "🔊";
+        this.pauseMuteIco.innerHTML = menuIcon(muted ? "soundOff" : "sound");
         this.pauseMuteLbl.textContent = muted ? "Sound off" : "Sound on";
       }
     }
@@ -1300,36 +1163,12 @@ export class HUD {
     this.adEl.classList.toggle("hidden", s.state !== "ad");
     this.overEl.classList.toggle("hidden", !(s.state === "gameover" && s.screen === "main"));
 
-    // Dynamic fit — hexagonal layout engine, aware of pause/mute
-    if (this.layoutRaf === 0) {
-      this.layoutRaf = window.requestAnimationFrame(() => {
-        this.layoutRaf = 0;
-        this.ensureLayout();
-      });
-    }
     if (inPlay) {
-<<<<<<< HEAD
       this.setText(this.distanceEl, "dist", distanceText(s.distance));
       this.setText(this.coinsEl, "coins", formatNumberLocalized(s.coins));
       this.setText(this.bestEl, "best", distanceText(s.bestDistance));
-=======
-      this.setText(this.distanceEl, "dist", formatDistance(s.distance));
-      this.setText(this.coinsEl, "coins", String(s.coins));
-      this.setText(this.bestEl, "best", formatDistance(s.bestDistance));
-      // Island progress bar: localX / ISLAND_PERIOD = % to next island (goal gradient)
-      const localX = s.distance % 920; // ISLAND_PERIOD
-      const islandPct = Math.max(0, Math.min(100, (localX / 920) * 100));
->>>>>>> origin/main
       this.setText(this.islandEl, "island", `Island ${s.island + 1}`);
-      this.setStyle(this.islandFillEl, "islandFill", "width", `${islandPct.toFixed(1)}%`);
-      // Chaos-free: combo and mult share one slot — when chaining, show ×N chain, otherwise ×1.0 mult
-      if (s.combo >= 2) {
-        this.setText(this.multEl, "mult", `×${s.combo} chain`);
-        this.multEl.classList.add("combo-active");
-      } else {
-        this.setText(this.multEl, "mult", `×${s.multiplier.toFixed(1)}`);
-        this.multEl.classList.remove("combo-active");
-      }
+      this.setText(this.multEl, "mult", `×${s.multiplier.toFixed(1)}`);
       this.goldChip.classList.toggle("hidden", !s.gold);
       this.vipChip.classList.toggle("hidden", !s.vip);
       if (this.vipChip.textContent !== `♛ VIP · ${s.vipDaysLeft}d`) this.vipChip.textContent = `♛ VIP · ${s.vipDaysLeft}d`;
@@ -1341,18 +1180,6 @@ export class HUD {
         this.ghostChip.textContent = `👻 ${ahead ? "+" : ""}${Math.round(s.ghostDelta)}m`;
         this.ghostChip.classList.toggle("ahead", ahead);
         this.ghostChip.classList.toggle("behind", !ahead);
-      }
-      // Time pressure + funny praise — want to beat time
-      if (s.timePressure) {
-        // Show as toast if close to best or beating
-        if (s.timePressure.kind === "beating" || s.timePressure.kind === "nearBest") {
-          // Only toast every ~8s to avoid spam, use runTime as throttle
-          const now = Math.floor(s.runTime / 8);
-          if (now !== this.lastTimePressure) {
-            this.lastTimePressure = now;
-            this.hudToast(s.timePressure.text, s.timePressure.tone as "gold" | "power" | "info" | "warn" | "zenith");
-          }
-        }
       }
 
       const day = Math.min(1, s.daylight / s.daylightMax);
@@ -1392,32 +1219,22 @@ export class HUD {
       if (s.inThermal) chips.push(`<span class="pchip thermal">♨ thermal — release!</span>`);
       const html = chips.join("");
 
-      // Combo merged into mult chip — hide standalone combo to prevent ×2 ×3 overlap
       if (s.combo !== this.lastCombo) {
         this.lastCombo = s.combo;
-        this.comboEl.textContent = "";
-        this.comboEl.classList.remove("show", "pop");
+        this.comboEl.textContent = s.combo >= 2 ? `×${s.combo} chain` : "";
+        this.comboEl.classList.toggle("show", s.combo >= 2);
         if (s.combo >= 2) {
-          // Pop the mult chip instead
-          this.multEl.classList.remove("pop");
-          void this.multEl.offsetWidth;
-          this.multEl.classList.add("pop");
+          this.comboEl.classList.remove("pop");
+          void this.comboEl.offsetWidth;
+          this.comboEl.classList.add("pop");
         }
       }
-      const biomeTxt = `${s.biomeEmoji} ${s.biomeName}`;
+      const biomeTxt = s.biomeName;
       if (biomeTxt !== this.lastBiome) {
         this.lastBiome = biomeTxt;
-        this.biomeChip.textContent = biomeTxt;
+        this.biomeChip.innerHTML = `<span class="biome-art">${menuIcon("atlas")}</span><span>${escapeHtml(biomeTxt)}</span>`;
       }
-      // Speed FX. Both curves live in SpeedFeel.ts so the streaks, the warp
-      // vignette, the camera FOV and the whoosh layer all lean in at the same
-      // speeds instead of each inventing its own threshold. The values are
-      // quantised before they reach the DOM: `setStyle` caches by string, and
-      // an unrounded opacity would write a new style every single frame.
-      const streak = Math.round(streakOpacity(s.speedNorm) * 100) / 100;
-      this.setStyle(this.speedLines, "speedlines", "opacity", streak.toFixed(2));
-      const vignette = Math.round(vignetteIntensity(s.speedNorm) * 100) / 100;
-      this.setStyle(this.warpVignette, "warpVignette", "opacity", vignette.toFixed(2));
+      this.setStyle(this.speedLines, "speedlines", "opacity", String(Math.max(0, (s.speedNorm - 0.55) * 1.6)));
 
       // altitude gauge (log-ish so low hops still read, big launches still climb)
       const aN = Math.min(1, Math.pow(s.altitude / 340, 0.65));
@@ -1443,24 +1260,6 @@ export class HUD {
           )
           .join("");
       }
-      // In-flight shop — game-changing: buy powerups mid-flight
-      if (s.state === "playing" || s.state === "paused") {
-        this.inflightShopEl.classList.remove("hidden");
-        const coins = s.coins;
-        // Simple inline render — modular domain would be InFlightShopDomain but we keep it lean for perf
-        const defs = [
-          { id: "boost", icon: "🚀", name: "Boost", cost: 35, desc: "+30 speed 5s" },
-          { id: "magnet", icon: "🧲", name: "Magnet", cost: 25, desc: "Coins 8s" },
-          { id: "shield", icon: "🛡", name: "Shield", cost: 40, desc: "No crash 6s" },
-        ];
-        this.inflightShopEl.innerHTML = defs.map((p) => {
-          const can = coins >= p.cost;
-          return `<button class="mini-btn ${can ? "gold" : "off"}" data-ui data-action="buy-powerup" data-id="${p.id}" ${can ? "" : "disabled"} title="${p.desc}">${p.icon} ${p.cost}</button>`;
-        }).join("");
-      } else {
-        this.inflightShopEl.classList.add("hidden");
-        this.inflightShopEl.innerHTML = "";
-      }
 
       const cd = s.countdown > 0 ? String(Math.ceil(s.countdown)) : "";
       if (cd !== this.lastCountdown) {
@@ -1484,117 +1283,30 @@ export class HUD {
         }
       }
 
-      // Three live goals, closest first — not just the nearest one.
-      //
-      // `SessionGoals` already keeps three in flight and refills a slot the
-      // instant it is completed ("the list must never be empty"), which is the
-      // loop that made Jetpack Joyride's mission system the reason people flew
-      // "one more game". Rendering only the lead goal threw two thirds of it
-      // away: a run where the lead goal is hopeless but another is 80 % done had
-      // nothing on screen to chase. Rows are re-ranked by fill so the closest is
-      // always first, which is where a short viewport condenses to (§ CSS).
-      //
-      // The career rung rides underneath: the one number in the game that only
-      // ever goes up, so a run that misses every goal still visibly moved
-      // something. docs/audits/PROGRESSION_FEEL_2026-09-24.md.
-      // Jetpack Joyride shows 3 active missions per run, visible in-run, 1-3 stars each,
-      // stars → level up → coin reward. Tiny Wings shows island counter. Best practice:
-      // show 2 missions max in flight (primary + secondary) to avoid clutter, but
-      // keep 3 active in session (refill instantly on complete — endless completion).
-      // One primary chase + one secondary is readable at 60fps on phone, 3 would be
-      // chaos on narrow viewports. Career rung underneath = number that only goes up.
-      const ranked = s.sessionGoals
-        .filter((g) => !g.done && g.target > 0)
-        .map((g) => ({ g, pct: Math.max(0, Math.min(1, g.progress / g.target)) }))
-        .sort((a, b) => b.pct - a.pct)
-        .slice(0, 2); // 2 missions visible in-run (was 1, now 2 for richer chase)
-      const career =
-        s.wings.nextNeeded > 0
-          ? {
-              pct: Math.max(0, Math.min(1, s.wings.progress)),
-              label: `${s.wings.name} → ${s.wings.nextName}`,
-              gap: formatDistance(s.wings.nextNeeded),
-            }
-          : null;
-      // Quantized key: rebuild the markup when a row set, a 5 % step or the
-      // career gap changes, and write nothing at all on the frames between.
-      // The nearest "can you beat this?" mark ahead: the flag stands in the world
-      // (BeatLine.ts), this row is the countdown to it, and it only exists inside
-      // the cue window — a mark 3 km away is scenery, not a goal.
-      const beat = s.beatLine;
-      // Quantized to 25 m so a countdown ticking every frame cannot rebuild the
-      // strip 60 times a second — the same discipline as the 5 % fill steps, and
-      // coarser than them, because a gap closes faster than a bar fills.
-      const beatStep = beat ? Math.ceil(Math.max(0, beat.gap) / 25) * 25 : 0;
-      const gk =
-        ranked.map((r) => `${r.g.id}:${Math.floor(r.pct * 20)}`).join("|") +
-        (career ? `#c${Math.floor(career.pct * 20)}:${career.gap}` : "") +
-        (beat ? `#b${beat.kind}:${beatStep}` : "");
+      // Surface only the goal nearest completion — a single, always-open loop.
+      let lead: SessionGoal | null = null;
+      for (const g of s.sessionGoals) {
+        if (g.done) continue;
+        if (!lead || g.progress / g.target > lead.progress / lead.target) lead = g;
+      }
+      const gk = lead ? `${lead.id}:${Math.floor((lead.progress / lead.target) * 20)}` : "";
       if (gk !== this.lastGoals) {
         this.lastGoals = gk;
-        // Max 2 rows: beat + closest goal, or closest goal + career. Never 3-5.
-        // Beat is the "can you beat this?" flag in the world — when it's close,
-        // it's more exciting than the career rung, so career yields.
-        const showCareer = !beat && career;
-        this.goalStrip.innerHTML =
-          // First row, so a short viewport — which keeps only :first-child —
-          // shows the mark about to be flown past rather than a goal 40 % done.
-          (beat
-            ? `<span class="gs gs-beat ${beatStep <= 100 ? "close" : ""}">` +
-              `<em>${escapeHtml(beat.label)}</em>` +
-              `<i><b style="width:${(Math.max(0, Math.min(1, 1 - beatStep / BEAT_CUE_WINDOW)) * 100).toFixed(1)}%"></b></i>` +
-              `<u>${formatDistance(beatStep)} to go</u></span>`
-            : "") +
-          ranked
-            .map((r) => {
-              const pct = r.pct * 100;
-              return (
-                `<span class="gs ${pct >= 70 ? "close" : ""}">` +
-                `<em>${escapeHtml(r.g.label)}</em>` +
-                `<i><b style="width:${pct.toFixed(1)}%"></b></i>` +
-                `<u>${Math.round(r.g.progress)}/${r.g.target} · +${r.g.reward}</u>` +
-                `</span>`
-              );
-            })
-            .join("") +
-          (showCareer
-            ? `<span class="gs gs-career"><em>${escapeHtml(career!.label)}</em>` +
-              `<i><b style="width:${(career!.pct * 100).toFixed(1)}%"></b></i>` +
-              `<u>${career!.gap} to go</u></span>`
-            : "");
-      }
-      if (s.rankUp !== this.lastRankUp) {
-        this.lastRankUp = s.rankUp;
-        this.rankUp.textContent = s.rankUp;
-        this.rankUp.className = `rank-up ${s.rankUp ? `show kind-${s.rankUpKind}` : ""}`;
+        if (lead) {
+          const pct = Math.min(100, (lead.progress / lead.target) * 100);
+          const close = pct >= 70;
+          this.goalStrip.innerHTML = `<span class="gs ${close ? "close" : ""}"><em>${lead.label}</em><i><b style="width:${pct}%"></b></i></span>`;
+        } else {
+          this.goalStrip.innerHTML = "";
+        }
       }
       if (s.goalPop !== this.lastGoalPop) {
         this.lastGoalPop = s.goalPop;
         this.goalPop.textContent = s.goalPop;
         this.goalPop.className = `goal-pop ${s.goalPop ? `show kind-${s.goalPopKind}` : ""}`;
       }
-
-      // Career-wings proximity: the last stretch of the rung, filling while the
-      // player flies. Quantized to whole percent and 10 m so the bar reads as a
-      // bar and the label does not blur, and written only when either changes.
-      const nearKey = s.proximity.visible
-        ? `${Math.round(s.proximity.fill * 100)}:${Math.round(s.proximity.remaining / 10)}`
-        : "";
-      if (nearKey !== this.lastWingsNear) {
-        this.lastWingsNear = nearKey;
-        this.wingsNear.classList.toggle("hidden", !s.proximity.visible);
-        if (s.proximity.visible) {
-          const bar = this.wingsNear.firstElementChild as HTMLElement | null;
-          if (bar) bar.style.width = `${Math.round(s.proximity.fill * 100)}%`;
-          const label = t(
-            "hud.progress.proximity",
-            { n: s.proximity.remaining, name: s.proximity.name },
-            "{{n}} m to {{name}}",
-          );
-          const text = this.wingsNear.lastElementChild;
-          if (text && text.textContent !== label) text.textContent = label;
-        }
-      }
+      this.rankUp.textContent = s.rankUp;
+      this.rankUp.classList.toggle("show", Boolean(s.rankUp));
 
       // Top-of-screen bird roster: every pilot as a live bird pip on the race
       // line, with your place badge and the gap to the leader. Rebuilds are
@@ -1718,16 +1430,6 @@ export class HUD {
         this.hintEl.textContent = s.hint;
         this.hintEl.classList.toggle("show", Boolean(s.hint));
       }
-      if ((s.onboardingTip?.id ?? "") !== this.lastOnboarding) {
-        this.lastOnboarding = s.onboardingTip?.id ?? "";
-        if (!s.onboardingTip) {
-          this.onboardingEl.classList.add("hidden");
-          this.onboardingEl.innerHTML = "";
-        } else {
-          this.onboardingEl.classList.remove("hidden");
-          this.onboardingEl.innerHTML = `<div class="onboarding-card"><div class="onboarding-kicker">💡 ${escapeHtml(t("onboarding.tip", undefined, "Tip"))}</div><h3>${escapeHtml(s.onboardingTip.title)}</h3><p>${escapeHtml(s.onboardingTip.body)}</p><div class="onboarding-actions"><button class="primary-btn" data-ui data-action="onboarding-dismiss" data-id="${escapeHtml(s.onboardingTip.id)}">${escapeHtml(t("onboarding.gotIt", undefined, "Got it ✓"))}</button><button class="soft-btn" data-ui data-action="onboarding-skip">${escapeHtml(t("onboarding.skipTips", undefined, "Skip tips"))}</button></div></div>`;
-        }
-      }
     }
 
     if (s.state === "continue" && this.contTimerEl) {
@@ -1735,14 +1437,27 @@ export class HUD {
       if (this.contTimerEl.textContent !== txt) this.contTimerEl.textContent = txt;
     }
     if (s.state === "ad") {
-      const running = s.adTimer > 0;
-      const p = running ? 1 - Math.max(0, s.adTimer) / Math.max(0.01, s.adTotal) : 0;
+      const done = s.adTimer <= 0;
+      // A finished break is 100% progress, not 0% — the bar used to snap back
+      // to empty the instant the timer hit zero, which read as "the ad reset
+      // and started over" right when the player was about to be let out.
+      const p = done ? 1 : 1 - Math.max(0, s.adTimer) / Math.max(0.01, s.adTotal);
       if (this.adBarEl) this.adBarEl.style.width = `${p * 100}%`;
       if (this.adSkipEl && s.adSkippable) {
-        const done = s.adTimer <= 0;
         this.adSkipEl.disabled = !done;
         const txt = done ? (s.adReason === "continue" ? "Wake up ▶" : "Continue ▶") : `Continues in ${Math.ceil(s.adTimer)}`;
         if (this.adSkipEl.textContent !== txt) this.adSkipEl.textContent = txt;
+      }
+      // The header/label are baked into the initial render and, unlike the bar
+      // and skip button above, were never touched again — so a placeholder
+      // break (no portal SDK) sat on "Your ad is loading" with a spinning
+      // spinner for its entire duration, including the seconds after it had
+      // already finished and "Wake up" was clickable. That reads as a hung ad,
+      // which is exactly the bug report this fixes.
+      if (s.portalName === "none" && done) {
+        if (this.adHeaderEl && this.adHeaderEl.textContent !== "Ready!") this.adHeaderEl.textContent = "Ready!";
+        const label = s.adReason === "continue" ? "Sponsored break · your second wind is ready" : "Sponsored break · ready to fly";
+        if (this.adLabelEl && this.adLabelEl.textContent !== label) this.adLabelEl.textContent = label;
       }
     }
     this.overlayNavigation.sync(this.copyDialog ?? (this.matchmakingEl.classList.contains("hidden") ? this.root.querySelector<HTMLElement>(".overlay:not(.hidden)") : this.matchmakingEl));
@@ -1852,6 +1567,8 @@ export class HUD {
       this.adCard.innerHTML = renderCoins(renderAd(s));
       this.adBarEl = this.adCard.querySelector('[data-live="adBar"]');
       this.adSkipEl = this.adCard.querySelector('[data-live="adSkip"]');
+      this.adHeaderEl = this.adCard.querySelector(".portal-ad-wait h3");
+      this.adLabelEl = this.adCard.querySelector(".ad-label");
     }
     if (s.state === "playing") this.lastChips = "";
   }
@@ -1867,8 +1584,6 @@ export class HUD {
         return renderCheckout(s);
       case "settings":
         return renderSettings(s);
-      case "privacy":
-        return renderPrivacy(s);
       case "scores":
         return renderScores(s);
       case "pass":
@@ -1913,7 +1628,6 @@ export class HUD {
     this.coinsEl = grab("coins");
     this.bestEl = grab("best");
     this.islandEl = grab("island");
-    this.islandFillEl = grab("islandFill");
     this.multEl = grab("mult");
     this.goldChip = grab("goldChip");
     this.vipChip = grab("vipChip");
@@ -1946,13 +1660,10 @@ export class HUD {
     this.overEl = grab("over");
     this.overCard = grab("overCard");
     this.toastLayer = grab("toasts");
-    this.onboardingEl = grab("onboarding");
-    this.inflightShopEl = grab("inflightShop");
     this.flashEl = grab("flash");
     this.comboEl = grab("combo");
     this.biomeChip = grab("biome");
     this.speedLines = grab("speedlines");
-    this.warpVignette = grab("warpVignette");
     this.handEl = grab("hand");
     this.altGauge = grab("altGauge");
     this.altFill = grab("altFill");
@@ -1976,7 +1687,6 @@ export class HUD {
     this.standingsEl = grab("standings");
     this.rosterBar = grab("rosterBar");
     this.draftMeter = grab("draftMeter");
-    this.wingsNear = grab("wingsNear");
     this.finishCd = grab("finishCd");
     this.emoteWheel = grab("emoteWheel");
     this.emoteBubble = grab("emoteBubble");
@@ -2017,80 +1727,10 @@ export class HUD {
 
 /* ---------- templates ---------- */
 
-/**
- * Screen ids — the canonical English strings that `head()` and the menu's
- * destination tables (`MenuCatalog.ts`) agree on.
- *
- * They are identifiers, not copy: `head()` looks a screen's heading icon up by
- * this exact string, so it must stay stable and English. The player-facing label
- * is translated in `SCREEN_TITLES`, which is why a screen title is written
- * `head(SCREEN.leaderboard)` and never as a bare string: the i18n ratchet counts
- * `head` called with a literal as untranslated English — correctly, and it still
- * does, so a new screen written the old way shows up as debt again.
- */
-export const SCREEN = {
-  leaderboard: "Leaderboard",
-  raceLobby: "Race Lobby",
-  aiPvp: "AI PvP",
-  challenges: "Challenges",
-  campaign: "The Long Migration",
-  squad: "Squad",
-  rivalRank: "Rival Rank",
-  tournaments: "Tournaments",
-  gameModes: "Game modes",
-  atlas: "Island Atlas",
-  shop: "Shop",
-  coinStore: "Coin Store",
-  confirmUnlock: "Confirm Unlock",
-  highGlides: "High glides",
-  nestPass: "Nest Pass",
-  trophyCase: "Trophy Case",
-  account: "Account",
-} as const;
-
-/** Screen id → barrel key + English fallback. `en` must equal the barrel's
- * `sourceText` word for word; `screen-titles.test.ts` fails on drift. A screen
- * that is missing here renders its id, which is the same visible bug a raw key
- * would be — the test covers that too. */
-export const SCREEN_TITLES: Readonly<Record<string, { key: string; en: string }>> = {
-  [SCREEN.leaderboard]: { key: "hud.screen.leaderboard.title", en: "Leaderboard" },
-  [SCREEN.raceLobby]: { key: "hud.screen.raceLobby.title", en: "Race Lobby" },
-  [SCREEN.aiPvp]: { key: "hud.screen.aiPvp.title", en: "AI PvP" },
-  [SCREEN.challenges]: { key: "hud.screen.challenges.title", en: "Challenges" },
-  [SCREEN.campaign]: { key: "hud.screen.campaign.title", en: "The Long Migration" },
-  [SCREEN.squad]: { key: "hud.screen.squad.title", en: "Squad" },
-  [SCREEN.rivalRank]: { key: "hud.screen.rivalRank.title", en: "Rival Rank" },
-  [SCREEN.tournaments]: { key: "hud.screen.tournaments.title", en: "Tournaments" },
-  [SCREEN.gameModes]: { key: "hud.screen.gameModes.title", en: "Game modes" },
-  [SCREEN.atlas]: { key: "hud.screen.atlas.title", en: "Island Atlas" },
-  [SCREEN.shop]: { key: "hud.screen.shop.title", en: "Shop" },
-  [SCREEN.coinStore]: { key: "hud.screen.coinStore.title", en: "Coin Store" },
-  [SCREEN.confirmUnlock]: { key: "hud.screen.confirmUnlock.title", en: "Confirm Unlock" },
-  [SCREEN.highGlides]: { key: "hud.screen.highGlides.title", en: "High glides" },
-  [SCREEN.nestPass]: { key: "hud.screen.nestPass.title", en: "Nest Pass" },
-  [SCREEN.trophyCase]: { key: "hud.screen.trophyCase.title", en: "Trophy Case" },
-  // Reuses the menu's own key: same word, same screen, one translation.
-  [SCREEN.account]: { key: "hud.menu.account", en: "Account" },
-} as const;
-
-/**
- * The heading every screen renders: back button, icon, title, right-hand pill.
- *
- * Titles are the most-read line on a screen and all seventeen of them were
- * English on all 36 locales — the single largest block of untranslated
- * player-facing copy in the game. They are translated here, once, by id, so the
- * icon lookup against `MenuCatalog.ts` keeps working on stable English strings
- * while the player reads their own language. A caller that passes text it
- * translated itself (the settings and progress screens already do) still works:
- * an unknown id falls through unchanged.
- */
 function head(title: string, backAction = "back", right = ""): string {
   const destination = [...PLAY_DESTINATIONS, ...COLLECTION_DESTINATIONS, ...PROGRESS_DESTINATIONS].find(d => d.title === title);
-  const icon = destination?.icon ?? (title === SCREEN.raceLobby ? "online" : title === "Solo modes" ? "compass" : undefined);
-  const entry = SCREEN_TITLES[title];
-  const label = entry ? t(entry.key, undefined, entry.en) : title;
-  const back = t("common.back", undefined, "Back");
-  return `<div class="screen-head"><button class="back-btn" data-ui data-action="${backAction}" aria-label="${escapeHtml(back)}">‹</button><h2>${icon ? `<span class="heading-art">${menuIcon(icon)}</span>` : ""}${escapeHtml(label)}</h2><span>${right}</span></div>`;
+  const icon = destination?.icon ?? (title === "Race Lobby" ? "online" : title === "Solo modes" ? "compass" : undefined);
+  return `<div class="screen-head"><button class="back-btn" data-ui data-action="${backAction}" aria-label="Back">‹</button><h2>${icon ? `<span class="heading-art">${menuIcon(icon)}</span>` : ""}${title}</h2><span>${right}</span></div>`;
 }
 
 function upsellStrip(): string {
@@ -2162,11 +1802,9 @@ function escapeHtml(v: string): string {
  *  cleanly on the baseline, and never needs a fallback font. */
 const COIN_SVG =
   '<svg class="coin-glyph" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
-  '<circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.25"/>' +
-  '<circle cx="12" cy="12" r="8.2" fill="currentColor"/>' +
-  '<circle cx="12" cy="12" r="8.2" fill="none" stroke="rgba(0,0,0,0.22)" stroke-width="1.2"/>' +
-  '<path d="M7.2 12 Q12 7 16.8 12 Q12 17 7.2 12 Z" fill="rgba(255,255,255,0.55)"/>' +
-  '<circle cx="12" cy="12" r="2.2" fill="rgba(255,255,255,0.8)"/>' +
+  '<circle cx="12" cy="12" r="8.7" fill="currentColor" stroke="rgba(0,0,0,0.22)" stroke-width="1.2"/>' +
+  '<path d="M7.5 11.5Q12 7.8 16.5 11.5Q12 15.2 7.5 11.5Z" fill="rgba(255,255,255,0.58)"/>' +
+  '<circle cx="12" cy="12" r="1.8" fill="rgba(255,255,255,0.86)"/>' +
   "</svg>";
 
 /** Replace every leading bullet with the SVG coin glyph. Runs on the final
@@ -2186,11 +1824,7 @@ function renderCoins(html: string): string {
  * configured. Naming the source honestly is the difference between a board the
  * player trusts and one that looks like a placeholder.
  */
-<<<<<<< HEAD
 function boardSource(_s: HudSnapshot): { chip: string; sentence: string } {
-=======
-function boardSource(): { chip: string; sentence: string } {
->>>>>>> origin/main
   const backend = leaderboardBackend();
   if (backend === "auds") {
     return { chip: LEADERBOARD_CLOUD_LABEL, sentence: `Scores sync to ${PORTAL_DISPLAY_NAME}'s worldwide board.` };
@@ -2198,10 +1832,9 @@ function boardSource(): { chip: string; sentence: string } {
   if (backend === "http") {
     return { chip: "🌐 global", sentence: "Scores sync to the global leaderboard." };
   }
-  // Portal builds name the portal: a player reading "Local" on a portal page
+  // Portal builds name the portal: a Poki player reading "Local" on a Poki page
   // concludes the board is broken, when what is true is narrower — this build
   // has no cloud board configured, so the standings are the ones on this
-<<<<<<< HEAD
   // device. Say that, in the portal's own words. The rows named "· Practice"
   // are the device's generated benchmarks, and the sentence says so rather than
   // letting a new player infer that twenty named humans are ahead of them.
@@ -2209,12 +1842,6 @@ function boardSource(): { chip: string; sentence: string } {
   return POKI_EDITION
     ? { chip: `${PORTAL_DISPLAY_NAME} · on-device`, sentence: `This build keeps scores on your device. ${offlineBench}` }
     : { chip: "💾 local", sentence: `Rankings are stored on this device. Fly well to climb! ${offlineBench}` };
-=======
-  // device. The wording comes from the edition module, so each bundle carries
-  // only its own portal's name (a shared ternary here put every portal's name
-  // in every bundle and failed the isolation gate).
-  return LEADERBOARD_LOCAL;
->>>>>>> origin/main
 }
 
 function renderBoard(s: HudSnapshot): string {
@@ -2246,7 +1873,7 @@ function renderBoard(s: HudSnapshot): string {
         : String(Math.round(v));
 
   // Never imply a device-only ladder is worldwide.
-  const source = boardSource();
+  const source = boardSource(s);
   const status = !s.boardOnline
     ? `<span class="board-badge local">${source.chip}</span>`
     : page?.stale
@@ -2279,7 +1906,7 @@ function renderBoard(s: HudSnapshot): string {
       : `<div class="board-row empty">${s.boardLoading ? "Loading…" : "No flights recorded yet — be the first wing on the board"}</div>`;
 
   return `
-    ${head(SCREEN.leaderboard, "back", status)}
+    ${head("Leaderboard", "back", status)}
     <div class="seg">${scopes
       .map((x) => `<button data-ui data-action="board-scope" data-id="${x.id}" class="${s.boardScope === x.id ? "on" : ""}">${x.label}</button>`)
       .join("")}</div>
@@ -2348,15 +1975,10 @@ function renderLive(s: HudSnapshot): string {
   const activeMode = (s.pvpModes || []).find((m) => m.id === s.selectedPvpMode) ?? (s.pvpModes || [])[0] ?? { name: "Sprint GP", icon: "⚡", finish: 1500 };
   const activeWorld = (s.pvpWorlds || []).find((w) => w.id === s.selectedPvpWorld) ?? (s.pvpWorlds || [])[0] ?? { name: "Emerald Circuit", emoji: "🌿" };
 
-  return `${head(SCREEN.raceLobby)}
-    <p class="tagline">${escapeHtml(t("hud.race.tagline", undefined, "40-pilot live & neural AI racing across 9 scenic worlds."))}</p>
+  return `${head("Race Lobby")}
+    <p class="tagline">40-pilot live &amp; neural AI racing across 9 scenic worlds.</p>
     ${s.netState === "error" && s.netError ? `<p class="network-notice" role="alert">${escapeHtml(s.netError)}</p>` : ""}
-    <p class="race-fairness">${menuIcon("medal")} ${escapeHtml(t("hud.race.fairness.equipment", undefined, "Equal flight equipment · your bird, your timing. Store boosts are saved for solo play."))}</p>
-    <p class="race-fairness assist">${menuIcon("medal")} ${escapeHtml(
-      s.packBalancing
-        ? t("hud.race.fairness.assistOn", undefined, "Casual field: rivals left far behind get a small catch-up push so the pack stays together. Rated races turn this off.")
-        : t("hud.race.fairness.assistOff", undefined, "Rated race: no catch-up assist for anyone — the field flies on skill alone."),
-    )}</p>
+    <p class="race-fairness">${menuIcon("medal")} Equal flight equipment · your bird, your timing. Store boosts are saved for solo play.</p>
 
     ${s.roomCode ? `      <section class="race-section private-session" aria-label="Your private room">
         <div class="race-section-head">
@@ -2452,7 +2074,7 @@ function renderLive(s: HudSnapshot): string {
 }
 
 function renderPractice(s: HudSnapshot): string {
-  return `${head(SCREEN.aiPvp)}
+  return `${head("AI PvP")}
     <section class="race-section" aria-label="AI race practice">
       <div class="race-section-head"><h3>Race the AI flock offline</h3><span class="section-step">AI pilots · no waiting</span></div>
       <p>Every format below starts immediately against computer-controlled birds — no server, no room, no rating. Learning the circuits here is the fastest way to win them online.</p>
@@ -2477,6 +2099,29 @@ function renderChallenges(s: HudSnapshot): string {
   const d = s.daily;
   const g = s.gauntlet;
   const c = s.calendar;
+  const modePills = (s.pvpModes || []).map((m) => `
+    <button class="pvp-pill ${s.selectedPvpMode === m.id ? "on" : ""}" data-ui data-action="select-pvp-mode" data-id="${m.id}" title="${escapeHtml(m.blurb)}">
+      <span>${escapeHtml(m.icon)}</span> <b>${escapeHtml(m.name)}</b> <small>${m.finish}m</small>
+    </button>`).join("");
+  const worldPills = (s.pvpWorlds || []).map((w) => `
+    <button class="world-pill ${s.selectedPvpWorld === w.id ? "on" : ""}" data-ui data-action="select-pvp-world" data-id="${w.id}" title="${escapeHtml(w.tagline)}">
+      <span>${escapeHtml(w.emoji)}</span> <b>${escapeHtml(w.name)}</b> <small>${escapeHtml(w.difficulty)}</small>
+    </button>`).join("");
+  const activeMode = (s.pvpModes || []).find((m) => m.id === s.selectedPvpMode) ?? (s.pvpModes || [])[0];
+  const activeWorld = (s.pvpWorlds || []).find((w) => w.id === s.selectedPvpWorld) ?? (s.pvpWorlds || [])[0];
+  const raceChallenges = `
+    <section class="race-section challenge-races" aria-label="Race challenges">
+      <div class="race-section-head"><h3>${menuIcon("versus")} Race challenges</h3><span class="section-step">PvP · AI · worlds</span></div>
+      <p class="fineprint">Choose a format and world once. Then race online when available, or launch the same challenge against the AI flock.</p>
+      <div class="lobby-selector-label"><span>Format</span><b>${activeMode ? `${escapeHtml(activeMode.name)} · ${activeMode.finish}m` : "Choose a format"}</b></div>
+      <div class="pills-scroll challenge-pills">${modePills}</div>
+      <div class="lobby-selector-label"><span>World</span><b>${activeWorld ? escapeHtml(activeWorld.name) : "Choose a world"}</b></div>
+      <div class="pills-scroll challenge-pills">${worldPills}</div>
+      <div class="quick-match-btns challenge-actions">
+        <button class="primary-btn gold" data-ui data-action="quick-match-instant">${menuIcon("online")} Race this challenge</button>
+        <button class="soft-btn" data-ui data-action="ai-pvp" data-id="${escapeHtml(s.selectedPvpMode)}">${menuIcon("versus")} Practice vs AI</button>
+      </div>
+    </section>`;
   const daily = `
     <div class="section-title">Daily challenge <small>resets at midnight</small></div>
     <div class="daily-card ${d.done ? "done" : ""}">
@@ -2557,8 +2202,9 @@ function renderChallenges(s: HudSnapshot): string {
     </div>`;
 
   return `
-    ${head(SCREEN.challenges, "back", `<span class="pill">Daily · Weekly</span>`)}
+    ${head("Challenges", "back", `<span class="pill">Daily · Weekly</span>`)}
     <p class="tagline">Same hills as everyone else today. Modifiers change how you fly them.</p>
+    ${raceChallenges}
     ${event}
     ${daily}
     ${gauntlet}
@@ -2594,7 +2240,7 @@ function renderCampaign(s: HudSnapshot): string {
     })
     .join("");
   return `
-    ${head(SCREEN.campaign, "back", `<span class="pill">${s.campaignDone}/${s.campaignTotal}</span>`)}
+    ${head("The Long Migration", "back", `<span class="pill">${s.campaignDone}/${s.campaignTotal}</span>`)}
     <p class="tagline">A journey in eight chapters. Progress accrues from every flight — no separate grind.</p>
     <div class="camp-list">${rows}</div>
   `;
@@ -2774,7 +2420,7 @@ export function renderSquad(s: HudSnapshot): string {
     : "";
 
   return `
-    ${head(SCREEN.squad, "back", sq.myCode ? `<span class="pill">${escapeHtml(sq.myCode)}</span>` : "")}
+    ${head("Squad", "back", sq.myCode ? `<span class="pill">${escapeHtml(sq.myCode)}</span>` : "")}
     <p class="tagline">A little flock. A bigger adventure.</p>
     ${hubBanner}
     ${recovery}
@@ -2791,7 +2437,7 @@ function renderRank(s: HudSnapshot): string {
   const r = s.rival;
   const wl = r.wins + r.losses > 0 ? Math.round((r.wins / (r.wins + r.losses)) * 100) : 0;
   return `
-    ${head(SCREEN.rivalRank, "back", `<span class="pill">${boardSource().chip}</span>`)}
+    ${head("Rival Rank", "back", `<span class="pill">${boardSource(s).chip}</span>`)}
     <div class="rank-hero">
       <div class="rank-div-big">${r.divisionIcon}</div>
       <div class="rank-hero-num">${r.rating}</div>
@@ -2874,7 +2520,7 @@ function renderCups(s: HudSnapshot): string {
     : "";
 
   return `
-    ${head(SCREEN.tournaments, "back", `<span class="pill">Weekly</span>`)}
+    ${head("Tournaments", "back", `<span class="pill">Weekly</span>`)}
     <p class="tagline">Two cups run every week. Beat a division cut-off, then claim the prize — it lands in your account immediately.</p>
     <div class="cup-list">${cups}</div>
     ${s.lastPrize ? `<div class="reward-strip">Last prize · ${s.lastPrize}</div>` : ""}
@@ -2885,7 +2531,7 @@ function renderCups(s: HudSnapshot): string {
 
 function renderModes(s: HudSnapshot): string {
   return `
-    ${head(SCREEN.gameModes)}
+    ${head("Game modes")}
     <p class="tagline">Solo flights below are you against the course. A <b>PvP circuit</b> opens the PvP options — ranked and casual online racing, private rooms, or the AI flock. All modes share your unlocks.</p>
     <div class="mode-list">
       ${s.modes
@@ -2954,7 +2600,7 @@ function renderVersusResult(s: HudSnapshot): string {
 
 function renderAtlas(s: HudSnapshot): string {
   return `
-    ${head(SCREEN.atlas, "back", `<span class="pill">Farthest: ${s.farthestIsland + 1}</span>`)}
+    ${head("Island Atlas", "back", `<span class="pill">Farthest: ${s.farthestIsland + 1}</span>`)}
     <p class="tagline">Every island has its own weather. Learn them, then chain them.</p>
     <div class="atlas">
       ${s.atlas
@@ -3042,6 +2688,13 @@ function renderNameEntry(s: HudSnapshot): string {
     <div class="name-entry-form">
       ${field}
 
+      <label class="name-language" for="welcome-language-select">
+        <span>Language / Idioma</span>
+        <select id="welcome-language-select" data-ui data-action="set-language" aria-label="Choose language">
+          ${SUPPORTED_LOCALES.map(loc => `<option value="${loc.code}" ${getLocale() === loc.code ? "selected" : ""}>${loc.flag} ${loc.name}</option>`).join("")}
+        </select>
+      </label>
+
       <button class="primary-btn name-entry-cta" data-ui data-action="confirm-pilot-name">
         Let's Fly ›
       </button>
@@ -3077,16 +2730,11 @@ function homeBoardStrip(s: HudSnapshot): string {
   // off a 640-tall phone entirely.
   return `
     <button class="home-board" data-ui data-action="open-board" aria-label="Open the leaderboards">
-<<<<<<< HEAD
       <span class="hb-head">
         <span class="hb-title">🏆 Top pilots</span>
         <span class="hb-go">All boards ›</span>
       </span>
       ${rows
-=======
-      <div class="hb-head"><b>Top wings</b><small>${boardSource().chip}</small></div>
-      ${s.homeBoard
->>>>>>> origin/main
         .map(
           (row, i) => `<span class="hb-row${row.you ? " you" : ""}">
             <span class="hb-medal">${medals[i]}</span>
@@ -3099,6 +2747,11 @@ function homeBoardStrip(s: HudSnapshot): string {
 }
 
 function renderMain(s: HudSnapshot): string {
+  // MenuCatalog is the single source of truth for home navigation. Keep the
+  // renderer declarative: filtering destinations here used to leave stale PvP
+  // entries in the catalog and made other screens drift from the home menu.
+  const playDestinations = PLAY_DESTINATIONS;
+  const progressDestinations = PROGRESS_DESTINATIONS;
   return `
     <button
       class="icon-btn menu-mute"
@@ -3124,28 +2777,26 @@ function renderMain(s: HudSnapshot): string {
     </header>
 
     <button class="primary-btn home-launch" data-ui data-action="pvp-practice" aria-label="Play free flight now"><span class="launch-art">${menuIcon("flight")}</span><span class="launch-copy"><small>${t("onboarding.skyIsYours", undefined, "THE SKY IS YOURS")}</small><b>Fly now</b><span>${t("onboarding.launchSub", undefined, "Hold to dive · release to glide")}</span></span><span class="launch-arrow" aria-hidden="true">${arrowRightSvg()}</span></button>
+    ${s.runsPlayed < 2 ? `<section class="onboarding-route" aria-label="Your first flight plan">
+      <div class="onboarding-route-head"><span>✦ START HERE</span><small>one input · three small wins</small></div>
+      <div class="onboarding-route-steps">
+        <button class="onboarding-route-step active" data-ui data-action="pvp-practice"><b>01</b><span><strong>Feel the glide</strong><small>Hold downhill · release to soar</small></span><i>Fly ›</i></button>
+        <button class="onboarding-route-step" data-ui data-action="open-shop"><b>02</b><span><strong>Choose your bird</strong><small>Spend the coins you just earned</small></span><i>Shop ›</i></button>
+        <button class="onboarding-route-step" data-ui data-action="open-challenges"><b>03</b><span><strong>Race the flock</strong><small>Choose online or AI when you are ready</small></span><i>Race ›</i></button>
+      </div>
+    </section>` : ""}
     <!-- 01 — PLAY. PvP, AI PvP and the solo modes are all ways of playing, so
          they sit under the Play heading as one grid. Standings then close the
          section as a single full-width bar instead of a sixth row of choices:
          "how am I doing" is a different question from "what shall I play", and
          one bar at the end reads as the section's full stop. -->
-    <div class="home-section-title"><span>${t("hud.menu.chooseAdventure", undefined, "Choose your adventure")}</span><small>01 — PLAY</small></div>
-    <nav class="destination-grid play-destinations" aria-label="Choose your adventure">${menuLinks(PLAY_DESTINATIONS)}</nav>
+    <div class="home-section-title"><span>Play now</span><small>FLY · RACE · EXPLORE</small></div>
+    <nav class="destination-grid play-destinations home-hub-grid" aria-label="Play">${menuLinks(playDestinations)}</nav>
     ${homeBoardStrip(s)}
-    <div class="home-section-title"><span>${t("hud.menu.makeItYours", undefined, "Make it yours")}</span><small>02 — HANGAR</small></div>
+    <div class="home-section-title"><span>Personalize</span><small>BIRD · FLOCK · SETTINGS</small></div>
     <nav class="destination-grid utility-destinations" aria-label="Your hangar">${menuLinks(COLLECTION_DESTINATIONS)}</nav>
-    <div class="home-section-title"><span>${t("hud.menu.everyFlightCounts", undefined, "Every flight counts")}</span><small>03 — PROGRESS</small></div>
-    <nav class="destination-grid progress-destinations" aria-label="Challenges and progress">${menuLinks(
-      PROGRESS_DESTINATIONS.map(item => {
-        if (item.action === "open-challenges") {
-          const liveDetail = s.daily.done
-            ? `✅ Today done · ${s.daily.dailiesDone} day streak`
-            : `${s.daily.modeIcon} ${s.daily.title} · ${s.daily.modeName}`;
-          return { ...item, detail: liveDetail };
-        }
-        return item;
-      }) as typeof PROGRESS_DESTINATIONS[number][]
-    )}</nav>
+    <div class="home-section-title"><span>Progress</span><small>GOALS · RANK · REWARDS</small></div>
+    <nav class="destination-grid progress-destinations home-hub-grid" aria-label="Progress">${menuLinks(progressDestinations)}</nav>
     <div class="home-record"><span class="record-art">${menuIcon("medal")}</span><span>${t("hud.menu.personalBest", undefined, "Personal best")} <b>${distanceText(s.bestDistance)}</b></span><span class="record-pass" data-ui data-action="open-pass">Nest Pass Lv.${s.season.tier}/${s.season.maxTier}</span><span class="record-wallet">● ${s.wallet.toLocaleString()} <small>${t("hud.menu.coinBalance", undefined, "coins")}</small></span></div>
   `;
 }
@@ -3246,7 +2897,6 @@ function renderProgress(s: HudSnapshot): string {
     </div>
 
     ${renderGoalList(s.sessionGoals)}
-    ${renderNextAction(s)}
     ${renderQuests(s.quests)}
     ${renderMissions(s.missions)}
     <div class="menu-stats"><div>Best <b>${distanceText(s.bestDistance)}</b></div><div>Today <b>${distanceText(s.todayBest)}</b></div></div>
@@ -3395,7 +3045,7 @@ function renderShop(s: HudSnapshot, browse: ShopBrowse): string {
   ] as const;
 
   return `
-    ${head(SCREEN.shop, "back", `<span class="pill coin">● ${s.wallet.toLocaleString()}</span>`)}
+    ${head("Shop", "back", `<span class="pill coin">● ${s.wallet.toLocaleString()}</span>`)}
     <p class="shop-intro">YOUR HANGAR <span>Find your wings. Make them yours.</span></p>
 
     <div class="pc pc--gold pc-row">
@@ -3504,12 +3154,11 @@ function renderShop(s: HudSnapshot, browse: ShopBrowse): string {
     <details class="shop-section"><summary><span class="section-art">${menuIcon("boost")}</span>Boosts &amp; upgrades <span>${armedBoosts.length} armed</span></summary>
       <p class="fineprint">One-flight boosts are used in solo or casual AI flights. Live races and ranked practice use equal flight equipment and keep these boosts for later. Permanent upgrades stay with you.</p>
       <div class="boost-list">${s.boosts.map((b) => renderBoostRow(b, s.wallet)).join("")}</div>
-      <div class="section-title">Nest <small>permanent score multiplier — visible growth like Tiny Wings</small></div>
+      <div class="section-title">Nest <small>permanent score multiplier</small></div>
       <div class="boost-list"><div class="boost-row nest-row">
-        <span class="bi" style="font-size:${16 + s.nestLevel * 2}px">${"🪺".repeat(Math.min(3, Math.ceil(s.nestLevel / 3)))}</span>
-        <div><div class="mt">Nest upgrade <span class="boost-once">forever</span> ${"⭐".repeat(s.nestLevel)}</div>
-        <div class="md">Lv.${s.nestLevel} · ×${s.nestMult.toFixed(2)} score${s.nestMaxed ? " · fully upgraded — nest at max size!" : ` · next ×${(s.nestMult + 0.12).toFixed(2)} — grows bigger!`}</div>
-        <div class="qb" style="margin-top:4px"><i style="width:${Math.min(100, (s.nestLevel / 10) * 100)}%"></i></div></div>
+        <span class="bi">${menuIcon("story")}</span>
+        <div><div class="mt">Nest upgrade <span class="boost-once">forever</span></div>
+        <div class="md">Lv.${s.nestLevel} · ×${s.nestMult.toFixed(2)} score${s.nestMaxed ? " · fully upgraded" : ` · next ×${(s.nestMult + 0.12).toFixed(2)}`}</div></div>
         ${
           s.nestMaxed
             ? `<span class="tag on">MAX ✓</span>`
@@ -3544,7 +3193,7 @@ function renderPaywall(s: HudSnapshot): string {
     </div>`
     : "";
   return `
-    ${head(SCREEN.coinStore)}
+    ${head("Coin Store")}
     <div class="wallet-row" style="margin-bottom:12px"><span class="pill coin">Your Balance: ● ${s.wallet.toLocaleString()}</span></div>
     ${starter}
     <div class="gold-hero"><div class="gold-badge">✦</div><div class="gold-price">${GOLD.price}<small> lifetime</small></div></div>
@@ -3589,7 +3238,7 @@ function renderCheckout(s: HudSnapshot): string {
 
   const canAfford = s.wallet >= item.coinPrice;
   return `
-    ${head(SCREEN.confirmUnlock, "checkout-cancel")}
+    ${head("Confirm Unlock", "checkout-cancel")}
     <div class="sheet">
       <div class="sheet-row"><span>${item.name}</span><b>${item.price}</b></div>
       <p class="tagline">Wallet: ● ${s.wallet.toLocaleString()}</p>
@@ -3607,75 +3256,37 @@ function volumeControl(label: string, key: string, value: number): string {
   return `<div class="setting-row setting-volume"><label for="${key}">${label}</label><div class="volume-control"><input id="${key}" data-ui data-action="set-${key}" type="range" min="0" max="100" step="5" value="${Math.min(100, Math.max(0, value))}"/><output for="${key}">${Math.min(100, Math.max(0, value))}%</output></div></div>`;
 }
 
-/**
- * The language selector: "Browser language" first, then every shipped locale
- * written in its own script (an endonym).
- *
- * Two deliberate choices:
- *   • The marked option follows the *preference*, not the resolved language.
- *     When the preference is `auto`, highlighting the detected language would
- *     make an automatic result look like an explicit choice — and a player
- *     who travels would find their selection silently rewritten.
- *   • Endonyms, not flags. A flag is a country, not a language (`ar` spans
- *     20+ of them), and flag emoji render as two-letter tofu boxes on Windows
- *     and as nothing on several mobile font sets. An endonym is readable by
- *     exactly the person who needs it: the player who cannot read the language
- *     the menu is currently in.
- */
-function languageOptions(pref: LocalePreference): string {
-  const option = (value: string, label: string, selected: boolean): string =>
-    `<option value="${value}"${selected ? " selected" : ""}>${escapeHtml(label)}</option>`;
-  return [
-    option(AUTO_LOCALE, t("hud.settings.language.auto", undefined, "Browser language"), pref === AUTO_LOCALE),
-    ...SUPPORTED_LOCALES.map((loc) => option(loc.code, loc.name, pref === loc.code)),
-  ].join("");
-}
-
 function renderSettings(s: HudSnapshot): string {
   const toggle = (label: string, key: string, on: boolean): string =>
     `<div class="setting-row"><span>${label}</span><button class="toggle ${on ? "on" : ""}" data-ui data-action="set-${key}" aria-pressed="${on}" aria-label="${label}"><i></i></button></div>`;
   const mPct = Math.round((s.settings.musicVolume ?? 0.8) * 100);
   const sPct = Math.round((s.settings.sfxVolume ?? 0.9) * 100);
-  const pilotLabel = t("hud.pilot.name", undefined, "Pilot Name");
-  const randomLabel = t("common.random", undefined, "\u{1F3B2} Random");
-  const saveLabel = t("common.save", undefined, "Save");
-  const pref = getLocalePreference();
-  const detected = detectedLocale();
-  const QUALITY_KEYS: Record<string, [string, string]> = {
-    auto: ["hud.settings.quality.auto", "Auto \u00b7 recommended"],
-    high: ["hud.settings.quality.high", "High \u00b7 more detail"],
-    low: ["hud.settings.quality.low", "Low \u00b7 less GPU work"],
-  };
   return `
     ${head(t("hud.settings.title", undefined, "Settings"))}
     <p class="settings-intro">Make the flight feel right for you. Changes save automatically.</p>
-    <div class="section-title">${t("hud.settings.section.pilot", undefined, "Pilot")}</div>
+    <div class="section-title">Pilot</div>
     ${CUSTOM_PILOT_NAMES
       ? `<div class="redeem pilot-name-row">
-      <input data-ui data-ref="pilotName" aria-label="${escapeHtml(pilotLabel)}" maxlength="14" placeholder="${escapeHtml(pilotLabel)}" value="${escapeHtml(s.pilotName)}" />
-      <button class="mini-btn autogen-btn" data-ui data-action="autogen-pilot" title="${escapeHtml(t("hud.pilot.autogenerate", undefined, "Autogenerate"))}">${escapeHtml(randomLabel)}</button>
-      <button class="mini-btn primary" data-ui data-action="rename-pilot">${escapeHtml(saveLabel)}</button>
+      <input data-ui data-ref="pilotName" aria-label="Pilot name" maxlength="14" placeholder="Pilot name" value="${escapeHtml(s.pilotName)}" />
+      <button class="mini-btn autogen-btn" data-ui data-action="autogen-pilot" title="Autogenerate random pilot name">🎲 Random</button>
+      <button class="mini-btn primary" data-ui data-action="rename-pilot">Save</button>
     </div>`
       : `<div class="redeem pilot-name-row">
-      <span class="pilot-name-readonly" aria-label="${escapeHtml(pilotLabel)}">${escapeHtml(s.pilotName)}</span>
-      <button class="mini-btn autogen-btn" data-ui data-action="autogen-pilot" title="${escapeHtml(t("hud.pilot.autogenerate", undefined, "Autogenerate"))}">${escapeHtml(randomLabel)}</button>
+      <span class="pilot-name-readonly" aria-label="Pilot name">${escapeHtml(s.pilotName)}</span>
+      <button class="mini-btn autogen-btn" data-ui data-action="autogen-pilot" title="Roll a new pilot name">🎲 Random</button>
     </div>`
     }
-    <div class="section-title">${t("hud.settings.section.sound", undefined, "Sound")}</div>
-    ${toggle(t("hud.settings.mute", undefined, "Mute all sound"), "mute", s.settings.mute)}
-    ${volumeControl(t("hud.settings.effectsVolume", undefined, "Effects volume"), "sfx-vol", sPct)}
-    ${toggle(t("hud.settings.musicToggle", undefined, "Music"), "music", s.settings.music)}
-    ${volumeControl(t("hud.settings.music", undefined, "Music Volume"), "music-vol", mPct)}
+    <div class="section-title">Sound</div>
+    ${toggle("Mute all sound", "mute", s.settings.mute)}
+    ${volumeControl("Effects volume", "sfx-vol", sPct)}
+    ${toggle("Music", "music", s.settings.music)}
+    ${volumeControl("Music volume", "music-vol", mPct)}
     <div class="setting-row setting-select"><label for="music-track">Music track</label><select id="music-track" data-ui data-action="set-track"><option value="shuffle" ${s.settings.musicTrack === "shuffle" ? "selected" : ""}>Shuffle all tracks</option>${TRACK_NAMES.map((name, i) => `<option value="${i}" ${s.settings.musicTrack === i ? "selected" : ""}>${i + 1}. ${name}</option>`).join("")}</select></div>
-    <div class="setting-row setting-select"><label for="language-select">${t("hud.settings.language", undefined, "Language")}</label><select id="language-select" data-ui data-action="set-language" aria-describedby="language-detected">${languageOptions(pref)}</select></div>
-    <p class="fineprint" id="language-detected">${pref === AUTO_LOCALE
-      ? escapeHtml(t("hud.settings.language.detected", { name: localeLabel(detected ?? getLocale()) }, "Detected: {{name}}"))
-      : `${SUPPORTED_LOCALES.length} languages`}</p>
-    <div class="setting-row"><span>${t("hud.settings.distancesIn", undefined, "Show distances in")}</span><div class="toggle-group"><button class="mini-btn ${s.settings.distUnit !== "mi" ? "gold" : ""}" data-ui data-action="set-dist-unit" data-id="km">km</button><button class="mini-btn ${s.settings.distUnit === "mi" ? "gold" : ""}" data-ui data-action="set-dist-unit" data-id="mi">mi</button></div></div>
-    <div class="section-title">${t("hud.settings.section.comfort", undefined, "Comfort & controls")}</div>
-    ${toggle(t("hud.settings.haptics", undefined, "Haptics"), "haptics", s.settings.haptics)}
+    <div class="setting-row setting-select"><label for="language-select">Language / Idioma</label><select id="language-select" data-ui data-action="set-language">${SUPPORTED_LOCALES.map(loc => `<option value="${loc.code}" ${getLocale() === loc.code ? "selected" : ""}>${loc.flag} ${loc.name}</option>`).join("")}</select></div>
+    <div class="setting-row"><span>Show distances in</span><div class="toggle-group"><button class="mini-btn ${s.settings.distUnit !== "mi" ? "gold" : ""}" data-ui data-action="set-dist-unit" data-id="km">km</button><button class="mini-btn ${s.settings.distUnit === "mi" ? "gold" : ""}" data-ui data-action="set-dist-unit" data-id="mi">mi</button></div></div>
+    <div class="section-title">Comfort &amp; controls</div>
+    ${toggle("Haptics", "haptics", s.settings.haptics)}
     ${s.boosts.some((b) => b.def.id === "doubletap" && b.armed) ? toggle("Double-tap boost", "doubletap", s.settings.doubleTapBoost) : ""}
-<<<<<<< HEAD
     ${toggle("Reduce motion", "motion", s.settings.reduceMotion)}
     ${toggle("Colorblind assist", "colorassist", s.settings.colorAssist)}
     ${toggle("Large text", "bigtext", s.settings.bigText)}
@@ -3691,63 +3302,14 @@ function renderSettings(s: HudSnapshot): string {
     <button class="soft-btn wide" data-ui data-action="open-privacy">🔒 Privacy policy</button>
     ${s.canInstall ? `<button class="soft-btn wide" data-ui data-action="install-app">⬇ Install Sunbird</button>` : ""}
     <details class="danger-zone"><summary>Manage saved progress</summary><p class="fineprint">Reset deletes progress saved on this device. Export a save code from Account first.</p>
-=======
-    ${toggle(t("hud.settings.reduceMotion", undefined, "Reduce Motion"), "motion", s.settings.reduceMotion)}
-    ${toggle(t("hud.settings.colorAssist", undefined, "Colorblind assist"), "colorassist", s.settings.colorAssist)}
-    ${toggle(t("hud.settings.largeText", undefined, "Large text"), "bigtext", s.settings.bigText)}
-    ${toggle(t("hud.settings.autoShop", undefined, "Open the shop when a flight unlocks something"), "autoshop", s.settings.autoShop)}
-    <div class="setting-row setting-select"><label for="render-quality">${t("hud.settings.renderQuality", undefined, "Render quality")}</label><select id="render-quality" data-ui data-action="set-quality">${["auto", "high", "low"].map(q => `<option value="${q}" ${s.settings.quality === q ? "selected" : ""}>${escapeHtml(t(QUALITY_KEYS[q][0], undefined, QUALITY_KEYS[q][1]))}</option>`).join("")}</select></div>
-    <div class="setting-row"><span>${t("hud.settings.flightsFlown", undefined, "Flights flown")}</span><b>${s.runsPlayed}</b></div>
-    <button class="soft-btn wide" data-ui data-action="toggle-fullscreen">\u26f6 ${t("hud.settings.fullscreen", undefined, "Fullscreen mode")}</button>
-    ${s.canInstall ? `<button class="soft-btn wide" data-ui data-action="install-app">\u2b07 Install Sunbird</button>` : ""}
-    <button class="soft-btn wide" data-ui data-action="open-privacy">${escapeHtml(t("hud.settings.privacy", undefined, "Privacy Policy"))}</button>
-    <p class="fineprint">${escapeHtml(t("hud.settings.privacy.hint", undefined, "How Sunbird handles your data"))}</p>
-    <details class="danger-zone" data-ref="resetOptions"><summary>Manage saved progress</summary><p class="fineprint">Reset deletes progress saved on this device. Export a save code from Account first.</p>
->>>>>>> origin/main
     <button class="ghost-btn danger" data-ui data-action="reset-progress">${s.resetArmed ? "Confirm: erase saved progress" : "Reset progress"}</button></details>
-    <p class="fineprint">Sunbird 1.0 \u00b7 ${s.seedLabel}</p>
-  `;
-}
-
-/**
- * In-game privacy policy.
- *
- * Rendered from `legal.ts` — the same object `scripts/gen-privacy-page.mjs`
- * turns into the hosted `privacy.html` — so the page a platform reviews and
- * the page a player reads inside the game are one document and cannot drift.
- *
- * It is a screen, not a link out: portals run the game in a sandboxed iframe
- * where popups and top-level navigation are blocked, so an `<a>` would be a
- * button that does nothing for exactly the players a platform is protecting.
- * The public URL is printed at the foot for anyone who needs to cite it.
- */
-function renderPrivacy(s: HudSnapshot): string {
-  const doc = PRIVACY_POLICY;
-  const rows = (list: [string, string][]): string =>
-    `<dl class="policy-rows">${list.map(([k, v]) => `<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v)}</dd>`).join("")}</dl>`;
-  return `
-    ${head(doc.title)}
-    <p class="fineprint">${escapeHtml(doc.controller)} \u00b7 v${escapeHtml(doc.version)}</p>
-    ${doc.summary.map((p) => `<p class="policy-lede">${escapeHtml(p)}</p>`).join("")}
-    ${doc.sections.map((sec) => `<section class="policy-section" id="policy-${sec.id}"><h3>${escapeHtml(sec.heading)}</h3>${sec.body.map((p) => `<p>${escapeHtml(p)}</p>`).join("")}${sec.rows ? rows(sec.rows) : ""}</section>`).join("")}
-    <section class="policy-section"><h3>Contact</h3>${rows(doc.contact.map((c) => [c.label, c.value] as [string, string]))}</section>
-    <p class="fineprint policy-url">${escapeHtml(PRIVACY_POLICY_URL)}</p>
-    ${
-      // Poki's external-resources policy wants the policy live on a public page
-      // *and* linked from inside the game. Text is not a link, and a plain
-      // anchor is dead in a sandboxed iframe — so the button appears only when
-      // the portal SDK offers its own sanctioned way out, and always opens the
-      // same absolute URL the hosted page lives at.
-      s.portalExternalLink && /^https?:\/\//i.test(PRIVACY_POLICY_URL)
-        ? `<button class="soft-btn wide" data-ui data-action="open-privacy-url">${escapeHtml(t("hud.privacy.openHosted", undefined, "Open the hosted policy page"))}</button>`
-        : ""
-    }
+    <p class="fineprint">Sunbird 1.0 · ${s.seedLabel}</p>
   `;
 }
 
 function renderScores(s: HudSnapshot): string {
   return `
-    ${head(SCREEN.highGlides)}
+    ${head("High glides")}
     ${renderScoreTable(s.highScores)}
     ${!s.highScores.length ? `<p class="tagline">Your first flight starts your story. Fly a little farther each time.</p><button class="primary-btn" data-ui data-action="pvp-practice">Take your first flight</button>` : ""}
     <div class="menu-stats"><div>Today's best <b>${distanceText(s.todayBest)}</b></div><div>Flights <b>${s.runsPlayed}</b></div></div>
@@ -3764,7 +3326,7 @@ function rewardLabel(r: { kind: string; amount?: number; id?: string }): string 
 function renderPass(s: HudSnapshot): string {
   const pct = Math.min(100, (s.season.have / s.season.need) * 100);
   return `
-    ${head(SCREEN.nestPass, "back", `<span class="pill">Lv.${s.season.tier}/${s.season.maxTier}</span>`)}
+    ${head("Nest Pass", "back", `<span class="pill">Lv.${s.season.tier}/${s.season.maxTier}</span>`)}
     <div class="pass-progress"><i style="width:${pct}%"></i></div>
     <p class="tagline">${s.season.label} — fly to earn XP.${SELL_AD_REMOVAL ? " Gold unlocks the premium track." : " Fly to unlock rewards."}</p>
     ${!s.gold && SELL_AD_REMOVAL ? `<button class="upsell" data-ui data-action="open-paywall"><div><b>✦ Unlock premium rewards</b><span>Double the tier rewards with Gold</span></div><span class="mini-btn gold">Unlock</span></button>` : ""}
@@ -3790,7 +3352,7 @@ function renderTrophies(s: HudSnapshot): string {
   for (const v of s.trophies) groups[v.def.rarity]!.push(v);
   const order: (keyof typeof groups)[] = ["bronze", "silver", "gold", "platinum"];
   return `
-    ${head(SCREEN.trophyCase, "back", `<span class="pill">${s.trophyCounts.unlocked}/${s.trophyCounts.total}</span>`)}
+    ${head("Trophy Case", "back", `<span class="pill">${s.trophyCounts.unlocked}/${s.trophyCounts.total}</span>`)}
     ${order
       .map(
         (rarity) => `
@@ -3831,12 +3393,8 @@ function renderAccount(s: HudSnapshot): string {
     </div>`
     : "";
   return `
-<<<<<<< HEAD
     ${head("Account")}
     ${portalAccount}
-=======
-    ${head(SCREEN.account)}
->>>>>>> origin/main
     <div class="section-title">Membership</div>
     ${!SELL_AD_REMOVAL ? "" : `
     <div class="sheet">
@@ -3851,13 +3409,10 @@ function renderAccount(s: HudSnapshot): string {
       <p class="fineprint">VIP gifts ${VIP_DAILY_GIFT} coins every day you play and adds a fourth daily quest. ${
         s.vip ? "" : "Cancel anytime — no auto-renewal in this build; your 30 days simply run out."
       }${
-        /* Only the direct build schedules its own interstitials, and only when
-           SIMULATED_BREAKS is on; on a portal the platform owns ad frequency, so
-           the game must not describe (or count) breaks it does not control — and
-           it must not promise a daily cap on breaks it never shows. */
-        SIMULATED_BREAKS && s.portalName === "none"
-          ? ` Sponsored breaks respect a hard cap: <b>${s.adsLeftToday}</b> left today.`
-          : ""
+        /* Only the direct build schedules its own interstitials; on a portal the
+           platform owns ad frequency, so the game must not describe (or count)
+           breaks it does not control. */
+        s.portalName === "none" ? ` Sponsored breaks respect a hard cap: <b>${s.adsLeftToday}</b> left today.` : ""
       }</p>
     </div>
     `}
@@ -3888,28 +3443,14 @@ function renderAccount(s: HudSnapshot): string {
   `;
 }
 
-/**
- * One line, one next action — the goal-gradient framing.
- *
- * Sits beside the goal list rather than replacing it: the list is the record,
- * this is the instruction. Empty string renders nothing, because a permanent
- * "go do something" banner trains the player to look past it.
- */
-function renderNextAction(s: HudSnapshot): string {
-  if (!s.nextAction) return "";
-  return `<div class="next-action" role="status"><span class="na-arrow">›</span><span>${escapeHtml(s.nextAction)}</span></div>`;
-}
-
 function renderGoalList(goals: SessionGoal[]): string {
   if (!goals.length) return "";
-  return `<div class="quests"><div class="mission-head">Session goals — 3 active, skip for coins like Jetpack Joyride</div>${goals
+  return `<div class="quests"><div class="mission-head">Session goals</div>${goals
     .map((g) => {
       const pct = Math.min(100, (g.progress / g.target) * 100);
-      const skipCost = Math.max(80, Math.round(g.reward * 1.5));
       return `<div class="quest ${g.done ? "done" : ""}">
         <div><div class="mt">${g.label}</div><div class="qb"><i style="width:${pct}%"></i></div></div>
         <span class="qr">● ${g.reward}</span>
-        ${!g.done ? `<button class="mini-btn" data-ui data-action="skip-goal" data-id="${g.id}" title="Skip for ●${skipCost}">Skip ●${skipCost}</button>` : ""}
       </div>`;
     })
     .join("")}</div>`;
@@ -4062,7 +3603,6 @@ function renderGameOver(s: HudSnapshot): string {
     <h2>${t("hud.gameover.title", undefined, "Flight completed")}</h2>
     <p class="tagline">${s.massRace ? "Your place, your progress, your next race." : "A little farther. A little smoother. One more flight?"}</p>
     <div class="result-actions"><button class="play-again-btn" data-ui data-action="${resultsPrimaryAction(s)}">${s.massRace && s.roomCode ? "Back to race lobby" : s.massRace && s.racePlace > 0 ? "Race again · same stakes" : t("hud.gameover.flyAgain", undefined, "Fly Again")}</button><button class="soft-btn" data-ui data-action="menu">${t("hud.gameover.mainMenu", undefined, "Main Menu")}</button></div>
-    ${resultsPrimaryAction(s) === "retry" ? `<p class="fineprint retry-hint">${escapeHtml(t("hud.gameover.retryHint", undefined, "Tap anywhere or press Space to fly again"))}</p>` : ""}
     ${!s.massRace ? `<p class="fineprint replay-note">Fly again replays this exact course so you can race the ghost of the run you just flew 👻</p>` : ""}
     ${s.newBest ? `<div class="new-best">👑 NEW BEST · ${distanceText(s.distance)}<small>your farthest flight yet</small></div>` : ""}
     ${s.boardScope === "global" && s.boardMetric === "distance" && s.board && s.board.yourRank > 0 ? `<div class="reward-strip rank-strip">Leaderboard rank · <b>#${s.board.yourRank}</b> of ${s.board.total}</div>` : ""}
@@ -4074,13 +3614,6 @@ function renderGameOver(s: HudSnapshot): string {
       <div><span>Score</span><b>${Math.floor(s.score).toLocaleString()}</b></div>
       <div><span>${t("hud.stat.coins", undefined, "Coins")}</span><b>${formatNumberLocalized(s.coins)}</b></div>
     </div>
-
-    ${renderCelebration(s)}
-
-    ${renderGrowthLedger(s)}
-
-    ${renderMomentStrip(s.moments)}
-    ${renderClipStrip(s.clips, s.viralScore)}
 
     ${renderCoinMultiplierCard(s.coins, s.multiplierClaimed, s.portalName !== "none")}
 
@@ -4117,7 +3650,6 @@ function renderGameOver(s: HudSnapshot): string {
     </div>
     <details class="result-details"><summary>Progress &amp; rewards <span>Goals, quests &amp; records</span></summary>
     ${renderGoalList(s.sessionGoals)}
-    ${renderNextAction(s)}
     ${renderQuests(s.quests)}
     ${renderMissions(s.missions, s.newlyCompleted)}
     <h3 class="table-title">High glides</h3>
@@ -4125,119 +3657,9 @@ function renderGameOver(s: HudSnapshot): string {
   `;
 }
 
-/**
- * The "what was funny" strip: one chip per moment kind this flight produced,
- * plus a single headline line in that moment's own words.
- *
- * Deliberately above the fold on the recap card and deliberately short. A
- * results screen that only reports metres teaches the player that distance is
- * the point; a screen that says "4 BONKs - the hills are keeping score" teaches
- * them the flight was a *story*, which is the thing worth flying again for and
- * the thing worth sharing.
- */
-function renderClipStrip(clips: ClipTally[] | undefined, score: number): string {
-  if (!clips?.length) return "";
-  const chips = clips
-    .map(
-      (c) =>
-        `<span class="moment-chip clip-chip" title="${escapeHtml(c.label)}"><b aria-hidden="true">${c.icon}</b>${escapeHtml(c.label)}<i>×${c.count}</i></span>`,
-    )
-    .join("");
-  const heat = Number.isFinite(score) && score > 0 ? `<i class="clip-heat">${Math.round(score)}</i>` : "";
-  return `<div class="moment-strip clip-strip" role="list">${chips}${heat}</div>`;
-}
-
-function renderMomentStrip(moments: MomentTally[]): string {
-  if (!moments.length) return "";
-  const chips = moments
-    .map(
-      (m) =>
-        `<span class="moment-chip" title="${escapeHtml(t(m.key, undefined, m.label))}"><b aria-hidden="true">${m.icon}</b>${escapeHtml(t(m.key, undefined, m.label))}<i>×${m.count}</i></span>`,
-    )
-    .join("");
-  const top = moments[0];
-  const def = MOMENTS[top.kind];
-  const line = t(def.cardKey, { n: top.count }, def.cardLine(top.count));
-  return `<div class="moment-strip" role="list" aria-label="${escapeHtml(t("moments.strip.label", undefined, "Moments from this flight"))}">${chips}</div>
-    <p class="moment-line">${escapeHtml(line)}</p>`;
-}
-
-/**
- * The celebration strip: what this flight grew, ranked and staggered.
- *
- * Above the growth ledger on purpose — the ledger says where the ladders stand,
- * this says what *just* happened. Staged beats are full-width chips that reveal
- * in order (quietest first, so the rarest thing the player did lands last), and
- * everything that did not make the stage still appears as a compact chip, so a
- * run that moved six ladders shows six. That is the whole point: the toast layer
- * caps at two pills and evicts the oldest to hold that cap, which is how a
- * Platinum trophy used to get deleted by a "+2% coins" line fired after it.
- *
- * The stagger is CSS `animation-delay`, not a timer: the card renders once and
- * the beats arrive on their own, which costs no frame budget and survives a
- * paused or backgrounded tab.
- */
-function renderCelebration(s: HudSnapshot): string {
-  const { staged, ledger, folded } = s.celebration;
-  if (!staged.length && !ledger.length && !folded) return "";
-  const chip = (b: BeatView, banner: boolean): string =>
-    `<span class="beat ${b.rarity}${banner && b.banner ? " banner" : ""}" role="listitem" style="animation-delay:${Math.max(0, Math.round(b.delayMs))}ms">` +
-    `<i aria-hidden="true">${escapeHtml(b.icon)}</i><b>${escapeHtml(t(b.key, b.params, b.fallback))}</b></span>`;
-  const row =
-    ledger.length || folded
-      ? `<div class="beat-row">${ledger.map((b) => chip(b, false)).join("")}${
-          folded
-            ? `<span class="beat more" role="listitem">${escapeHtml(
-                t("hud.progress.more", { n: folded }, "+{{n}} more from this flight"),
-              )}</span>`
-            : ""
-        }</div>`
-      : "";
-  const label = t("hud.progress.strip", undefined, "What this flight grew");
-  return `<div class="celebration" role="list" aria-label="${escapeHtml(label)}">${staged
-    .map((b) => chip(b, true))
-    .join("")}${row}</div>`;
-}
-
-/**
- * What this flight *grew* — career wings and this mode's mastery, the two
- * ladders that were already computed for the snapshot but only ever rendered on
- * the progress screen. Placed directly under the distance/score/coins row so
- * "what I got" is immediately followed by "what it adds up to". The decision
- * logic (which lines, what is left, clamping) lives in `GrowthLedger.ts` and is
- * unit-tested there; this is only markup.
- */
-function renderGrowthLedger(s: HudSnapshot): string {
-  const mode = s.mastery.find((m) => m.modeId === s.modeId) ?? null;
-  const rows = growthLedger(s.wings, mode ? {
-    name: mode.name,
-    icon: mode.icon,
-    runs: mode.runs,
-    level: mode.level,
-    nextAt: mode.nextAt,
-    progress: mode.progress,
-    perk: mode.perk,
-    maxed: mode.maxed,
-  } : null);
-  if (!rows.length) return "";
-  return `<div class="growth-ledger">${rows
-    .map(
-      (r) =>
-        `<span class="gl ${r.kind}"><i aria-hidden="true">${escapeHtml(r.icon)}</i><b>${escapeHtml(r.label)}</b><u>${escapeHtml(r.detail)}</u><em aria-hidden="true" style="width:${Math.round(r.progress * 100)}%"></em></span>`,
-    )
-    .join("")}</div>`;
-}
-
 function renderNextFlight(s: HudSnapshot): string {
-  const bird = nextBird(s.skins);
-  // The run's dominant moment outranks the generic lesson when it repeated: a
-  // flight that BONKed four times has one obvious next purchase, and a flight
-  // that broke a record has one obvious next action (tell somebody). A single
-  // stray moment is not a personality, so the skill lesson still leads then.
-  const top = s.moments[0];
-  const momentLesson = top && top.count >= 2 ? MOMENTS[top.kind].next : null;
-  const lesson = momentLesson ?? flightTakeaway(s);
-  return `<section class="next-flight" aria-label="Next flight plan"><span class="next-flight-art">${menuIcon("compass")}</span><div><small>${momentLesson ? escapeHtml(t("moments.next.kicker", undefined, "BECAUSE OF THIS FLIGHT")) : "TAKE THIS INTO YOUR NEXT FLIGHT"}</small><b>${escapeHtml(lesson.title)}</b><p>${escapeHtml(lesson.tip)}</p>${bird ? `<p class="next-unlock">${s.wallet >= bird.def.price ? `${bird.def.name} is within reach · ${bird.def.price} coins in the Shop` : `${bird.def.name} · ${bird.def.price - s.wallet} more coins to unlock`}</p>` : ""}</div></section>`;
+  const lesson = flightTakeaway(s), bird = nextBird(s.skins);
+  return `<section class="next-flight" aria-label="Next flight plan"><span class="next-flight-art">${menuIcon("compass")}</span><div><small>TAKE THIS INTO YOUR NEXT FLIGHT</small><b>${lesson.title}</b><p>${lesson.tip}</p>${bird ? `<p class="next-unlock">${s.wallet >= bird.def.price ? `${bird.def.name} is within reach · ${bird.def.price} coins in the Shop` : `${bird.def.name} · ${bird.def.price - s.wallet} more coins to unlock`}</p>` : ""}</div></section>`;
 }
 
 function renderContinue(s: HudSnapshot): string {
@@ -4291,17 +3713,12 @@ function renderAd(s: HudSnapshot): string {
     <div class="portal-ad-wait"><div class="spinner"></div><h3>${header}</h3><p>${subtext}</p></div>
     <div class="ad-bar"><i data-live="adBar"></i></div>
     <div class="ad-actions">
-<<<<<<< HEAD
       ${
         s.adSkippable
           ? `<button class="mini-btn" data-ui data-action="ad-skip" data-live="adSkip" disabled>Continues in ${Math.ceil(s.adTimer)}</button>`
           : ""
       }
       ${canRemoveBreaks ? `<button class="mini-btn gold" data-ui data-action="ad-gold">✦ Remove breaks</button>` : ""}
-=======
-      <button class="mini-btn" data-ui data-action="ad-skip" data-live="adSkip" disabled>Skip in ${Math.ceil(s.adTimer)}</button>
-      ${!import.meta.env.VITE_SELL_AD_REMOVAL || s.gold ? "" : `<button class="mini-btn gold" data-ui data-action="ad-gold">✦ Remove breaks</button>`}
->>>>>>> origin/main
     </div>
   `;
 }

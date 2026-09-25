@@ -80,7 +80,9 @@ export class TrailRibbon {
 
     this.mesh = new THREE.Mesh(this.geo, this.mat);
     this.mesh.frustumCulled = false;
-    this.mesh.renderOrder = 45;
+    // Depth contract: terrain/collectibles -> trail -> particles -> bird.
+    // The ribbon is a wake, never a foreground costume.
+    this.mesh.renderOrder = 30;
     this.mesh.visible = false;
   }
 

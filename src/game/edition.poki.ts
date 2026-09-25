@@ -19,38 +19,16 @@ export const LEADERBOARD_CLOUD_LABEL = "Poki";
 /** True only in the Poki build (see edition.ts). */
 export const POKI_EDITION = true;
 
-/** No cloud board is configured in this edition: say so in the portal's words. */
-export const LEADERBOARD_LOCAL: { chip: string; sentence: string } = {
-  chip: "Poki \u00b7 on-device",
-  sentence: "This build keeps scores on your device.",
-};
-
 /** Poki's netlib transport handles multiplayer; other builds have no room API. */
 export const POKI_MULTIPLAYER = true;
+export const SIMULATED_BREAKS = false;
 
 /** Poki forbids chat in multiplayer surfaces (REQ-31) — emotes only. */
 export const SQUAD_CHAT = false;
 
-<<<<<<< HEAD
 /** Player-typed names are allowed on Poki, but every write is gated on
  * isPilotNameClean (profanity filter) before it is stored or broadcast. */
 export const CUSTOM_PILOT_NAMES = true;
-=======
-/**
- * Generated pilot names only — no free-text field in this edition.
- *
- * Portal builds broadcast the pilot name to real players (netlib rooms,
- * rosters, name tags), so a keyboard here means player-authored text leaving a
- * device into other people's screens. That is what the platform's content and
- * player-safety rules are about, and it is why `scripts/portal-markers.mjs`
- * treats `data-ref="pilotName"` as a forbidden marker in ANY portal bundle:
- * with this true the input survives into the shipped file and the compliance
- * gate fails. The name is still the player's — it is generated from a curated
- * word list and rerolled with one tap on the dice — and `isPilotNameClean`
- * still guards any name that arrives from a portal identity.
- */
-export const CUSTOM_PILOT_NAMES = false;
->>>>>>> origin/main
 
 /** Poki owns ad scheduling and forbids in-app purchases (REQ-20).
  * Unconditionally false: this is the edition's policy, not a build toggle.
@@ -59,7 +37,6 @@ export const CUSTOM_PILOT_NAMES = false;
 export const SELL_AD_REMOVAL = false;
 
 /**
-<<<<<<< HEAD
  * Call-sign names that would read as a claim to be the platform or the game
  * itself (the Poki build). Kept HERE, per edition, rather than in the moderation module:
  * that module is shared by every build, so a literal platform name in it ships
@@ -67,9 +44,3 @@ export const SELL_AD_REMOVAL = false;
  * failure, not a hypothetical one.
  */
 export const RESERVED_PILOT_NAMES: readonly string[] = ["poki", "sunbird"];
-=======
- * Poki supplies real `commercialBreak` / `rewardedBreak` calls and owns
- * ad frequency (REQ-20): the game never rehearses a break it cannot serve.
- */
-export const SIMULATED_BREAKS = false;
->>>>>>> origin/main

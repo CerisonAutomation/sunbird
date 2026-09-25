@@ -43,15 +43,20 @@ const copy = document.getElementById("boot-copy");
 const retry = document.getElementById("boot-retry");
 if (boot && copy && retry) {
   retry.addEventListener("click", () => location.reload());
-  const timer = setTimeout(() => {
-    if (!boot.isConnected) return;
-    copy.textContent = "Still warming up. Slow connection? You can reload and try again.";
-    retry.style.display = "block";
-  }, 20000);
-  window.addEventListener("sunbird-ready", () => clearTimeout(timer), { once: true });
-  window.addEventListener("error", () => {
+  const failBoot = (message: string) => {
     if (!boot.isConnected) return;
     boot.classList.add("is-error");
-    copy.textContent = "Sunbird could not start. Reload to try again.";
+    copy.textContent = message;
+    retry.style.display = "block";
+  };
+  const timer = setTimeout(() => {
+    failBoot("Sunbird could not start. Check your connection and reload.");
+  }, 15000);
+  window.addEventListener("sunbird-ready", () => clearTimeout(timer), { once: true });
+  window.addEventListener("error", () => {
+    failBoot("Something went wrong while loading Sunbird. Reload to try again.");
+  }, { once: true });
+  window.addEventListener("unhandledrejection", () => {
+    failBoot("Sunbird could not start. Check your connection and reload.");
   }, { once: true });
 }

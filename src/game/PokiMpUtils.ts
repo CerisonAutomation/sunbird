@@ -46,7 +46,10 @@ export const POKI_NETLIB_GAME_ID: string = IS_POKI
     : DEV_NETLIB_GAME_ID
   : "";
 
-/** @deprecated use POKI_NETLIB_GAME_ID */
+/**
+ * Canonical Poki Netlib game id — see `POKI_NETLIB_GAME_ID`.
+ * @deprecated use POKI_NETLIB_GAME_ID
+ */
 export const NETLIB_GAME_ID = POKI_NETLIB_GAME_ID;
 
 /**

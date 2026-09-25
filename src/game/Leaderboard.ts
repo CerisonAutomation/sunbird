@@ -1,4 +1,3 @@
-import { backendBase } from "./apiBase";
 import { dateSeed, truncate } from "./math";
 import { verifyRunSubmission } from "./AntiCheat";
 import { generatePilotName, isPilotNameClean } from "./pilotNameGenerator";
@@ -6,7 +5,6 @@ import { storage } from "./Storage";
 import { createAudsIfConfigured, type PokiAuds } from "../sdk/auds";
 import { breakerKeyFor, fetchJson } from "./resilience/fetchJson";
 import { OfflineOutbox } from "./resilience/OfflineOutbox";
-import { BUILD_ID } from "./version";
 
 /**
  * Global leaderboard.
@@ -27,23 +25,12 @@ import { BUILD_ID } from "./version";
  * `board-badge` in renderBoard).
  */
 
-<<<<<<< HEAD
 // Portal builds have no cloud board configured, so they default to "" and read
 // the on-device ladder unless VITE_LEADERBOARD_URL or AUDS is set. The old
 // expression was `?? (import.meta.env.DEV ? "" : "")` — both arms identical, so
 // the comment above it ("dev uses the social server root") described behaviour
 // the code did not have. It does not: dev reads the local board too.
 const API = (import.meta.env.VITE_LEADERBOARD_URL ?? "").replace(/\/$/, "");
-=======
-// Dev uses the social server root (vite proxies /board & /score to the local
-// Node social server). Production portal builds default to "" (offline local
-// board) unless VITE_LEADERBOARD_URL or AUDS is configured.
-// `/board` and `/score` are server-ROOT routes (and vite proxies both in dev),
-// so the dev prefix is "" — not "/mp" like the ghost/entitlement routes. The
-// old inline `import.meta.env.DEV ? "" : ""` said the same thing twice and read
-// like a typo; apiBase.ts is now the one place that documents the contract.
-const API = backendBase("");
->>>>>>> origin/main
 const SALT = import.meta.env.VITE_LEADERBOARD_SALT ?? "";
 const AUDS: PokiAuds | null =
   (import.meta.env.VITE_PORTAL_TARGET as string | undefined) === "poki"
@@ -446,12 +433,6 @@ export class Leaderboard {
           mode: row.mode,
           seed: row.seed,
           date: row.date,
-          // Which build set this score. AUDS always carried the field and the
-          // client never filled it, so every row read `build: ""`: once physics
-          // or scoring changes, there was no way to tell an old-format score
-          // from a new one (or to roll a board over per release). It is a semver
-          // + edition + commit sha — no device id, no PII.
-          build: BUILD_ID,
         }).catch(() => {
           /* AUDS failure must not surface — local board always works */
         });

@@ -107,16 +107,6 @@ export interface NetTransport {
   readonly connected: boolean;
   send(x: number, y: number, rotation: number, distance: number): void;
   poll(): RemoteSnapshot[];
-  /**
-   * Inbound cadence grade, when the transport can measure one.
-   *
-   * Optional on purpose: a transport that cannot grade its own link reports
-   * nothing and the UI says "unknown", rather than shared code reaching for a
-   * concrete client class — `this.net instanceof RealtimeClient` pulled the
-   * WebSocket client into every bundle, including the Poki build that swaps in
-   * the Netlib transport.
-   */
-  readonly connectionQuality?: "unknown" | "good" | "fair" | "poor";
 }
 
 /** Fallback short names for shuffle() and legacy callers; spawn() now uses the full pilot generator. */

@@ -72,6 +72,8 @@ export class ParticleFX {
     });
     this.points = new THREE.Points(geo, mat);
     this.points.frustumCulled = false;
+    // Celebration FX may bloom around the bird, but never owns the focal layer.
+    this.points.renderOrder = 40;
 
     for (let i = 0; i < 4; i++) {
       const ringGeo = new THREE.RingGeometry(0.6, 0.85, 24);
@@ -83,6 +85,7 @@ export class ParticleFX {
         depthWrite: false,
       });
       const mesh = new THREE.Mesh(ringGeo, ringMat);
+      mesh.renderOrder = 42;
       mesh.visible = false;
       this.rings.push(mesh);
     }

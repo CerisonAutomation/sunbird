@@ -73,6 +73,9 @@ export class Telemetry {
   private readonly outbox: CoarseEvent[] = [];
   private deviceId = "";
   private hookInstalled = false;
+  /** Keep spectacular moments useful without turning a single flight into a
+   * telemetry flood. The first five are exact; later moments are sampled. */
+  private viralMoments = 0;
   private readonly debug =
     typeof location !== "undefined" && /localhost|127\.0\.0\.1/.test(location.hostname);
 
@@ -83,6 +86,11 @@ export class Telemetry {
   }
 
   track(name: string, props: Props = {}): void {
+    if (name === "viral_moment") {
+      this.viralMoments += 1;
+      if (this.viralMoments > 5 && Math.random() > 0.1) return;
+    }
+    if (name === "run_start") this.viralMoments = 0;
     const entry: Entry = { name, props, t: Date.now() };
     this.buffer.push(entry);
     if (this.buffer.length > 100) this.buffer.shift();
@@ -97,6 +105,9 @@ export class Telemetry {
     if (endpointUrl() && this.outbox.length < 64) {
       this.outbox.push(coarseEvent(name, props));
     }
+    // A completed run is the natural flush boundary. This keeps the funnel
+    // intact even when a player closes the tab before visibilitychange fires.
+    if (name === "run_end") this.flush();
   }
 
   recent(): readonly Entry[] {

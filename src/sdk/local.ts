@@ -110,15 +110,7 @@ export class LocalAdapter implements PlatformAdapter {
   gameplayStart(): void {}
   gameplayStop(): void {}
   pause(): void {}
-<<<<<<< HEAD
   happyTime(): void {}
-=======
-  happyTime(_intensity: number): void {}
-  portalLanguage(): string | null {
-    return null;
-  }
-  movePill(_topPercent: number, _topPx: number): void {}
->>>>>>> origin/main
 
   /* ads — none */
   async commercialBreak(): Promise<void> {}

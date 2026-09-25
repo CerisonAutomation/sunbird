@@ -11,23 +11,18 @@ import { BIOMES, biomeForIsland } from "./Biomes";
 import { TRACK_NAMES } from "./Music";
 import { Bird, type BirdStepOpts } from "./Bird";
 import { AttractPilot } from "./pilot";
-import { CameraRig, clipShotFor } from "./CameraRig";
+import { CameraRig } from "./CameraRig";
 import { PICKUP_STYLE, Collectibles, type CloudKind, type PickupKind } from "./Collectibles";
-import { evaluateNearMiss, FlowTuner, SessionGoals, IDENTITY_TUNE, type DifficultyTune, type NearMiss, tuneDifficulty } from "./Engagement";
+import { evaluateNearMiss, FlowTuner, SessionGoals, type NearMiss } from "./Engagement";
 import { BIG_LAUNCH_QUIPS, BOP_QUIPS, FEVER_QUIPS, GEM_QUIPS, MILESTONE_QUIPS, SLEEP_QUIPS, SPLASH_QUIPS, SURRENDER_QUIPS, THUD_QUIPS, SurpriseEngine, quip } from "./Surprises";
-import { MOMENTS, MomentLedger, momentShouldReact, type MomentKind, ClipLedger, clipFromMoment, clipHappyTime, clipShareLine, viralScore, pickCta } from "./Moments";
-import { WEE_IDLE, fxScale, warpT, weeCheck, type WeeState } from "./SpeedFeel";
-import { arcShouldWrite, arcSmooth, arcTarget , runEnergy } from "./MusicArc";
-import { PRIVACY_POLICY_URL } from "./legal";
-import { Funnel, visitKind, type FunnelStage, viralEventProps } from "./Funnel";
+import { MOMENTS, MomentLedger, momentShouldReact, type MomentKind } from "./Moments";
+import { Funnel, type FunnelStage } from "./Funnel";
 import type { Fx } from "./Fx";
 import { DPR_COOLDOWN_SECONDS, EFFECT_UP_FRAME_SECONDS, nextBloomBudget, nextDpr, QUALITY_WINDOW_SECONDS } from "./quality";
 import { LaunchSystem, ratingLabel, type LaunchResult } from "./LaunchSystem";
 import { isRaceMode, MASS_RACE_FIELD, MODES, modeById, PVP_MODES, PVP_WORLDS, RACE_FINISH, type ModeDef, type ModeId, type PvpWorldCourse } from "./Modes";
 import { adBreakAllowsAction, adBreakCanEnd } from "./adGate";
 import { MassRace } from "./MassRace";
-import { BeatLine } from "./BeatLine";
-import { beatTargets, crossedBeatLines, nearestBeatLine, type BeatLineInput, type BeatLineKind, type BeatTarget } from "./BeatLines";
 import { FinishGate } from "./FinishGate";
 import { fetchPublicRooms, isMultiplayerConfigured, makeRoomCode, type AnyRealtimeClient } from "./Realtime";
 import { createNetTransport, prewarmNetTransport } from "./net-transport";
@@ -35,13 +30,8 @@ import { photoFinishMessage } from "./RacePolish";
 import { SlopeChain } from "./SlopeChain";
 import { RoomWatcher, ROOM_POLL_MS, roomSummaryLine, summarizeRooms, type LiveRoom } from "./RoomBrowser";
 import { Leaderboard, loadPilotName, savePilotName, isLeaderboardOnline, type BoardMetric, type BoardPage, type BoardScope } from "./Leaderboard";
-<<<<<<< HEAD
 import { generatePilotName, isPilotNameClean, moderatePilotName, pilotNameRejection } from "./pilotNameGenerator";
 import { adoptPortalLocale, setLocale, whenLocaleReady, type SupportedLocale } from "../i18n";
-=======
-import { generatePilotName, isPilotNameClean } from "./pilotNameGenerator";
-import { setLocale, t, whenLocaleReady, type SupportedLocale } from "../i18n";
->>>>>>> origin/main
 import { Tournaments, TRAILS, weekKey, type PrizeGrant } from "./Tournaments";
 import {
   dailyChallenge,
@@ -57,7 +47,6 @@ import {
 } from "./Challenges";
 import { bankMasteryRun, masteryPerks, masteryViews, NO_MASTERY_PERKS, type MasteryPerks } from "./Mastery";
 import { FirstFlight } from "./FirstFlight";
-import { ONBOARDING_TIPS, nextOnboardingTip, type OnboardingContext, type OnboardingId, type OnboardingTip } from "./Onboarding";
 import { bootStage, defer } from "./BootProgress";
 import { continueOffer, continuePlacementLabel, type ContinueOffer } from "./ContinueOffer";
 import { createWakeLock, type ScreenWakeLock } from "./WakeLock";
@@ -66,8 +55,6 @@ import { campaignProgress, campaignViews, CAMPAIGN } from "./Campaign";
 import { monthKey, monthlyTheme, THEME_TRAIL_CLEARS, weeklyEvent } from "./Events";
 import { emptySquadState, SquadClient } from "./Squad";
 import { PowerUps } from "./PowerUps";
-import { INFLIGHT_POWERUPS } from "./hud/components/InFlightShop";
-import { getPraise, getTimePressureMessage } from "./FunnyPraise";
 import { Racer } from "./Racer";
 import {
   ALT_CLOUDS,
@@ -100,7 +87,6 @@ import {
   DAILY_STIPEND,
   REFERRAL_BONUS,
   STALL_SPEED,
-  MAX_SPEED,
   WATER_Y,
 ZENITH_ALT,
 ZENITH_DURATION,
@@ -110,21 +96,18 @@ SHOP_AD_COINS,
 SHOP_AD_SESSION_CAP,
 } from "./constants";
 import { BOOSTS, COLLECTIONS, GOLD, PROMO_CODES, SHOP_TRAILS, SKINS, STARTER_PACK, VIP, WHEEL_SECTORS, dailyDealBoost, dailyFlashBird, skinById, type BoostView, type ShopTrailDef, type ShopTrailView, type SkinDef, type SkinView } from "./Economy";
-import { nextWings, wingsCrossing, wingsFor, wingsProgress, wingsPromotion } from "./Career";
-import { celebrationView, planCelebration, wingsProximity, type Celebration, type ProgressEvent } from "./ProgressBeats";
+import { nextWings, wingsFor, wingsProgress, wingsPromotion } from "./Career";
 import { GhostPlayer, GhostRecorder } from "./Ghost";
 import { fetchRivalGhost, publishGhost } from "./GhostNet";
 import { paceTargetDistance, synthesizePaceGhost } from "./RivalGhost";
-import { buildGauntletCard, buildRivalCard } from "./Cards";
 import { HUD, type CalendarCard, type CheckoutMode, type DailyCard, type GauntletCard, type HudSnapshot, type LoadoutView, type RivalCard, type SeedMode, type UiScreen, type UiState } from "./HUD";
-import { divisionFor, duelOpponent, duelSkillFor, lobbyRivals, rankSeasonId, seasonReward } from "./pvp";
+import { divisionFor, duelOpponent, duelSkillFor, lobbyRivals, nextDivision, rankSeasonId, seasonReward } from "./pvp";
 import { PilotBook } from "./pilots";
 import { launchIntentFor, pvpCircuitFor } from "./launchRouting";
 import { countSharePlay, loadSharedRun, shareRun, sharingAvailable, type SharedRun } from "./SharedRun";
 import { Input } from "./Input";
 import { clamp, dateSeed, formatDatePretty, lerp, SeededRandom } from "./math";
-import { Missions, missionRows, newlyDone, nextActionLine, type MissionView, type QuestReward, type MissionRow, type QuestView, type RunStats } from "./Missions";
-import { enqueue, enqueuePop, type BannerKind, type BannerMoment, type PopMoment } from "./HudFeedback";
+import { Missions, type MissionView, type QuestReward, type QuestView, type RunStats } from "./Missions";
 import { ParticleFX } from "./ParticleFX";
 import { TrailRibbon } from "./Trail";
 import { fetchServerEntitlements,
@@ -140,18 +123,11 @@ import { FlightCues } from "./FlightCues";
 import { endlessSpeedScale } from "./FlightProgression";
 import { buildChallengeUrl, readChallengeFromUrl, type RivalChallenge } from "./Challenge";
 import { flag } from "./Flags";
-import { EXPERIMENTS, variant } from "./Experiments";
+import { variant } from "./Experiments";
 import { buildRoomInviteUrl, normalizeRoomCode, readRoomInviteFromUrl } from "./RoomInvite";
-<<<<<<< HEAD
 import { PORTAL_BANNER_ID, attachPortalErrorReporters, initPlatform, installPageScrollGuards, isCoarsePointer, isPortalBuild, portalTarget as getPortalTarget, type PlatformAdapter } from "../sdk/platform";
 import { CUSTOM_PILOT_NAMES, POKI_MULTIPLAYER, SELL_AD_REMOVAL, SQUAD_CHAT } from "./edition";
 import { PRIVACY_URL } from "./legal";
-=======
-import { PORTAL_BANNER_ID, attachPortalErrorReporters, initPlatform, isCoarsePointer, isPortalBuild, portalTarget as getPortalTarget, type PlatformAdapter } from "../sdk/platform";
-import { CUSTOM_PILOT_NAMES, POKI_MULTIPLAYER, SELL_AD_REMOVAL, SIMULATED_BREAKS, SQUAD_CHAT } from "./edition";
-import { buildStamp } from "./version";
-import type { PokiNetlibClient } from "./PokiNetlib";
->>>>>>> origin/main
 import { GameplayEventSink } from "./GameplayEvents";
 import { LivingBackground } from "./LivingBackground";
 import { Sky } from "./Sky";
@@ -170,41 +146,6 @@ if (POKI_MULTIPLAYER) prewarmNetTransport();
 export type GameState = UiState;
 type AdReason = "continue" | "interstitial";
 
-/**
- * Which states count as "the player is interacting" for the portal gameplay
- * clock.
- *
- * Poki defines `gameplayStart()` as *interaction*, not "the run timer is
- * running": "fire when the player starts interacting (first input, level start,
- * unpause)", and the documented startup sequence is
- * `gameLoadingFinished()` → `gameplayStart()`. A menu-driven game that only
- * starts the clock when a flight begins reports **zero** engaged time for the
- * whole first minute of a session — the menu, the shop, the results screen and
- * every choice in between — and a player who browses for 50 s and leaves has
- * an engaged session of 0 s.
- *
- * So: the clock runs whenever the player can act, and stops only when they
- * genuinely cannot — an ad break (the portal owns the screen), paused, or the
- * tab is hidden. `GameplayEventSink` still guarantees no duplicate phase ever
- * reaches the SDK, which is the one thing the Inspector flags.
- */
-/** What triggered the shared speed burst — telemetry + the toast copy. */
-type ManualBoostSource = "double_tap" | "stall_rescue" | "tailwind";
-
-const MANUAL_BOOST_COPY: Record<ManualBoostSource, string> = {
-  double_tap: "DOUBLE TAP BOOST!",
-  stall_rescue: "STALL RESCUE BOOST!",
-  tailwind: "TAILWIND! Off like a shot",
-};
-
-const INTERACTIVE_STATES: ReadonlySet<GameState> = new Set<GameState>([
-  "menu", "playing", "gameover", "continue",
-]);
-
-function isInteractive(state: GameState): boolean {
-  return INTERACTIVE_STATES.has(state);
-}
-
 function hsl(h: number, s: number, l: number): [number, number, number] {
   const c = new THREE.Color().setHSL(h, s, l);
   return [c.r, c.g, c.b];
@@ -216,21 +157,6 @@ const RING_CHAIN_WINDOW = 2.8;
 const ASLEEP: BirdStepOpts = { diving: false, fever: false, speedMult: 1, boost: false };
 
 type BeforeInstallPromptEvent = Event & { prompt: () => Promise<void> };
-
-/** Flags alive at once — matches `BEAT_MAX_LINES`, the cap the pure seam returns. */
-const BEAT_MAX_FLAGS = 3;
-
-/**
- * The tint on each flag's band: a rival's mark is the same amber as their ghost
- * silhouette, so the flag and the bird you are chasing read as one opponent.
- */
-const BEAT_TINTS: Record<BeatLineKind, number> = {
-  rival: 0xffc86a,
-  best: 0xffd76a,
-  daily: 0x9dffb0,
-  today: 0xb6e0a8,
-  goal: 0xffffff,
-};
 
 export class Game {
   private readonly renderer: THREE.WebGLRenderer;
@@ -261,25 +187,13 @@ export class Game {
   private readonly sky: Sky;
   private readonly mockPayments = new CoinPaymentProvider();
   private readonly ads: AdProvider = new PlaceholderAdProvider();
-  /** Runs started since load. The Startup row exempts the first one from a break. */
+  /** Runs started since load. */
   private sessionRuns = 0;
-  /** Guards the break-then-run re-entry from requesting a break of its own. */
-  private inRunStartBreak = false;
   private platform: PlatformAdapter | null = null;
   /** Detaches the window error → `captureError` reporters (see platform boot). */
   private detachPortalErrorReporters: (() => void) | null = null;
-<<<<<<< HEAD
   /** Detacher for the host-page scroll guards (see installPageScrollGuards). */
   private detachPageScrollGuards: (() => void) | null = null;
-=======
-  /** Set once `maybeAutoOpenShop()` has fired; the hangar opens itself at most
-   * once per session, so a player who backs out is never dragged back in. */
-  private autoShopDone = false;
-  /** Wallet value from the previous auto-shop scan; -1 = never scanned. The
-   * hangar only opens for an item that crossed from "too dear" to "yours" since
-   * then, so it is always news and never a nag. */
-  private autoShopLastWallet = -1;
->>>>>>> origin/main
   /**
    * Every gameplayStart/gameplayStop that reaches a portal funnels through
    * this sink — Poki forbids a gameplay event following an identical one.
@@ -307,13 +221,6 @@ export class Game {
   /** Network rival ghost (async PvP on the daily seed) — amber silhouette. */
   private readonly rivalGhostPlayer = new GhostPlayer();
   private rivalGhostName = "";
-  /**
-   * True when the chase target is a generated pace ghost rather than a real
-   * pilot's flight. The copy has to differ: claiming a synthetic line was flown
-   * by a person would poison every rival in the game the day a player works it
-   * out (see `RivalGhost.ts`).
-   */
-  private rivalGhostSynthetic = false;
   private rivalGhostPassed = false;
   /** Run counter — guards async ghost loads against arriving mid-next-run. */
   private runEpoch = 0;
@@ -357,17 +264,6 @@ export class Game {
   private zenithTimer = 0;
   private hitStopTimer = 0;
   private frameEma = 1 / 60;
-  /** Hysteresis state for the WEE celebration (see SpeedFeel.weeCheck). */
-  private weeState: WeeState = WEE_IDLE;
-  /** Fastest speed reached this run, for `run_end.speedPeak` (units/s). */
-  private speedPeak = 0;
-  /** Smoothed music-arc intensity, and the last value actually written to the
-   *  audio graph (see MusicArc.arcShouldWrite — the dead band exists so the
-   *  automation timeline does not grow by one event per frame). */
-  private arcIntensity = 0;
-  private arcWritten = 0;
-  /** Last particle budget pushed to ParticleFX, so we only write on change. */
-  private fxBudget = 1;
   /** Wall-clock ms of the last emitted frame_error telemetry (throttled). */
   private frameErrAt = 0;
   /** Rolling field-performance stats, flushed to telemetry every ~10s so a
@@ -402,8 +298,6 @@ export class Game {
   private readonly wakeLock: ScreenWakeLock = createWakeLock();
   /** Context-driven rewarded framing for the continue screen (MON-19). */
   private continueOfferView: ContinueOffer | null = null;
-  /** Current progressive onboarding tip, or null when none eligible */
-  private onboardingTip: OnboardingTip | null = null;
 
   private daylight = DAYLIGHT_MAX;
   /** Seconds the bird has sat settled (grounded/water, slow, no input). */
@@ -424,30 +318,10 @@ export class Game {
   private splashCd = 0;
   private thudCount = 0;
   private bounceCount = 0;
-  /**
-   * The run's moment ledger: every BONK / SPLOSH / BOING / PHEW / PERFECT /
-   * PANIC / SLEEP / RECORD, tallied for the results card, the share line and
-   * the retention funnel. Classification and copy both live in `Moments.ts` so
-   * one table drives popups, haptics, telemetry and the recap.
-   */
+  /** One source of truth for clip-worthy beats, recap telemetry and first-laugh conversion. */
   private readonly moments = new MomentLedger();
-  /** Share-layer ledger: near-miss / overtake / photo-finish / crash / clean. */
-  private readonly clips = new ClipLedger();
-  /** Previous finished run, for Engagement.tuneDifficulty (resetRun zeroes the bird). */
-  private lastFinishedDistance = 0;
-  private lastFinishedDuration = 0;
-  private recentPlaces: number[] = [];
-  private lastViralScore = 0;
-  /** Casual-only contest feel. Identity on rated / live rooms. */
-  private difficultyTune: DifficultyTune = IDENTITY_TUNE;
-  /**
-   * Retention funnel: when this session first saw a tap, a flight, a coin, a
-   * laugh, a death and a retry. One beacon per stage, ever - see `Funnel.ts`.
-   */
   private readonly funnel = new Funnel();
-  /** `funnel_summary` fires at most once per session (first tab-hide). */
   private funnelSummarySent = false;
-  /** Run-clock stamp of each kind's last *shown* reaction (throttle budget). */
   private momentLastAt: Partial<Record<MomentKind, number>> = {};
   private konamiBuffer: string[] = [];
   /** Edge-trigger for the ocean-entry splash burst (see fixedUpdate). */
@@ -517,15 +391,6 @@ export class Game {
   private readonly launch = new LaunchSystem();
   private readonly massRace = new MassRace();
   private readonly finishGate = new FinishGate();
-  /**
-   * The "can you beat this?" flags: a pool of `BEAT_MAX_LINES` world props, stood
-   * at the marks ahead of the bird and hidden when a slot has nothing to show.
-   */
-  private readonly beatFlags: BeatLine[] = [];
-  private beatAhead: BeatTarget[] = [];
-  private beatCue: BeatTarget | null = null;
-  private beatFired = new Set<string>();
-  private beatPollT = 0;
   private finishRemaining = -1;
   private readonly board: Leaderboard;
   private readonly cups: Tournaments;
@@ -639,41 +504,18 @@ export class Game {
   private readonly goals: SessionGoals;
   private nearMiss: NearMiss = { kind: "none", gap: 0, text: "" };
   private goalPop = "";
-  private goalPopT = 0;
   private goalPopKind: "goal" | "quest" = "goal";
-  /** Session goals completed this run — the only music term that cannot fall. */
-  private runGoalsDone = 0;
-  /** Moments waiting for the single pill, in the order they were earned. */
-  private popQueue: PopMoment[] = [];
-  /** Career rung crossed during this flight: banner text and its own timer. */
+  private goalPopT = 0;
   private rankUp = "";
-  private rankUpKind: BannerKind = "rank";
   private rankUpT = 0;
-  private rankCued = false;
-  /** Banners waiting for the one banner slot, in the order they were earned. */
-  private bannerQueue: BannerMoment[] = [];
-  /** Today's quest rows as of the last live poll, so crossings fire once. */
-  private questRowsPrev: MissionRow[] = [];
-  private questPollT = 0;
   private recordBanner = "";
   /** Previous personal-best distance, captured at run start (for the record loop). */
   private bestAtStart = 0;
   private distanceRecordCrossed = false;
   private newBest = false;
-<<<<<<< HEAD
   /** Distance frozen at finishRun() — see the comment there. Read by pushHud()
    *  so the results screen can't drift away from the number that was scored. */
   private resultDistance = 0;
-=======
-  /** Progression this flight earned — collected into ONE ranked celebration. */
-  private progressEvents: ProgressEvent[] = [];
-  /** The plan the results card renders (`ProgressBeats.ts` decides it). */
-  private celebration: Celebration = planCelebration([]);
-  /** Career-wings proximity: the bar that fills while a rank-up approaches. */
-  private proximity = { visible: false, fill: 0, remaining: 0, name: "" };
-  /** One shimmer per flight, fired in the last stretch of the rung. */
-  private proximityCued = false;
->>>>>>> origin/main
   private runGems = 0;
   private runRings = 0;
   private ringChain = 0;
@@ -754,8 +596,6 @@ export class Game {
   private readonly loop: (t: number) => void;
 
   constructor(private readonly host: HTMLElement) {
-    // The funnel clock starts before anything is built, so the "boot" mark
-    // measures real time-to-interactive instead of always reading zero.
     this.funnel.start();
     this.save = new SaveData();
     this.social = new SocialSystem(this.save);
@@ -780,11 +620,6 @@ export class Game {
     crashReporter.attach(this.telemetry);
     const priorCrashes = crashReporter.previousSessionCrashes.length;
     if (priorCrashes > 0) this.telemetry.track("boot_after_crash", { count: priorCrashes });
-    // Build identity, once per boot: the line a player bug report, a portal
-    // review or a crash journal gets tied back to. `console.debug` only (shipped
-    // code may not carry log/warn/info — `verify:prod` fails on them) and no PII:
-    // a semver, an edition name and a commit sha. See docs/VERSIONS.md.
-    console.debug(buildStamp());
     this.watchdog.start();
     // Persistence failures (quota / blocked storage) lose progress silently
     // unless we say so — route them through the same observability bus.
@@ -930,9 +765,6 @@ export class Game {
     this.hud = new HUD(host);
     this.input = new Input(host, () => {
       void this.audio.resume();
-      // The first touch is the first real commitment a portal visitor makes and
-      // the cheapest stage to lose. Marked from the input callback itself, so
-      // no input path (mouse, touch, key, pad) can be missed.
       this.markFunnel("first_input");
     });
     this.audio = new GameAudio();
@@ -944,17 +776,12 @@ export class Game {
       if (this.state === "menu" || this.state === "playing") this.hud.toast(`♪ ${name}`, "info");
     });
 
-    // Critical preload: bird first (player must see self immediately), then first 2 islands
-    // (920 units each = 1840). Remaining chunks load via idle — EA-05 progressive.
+    this.terrain = new TerrainSystem(this.seed);
+    this.scene.add(this.terrain.group);
+    bootStage("world");
+
     this.bird = new Bird();
     this.bird.addTo(this.scene);
-    const qualityTier = this.deviceProfile.tier === "lite" ? "lite" : this.deviceProfile.tier === "standard" ? "mid" : "high";
-    this.terrain = new TerrainSystem(this.seed, qualityTier);
-    this.scene.add(this.terrain.group);
-    // Pre-warm first 2 islands synchronously — player spawns at 0, needs 0-1840 visible
-    this.terrain.update(0);
-    this.terrain.update(920);
-    bootStage("world");
     this.ghostPlayer.addTo(this.scene);
     this.rivalGhostPlayer.addTo(this.scene);
     this.rivalGhostPlayer.setTint(0xffc86a, 0xffe8b0);
@@ -970,17 +797,12 @@ export class Game {
     this.scene.add(this.sky.group);
     this.sky.addLights(this.scene);
 
-    this.collect = new Collectibles(this.terrain.seedN, this.seed, qualityTier);
+    this.collect = new Collectibles(this.terrain.seedN);
     this.scene.add(this.collect.group);
     this.weather = new Weather(this.terrain.seedN);
     this.weather.addTo(this.scene);
     this.massRace.addTo(this.scene);
     this.finishGate.addTo(this.scene);
-    for (let i = 0; i < BEAT_MAX_FLAGS; i++) {
-      const flag = new BeatLine();
-      flag.addTo(this.scene);
-      this.beatFlags.push(flag);
-    }
 
     this.applySkin();
     this.applySettings();
@@ -998,12 +820,8 @@ export class Game {
         this.modeId = rival.mode as ModeId;
         this.mode = modeById(this.modeId);
       }
-      this.hud.toast(
-        t("toast.rival.challenge", { name: rival.name, distance: rival.distance }, "🥊 {name} challenged you: beat {distance} m on their hills"),
-        "quest",
-      );
+      this.hud.toast(`🥊 ${rival.name} challenged you: beat ${rival.distance} m on their hills`, "quest");
       this.telemetry.track("rival_received", { distance: rival.distance, mode: this.modeId });
-      this.telemetry.track("challenge_open", viralEventProps("challenge_open", { mode: this.modeId, distance: rival.distance }));
     }
 
     // Room invite links: #room=CODE → seat straight into that private room.
@@ -1090,8 +908,6 @@ export class Game {
     this.onVis = () => {
       if (document.hidden) {
         this.hidden = true;
-        // A tab going quiet is the last chance to ask "how far did they get?".
-        // One beacon: the path walked, where it stalled, how long it sat there.
         if (!this.funnelSummarySent) {
           this.funnelSummarySent = true;
           const drop = this.funnel.dropOff();
@@ -1103,10 +919,6 @@ export class Game {
             stuckForMs: drop?.stuckForMs ?? 0,
           });
         }
-        // A hidden tab is not being played: stop the portal clock even when the
-        // player was only browsing the menu (setState("paused") below only runs
-        // mid-flight, so without this the clock would keep running forever).
-        this.gameplaySink.send("stop");
         if (this.state === "playing") this.setState("paused");
         // Portal QA requirement (and basic courtesy): a hidden tab is silent.
         this.audio.setHiddenMuted(true);
@@ -1117,7 +929,6 @@ export class Game {
         this.acc = 0;
         this.audio.setHiddenMuted(false);
         void this.audio.resumeExisting();
-        if (isInteractive(this.state)) this.gameplaySink.send("start");
       }
     };
     document.addEventListener("visibilitychange", this.onVis);
@@ -1138,9 +949,7 @@ export class Game {
     this.last = performance.now();
     this.raf = requestAnimationFrame(this.loop);
 
-    // First two sessions run on the starter goal table so the first reward
-    // lands inside ~30 s of play instead of after a flight they cannot yet fly.
-    this.goals.reset(this.today, { starter: this.save.state.runsPlayed < 2 });
+    this.goals.reset(this.today);
     // monthly VIP really lapses — surface it once per session
     this.vipActive = this.save.isVipActive();
     if (this.save.state.vip === false && this.save.state.vipUntil > 0) this.vipExpiredNotice = true;
@@ -1221,12 +1030,10 @@ export class Game {
       adapter.movePill(0, 56);
       adapter.loadingFinished();
       adapter.signalGameReady();
-      // Poki's documented startup sequence is gameLoadingFinished() →
-      // gameplayStart(): the player is now looking at an interactive menu, so
-      // the engaged clock starts here rather than at the first flight. The
-      // sink suppresses any repeat on a later transition, so a late-landing
-      // SDK can never double-start.
-      if (isInteractive(this.state) && !this.hidden) this.gameplaySink.send("start");
+      // Late-landing sync: if the player is already mid-flight when the
+      // SDK arrives, start fires once — the sink suppresses the repeat
+      // on the next genuine transition and never replays a stale phase.
+      if (this.state === "playing") this.gameplaySink.send("start");
       this.telemetry.track("portal_ready", { portal: adapter.name, caps: adapter.capabilities().join(",") });
 
       // Portal-native room invite (CrazyGames instant multiplayer): the
@@ -1277,7 +1084,6 @@ export class Game {
     bootStage("flight");
     this.bump();
     this.pushHud();
-<<<<<<< HEAD
     // First use: ask for a name only where the player can actually choose one.
     // Portal editions roll a curated call sign instead of accepting typed text
     // (edition CUSTOM_PILOT_NAMES), so a "confirm your name" screen there has
@@ -1287,11 +1093,6 @@ export class Game {
     // silently instead; the 🎲 on the board page can still reroll it, and
     // `pilotNameChosen` stays false so a signed-in player is still adopted by
     // `adoptPortalIdentity()` when the portal identity resolves.
-=======
-    this.noteSessionStart();
-    this.updateOnboarding();
-    // Show name entry on first use
->>>>>>> origin/main
     if (!this.save.state.pilotNameCustomized && this.state === "menu") {
       if (CUSTOM_PILOT_NAMES) {
         this.setScreen("nameEntry");
@@ -1364,8 +1165,6 @@ export class Game {
     this.net?.disconnect();
     this.massRace.dispose();
     this.finishGate.dispose();
-    for (const flag of this.beatFlags) flag.dispose();
-    this.beatFlags.length = 0;
     this.input.dispose();
     this.audio.dispose();
     this.hud.dispose();
@@ -1523,29 +1322,11 @@ export class Game {
     if (this.launchBannerT > 0) this.launchBannerT = Math.max(0, this.launchBannerT - raw);
     if (this.goalPopT > 0) {
       this.goalPopT = Math.max(0, this.goalPopT - raw);
-      if (this.goalPopT === 0) {
-        // The pill is free: hand it to the next moment earned while it was busy,
-        // so nothing the player did goes unreported.
-        const next = this.popQueue.shift();
-        if (next) {
-          this.goalPop = next.text;
-          this.goalPopKind = next.kind;
-          this.goalPopT = 2.6;
-        }
-        this.bump();
-      }
+      if (this.goalPopT === 0) this.bump();
     }
     if (this.rankUpT > 0) {
       this.rankUpT = Math.max(0, this.rankUpT - raw);
-      if (this.rankUpT === 0) {
-        const next = this.bannerQueue.shift();
-        if (next) {
-          this.rankUp = next.text;
-          this.rankUpKind = next.kind;
-          this.rankUpT = 2.6;
-        }
-        this.bump();
-      }
+      if (this.rankUpT === 0) this.rankUp = "";
     }
     this.input.pollGamepads();
     this.render(simDt, raw);
@@ -1665,13 +1446,6 @@ export class Game {
     // hill timing remains the skill expression. A stalled bird can also use
     // the same rescue burst once the cooldown is clear.
     if (!this.fairRace && this.save.hasUpgrade("doubletap") && this.save.state.settings.doubleTapBoost && this.input.consumeBoost() && this.manualBoostCooldown <= 0) this.activateManualBoost("double_tap");
-    // PANIC: a grounded bird bleeding speed is the most anxious beat a run has.
-    // Tallied and buzzed for even when no rescue boost is owned - that is
-    // exactly the flight the results card should be able to talk about, and the
-    // shared throttle keeps it off every physics frame.
-    if (this.bird.grounded && this.bird.speed() < STALL_SPEED && this.runTime > 1.5 && this.bird.x - this.startX > 40) {
-      this.fireMoment("panic", { popup: false });
-    }
     if (!this.fairRace && this.save.hasUpgrade("doubletap") && this.save.state.settings.doubleTapBoost && this.bird.grounded && this.bird.speed() < STALL_SPEED && this.manualBoostCooldown <= 0 && this.runTime > 1.2) {
       this.activateManualBoost("stall_rescue");
     }
@@ -1712,10 +1486,9 @@ export class Game {
       });
       if (this.coach.done) {
         this.save.state.firstFlightDone = true;
-        const firstFlightCoins = 50;
-        this.save.addCoins(firstFlightCoins);
+        this.save.addCoins(50);
         this.save.persist();
-        this.hud.toast(t("hud.toast.firstFlight", { n: firstFlightCoins }, "🕊 First flight complete · +{{n}} coins — the sky is yours"), "gold");
+        this.hud.toast("🕊 First flight complete · +50 coins — the sky is yours", "gold");
         this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
       }
     }
@@ -1726,12 +1499,7 @@ export class Game {
       const rx = this.rivalGhostPlayer.update(this.runTime, dt);
       if (rx !== null && !this.rivalGhostPassed && this.bird.x > rx + 0.5 && this.runTime > 4) {
         this.rivalGhostPassed = true;
-        this.hud.toast(
-          this.rivalGhostSynthetic
-            ? `👻 Pace beaten — you are ahead of the ${this.rivalGhostName.replace("Pace · ", "")} line`
-            : `👻 Passed ${this.rivalGhostName}'s flight!`,
-          "gold",
-        );
+        this.hud.toast(`👻 Passed ${this.rivalGhostName}'s flight!`, "gold");
         this.audio.ding();
         this.bonus += 60;
       }
@@ -1744,21 +1512,10 @@ export class Game {
         if (ahead && this.ghostWasAhead && !this.ghostPassed && this.runTime > 4) {
           this.ghostPassed = true;
           this.save.addGhostBeat();
-<<<<<<< HEAD
           const newTrophies = this.achievements.checkNew();
           for (const t of newTrophies) this.hud.toast(`Trophy: ${t.title}`, "gold");
           if (newTrophies.length > 0) this.audio.trophy();
           this.hud.toast("Passed your ghost! 👻", "quest");
-=======
-          for (const trophy of this.achievements.checkNew()) {
-            // Announced now (the flight is still live) and again on the card, so
-            // a trophy unlocked behind a hill is not lost when the run ends.
-            this.progressEvents.push({ kind: "trophy", id: trophy.id, title: trophy.title, rarity: trophy.rarity });
-            this.hud.toast(t("hud.toast.trophy", { title: trophy.title }, "Trophy: {{title}}"), "gold");
-            this.portalAchievement(trophy.id);
-          }
-          this.hud.toast(t("toast.ghost.passed", undefined, "Passed your ghost! 👻"), "quest");
->>>>>>> origin/main
           this.audio.ding();
           this.bonus += 30;
           this.awardXp(XP_RULES.ghostBeat);
@@ -1775,7 +1532,7 @@ export class Game {
         // message — toasting every thermal doubled the same text on screen.
         if (!this.thermalToasted && this.hintTimer < 40) {
           this.thermalToasted = true;
-          this.hud.toast(t("hud.toast.thermal", undefined, "Thermal — release to ride it"), "power");
+          this.hud.toast("Thermal — release to ride it", "power");
         }
       },
       onGustStart: () => {
@@ -1921,15 +1678,6 @@ export class Game {
         const place = this.massRace.standings(this.bird.x, this.startX, this.pilotName, 8).place;
         if (this.lastPlace > 0 && place > 0 && place < this.lastPlace) {
           const gain = this.lastPlace - place;
-          if (flag("clipWorthy")) {
-            const first = this.clips.isFirstEver("overtake");
-            this.clips.record("overtake");
-            if (first) {
-              this.telemetry.track("clip_moment", viralEventProps("clip_moment", { kind: "overtake", mode: this.modeId }));
-              this.platform?.happyTime(clipHappyTime("overtake"));
-              this.camera.pulseClip(clipShotFor("overtake"), Math.min(1.2, this.bird.speed() / MAX_SPEED), this.bird.altitude);
-            }
-          }
           this.hud.toast(place === 1 ? "👑 LEAD! Hold it!" : `P${this.lastPlace} → P${place}!`, "gold");
           if (place === 1) {
             this.flash("perfect");
@@ -1974,12 +1722,7 @@ export class Game {
       // sound behind it.
       this.audio.boing();
       this.hud.toast("Shield bounce!", "power");
-<<<<<<< HEAD
-      this.popupAtBird(this.bopWord(), "bop");
-=======
-      this.bounceCount += 1;
-      this.fireMoment("boing", { shout: quip(BOP_QUIPS, this.bounceCount), always: true });
->>>>>>> origin/main
+      this.fireMoment("boing", { shout: this.bopWord(), always: true });
       this.shake(0.6);
       this.haptic([15, 10, 15, 10, 30]);
     }
@@ -1996,18 +1739,15 @@ export class Game {
         if (this.bird.impact > 8) {
           const ridge = this.terrain.biomeAt(this.bird.x).ridge;
           this.particles.emitThunk(this.bird.x, this.bird.y, ((ridge >> 16) & 255) / 255, ((ridge >> 8) & 255) / 255, (ridge & 255) / 255);
-          // BONK: hard contact with the world. Shout it - a hit the player only
-          // hears is a hit they will blame the game for.
           this.fireMoment("bonk", { shout: "BONK!" });
         } else {
           this.particles.emitDust(this.bird.x, this.bird.y, this.bird.speed(), slope);
         }
       } else if (this.bird.landingQuality < LAND_PERFECT && this.bird.impact < 2.4 && this.bird.speed() > 36 && diving && slope < -0.05) {
         // tangential touchdown at speed on a downslope: reward the finesse
-        const butterBonus = 10;
-        this.bonus += butterBonus;
+        this.bonus += 10;
         this.audio.butter();
-        this.hud.toast(t("hud.toast.butterLanding", { n: butterBonus }, "Butter landing +{{n}}"), "cloud");
+        this.hud.toast("Butter landing +10", "cloud");
         this.particles.burstRing(this.bird.x, this.bird.y, 0xffffff);
       }
     }
@@ -2019,12 +1759,11 @@ export class Game {
 
     // Ridge skim: airborne, fast, and hugging the hill — flow-state bonus.
     this.skimCd = Math.max(0, this.skimCd - dt);
-    const skimCeil = 3.2 + this.difficultyTune.ridgeForgiveness;
     const skimming =
       !this.bird.grounded &&
       !this.bird.inWater &&
       this.bird.altitude > 0.4 &&
-      this.bird.altitude < skimCeil &&
+      this.bird.altitude < 3.2 &&
       this.bird.speed() > 40;
     if (skimming) {
       this.skimTime += dt;
@@ -2034,32 +1773,14 @@ export class Game {
         this.bonus += pts;
         this.awardXp(XP_RULES.coin);
         this.audio.ridgeSkim();
-        // PHEW: skimming a ridge at speed is the run's "that close" beat. The
-        // bespoke popup and audio stay; the ledger gets the moment.
         this.fireMoment("phew", { popup: false });
         this.popupAtBird("RIDGE SKIM! +15", "power");
-        this.hud.toast(t("hud.toast.ridgeSkim", { n: pts }, "Ridge skim +{{n}}"), "cloud");
+        this.hud.toast(`Ridge skim +${pts}`, "cloud");
         this.particles.emitDust(this.bird.x, this.terrain.heightAt(this.bird.x) + 0.4, this.bird.speed(), slope);
       }
     } else if (this.bird.altitude > 6 || this.bird.grounded) {
       this.skimTime = 0;
     }
-
-    // WEE: warp speed while diving. Every other moment in the ledger is a
-    // collision with the world; this one is the world falling away, and it is
-    // the beat that tells the player the fast line they just found was the
-    // point of the game. SpeedFeel owns the hysteresis (fire once per
-    // acceleration, re-arm below the rush band) and `momentShouldReact` inside
-    // fireMoment owns the repeat gap, so a chaotic flight cannot turn it into
-    // a machine gun.
-    const spd = this.bird.speed();
-    const speedNorm = Math.min(1.2, spd / MAX_SPEED);
-    // Peak speed is the one number that says whether a flight *felt* fast, so
-    // it rides along on run_end instead of needing its own event.
-    if (spd > this.speedPeak) this.speedPeak = spd;
-    const wee = weeCheck(this.weeState, speedNorm, this.bird.vy);
-    this.weeState = wee.state;
-    if (wee.fire) this.fireMoment("wee");
     if (this.feverOn || this.boostTimer > 0 || this.bird.speed() > 48 || ((this.gameplaySkin.magnetAlways || this.gameplaySkin.id === "aurora") && this.bird.speed() > 24)) {
       this.emitTrail(dt);
     }
@@ -2090,10 +1811,10 @@ export class Game {
       this.splashCd = 0.55;
       this.particles.emitSplash(this.bird.x, WATER_Y);
       this.audio.splash();
+      this.fireMoment("splash", { popup: false });
       this.shake(0.45);
       this.daylight = Math.max(0, this.daylight - DAYLIGHT_OCEAN_PENALTY);
       this.splashQuipN += 1;
-      this.fireMoment("splash", { popup: false });
       if (this.splashQuipN % 3 === 1) this.hud.toast(quip(SPLASH_QUIPS, this.splashQuipN), "cloud");
     }
 
@@ -2150,10 +1871,8 @@ export class Game {
           break;
       }
       if (surprise.coins > 0) {
-        // Banked once, at the end of the flight, like every other coin this run
-        // earns. This used to also call `save.addCoins()` on the spot, which
-        // paid every surprise twice: once live and again through `recordRun`.
-        this.addRunCoins(surprise.coins);
+        this.runCoins += surprise.coins;
+        this.save.addCoins(surprise.coins);
       }
       this.telemetry.track("surprise", { kind: surprise.kind });
     }
@@ -2182,7 +1901,7 @@ export class Game {
     }
 
     const magnetOn = this.feverOn || this.magnetTimer > 0 || this.gameplaySkin.magnetAlways || this.powers.magnetOn();
-    this.collect.update(dt, this.bird, this.terrain, magnetOn, this.elapsed, this.powers.magnetScale() * (1 + this.difficultyTune.magnetBonus), {
+    this.collect.update(dt, this.bird, this.terrain, magnetOn, this.elapsed, this.powers.magnetScale(), {
       onCoin: (x, y, gem) => {
         const base = gem ? 5 : 1;
         const value = Math.round(
@@ -2196,8 +1915,9 @@ export class Game {
             (this.goldenHour ? 2 : 1) *
             (this.stormfront && this.stormPhase >= 3 ? 2 : 1),
         );
-        const awarded = this.addRunCoins(value);
-        this.bonus += 4 * COIN_VALUE * awarded;
+        this.runCoins += value;
+        this.markFunnel("first_reward");
+        this.bonus += 4 * COIN_VALUE * value;
         if (this.modeId === "pvp_coinrush") {
           this.bird.vx = Math.min(225, this.bird.vx + 2.5);
           this.popupAtBird("COIN TURBO! ⚡", "splash");
@@ -2210,7 +1930,7 @@ export class Game {
           this.particles.burstRing(x, y, 0x9ae8ff);
           this.particles.emitSonicBoom(x, y);
           this.glow(0.8);
-          this.hud.toast(t("hud.toast.skyGem", { n: value }, "Sky gem +{{n}}"), "gold");
+          this.hud.toast(`Sky gem +${value}`, "gold");
           if (this.runGems % 2 === 1) this.hud.toast(quip(GEM_QUIPS, this.runGems), "gold");
         }
         this.haptic(8);
@@ -2245,7 +1965,7 @@ export class Game {
       // banks the real record with a single persist.
       if (this.maxAltitude > this.save.state.bestAltitude && this.save.state.bestAltitude > 40 && this.recordBanner !== "altitude") {
         this.recordBanner = "altitude";
-        this.fireMoment("record", { popup: false, toast: "👑 NEW ALTITUDE RECORD", always: true });
+        this.hud.toast("NEW ALTITUDE RECORD", "gold");
         this.flash("perfect");
       }
     }
@@ -2270,8 +1990,7 @@ export class Game {
     if (!this.distanceRecordCrossed && this.bestAtStart > 0 && runDist > this.bestAtStart) {
       this.distanceRecordCrossed = true;
       this.audio.fanfare();
-      this.fireMoment("record", { popup: false, always: true });
-      this.hud.toast(t("hud.toast.newRecord", undefined, "👑 NEW DISTANCE RECORD — keep flying!"), "gold");
+      this.hud.toast("👑 NEW DISTANCE RECORD — keep flying!", "gold");
       this.flash("perfect");
       this.particles.emitConfetti(this.bird.x, this.bird.y + 4);
       this.glow(0.9);
@@ -2301,10 +2020,7 @@ export class Game {
     if (this.rival && !this.rivalBeatenToast && this.seed === this.rival.seed && runDist >= this.rival.distance) {
       this.rivalBeatenToast = true;
       this.audio.rivalDown();
-      this.hud.toast(
-        t("toast.rival.passed", { name: this.rival.name }, "🥊 Passed {name}'s mark — keep flying!"),
-        "gold",
-      );
+      this.hud.toast(`🥊 Passed ${this.rival.name}'s mark — keep flying!`, "gold");
     }
 
     // Finish line (Race / Mass Race) — reached by distance, not by clock.
@@ -2326,12 +2042,6 @@ export class Game {
           .sort((a, b) => Math.abs(a.distance - (you?.distance ?? 0)) - Math.abs(b.distance - (you?.distance ?? 0)))[0];
         if (rival && you && Math.abs(rival.distance - you.distance) < 25) {
           const won = you.distance > rival.distance;
-          if (flag("clipWorthy")) {
-            this.clips.record("last_second");
-            this.telemetry.track("clip_moment", viralEventProps("clip_moment", { kind: "last_second", mode: this.modeId }));
-            this.platform?.happyTime(clipHappyTime("last_second"));
-            this.camera.pulseClip(clipShotFor("last_second"), Math.min(1.2, this.bird.speed() / MAX_SPEED), this.bird.altitude);
-          }
           this.photoFinish = photoFinishMessage(won, rival.name, Math.abs(rival.distance - you.distance));
           if (!won) this.nemesis = rival.name;
           this.hud.toast(this.photoFinish, won ? "gold" : "warn");
@@ -2399,7 +2109,7 @@ export class Game {
     }
 
     if (this.mode.clock > 0) {
-      this.daylight -= dt * this.difficultyTune.daylightMult;
+      this.daylight -= dt;
       // GOLDEN HOUR — the last 22% of the day. The world turns amber, the
       // music opens, and every coin is worth double. Deep runs get a reason.
       const goldenNow = this.daylight > 0 && this.daylight < this.daylightMax() * 0.22;
@@ -2457,109 +2167,15 @@ export class Game {
       gems: this.runGems,
       sunflowers: this.runSunflowers,
     });
-    this.runGoalsDone += done.length;
     for (const g of done) {
       this.save.addCoins(g.reward);
       this.audio.ding();
       this.goalPop = `${g.label} ✓  +${g.reward}`;
+      this.goalPopKind = "quest";
       this.goalPopT = 2.6;
-      this.hud.toast(t("hud.toast.goalComplete", { n: g.reward }, "Goal complete +{{n}}"), "quest");
+      this.hud.toast(`Goal complete +${g.reward}`, "quest");
       this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
       this.bump();
-    }
-
-    // Today's quests, read against *live* counters so the day horizon fires in
-    // the run instead of only on the card afterwards. Sampled at 5 Hz: three rows
-    // is nothing, but this is the 60 fps hot path and a crossing only has to feel
-    // instant, not be instant.
-    this.questPollT -= dt;
-    if (this.questPollT <= 0) {
-      this.questPollT = 0.2;
-      const rows = missionRows(
-        this.missions.dailyQuests(this.today),
-        this.runStats(),
-        this.save.questsClaimed(this.today),
-      );
-      for (const q of newlyDone(this.questRowsPrev, rows)) {
-        // Coins are paid when the run lands, so the pill says so: a reward that
-        // reads as instant and arrives later feels like the game lied.
-        this.popQueue = enqueuePop(this.popQueue, { text: `${q.title} \u2713  +${q.reward} on landing`, kind: "quest" }, 3);
-        this.audio.ding();
-        this.telemetry.track("quest_live", { id: q.id });
-        this.bump();
-      }
-      this.questRowsPrev = rows;
-    }
-
-    // "Can you beat this?" — the marks ahead of the bird, as flags in the world.
-    // Crossings are tested every frame against the marks that were ahead, so a
-    // flag is beaten on the frame it is beaten; the target list itself is rebuilt
-    // at 4 Hz, because sorting five candidates is not worth doing sixty times a
-    // second when the numbers move once a run.
-    {
-      const flown = Math.max(0, this.bird.x - this.startX);
-      const crossed = crossedBeatLines(this.beatAhead, flown);
-      if (crossed.length) {
-        const keys = new Set(crossed.map((c) => `${c.kind}:${c.at}`));
-        this.beatAhead = this.beatAhead.filter((t) => !keys.has(`${t.kind}:${t.at}`));
-        for (const t of crossed) this.beatLineCrossed(t);
-      }
-      this.beatPollT -= dt;
-      if (this.beatPollT <= 0) {
-        this.beatPollT = 0.25;
-        this.beatAhead = beatTargets(this.beatInput(flown));
-        this.beatCue = nearestBeatLine(this.beatAhead, flown);
-        this.placeBeatFlags();
-      }
-    }
-
-    // Career wings are fed by every metre of every flight, but the ladder used
-    // to be something you only ever saw on a menu. Show the last stretch of the
-    // rung as a bar filling while the player flies: progress felt *during* the
-    // run is what makes the promotion at the end read as earned rather than
-    // random. Only the wings ladder qualifies — it is free to evaluate per frame
-    // and true on every flight, where 46 trophy metrics are neither.
-    {
-      const life = this.save.state.lifetime.distance;
-      const next = nextWings(life);
-      if (next) {
-        const near = wingsProximity({
-          flownMetres: Math.max(0, this.bird.x - this.startX),
-          nextName: next.tier.name,
-          nextNeeded: next.needed,
-          tierSpan: next.tier.min - wingsFor(life).min,
-        });
-        this.proximity = { visible: near.visible, fill: near.fill, remaining: near.remaining, name: next.tier.name };
-        if (near.visible && near.imminence >= 0.85 && !this.proximityCued) {
-          this.proximityCued = true;
-          this.audio.apexChime();
-        }
-        // The crossing itself: the biggest status jump in the game, felt at the
-        // instant it is earned instead of read off a card 20 s later. No portal
-        // event here on purpose — the run-end `wingsPromotion` already owns the
-        // `wings_promo` telemetry and the single happyTime peak, and Poki asks
-        // for that signal sparingly.
-        if (
-          wingsCrossing({
-            flownMetres: Math.max(0, this.bird.x - this.startX),
-            nextNeeded: next.needed,
-            alreadyCued: this.rankCued,
-          })
-        ) {
-          this.rankCued = true;
-          this.showBanner(`${next.tier.icon} ${next.tier.name}`, "rank");
-          this.audio.milestone();
-          // The score marks it too: one bounded beat drop, the same reaction the
-          // comedy moments get. Not a MomentKind on purpose — those nine feed the
-          // "first funny moment" funnel and the results-card joke tally, and a
-          // career promotion is neither a joke nor a physics event.
-          this.audio.triggerBeatDrop(1.15);
-          this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
-          this.bump();
-        }
-      } else {
-        this.proximity = { visible: false, fill: 0, remaining: 0, name: "" };
-      }
     }
 
     this.hintTimer += dt;
@@ -2577,7 +2193,7 @@ export class Game {
     if (linked) {
       this.bonus += linked.points;
       this.audio.ringPass(linked.chain);
-      this.hud.toast(t("hud.toast.slopeFlow", { n: linked.chain, p: linked.points }, "SLOPE FLOW ×{{n}} +{{p}}"), linked.chain >= 3 ? "gold" : "cloud");
+      this.hud.toast(`SLOPE FLOW ×${linked.chain} +${linked.points}`, linked.chain >= 3 ? "gold" : "cloud");
     }
     if (res.rating === "none") {
       if (this.bird.launchSpeed > 18) this.audio.chirp();
@@ -2643,21 +2259,15 @@ export class Game {
   private onSunflower(): void {
     this.slopeChain.break();
     this.runSunflowers += 1;
-    const sunflowerBonus = 80;
-    this.bonus += sunflowerBonus;
+    this.bonus += 80;
     this.awardXp(XP_RULES.coin);
     this.audio.boing();
     this.particles.burstRing(this.bird.x, this.bird.y, 0xffcf33);
     this.particles.emitBounceBop(this.bird.x, this.bird.y, 1.0, 0.85, 0.2);
     this.particles.emitConfetti(this.bird.x, this.bird.y + 1);
-<<<<<<< HEAD
     this.popupAtBird(this.bopWord(), "bop");
-=======
-    this.bounceCount += 1;
-    this.fireMoment("boing", { shout: quip(BOP_QUIPS, this.bounceCount), always: true });
->>>>>>> origin/main
     this.camera.punch(4);
-    this.hud.toast(t("hud.toast.sunflower", { n: sunflowerBonus }, "🌻 Sunflower bounce +{{n}}"), "gold");
+    this.hud.toast("🌻 Sunflower bounce +80", "gold");
     this.glow(0.55);
     this.haptic([20, 10, 40]);
     this.telemetry.track("sunflower", {});
@@ -2670,7 +2280,6 @@ export class Game {
     if (q >= LAND_PERFECT && this.bird.speed() > 30) {
       this.bonus += 12;
       this.audio.butter();
-      this.fireMoment("perfect", { shout: "BUTTER!", popup: false });
       this.hud.toast("Butter landing", "cloud");
       this.particles.burstRing(this.bird.x, this.bird.y, 0xffffff);
     } else if (q < 0.8) {
@@ -2691,10 +2300,7 @@ export class Game {
         // The main step emits the high-impact burst; keep this fallback for
         // rough landings that are below that visual threshold.
         if (this.bird.impact <= 8) this.particles.emitThunk(this.bird.x, this.bird.y, tr, tg, tb);
-        if (this.bird.impact > 10) {
-          this.thudCount += 1;
-          this.fireMoment("bonk", { shout: quip(THUD_QUIPS, this.thudCount) });
-        }
+        if (this.bird.impact > 10) this.popupAtBird(quip(THUD_QUIPS, this.thudCount++), "thud");
       }
     }
   }
@@ -2703,21 +2309,17 @@ export class Game {
     const was = this.feverOn;
     this.feverOn = true;
     this.feverReached = true;
-    this.updateOnboarding();
     this.feverTimer = FEVER_DURATION + this.gameplaySkin.feverBonus + this.masteryPerk.feverBonus;
     if (!was) {
       this.audio.feverOn();
       this.audio.setMusicMode("fever");
-      this.hud.toast(t("hud.toast.fever", undefined, "FEVER"), "fever");
+      this.hud.toast("FEVER", "fever");
       this.flash("fever");
       this.glow(0.95);
       this.particles.emitFeverBurst(this.bird.x, this.bird.y);
       this.particles.emitConfetti(this.bird.x, this.bird.y);
       this.popupAtBird("ON FIRE!", "fever");
       this.hud.toast(quip(FEVER_QUIPS, this.perfectChain), "fever");
-      // Funny praise — makes player feel legendary
-      const praise = getPraise("fever", this.perfectChain + this.island);
-      this.hud.toast(praise.text, praise.tone as "gold" | "power" | "info" | "warn" | "zenith");
       this.telemetry.track("fever", { distance: Math.round(this.bird.x - this.startX) });
     }
   }
@@ -2736,12 +2338,11 @@ export class Game {
         this.bonus += 25;
         this.hud.toast("Cloud boost — light as air", "power");
         break;
-      case "golden": {
-        const awarded = this.addRunCoins(10);
+      case "golden":
+        this.runCoins += 10;
         this.bonus += 60;
-        this.hud.toast(`Golden cloud +${awarded}`, "gold");
+        this.hud.toast("Golden cloud +10", "gold");
         break;
-      }
       case "wind":
         this.bird.vx += cb ? 22 : 14;
         this.bonus += 25;
@@ -2779,7 +2380,7 @@ export class Game {
     this.particles.emitSonicBoom(x, y);
     if (this.ringChain >= 3) {
       this.particles.emitConfetti(x, y + 2);
-      this.hud.toast(t("hud.toast.ringChain", { n: this.ringChain, p: pts }, "RING CHAIN ×{{n}} +{{p}}"), "gold");
+      this.hud.toast(`RING CHAIN ×${this.ringChain} +${pts}`, "gold");
       this.flash("fever");
       this.glow(0.6);
       // The ring chord already marks the chain; a five-note fanfare on every
@@ -2804,12 +2405,7 @@ export class Game {
     this.particles.emitConfetti(x, y + 1);
     this.particles.burstRing(x, y, 0xff6b6b);
     this.particles.emitBounceBop(x, y, 1.0, 0.42, 0.75);
-<<<<<<< HEAD
     this.popupAtBird(this.bopWord(), "bop");
-=======
-    this.bounceCount += 1;
-    this.fireMoment("boing", { shout: quip(BOP_QUIPS, this.bounceCount), always: true });
->>>>>>> origin/main
     this.camera.punch(6);
     this.shake(0.3);
     this.hud.toast("🎈 Balloon bounce! +150", "gold");
@@ -2859,16 +2455,7 @@ export class Game {
     this.prevVy = vy;
   }
 
-  /**
-   * The one speed burst the player can trigger, shared by every source.
-   *
-   * One function on purpose: the burst is the single most "feels like flying
-   * fast" moment in the game, so a new source (the Tailwind Launch boost, a
-   * stall rescue, a double tap) inherits the identical speed curve, audio,
-   * particle ring, shake and haptics instead of growing a slightly different
-   * variant that nobody tuned.
-   */
-  private activateManualBoost(source: ManualBoostSource): void {
+  private activateManualBoost(source: "double_tap" | "stall_rescue"): void {
     this.manualBoostCooldown = MANUAL_BOOST_COOLDOWN;
     this.boostTimer = Math.max(this.boostTimer, MANUAL_BOOST_TIME);
     this.bird.vx += MANUAL_BOOST_SPEED;
@@ -2878,7 +2465,7 @@ export class Game {
     this.particles.burstRing(this.bird.x, this.bird.y, 0xffb347);
     this.shake(0.28);
     this.haptic([18, 12, 28]);
-    this.hud.toast(MANUAL_BOOST_COPY[source], "power");
+    this.hud.toast(source === "double_tap" ? "DOUBLE TAP BOOST!" : "STALL RESCUE BOOST!", "power");
     this.telemetry.track("manual_boost", { source });
   }
 
@@ -3019,23 +2606,24 @@ export class Game {
       landingSlope: !this.bird.grounded && this.bird.altitude < 55 && this.bird.vy < -8
         ? this.terrain.slopeAt(this.bird.x + landingLookAhead(this.bird.altitude, this.bird.vx, this.bird.vy)) : 0 });
     if (cue) return cue;
-
-    // Anti-bore: long passive glide = immediate actionable hint
-    if (!this.bird.grounded && this.bird.airTime > 2.8) {
-      const sp = this.bird.speed();
-      if (sp < 14) return "STALLING — HOLD to dive!";
-      if (this.bird.airTime > 3.5 && this.bird.vy < -4) return this.weather.inThermal ? "RELEASE to ride thermal ♨" : "HOLD to dive — find lift!";
-      if (this.bird.airTime > 4.5) return "DIVE for speed — then launch again";
-    }
-
     if (this.hintTimer > (novice ? 26 : 8)) {
       if (this.terrain.isOcean(this.bird.x + 40) && !this.terrain.isOcean(this.bird.x) && this.island < 2) return "Build speed — then RELEASE";
       return "";
     }
     const slope = this.terrain.slopeAt(this.bird.x);
-    if (this.hintTimer < 2.6 && slope < -0.08) return "HOLD to dive";
+    if (this.hintTimer < 2.6 && slope < -0.08) {
+      // Close the first-flight action loop: acknowledge the hold immediately
+      // and teach the release that converts the dive into lift.
+      return this.input.diving ? "RELEASE to soar" : "HOLD to dive";
+    }
+    if (this.hintTimer > 6 && this.ringChain >= 2) return `RING CHAIN ×${this.ringChain} · KEEP IT GOING`;
+    if (this.hintTimer > 8 && this.runRings === 0) return "OPTIONAL: THREAD A RING CHAIN";
+    if (this.hintTimer > 12 && this.pickups === 0) return "OPTIONAL: GRAB COINS FOR A BOOST";
     if (novice && !this.fairRace && this.save.hasUpgrade("doubletap") && this.save.state.settings.doubleTapBoost && this.hintTimer >= 3 && this.hintTimer < 5.8) return "DOUBLE TAP for a boost";
     if (slope > 0.16 && this.bird.grounded && this.bird.speed() > 18) return "RELEASE to launch";
+    // No thermal line here: the ♨ HUD chip already says "release!" — three
+    // simultaneous thermal texts (toast + chip + hint) was the worst offender
+    // of the multiple-text bug.
     if (this.terrain.isOcean(this.bird.x + 40) && !this.terrain.isOcean(this.bird.x)) return "Build speed — then RELEASE";
     return "";
   }
@@ -3084,14 +2672,7 @@ export class Game {
   private emitTrail(dt: number): void {
     this.trailFxAcc -= dt;
     if (this.trailFxAcc > 0) return;
-    // Trail density is a speed *curve*, not two thresholds: the sparkle
-    // cadence tightens continuously from cruise to warp, so the streak behind
-    // the bird visibly compresses as the flight accelerates. Cheap by
-    // construction (one division per emission) and it inherits the adaptive
-    // particle budget — a slow device thins the trail instead of dropping
-    // frames, because ParticleFX skips spawns when setBudget is below 1.
-    const warp = warpT(Math.min(1.2, this.bird.speed() / MAX_SPEED));
-    this.trailFxAcc = 0.055 - 0.03 * warp;
+    this.trailFxAcc = this.bird.speed() > 82 ? 0.028 : 0.055;
     const c = this.trailColor();
     this.particles.emitSparkle(this.bird.x - 0.4, this.bird.y, c[0], c[1], c[2]);
     if (this.bird.speed() > 68) this.particles.emitWingTrails(this.bird.x, this.bird.y, this.bird.speed());
@@ -3173,24 +2754,7 @@ export class Game {
 
     const dayT = Math.max(0, Math.min(1, this.daylight / this.daylightMax()));
     this.audio.update(rawDt, this.bird.speed(), diving, this.bird.grounded, this.feverOn, dayT, playing, this.weather.gust);
-    // Music phase 2 — the score follows the *arc* of a run, not only its events.
-    // `musicEnergy()` is the game's own weighted sum (speed, altitude, fever,
-    // danger, ring chain) and stays untouched; MusicArc wraps it in a launch
-    // swell, so the take-off is never the quietest beat of a flight, and in a
-    // slow release, so the run resolves instead of cutting to silence.
-    const arc = arcSmooth(this.arcIntensity, arcTarget(playing, this.runTime, this.musicEnergy()), rawDt);
-    this.arcIntensity = arc;
-    if (arcShouldWrite(this.arcWritten, arc)) {
-      this.arcWritten = arc;
-      this.audio.setMusicIntensity(arc);
-    }
-    // Music pass 3 — the *arrangement* follows the flight next to the intensity:
-    // a take-off breath with the kit held back, the tuned mix in cruise, a
-    // brightened and thinned band at the apex, and a landing cadence that keeps
-    // its own window after the mode has already flipped back to the menu. Not
-    // gated by the arc's dead band — the phase has to change on the frame a run
-    // ends, which is exactly when the intensity write is skipped.
-    this.audio.setMusicRunPhase(playing, this.runTime);
+    this.audio.setMusicIntensity(this.musicIntensity());
 
     const size = this.renderer.getSize(this.tmpSize);
     this.renderer.setViewport(0, 0, size.x, size.y);
@@ -3262,9 +2826,6 @@ export class Game {
     this.terrain.update(lead.bird.x);
     this.audio.update(rawDt, lead.bird.speed(), playing && this.input.diving, lead.bird.grounded, false, 1, playing, 0);
     this.audio.setMusicIntensity(playing ? Math.min(1, lead.bird.speed() / 90 * 0.5 + Math.min(1, lead.bird.altitude / ALT_HIGH) * 0.3) : 0);
-    // Same arrangement contract as the solo path: two players share one band,
-    // and it follows the leader's flight.
-    this.audio.setMusicRunPhase(playing, this.runTime);
 
     const size = this.renderer.getSize(this.tmpSize);
     const views = splitViews(size.x, size.y, this.renderer.getPixelRatio());
@@ -3290,72 +2851,6 @@ export class Game {
 
   /* ------------------------------------------------------------- run flow */
 
-  /**
-   * Puts a chase target in the sky for this run.
-   *
-   * Real rival first, pace ghost as the guaranteed fallback. The network call
-   * gets 1.8 s: long enough to win on a warm cache, short enough that a cold
-   * backend never leaves the player staring at an empty sky through the opening
-   * seconds - which is exactly when a first-timer decides whether this game is
-   * worth another tap. Whichever target lands first owns the run: swapping
-   * ghosts mid-flight would teleport a bird in front of the player, and that
-   * reads as a bug no matter how correct the data behind it is.
-   */
-  private armRivalGhost(): void {
-    const epoch = this.runEpoch;
-    const alive = (): boolean => !this.disposed && epoch === this.runEpoch && this.state === "playing";
-    const armPace = (): void => {
-      if (!alive() || this.rivalGhostPlayer.active) return;
-      const best = this.save.state.bestDistance;
-      const target = paceTargetDistance(best);
-      // Skill gradient with progress: a new player faces a sloppier pace line,
-      // an experienced one a cleaner line. Never a wall, always catchable.
-      const skill = best <= 0 ? 0.35 : Math.min(0.85, 0.4 + best / 6000);
-      const pace = synthesizePaceGhost({
-        seed: this.seed,
-        startX: this.startX,
-        distance: target,
-        terrain: this.terrain,
-        skill,
-      });
-      this.rivalGhostName = pace.name;
-      this.rivalGhostSynthetic = true;
-      this.rivalGhostPlayer.loadRecord(pace.record);
-      this.hud.toast(t("toast.pace.ghost", { name: pace.name }, "👻 {name} on these hills — catch it"), "quest");
-      this.telemetry.track("rival_ghost", { kind: "pace", distance: pace.distance, best: Math.round(best) });
-    };
-
-    if (this.seedMode === "today") {
-      const real = fetchRivalGhost(this.seed, this.save.state.deviceId, this.save.state.bestDistance);
-      // Race the backend against a short fuse. A rejected or hanging fetch must
-      // still end with a rival in the sky, never with an empty one.
-      const fuse = new Promise<null>((resolve) => {
-        const id = window.setTimeout(() => resolve(null), 1800);
-        real.then(
-          () => window.clearTimeout(id),
-          () => window.clearTimeout(id),
-        );
-      });
-      void Promise.race([real.catch(() => null), fuse]).then((rg) => {
-        if (!alive()) return;
-        if (!rg) {
-          armPace();
-          return;
-        }
-        if (this.rivalGhostPlayer.active) return;
-        this.rivalGhostName = rg.name;
-        this.rivalGhostSynthetic = false;
-        this.rivalGhostPlayer.loadRecord({ seed: this.seed, distance: rg.distance, samples: rg.samples });
-        this.hud.toast(`👻 ${rg.name} flew ${Math.round(rg.distance)} m here — chase them`, "quest");
-        this.telemetry.track("rival_ghost", { kind: "player", distance: Math.round(rg.distance) });
-      });
-      return;
-    }
-    // Yesterday / Random / shared seeds have no population to ask, so the pace
-    // ghost is the rival. The player still races somebody.
-    armPace();
-  }
-
   private startRun(opts?: RunOptions): void {
     // Poki, "PokiSDK: HTML5" step 4: "we recommend calling commercialBreak()
     // before every gameplayStart(), whenever the player has shown intent to
@@ -3363,31 +2858,26 @@ export class Game {
     // the rule lives here rather than at the thirteen call sites that used to
     // skip it — only restarts ever asked for a break, so a player who kept
     // launching runs from the menu was never offered one at all.
-    if (this.shouldBreakBeforeRun(opts)) {
-      this.inRunStartBreak = true;
-      void this.restartWithPortalBreak(opts).finally(() => { this.inRunStartBreak = false; });
-      return;
-    }
     this.sessionRuns += 1;
+    this.markFunnel("first_flight");
+    if (this.funnel.reached("first_death")) this.markFunnel("first_retry");
+    if (this.sessionRuns >= 2) this.markFunnel("second_run");
+    if (this.sessionRuns === 2 && !this.save.state.seenShop) {
+      this.hud.toast("Next step: visit the Hangar — your first bird is waiting", "gold");
+    }
     this.exitVersus();
     this.mode = modeById(this.modeId);
     // Portal game events: open this attempt's measurement span. The run is a
     // `fail` until the goal is actually reached (death/sun-out/elimination
     // all keep it a fail).
     this.runOutcome = "fail";
-    // `round` is in Poki's published MeasureCategory vocabulary (so it reports
-    // alongside every other game's round funnels); `run` was ours alone.
-    this.platform?.measure("round", this.modeId, "start");
+    this.platform?.measure("run", this.modeId, "start");
     // Snapshot the record to beat BEFORE this run writes anything, so the
     // mid-run "new record" moment and the results "NEW BEST" banner compare
     // against the genuinely previous best.
     this.bestAtStart = this.save.state.bestDistance;
     this.distanceRecordCrossed = false;
     this.newBest = false;
-    this.progressEvents = [];
-    this.celebration = planCelebration([]);
-    this.proximity = { visible: false, fill: 0, remaining: 0, name: "" };
-    this.proximityCued = false;
     // World variety: in the default "today" mode a plain casual flight gets
     // fresh random hills every run so no two free-flights look alike. An
     // explicit Yesterday/Random seed pick is honoured, and date-seeded
@@ -3506,11 +2996,6 @@ export class Game {
     // Give race modes something to actually aim at.
     if (this.mode.finish > 0) this.finishGate.place(this.startX + this.mode.finish, this.terrain);
     else this.finishGate.hide();
-    this.beatAhead = [];
-    this.beatCue = null;
-    this.beatFired.clear();
-    this.beatPollT = 0;
-    for (const flag of this.beatFlags) flag.hide();
 
     // Race boosts are retained for a later solo flight, never spent invisibly.
     const armed = this.fairRace ? [] : this.save.consumeArmedBoosts();
@@ -3519,107 +3004,22 @@ export class Game {
       const ev = weeklyEvent();
       this.hud.toast(`${ev.icon} ${ev.name} · fly ${ev.target.toLocaleString()} m`, "quest");
       this.audio.eventStinger();
-      // Progress funnel, canonical shape: one `start` per attempt, then exactly
-      // one of `complete`/`fail` at the end of the same run.
-      this.platform?.measure("quest", "weekly-event", "start");
     }
     if (this.challengeRun === "daily") {
       const c = dailyChallenge(this.today);
       this.hud.toast(`${c.modifier.icon} ${c.title} · ${c.modifier.label}`, "quest");
-      this.platform?.measure("quest", "daily-challenge", "start");
     } else if (this.challengeRun.startsWith("gauntlet")) {
       const idx = Number(this.challengeRun.slice(8)) || 0;
       const st = weeklyGauntlet(weekKey()).stages[idx];
       if (st) this.hud.toast(`🌩 Gauntlet ${idx + 1}/3 · ${st.label}`, "quest");
-      this.platform?.measure("quest", "gauntlet", "start");
-    }
-    // Trust rule: wherever the player's own paid advantages are stripped
-    // (`fairRace`), the field's hidden catch-up push is stripped too. A ranked
-    // result must not be decided by assistance on either side of the race.
-    this.massRace.setPackBalancing(!this.fairRace);
-    if (flag("adaptiveDifficulty") && !this.fairRace) {
-      this.difficultyTune = tuneDifficulty({
-        runsPlayed: this.save.state.runsPlayed,
-        skill: this.flow.skill,
-        lastDistance: this.lastFinishedDistance,
-        lastDurationSec: this.lastFinishedDuration,
-        recentPlaces: this.recentPlaces,
-      }, false);
-      this.massRace.setPackIntensity(this.difficultyTune.packCatchupMult);
-    } else {
-      this.difficultyTune = IDENTITY_TUNE;
-      this.massRace.setPackIntensity(1);
     }
     this.setState("playing");
     this.setScreen("main");
     this.camera.setIntro(0);
     this.hint = "HOLD to dive";
-    // Funnel: the first launch is the conversion moment, a launch after a death
-    // is the retry, and a second run at all is the habit forming.
-    this.markFunnel("first_flight");
-    if (this.funnel.reached("first_death")) this.markFunnel("first_retry");
-    if (this.save.state.runsPlayed >= 1) this.markFunnel("second_run");
     void this.audio.resume();
     this.audio.setMusicMode("play");
     this.telemetry.track("run_start", { mode: this.modeId, seed: this.seed, skin: this.skin.id, boosts: armed.join(",") || "none", gold: this.save.state.gold });
-  }
-
-  /**
-   * Open the Hangar by itself — once per session, and only when it is news.
-   *
-   * The shop is where progression is *felt*, and a shop nobody opens is a
-   * feature nobody has. But an auto-navigation the player cannot predict is
-   * exactly what breaks flow, so this is fenced on every side:
-   *   • once per session (`autoShopDone`), never repeatedly;
-   *   • only from the main menu — never over a results screen the player is
-   *     still reading, never mid-flight, never during a portal break;
-   *   • only when a flight just made something affordable that was not
-   *     affordable before, so it always has a reason to exist;
-   *   • only when the setting is on (default on, one tap off in Settings);
-   *   • and it says why, so the player learns the rule instead of guessing.
-   */
-  private maybeAutoOpenShop(): void {
-    if (this.autoShopDone) return;
-    if (!this.save.state.settings.autoShop) return;
-    if (this.state !== "menu" || this.screen !== "main") return;
-    if (this.hidden || this.disposed) return;
-    const st = this.save.state;
-    // Never interrupt the opening minutes: the first flights belong to flying.
-    if (st.runsPlayed < 2) { this.autoShopLastWallet = st.wallet; return; }
-    const target = this.newlyAffordableShopItem(this.autoShopLastWallet, st.wallet);
-    this.autoShopLastWallet = st.wallet;
-    if (!target) return;
-    this.autoShopDone = true;
-    this.setScreen("shop");
-    this.audio.purchase();
-    this.hud.toast(t("hud.toast.shopAfford", { name: target.name }, "You can afford {{name}} now — one look, then back to the sky"), "gold");
-    this.telemetry.track("shop_auto_open", { item: target.id, price: target.price, wallet: this.save.state.wallet });
-    this.bump();
-  }
-
-  /**
-   * The cheapest unowned item that became affordable between two wallet
-   * readings — across gear, trails and birds together, because "the shop has
-   * something new for me" is true far more often when all three shelves are
-   * scanned as one. Items paid for in gold or gated to VIP/prize shelves are
-   * excluded: the wallet cannot actually buy them, so promising otherwise
-   * would be a lie the player discovers in one tap.
-   */
-  private newlyAffordableShopItem(prevWallet: number, wallet: number): { id: string; name: string; price: number } | null {
-    if (prevWallet < 0 || wallet <= prevWallet) return null;
-    const st = this.save.state;
-    let best: { id: string; name: string; price: number } | null = null;
-    const consider = (id: string, name: string, price: number, owned: boolean): void => {
-      if (owned || price <= 0 || price > wallet || price <= prevWallet) return;
-      if (!best || price < best.price) best = { id, name, price };
-    };
-    for (const def of BOOSTS) consider(def.id, `${def.icon} ${def.name}`, def.price, this.save.hasUpgrade(def.id));
-    for (const trail of SHOP_TRAILS) consider(trail.id, `\u2728 ${trail.label} trail`, trail.price, st.tournaments.trails.includes(trail.id));
-    for (const skin of SKINS) {
-      if (skin.prizeOnly || skin.goldOnly || skin.vipOnly) continue;
-      consider(skin.id, skin.name, skin.price, st.ownedSkins.includes(skin.id));
-    }
-    return best;
   }
 
   private applyBoost(id: string): void {
@@ -3640,36 +3040,6 @@ export class Game {
       case "hotwings":
         this.enterFever();
         break;
-      case "tailwind":
-        // The same burst the permanent Sunburst Trigger gives on a double-tap,
-        // handed over for free at takeoff. Reusing activateManualBoost keeps
-        // the speed curve, the audio and the camera punch identical to a boost
-        // the player already knows — a new SKU should feel like more of the
-        // good thing, not like an untested one.
-        this.activateManualBoost("tailwind");
-        break;
-      case "daybreak":
-        this.daylight += 20;
-        break;
-      case "luckycoin":
-        // Timed, session-only, and announced: the player should be able to see
-        // the window they just bought, and coins picked up inside it read x2 in
-        // the air (`addRunCoins` prints the awarded number, not the base one).
-        const luckySeconds = 20;
-        this.save.setCoinBonus(2, luckySeconds);
-        this.hud.toast(t("hud.toast.luckyCoin", { n: luckySeconds }, "🍀 LUCKY COIN — double coins for {{n}} s"), "gold");
-        this.audio.ding();
-        break;
-      case "fullhouse": {
-        // A bundle, not a new mechanic: the three cheapest consumables in one
-        // tap, priced below their parts. Bundles are what make a shop feel
-        // generous instead of grindy, and this one cannot desync anything
-        // because each half is the same assignment the solo boost makes.
-        this.shield = Math.max(this.shield, 1);
-        this.magnetTimer = Math.max(this.magnetTimer, 15);
-        this.daylight += 12;
-        break;
-      }
       case "headstart": {
         let hx = this.startX + HEADSTART_DISTANCE;
         for (let i = 0; i < 40; i++) {
@@ -3703,7 +3073,7 @@ export class Game {
     this.audio.sleep();
     this.audio.setMusicMode("sleep");
     this.flash("sleep");
-    this.fireMoment("sleep", { shout: quip(SLEEP_QUIPS, Math.round(this.bird.x)), always: true });
+    this.hud.toast(quip(SLEEP_QUIPS, Math.round(this.bird.x)), "cloud");
     const gold = this.save.state.gold;
     const canCoins = this.save.state.wallet >= CONTINUE_COST;
     // A portal BUILD is not a portal SESSION: a blocked SDK script, an ad-blocked
@@ -3713,13 +3083,8 @@ export class Game {
     // `if (!this.adsLive()) return;` — so the button was offered AND inert: the
     // tap did nothing, with no ad, no toast and no state change.
     const canAd = this.portalEnabled()
-<<<<<<< HEAD
       ? this.adsLive()
       : !gold && this.ads.isAvailable() && this.save.adsLeftToday() > 0;
-=======
-      ? Boolean(this.platform && this.platform.name !== "none")
-      : SIMULATED_BREAKS && !gold && this.ads.isAvailable() && this.save.adsLeftToday() > 0;
->>>>>>> origin/main
     // Honest tiering: free players get 1 second wind, VIP gets 2, and Gold
     // gets what its feature list promises — the sun never wins on a technicality.
     const maxContinues = gold ? 99 : this.save.isVipActive() ? 2 : 1;
@@ -3746,7 +3111,7 @@ export class Game {
       // the dashboard can compare it against `interact` when tapped. The label
       // carries the offer kind so placement usage is measurable per context.
       if (this.portalEnabled() && canAd) {
-        this.platform?.measure("rewarded", continuePlacementLabel(this.continueOfferView.kind), "visible");
+        this.platform?.measure("button", continuePlacementLabel(this.continueOfferView.kind), "visible");
       }
       this.telemetry.track("continue_offer", { kind: this.continueOfferView.kind, distance: Math.round(distance) });
     } else {
@@ -3774,6 +3139,7 @@ export class Game {
   private finishRun(): void {
     if (this.runRecorded) return;
     this.runRecorded = true;
+    this.markFunnel("first_death");
     this.bird.asleep = true;
     // The rival field is done: drop the (up to 41) frozen birds out of the
     // scene the moment the run ends. They keep drawing behind the results
@@ -3785,9 +3151,8 @@ export class Game {
     // reached its goal, `fail` when it ended by death/elimination/sun-out.
     // (Poki funnel contract: send complete OR fail, never both, and a start
     // without an outcome would break the drop-off funnel.)
-    this.platform?.measure("round", this.modeId, this.runOutcome);
+    this.platform?.measure("run", this.modeId, this.runOutcome);
     const stats = this.runStats();
-<<<<<<< HEAD
     // Freeze the number the results card shows: `bird.asleep` only damps
     // velocity (see Bird.update), it doesn't zero it, so the bird keeps
     // coasting for a couple of seconds after this point. Score, leaderboard
@@ -3798,36 +3163,19 @@ export class Game {
     this.newBest = this.bestAtStart > 0 && stats.distance > this.bestAtStart;
     // A personal best is the one moment CrazyGames wants celebrated site-wide.
     if (this.newBest) this.platform?.happyTime();
-    this.telemetry.track("run_end", { mode: this.modeId, distance: Math.round(stats.distance), newBest: this.newBest });
-=======
-    // Every way a flight can end (sun down, water, elimination, surrender)
-    // banks through here, so this is the one honest place to mark the death.
-    this.markFunnel("first_death");
-    this.newBest = this.bestAtStart > 0 && stats.distance > this.bestAtStart;
-    // A personal best is the strongest celebration signal there is, and the only
-    // one that is about *this* player: `planCelebration` ranks it above every
-    // trophy, and its weight maps to Poki's canonical happyTime(1). The adapter
-    // used to call `happytime()` — CrazyGames' spelling — which silently did
-    // nothing on Poki; the CrazyGames adapter gates on intensity, so the single
-    // call this run sends at the end of finishRun() serves both portals.
-    if (this.newBest) {
-      this.progressEvents.push({ kind: "record", metres: Math.round(stats.distance) });
-      this.platform?.measure("player", "personal-best", "reached");
-    }
-    // The run's moment fingerprint travels with run_end as one compact string
-    // ("bonk:2,splash:1") rather than a burst of per-moment events: the funnel
-    // needs which kinds a run contained, not 40 identical beacons.
     this.telemetry.track("run_end", {
       mode: this.modeId,
       distance: Math.round(stats.distance),
       newBest: this.newBest,
-      moments: Object.entries(this.moments.toJSON())
-        .map(([kind, n]) => `${kind}:${n}`)
-        .join(","),
-      clips: this.clips.recapLine(),
-      speedPeak: Math.round(this.speedPeak),
+      moments: JSON.stringify(this.moments.toJSON()),
+      momentRecap: this.moments.recapLine(),
     });
->>>>>>> origin/main
+    if (this.sessionRuns === 1) {
+      this.hud.toast("Flight logged ✦ Open the Hangar to spend your coins", "quest");
+      this.telemetry.track("onboarding_first_flight_complete", { distance: Math.round(stats.distance) });
+    } else if (this.sessionRuns === 2) {
+      this.hud.toast("Ready for the social sky? Challenge a rival or try today's course", "quest");
+    }
 
     // A duel abandoned short of the line is a loss — no free retries on rating.
     if (this.duelActive && this.duelResult === "") {
@@ -3846,21 +3194,6 @@ export class Game {
       this.launch.best,
       this.save.state.bestCombo,
     );
-    this.lastFinishedDistance = stats.distance;
-    this.lastFinishedDuration = this.runTime;
-    if (this.racePlace > 0) {
-      this.recentPlaces.push(this.racePlace);
-      if (this.recentPlaces.length > 5) this.recentPlaces.shift();
-    }
-    this.lastViralScore = viralScore({
-      clips: this.clips.toJSON(),
-      distance: stats.distance,
-      newBest: this.newBest,
-      nearMiss: this.nearMiss.kind !== "none",
-      photoFinish: Boolean(this.photoFinish),
-      perfects: this.perfects,
-      crashes: this.clips.count("crash"),
-    });
     this.save.noteRecords(this.maxAltitude, this.launch.best);
     this.flow.noteRun(stats.distance, this.perfects, this.launch.goods + this.launch.greats + this.launch.perfects, this.save);
 
@@ -3881,17 +3214,13 @@ export class Game {
     // off the ghost network; this guard keeps them out of local replays too.
     const beatGhost = this.seed.startsWith("fly-") ? false : this.ghostRecorder.commit(this.seed, stats.distance);
     if (beatGhost) {
-      this.hud.toast(t("toast.ghost.recorded", undefined, "New personal ghost recorded"), "gold");
+      this.hud.toast("New personal ghost recorded", "gold");
       this.telemetry.track("ghost_new", { distance: Math.round(stats.distance) });
     }
 
     // Global board + weekly cups both score off the same verified run stats.
-<<<<<<< HEAD
     // durationMs is not decoration: the server's plausibility gate reads it, and
     // a submission that carries none is quarantined instead of ranked.
-=======
-    this.updateOnboarding();
->>>>>>> origin/main
     this.board.submit({
       deviceId: this.save.state.deviceId,
       name: this.racedName(),
@@ -3949,11 +3278,10 @@ export class Game {
       if (dailyDone(stats, c) && this.save.completeDaily(this.today)) {
         this.save.addCoins(c.reward);
         this.challengeOutcome = `☀ Daily challenge complete · +${c.reward} coins`;
-        this.progressEvents.push({ kind: "challenge", variant: "daily", icon: "☀", label: "Daily challenge", coins: c.reward });
-        this.platform?.measure("quest", "daily-challenge", "complete");
+        this.hud.toast(this.challengeOutcome, "gold");
+        this.audio.island();
       } else if (!dailyDone(stats, c)) {
         this.challengeOutcome = `Daily challenge missed — needed ${c.target} ${c.metric}`;
-        this.platform?.measure("quest", "daily-challenge", "fail");
       }
     } else if (this.challengeRun.startsWith("gauntlet")) {
       const idx = Number(this.challengeRun.slice(8)) || 0;
@@ -3964,35 +3292,23 @@ export class Game {
         if (res) {
           this.save.addCoins(st.reward);
           this.challengeOutcome = `🌩 Gauntlet stage ${idx + 1} clear · +${st.reward} coins`;
-          this.progressEvents.push({
-            kind: "challenge",
-            variant: "gauntletStage",
-            icon: "🌩",
-            label: `Gauntlet stage ${idx + 1}`,
-            coins: st.reward,
-          });
-          // Stage checkpoints are their own progress pair, so a drop-off inside
-          // a gauntlet is visible instead of hiding behind the quest event.
-          this.platform?.measure("checkpoint", "gauntlet-stage", "complete");
+          this.hud.toast(this.challengeOutcome, "gold");
           if (res === "clear") {
             this.save.addCoins(g.clearBonus);
-            this.progressEvents.push({ kind: "challenge", variant: "gauntlet", icon: "🏆", label: "Gauntlet", coins: g.clearBonus });
-            this.platform?.measure("quest", "gauntlet", "complete");
-            if (this.save.ownTrail("trail_gauntlet")) {
-              this.progressEvents.push({ kind: "cosmetic", icon: "✨", label: "Stormline trail" });
-              this.platform?.measure("cosmetic", "trail-stormline", "unlocked");
-            }
+            this.hud.toast(`🏆 GAUNTLET CLEARED · +${g.clearBonus} coins`, "gold");
+            this.platform?.measure("event", "gauntlet-clear", "complete");
+            this.platform?.happyTime();
+            if (this.save.ownTrail("trail_gauntlet")) this.hud.toast("✨ Stormline trail unlocked!", "gold");
             // Gauntlet prize skin: 5 lifetime clears earns the Stormcrow.
             if (this.save.state.challenges.gauntletsCleared >= 5 && !this.save.state.ownedSkins.includes("stormcrow")) {
               this.save.ownSkin("stormcrow");
-              this.progressEvents.push({ kind: "cosmetic", icon: "🐦", label: "Stormcrow" });
-              this.platform?.measure("cosmetic", "bird-stormcrow", "unlocked");
+              this.hud.toast("🐦 Stormcrow unlocked — 5 gauntlets cleared!", "gold");
             }
+            this.audio.island();
           }
         }
       } else if (st) {
         this.challengeOutcome = `Gauntlet stage ${idx + 1} missed — needed ${st.target} ${st.metric}`;
-        this.platform?.measure("checkpoint", "gauntlet-stage", "fail");
       }
     }
 
@@ -4003,59 +3319,36 @@ export class Game {
         const counts = this.save.recordEventClear(ev.week, monthKey());
         this.save.addCoins(ev.reward);
         this.challengeOutcome = `${ev.icon} ${ev.name} clear ×${counts.week} · +${ev.reward} coins`;
-        this.progressEvents.push({ kind: "challenge", variant: "event", icon: ev.icon, label: ev.name, coins: ev.reward });
-        // Live-ops was invisible to the portal: Events.ts tracked clears
-        // internally and nothing was reported upstream. Canonical Game Events
-        // close that, with stable values (`weekly-event`, not the dated key,
-        // which would burn measure()'s two-numeric budget).
-        this.platform?.measure("quest", "weekly-event", "complete");
+        this.hud.toast(this.challengeOutcome, "gold");
+        this.platform?.measure("event", "weekly-clear", "complete");
+        this.platform?.happyTime();
+        this.audio.eventStinger();
         // Monthly theme trail: 3 event clears inside the month.
         const th = monthlyTheme();
         if (counts.month >= THEME_TRAIL_CLEARS && this.save.claimThemeTrail(th.month)) {
-          this.platform?.measure("cosmetic", "theme-trail", "unlocked");
           if (this.save.ownTrail(th.prizeTrail)) {
-            this.progressEvents.push({
-              kind: "cosmetic",
-              icon: th.icon,
-              label: `${th.name} · ${TRAILS[th.prizeTrail]?.label ?? th.prizeTrail} trail`,
-            });
+            this.hud.toast(`${th.icon} ${th.name} · ✨ ${TRAILS[th.prizeTrail]?.label ?? th.prizeTrail} trail unlocked!`, "gold");
           } else {
             this.save.addCoins(300);
-            this.progressEvents.push({ kind: "challenge", variant: "event", icon: th.icon, label: `${th.name} complete`, coins: 300 });
+            this.hud.toast(`${th.icon} ${th.name} complete · trail owned, +300 coins`, "gold");
           }
         }
       } else {
         this.challengeOutcome = `${ev.icon} ${ev.name} missed — needed ${ev.target.toLocaleString()} m`;
-        this.platform?.measure("quest", "weekly-event", "fail");
       }
     }
 
     // Mode mastery: every finished run banks progress; level-ups pay coins.
     const mastery = bankMasteryRun(this.save, this.modeId);
     if (mastery) {
-      this.progressEvents.push({
-        kind: "mastery",
-        icon: this.mode.icon,
-        mode: this.mode.name,
-        level: mastery.level,
-        maxed: mastery.skill !== null,
-        skill: mastery.skill?.name ?? "",
-        coins: mastery.coins,
-      });
+      this.platform?.measure("mastery", this.modeId, "complete");
+      this.platform?.happyTime();
       if (mastery.skill) {
-<<<<<<< HEAD
         this.hud.toast(`★ ${this.mode.name} MASTERED · skill unlocked: ${mastery.skill.name} (${mastery.skill.desc}) · +${mastery.coins} coins`, "gold");
         this.audio.chapterFanfare();
       } else {
         this.hud.toast(`${this.mode.icon} ${this.mode.name} mastery Lv.${mastery.level} · +2% coins in mode · +${mastery.coins} coins`, "gold");
         this.audio.milestone();
-=======
-        this.platform?.measure("achievement", "mode-mastery", "mastered");
-      } else {
-        // The level number stays out of the event value: a digit run in `what`
-        // would spend measure()'s two-numeric budget and compare worse.
-        this.platform?.measure("upgrade", "mode-mastery", "level-up");
->>>>>>> origin/main
       }
     }
     const score = this.score();
@@ -4079,10 +3372,11 @@ export class Game {
     // CAREER WINGS promotion — a lifetime rank-up is rare; make it land.
     const promo = wingsPromotion(lifetimeBefore, this.save.state.lifetime.distance);
     if (promo) {
-      // Fanfare, confetti and the words belong to the celebration plan now: it
-      // ranks a rank-up above every trophy except a personal best, and fires one
-      // cue for the whole run instead of one per ladder that moved.
-      this.progressEvents.push({ kind: "wings", tierId: promo.id, icon: promo.icon, name: promo.name });
+      this.rankUp = `${promo.icon} ${promo.name}`;
+      this.rankUpT = 3.2;
+      this.audio.fanfare();
+      this.particles.emitConfetti(this.bird.x, this.bird.y + 4);
+      this.hud.toast(`${promo.icon} ${promo.name.toUpperCase()} — lifetime rank earned`, "gold");
       this.telemetry.track("wings_promo", { tier: promo.id });
     }
     this.save.addLifetimeZeniths(stats.zenith);
@@ -4094,15 +3388,16 @@ export class Game {
     const tierAfter = this.seasonPass.tier();
     const xp = this.seasonPass.xp();
     const newTrophies = this.achievements.checkNew();
-    // celebrate=false: the run's one celebration signal is fired below at the
-    // peak of everything the flight earned, not once per trophy.
-    for (const trophy of newTrophies) this.portalAchievement(trophy.id, false);
+    if (newTrophies.length > 0) {
+      this.platform?.measure("achievement", "trophy-unlock", "complete");
+      this.platform?.happyTime();
+    }
     this.checkPrizeSkins();
 
     // Poki game-events: the rewarded bonus card is on the recap — measure its
     // exposure once so the dashboard can pair it with the tap's `interact`.
     if (this.portalEnabled() && this.runCoins > 0 && !this.multiplierClaimed) {
-      this.platform?.measure("rewarded", "results-coin-multiplier", "visible");
+      this.platform?.measure("button", "results-coin-multiplier", "visible");
     }
     this.telemetry.track("run_end", {
       distance: Math.round(stats.distance),
@@ -4111,62 +3406,23 @@ export class Game {
       islands: stats.island,
       zeniths: stats.zenith,
       xp,
-      speedPeak: Math.round(this.speedPeak),
-      viral: this.lastViralScore,
-      clips: this.clips.recapLine(),
+      moments: JSON.stringify(this.moments.toJSON()),
     });
 
-    if (tierAfter > tierBefore) this.progressEvents.push({ kind: "pass", tier: tierAfter });
-    if (this.claimedQuests.length) {
-      this.progressEvents.push({
-        kind: "quest",
-        count: this.claimedQuests.length,
-        coins: this.claimedQuests.reduce((a, q) => a + q.reward, 0),
-      });
+    if (tierAfter > tierBefore) {
+      this.hud.toast(`Nest Pass Lv.${tierAfter} unlocked — claim it!`, "gold");
+      this.audio.island();
     }
-<<<<<<< HEAD
+    if (this.claimedQuests.length) {
+      const total = this.claimedQuests.reduce((a, q) => a + q.reward, 0);
+      this.hud.toast(`Quest complete · +${total} coins`, "quest");
+    }
     if (this.newlyCompleted.length) this.hud.toast("Nest upgraded!", "island");
     for (const t of newTrophies) this.hud.toast(`Trophy: ${t.title}`, "gold");
     if (newTrophies.length > 0) this.audio.trophy();
-=======
-    if (this.newlyCompleted.length) {
-      this.progressEvents.push({ kind: "nest", level: this.save.state.nestLevel, mult: this.save.nestMultiplier() });
-    }
-    for (const trophy of newTrophies) {
-      this.progressEvents.push({ kind: "trophy", id: trophy.id, title: trophy.title, rarity: trophy.rarity });
-    }
-
-    // ONE celebration for everything this flight grew: ranked, staggered, capped,
-    // and rendered on the results card, which is where the player is already
-    // looking. The toast layer caps at two pills and evicts the oldest to hold
-    // that cap, so the old burst routinely deleted the rarest thing a run earned
-    // — a Platinum trophy or a lifetime rank-up — two statements before it fired
-    // a "+2% coins in mode" line. Progression was not under-celebrated; it was
-    // celebrated eleven times at once, which reads the same as never.
-    this.celebration = planCelebration(this.progressEvents);
-    if (this.celebration.fanfare) this.audio.fanfare();
-    else if (this.celebration.chime) this.audio.milestone();
-    if (this.celebration.confetti > 0) {
-      this.particles.emitConfetti(this.bird.x, this.bird.y + 4, this.celebration.confetti);
-    }
-    // Poki's happyTime is one signal per moment at the peak of what happened: a
-    // personal best still sends 1, and four ladders moving at once no longer send
-    // four competing calls (the guide asks for it sparingly).
-    if (this.celebration.peak > 0) this.platform?.happyTime(this.celebration.peak);
-    this.telemetry.track("progress_celebration", {
-      staged: this.celebration.staged.length,
-      folded: this.celebration.ledger.length,
-      peak: Math.round(this.celebration.peak * 100) / 100,
-      top: this.celebration.staged[this.celebration.staged.length - 1]?.event.kind ?? "none",
-    });
->>>>>>> origin/main
 
     const runs = this.save.state.runsPlayed;
-    // The direct build only schedules a break when SIMULATED_BREAKS is on:
-    // with no ad network wired in, a "break" would be a fake ad state that
-    // interrupts a run to show nothing (and Gold would sell its removal).
-    const dueAd =
-      !this.portalEnabled() && SIMULATED_BREAKS && !this.save.state.gold && this.save.shouldShowInterstitial(runs);
+    const dueAd = !this.portalEnabled() && !this.save.state.gold && this.save.shouldShowInterstitial(runs);
     if (dueAd && !this.skipInterstitialOnce && this.ads.isAvailable()) {
       this.adReason = "interstitial";
       this.adTimer = this.ads.duration;
@@ -4205,7 +3461,7 @@ export class Game {
     if (this.vipActive && !now) {
       this.vipActive = false;
       this.vipExpiredNotice = true;
-      this.hud.toast(t("hud.toast.vipExpired", undefined, "VIP expired — perks paused"), "warn");
+      this.hud.toast("VIP expired — perks paused", "warn");
       this.telemetry.track("vip_expired", {});
       this.bump();
     } else if (!this.vipActive && now) {
@@ -4224,9 +3480,9 @@ export class Game {
     // Only swap hills while resting in the menu — a midnight rollover mid-run
     // must never yank the terrain out from under a live flight.
     if (this.state === "menu" && this.seedMode === "today") this.rebuildWorld(today);
-    if (reward > 0) this.hud.toast(t("hud.toast.streakDay", { n: this.save.state.streak.days, c: reward }, "Day {{n}} streak · +{{c}} coins"), "gold");
-    if (gift > 0) this.hud.toast(t("hud.toast.vipGift", { n: gift }, "VIP daily gift · +{{n}} coins"), "vip");
-    this.hud.toast(t("hud.toast.newHills", undefined, "New hills today"), "island");
+    if (reward > 0) this.hud.toast(`Day ${this.save.state.streak.days} streak · +${reward} coins`, "gold");
+    if (gift > 0) this.hud.toast(`VIP daily gift · +${gift} coins`, "vip");
+    this.hud.toast("New hills today", "island");
     this.telemetry.track("day_rollover", { date: today });
     this.bump();
   }
@@ -4264,9 +3520,7 @@ export class Game {
     this.perfectChain = 0;
     this.skimTime = 0;
     this.skimCd = 0;
-    // Warm the surprise engine for a brand-new pilot: one delight inside the
-    // first ~20 s of the first flights, normal rarity from the second surprise.
-    this.surprises.reset({ warm: !idle && this.save.state.runsPlayed < 2 });
+    this.surprises.reset();
     this.surpriseRng = new SeededRandom(`${this.seed}:surprises`);
     this.feverTimer = 0;
     this.feverOn = false;
@@ -4278,12 +3532,7 @@ export class Game {
     this.thudCount = 0;
     this.bounceCount = 0;
     this.moments.resetRun();
-    this.clips.resetRun();
-    this.lastViralScore = 0;
-    this.difficultyTune = IDENTITY_TUNE;
     this.momentLastAt = {};
-    this.weeState = WEE_IDLE;
-    this.speedPeak = 0;
     this.wasInWater = false;
     this.hintTimer = 0;
     this.hint = idle ? "" : "HOLD to dive";
@@ -4321,10 +3570,6 @@ export class Game {
     this.menuHold = 0;
     this.needRelease = true;
     this.runTime = 0;
-    // The arc restarts from silence so every launch gets the swell: the band
-    // arriving with the player is the beat, and it only reads if it starts low.
-    this.arcIntensity = 0;
-    this.arcWritten = 0;
     this.ghostWasAhead = false;
     this.ghostPassed = false;
     this.lastBiomeId = idle ? "" : this.terrain.biomeAt(this.startX).id;
@@ -4336,31 +3581,38 @@ export class Game {
     this.runEpoch += 1;
     if (!idle) {
       this.ghostPlayer.load(this.seed);
-      this.rivalGhostSynthetic = false;
-      // A rival is not a feature, it is the loop: every solo flight gets
-      // somebody to chase. Best case that is a REAL pilot's flight on the same
-      // hills (async PvP - no matchmaking, no waiting). When the backend has no
-      // answer (cold cache, portal build, dead network, first ever session) a
-      // deterministic pace ghost takes the slot instead, aimed just past the
-      // player's own best so the chase is winnable and worth something.
-      if (!this.versus && !this.massRace.active) this.armRivalGhost();
+      // Every solo flight gets a visible, beatable chase line. This fallback is
+      // explicitly labelled as a pace target, never as a real player.
+      if (!this.versus && !this.massRace.active) {
+        const targetRng = new SeededRandom(`${this.seed}:pace-target`);
+        const pace = synthesizePaceGhost({
+          seed: this.seed,
+          startX: this.startX,
+          distance: paceTargetDistance(this.save.state.bestDistance, () => targetRng.next()),
+          terrain: this.terrain,
+          skill: clamp(this.flow.difficulty() * 0.5, 0.3, 0.82),
+        });
+        this.rivalGhostName = pace.name;
+        this.rivalGhostPlayer.loadRecord(pace.record);
+        this.hud.toast(`👻 Chase ${pace.name} — pass it before the finish`, "quest");
+
+        // Prefer an actual player's compatible ghost when one exists.
+        const epoch = this.runEpoch;
+        void fetchRivalGhost(this.seed, this.save.state.deviceId, this.save.state.bestDistance).then((rg) => {
+          if (!rg || this.disposed || epoch !== this.runEpoch || this.state !== "playing") return;
+          this.rivalGhostName = rg.name;
+          this.rivalGhostPlayer.loadRecord({ seed: this.seed, distance: rg.distance, samples: rg.samples });
+          this.hud.toast(`👻 ${rg.name} flew ${Math.round(rg.distance)} m here — chase them`, "quest");
+        });
+      }
     }
     this.launch.reset();
     this.powers.reset();
     this.runGems = 0;
     this.recordBanner = "";
     this.goalPop = "";
-    this.goalPopT = 0;
     this.goalPopKind = "goal";
-    this.popQueue = [];
-    this.runGoalsDone = 0;
-    this.rankUp = "";
-    this.rankUpKind = "rank";
-    this.rankUpT = 0;
-    this.rankCued = false;
-    this.bannerQueue = [];
-    this.questRowsPrev = [];
-    this.questPollT = 0;
+    this.goalPopT = 0;
     this.maxAltitude = 0;
     this.maxSpeed = 0;
     this.launchBannerT = 0;
@@ -4453,16 +3705,16 @@ export class Game {
         if (this.state === "gameover" && !this.multiplierClaimed && this.runCoins > 0) {
           const platform = this.platform;
           if (this.portalEnabled() && platform && platform.name !== "none") {
-            platform.measure("rewarded", "results-coin-multiplier", "interact");
-            this.beginPortalBreak("results-multiplier");
+            platform.measure("button", "results-coin-multiplier", "interact");
+            this.setState("ad");
+            this.telemetry.track("portal_break_request", { portal: platform.name, placement: "results-multiplier" });
             void this.multiplierWithPortalReward();
           } else {
-            const flightMultiplier = 3;
-            const bonus = this.runCoins * (flightMultiplier - 1);
+            const bonus = this.runCoins * 2;
             this.multiplierClaimed = true;
             this.save.addCoins(bonus);
             this.audio.chapterFanfare();
-            this.hud.toast(t("hud.toast.flightBonus", { m: flightMultiplier, n: bonus }, "{{m}}× flight bonus — +● {{n}} coins"), "gold");
+            this.hud.toast(`3× flight bonus — +● ${bonus} coins`, "gold");
           }
         }
         this.bump();
@@ -4477,7 +3729,7 @@ export class Game {
         // with that circuit preselected. A card labelled PvP must never drop
         // the player straight into an offline AI race.
         const intent = launchIntentFor(id);
-        if (intent === "lobby") { this.setScreen("live"); break; }
+        if (intent === "lobby") { this.setScreen("challenges"); break; }
         if (intent === "pvp-options") {
           const circuit = pvpCircuitFor(id);
           if (circuit) {
@@ -4485,7 +3737,7 @@ export class Game {
             this.mode = modeById(circuit);
             this.hud.toast(`${this.mode.icon} ${this.mode.name} selected — ranked, casual, a room, or the AI flock`, "gold");
           }
-          this.setScreen("live");
+          this.setScreen("challenges");
           this.bump();
           break;
         }
@@ -4555,23 +3807,12 @@ export class Game {
         // the confirmation flow (goToMenu returns to menu state) starts clean.
         if (this.state === "paused") this.closePauseScreen();
         this.exitVersus();
-        if (this.state === "gameover" && this.portalEnabled() && this.platform && this.platform.name !== "none") {
-<<<<<<< HEAD
-          // Leaving the recap for the menu is a natural stop, and the portal's
-          // own frequency capping decides whether a real ad serves. The break
-          // routes through menuAfterPortalBreak(), so an absent/declined ad
-          // still lands the player in the menu instead of wedging in "ad".
-          this.telemetry.track("portal_break_request", { portal: this.platform.name, placement: "to-menu" });
-=======
-          // Leaving the recap for the menu is one of Poki's documented
-          // commercial-break points ("back to the main menu"); the SDK
-          // frequency-caps how often a real ad actually serves. The request
-          // telemetry is emitted by beginPortalBreak("to-menu") inside, so this
-          // path does not track it a second time.
->>>>>>> origin/main
-          void this.menuAfterPortalBreak();
-          break;
-        }
+        // Poki technical standard (Requirements → SDK integration):
+        // commercialBreak() must fire only when exiting a pause and heading
+        // back into gameplay — "leaving gameplay and going into a Level
+        // selection = Wrong". Results→menu is exactly that navigation shape,
+        // so no break fires here; the restart and resume placements carry the
+        // commercial load.
         this.goToMenu();
         break;
       case "pause-to": {
@@ -4583,7 +3824,11 @@ export class Game {
         break;
       }
       case "open-practice":
-        this.setScreen("practice");
+      case "open-live":
+        // One race hub owns both human matchmaking and AI practice. Keeping
+        // the old screens as routing destinations made the same format/world
+        // picker appear three times with subtly different actions.
+        this.setScreen("challenges");
         break;
       case "practice-ranked":
       case "practice-storm":
@@ -4594,6 +3839,12 @@ export class Game {
         this.setScreen("progress");
         break;
       case "open-shop":
+        if (!this.save.state.seenShop) {
+          this.save.state.seenShop = true;
+          this.save.persist();
+          this.telemetry.track("onboarding_shop_opened", { runs: this.save.state.runsPlayed });
+          this.hud.toast("Start with a bird — each one changes your flight", "gold");
+        }
         this.setScreen("shop");
         break;
       case "open-paywall":
@@ -4604,22 +3855,6 @@ export class Game {
         break;
       case "open-settings":
         this.setScreen("settings");
-        break;
-      case "open-privacy":
-        // In-game screen, not a link out: portals sandbox the iframe, so a
-        // popup is a dead button for exactly the players the policy protects.
-        // `legal.ts` renders the same document the hosted page is built from.
-        this.setScreen("privacy");
-        this.telemetry.track("privacy_open", { from: this.state });
-        break;
-      case "open-privacy-url":
-        // The hosted copy, opened through the portal's own external-link API —
-        // never window.open, never top-level navigation. Rendered only when the
-        // SDK advertises the capability, so this cannot be a dead button.
-        if (this.platform && /^https?:\/\//i.test(PRIVACY_POLICY_URL)) {
-          this.platform.openExternalLink(PRIVACY_POLICY_URL);
-          this.telemetry.track("privacy_open_hosted", { portal: this.platform.name });
-        }
         break;
       case "open-scores":
         this.setScreen("scores");
@@ -4714,7 +3949,7 @@ export class Game {
           // Pack loads before the re-render: UI never paints half-switched
           // text, and the confirmation toast lands once strings are live.
           void setLocale(id as SupportedLocale).then(() => {
-            this.hud.toast(t("hud.settings.languageUpdated", undefined, "Language updated"), "info");
+            this.hud.toast(`Language updated`, "info");
             this.bump();
           });
         }
@@ -5422,17 +4657,14 @@ export class Game {
       case "room-size": {
         const n = Math.max(5, Math.min(40, parseInt(id || "40", 10) || 40));
         this.roomSize = n;
-        this.hud.toast(t("toast.field.size", { n }, "Field size · {n} rivals"), "info");
+        this.hud.toast(`Field size · ${n} rivals`, "info");
         this.bump();
         break;
       }
       case "room-skill":
         this.roomSkill = (id as "chill" | "sharp" | "ace") || "sharp";
         this.massRace.setFieldSkill(this.roomSkill === "ace" ? 1.25 : this.roomSkill === "chill" ? 0.7 : 1);
-        this.hud.toast(
-          t("toast.rival.skill", { skill: t(`race.skill.${this.roomSkill}`, undefined, this.roomSkill) }, "Rival skill · {skill}"),
-          "info",
-        );
+        this.hud.toast(`Rival skill · ${this.roomSkill}`, "info");
         this.bump();
         break;
       case "room-shuffle":
@@ -5485,10 +4717,6 @@ export class Game {
         break;
       case "open-rank":
         this.setScreen("rank");
-        break;
-      case "open-live":
-        this.setScreen("live");
-        // Browsing must not seat an unready spectator into public matchmaking.
         break;
       case "back":
         this.backScreen();
@@ -5562,52 +4790,9 @@ export class Game {
         const dist = Math.max(1, Math.round(this.lastRunDistance()));
         const mode = flag("modeAwareChallenge") ? this.modeId : undefined;
         const url = buildChallengeUrl(this.seed, dist, this.pilotName, mode);
-        const recap = clipShareLine(this.lastViralScore, this.clips.recapLine(), dist, this.pilotName);
-        const text = recap ? `${recap} 🐦 → ${url}` : `Beat my ${dist} m flight on these hills 🐦 → ${url}`;
+        const text = `Beat my ${dist} m flight on these hills 🐦 → ${url}`;
         this.shareText(text, `🥊 Challenge link copied — send it to a rival`);
         this.telemetry.track("rival_thrown", { distance: dist, mode: this.modeId });
-        this.telemetry.track("challenge_share", viralEventProps("challenge_share", { mode: this.modeId, distance: dist, score: this.lastViralScore }));
-        break;
-      }
-      case "buy-powerup": {
-        // Game-changing: in-flight shop — buy powerups mid-flight with coins
-        if (this.state !== "playing" && this.state !== "paused") break;
-        const def = INFLIGHT_POWERUPS.find((p) => p.id === id);
-        if (!def) break;
-        if (this.runCoins < def.cost) {
-          this.hud.toast(t("inflight.needCoins", { cost: def.cost, have: this.runCoins }, `Need ●${def.cost} — you have ●${this.runCoins}`), "warn");
-          break;
-        }
-        // Deduct and apply
-        this.runCoins -= def.cost;
-        this.bonus += 0; // coins already deducted from run
-        switch (def.id) {
-          case "boost":
-            this.powers.add("rocket");
-            this.audio.powerup();
-            this.hud.toast(t("inflight.bought.boost", { s: def.duration }, `🚀 Boost! +30 speed ${def.duration}s`), "power");
-            break;
-          case "magnet":
-            this.powers.add("magnet");
-            this.audio.powerup();
-            this.hud.toast(t("inflight.bought.magnet", { s: def.duration }, `🧲 Magnet! Coins ${def.duration}s`), "power");
-            break;
-          case "shield":
-            this.shield = Math.min(2, this.shield + 1);
-            this.powers.shield = this.shield;
-            this.audio.powerup();
-            this.hud.toast(t("inflight.bought.shield", { s: def.duration }, `🛡 Shield! No crash ${def.duration}s`), "power");
-            break;
-          case "fever":
-            this.feverTimer = def.duration;
-            this.feverOn = true;
-            this.feverReached = true;
-            this.audio.feverOn();
-            this.hud.toast(t("inflight.bought.fever", { s: def.duration }, `🔥 Fever! Warp ${def.duration}s`), "gold");
-            break;
-        }
-        this.telemetry.track("inflight_shop_buy", { id: def.id, cost: def.cost, coinsLeft: this.runCoins });
-        this.bump();
         break;
       }
       case "rematch": {
@@ -5655,36 +4840,6 @@ export class Game {
       case "continue-coins":
         if (this.state === "continue" && this.save.spend(CONTINUE_COST)) this.doContinue("coins");
         break;
-      case "onboarding-dismiss":
-        if (id) {
-          this.save.markOnboardingSeen(id);
-          this.onboardingTip = null;
-          this.bump();
-        }
-        break;
-      case "onboarding-skip":
-        // Mark all as seen
-        for (const tipId of Object.keys(ONBOARDING_TIPS)) this.save.markOnboardingSeen(tipId);
-        this.onboardingTip = null;
-        this.bump();
-        break;
-      case "skip-goal": {
-        const goalId = (action as { id?: string }).id;
-        if (!goalId) break;
-        const goal = this.goals.goals.find((g) => g.id === goalId);
-        if (!goal || goal.done) break;
-        const cost = this.goals.skipCost(goal);
-        if (this.save.state.wallet < cost) {
-          this.hud.toast(t("inflight.shop.skip.needCoins", { cost, have: this.save.state.wallet }, `Need ●${cost} to skip — you have ●${this.save.state.wallet}`), "warn");
-          break;
-        }
-        this.save.spend(cost);
-        const replacement = this.goals.skip(goalId, this.seed);
-        this.hud.toast(t("inflight.shop.skip.done", { old: goal.label, new: replacement?.label ?? "new goal", cost }, `Skipped ${goal.label} → ${replacement?.label ?? "new goal"} for ●${cost}`), "info");
-        this.telemetry.track("goal_skip", { id: goalId, cost, newId: replacement?.id ?? "" });
-        this.pushHud();
-        break;
-      }
       case "continue-ad":
         if (this.state === "continue") {
           if (this.portalEnabled() && !this.adsLive()) {
@@ -5695,7 +4850,7 @@ export class Game {
             // Poki game-events: the player chose the rewarded option. The label
             // matches the `visible` event for the same offer kind (REQ-14).
             const kind = this.continueOfferView?.kind ?? "standard";
-            this.platform?.measure("rewarded", continuePlacementLabel(kind), "interact");
+            this.platform?.measure("button", continuePlacementLabel(kind), "interact");
             void this.continueWithPortalReward();
           } else {
             this.adReason = "continue";
@@ -5806,17 +4961,6 @@ export class Game {
         this.save.persist();
         this.applySettings();
         break;
-      case "set-autoshop":
-        this.save.state.settings.autoShop = !this.save.state.settings.autoShop;
-        this.save.persist();
-        this.hud.toast(
-          this.save.state.settings.autoShop
-            ? "Hangar will open itself once a session when you can afford something new"
-            : "Hangar will only open when you tap it",
-          "info",
-        );
-        this.bump();
-        break;
       case "set-quality": {
         const order = ["auto", "high", "low"] as const;
         const cur = this.save.state.settings.quality;
@@ -5896,7 +5040,7 @@ export class Game {
         this.hud.toast(`⚔ Duel forfeited · ${res.delta} rating`, "warn");
       }
       // A graceful retreat still deserves a punchline.
-      this.fireMoment("sleep", { shout: quip(SURRENDER_QUIPS, Math.round(this.bird.x)), always: true });
+      this.hud.toast(quip(SURRENDER_QUIPS, Math.round(this.bird.x)), "cloud");
     }
     this.disconnectRace();
     this.roomCode = "";
@@ -5960,7 +5104,6 @@ export class Game {
     this.audio.purchase();
     this.hud.toast(`${def.name} is yours!`, "gold");
     this.telemetry.track("skin_bought", { id, price });
-    this.portalPurchase("cosmetic", id, "unlocked");
     this.bump();
   }
 
@@ -5987,7 +5130,6 @@ export class Game {
     this.audio.purchase();
     this.hud.toast(`${def.icon} ${def.name} ${def.permanent ? "unlocked" : "armed"}`, "power");
     this.telemetry.track("boost_bought", { id, price });
-    this.portalPurchase(def.permanent ? "upgrade" : "powerup", id, def.permanent ? "unlocked" : "armed");
     this.bump();
   }
 
@@ -6011,7 +5153,6 @@ export class Game {
     this.audio.purchase();
     this.hud.toast(`${def.label} trail is yours!`, "gold");
     this.telemetry.track("trail_bought", { id, price: def.price });
-    this.portalPurchase("cosmetic", id, "unlocked");
     this.bump();
   }
 
@@ -6195,16 +5336,12 @@ export class Game {
         const handled = await platform.share(card.text);
         if (handled) {
           this.telemetry.track("share_run", { result: "shared" });
-          this.telemetry.track("clip_export", viralEventProps("clip_export", { mode: this.modeId, distance: dist, score: this.lastViralScore }));
           if (!this.disposed) this.hud.toast("Shared!", "gold");
           return;
         }
       }
       const result = await shareOrDownload(card, undefined, !this.portalEnabled());
       this.telemetry.track("share_run", { result });
-      if (result === "shared" || result === "copied") {
-        this.telemetry.track("clip_export", viralEventProps("clip_export", { mode: this.modeId, distance: dist, score: this.lastViralScore }));
-      }
       if (this.disposed) return;
       if (result === "unavailable") this.hud.offerCopy(card.text);
       else if (result !== "cancelled") this.hud.toast(result === "shared" ? "Shared!" : result === "copied" ? "Flight link copied" : "Image download requested", "info");
@@ -6340,10 +5477,9 @@ export class Game {
     this.collect.dispose();
     this.scene.remove(this.weather.group);
     this.weather.dispose();
-    const qualityTier2 = this.deviceProfile.tier === "lite" ? "lite" : this.deviceProfile.tier === "standard" ? "mid" : "high";
-    this.terrain = new TerrainSystem(seed, qualityTier2);
+    this.terrain = new TerrainSystem(seed);
     this.scene.add(this.terrain.group);
-    this.collect = new Collectibles(this.terrain.seedN, seed, qualityTier2);
+    this.collect = new Collectibles(this.terrain.seedN);
     this.scene.add(this.collect.group);
     this.weather = new Weather(this.terrain.seedN);
     this.weather.addTo(this.scene);
@@ -6429,7 +5565,7 @@ export class Game {
     // Mobile gets a lighter decorative particle stream by default. Gameplay
     // events still render because critical emitters are short-lived and the
     // adaptive quality loop can shed more work under sustained load.
-    this.particleBudget = s.quality === "low" ? 0.3 : this.deviceProfile.tier === "lite" || this.isMobile || this.deviceProfile.tier === "standard" ? 0.5 : 1;
+    this.particleBudget = s.quality === "low" ? 0.3 : this.isMobile ? 0.5 : 1;
     this.particles.setBudget(this.particleBudget);
     // Soft shadows are the single priciest feature on mobile GPUs — keep them
     // only when the user asked for high quality (auto tiers shed them first).
@@ -6454,15 +5590,6 @@ export class Game {
 
   private adaptQuality(raw: number): void {
     this.frameEma = lerp(this.frameEma, raw, 0.05);
-    // Shed particles before frames. The budget follows the same 38/48/58 fps
-    // ladder as the DPR stepper in quality.ts, so a weak device loses sparkle
-    // rather than responsiveness — and the write only happens on a change,
-    // because ParticleFX.setBudget is called from inside the frame loop.
-    const budget = fxScale(this.frameEma);
-    if (budget !== this.fxBudget) {
-      this.fxBudget = budget;
-      this.particles.setBudget(budget);
-    }
     // Field perf telemetry: count frames that blow the 60 fps budget (16.7 ms)
     // and track the worst, then report a coarse aggregate every ~10s. This is
     // the same signal the quality stepper reacts to — surfaced so a deploy that
@@ -6566,6 +5693,45 @@ export class Game {
     this.hud.flash(kind);
   }
 
+  /** Records a memorable beat once at a readable cadence, then fans it into
+   * feedback and telemetry.  The ledger is intentionally per-run; the
+   * session-level first-seen set lives inside it for the retention funnel. */
+  private fireMoment(
+    kind: MomentKind,
+    opts: { shout?: string; toast?: string; popup?: boolean; always?: boolean } = {},
+  ): number {
+    const before = this.moments.count(kind);
+    const last = this.momentLastAt[kind];
+    const since = last === undefined ? Number.POSITIVE_INFINITY : this.runTime - last;
+    if (!opts.always && !momentShouldReact(before, since)) return before;
+    const def = MOMENTS[kind];
+    const count = this.moments.record(kind);
+    this.momentLastAt[kind] = this.runTime;
+    if (opts.popup !== false) this.popupAtBird(opts.shout ?? def.shout, def.popup);
+    if (opts.toast) this.hud.toast(opts.toast, def.tone);
+    this.haptic(def.haptic);
+    if (this.moments.isFirstEver(kind)) {
+      this.telemetry.track("moment_first", { kind, mode: this.modeId });
+      this.markFunnel("first_moment");
+    }
+    return count;
+  }
+
+  /** Emits each first-session milestone exactly once, with timings that make
+   * early churn actionable instead of guessing at it from aggregate playtime. */
+  private markFunnel(stage: FunnelStage): void {
+    const event = this.funnel.mark(stage);
+    if (!event) return;
+    this.platform?.measure("player", `funnel-${event.stage}`, "reached");
+    this.telemetry.track("funnel_stage", {
+      stage: event.stage,
+      step: event.step,
+      ms: event.ms,
+      stepMs: event.stepMs,
+      progress: Math.round(event.progress * 100) / 100,
+    });
+  }
+
   /** Project a world position to screen fractions [0..1, 0..1] for popups.
    *  Returns [0.42, 0.5] as a safe fallback when projection fails. */
   private projectToScreen(wx: number, wy: number): [number, number] {
@@ -6578,158 +5744,6 @@ export class Game {
   }
 
   /** Fire a floating impact text popup near the bird's current screen position. */
-  /**
-   * The one door every memorable beat walks through: classify → react → tally.
-   *
-   * `Moments.ts` owns what a kind means (shout word, popup style, toast tone,
-   * vibration pattern, results-card language, next-action CTA); this owns doing
-   * it exactly once, on the run clock, and counting it even when the reaction
-   * is throttled. Call sites keep their own audio and particles because those
-   * depend on live scene context — but they all feed the same ledger now, so
-   * the recap card, the share line and the funnel see one truth instead of ten
-   * private counters.
-   *
-   * @param opts.shout overrides the popup word (quip pools still work)
-   * @param opts.toast optional toast text, shown in the kind's tone
-   * @param opts.popup `false` to tally silently (sites with a bespoke popup)
-   * @param opts.always bypass the repeat throttle (records, sleeping)
-   * @returns the kind's new count for this run
-   */
-  /**
-   * The one door flight coins walk through.
-   *
-   * Everything a run earns is accumulated here and banked once by
-   * `SaveData.recordRun()` at the end of the flight, so this is where the coin
-   * multipliers have to live: the permanent Golden Feather upgrade and the
-   * timed Lucky Coin bonus both read through `SaveData.coinMultiplier()`. A
-   * multiplier applied anywhere else only ever catches part of the economy,
-   * which is how shops end up selling upgrades that quietly do nothing.
-   *
-   * @returns the coins actually awarded (>= `base`), so callers can print the
-   * number the player will really get instead of the pre-multiplier one.
-   */
-  private addRunCoins(base: number): number {
-    if (base <= 0) return 0;
-    const mult = this.save.coinMultiplier();
-    const awarded = Math.max(base, Math.ceil(base * mult));
-    this.runCoins += awarded;
-    this.markFunnel("first_reward");
-    // Say so out loud while it lasts: a paid or earned multiplier that is
-    // invisible is a multiplier players stop believing in.
-    if (mult > 1) this.popupAtBird(`+${awarded} ×${mult % 1 === 0 ? mult : mult.toFixed(1)}`, "power");
-    return awarded;
-  }
-
-  /**
-   * One beacon per session, carrying the two numbers retention actually turns
-   * on: how long boot took, and which cohort today's visit belongs to (new /
-   * D1 / D2-6 / D7+). The cohort comes from the stamped first-session day, so
-   * D1 here means the same thing D1 means on a portal dashboard - a real
-   * calendar day later, in the player's own timezone. Nothing identifying is
-   * attached: stage timings and a cohort label, that is all.
-   */
-  private noteSessionStart(): void {
-    this.markFunnel("boot");
-    const cohort = visitKind(this.save.state.firstPlayed, this.today);
-    this.save.noteFirstPlayed(this.today);
-    this.telemetry.track("session_start", { cohort, runsPlayed: this.save.state.runsPlayed });
-  }
-
-  /**
-   * Records a funnel stage and reports it once.
-   *
-   * `Funnel.mark()` returns an event only the first time a stage is reached, so
-   * this is safe to call from hot paths (input handling, every coin pickup)
-   * without double-counting or spamming beacons. `stepMs` is the number that
-   * matters: it turns "players drop off" into "38 s between first flight and
-   * first coin".
-   */
-  /**
-   * Achievement unlock → canonical Game Events + celebration:
-   * `measure('achievement', id, 'unlocked')` and a strong `happyTime`.
-   *
-   * `celebrate` is false when the unlock is part of a run-end batch: Poki asks
-   * for happyTime sparingly, and four trophies unlocking on one landing are one
-   * moment, not four. `finishRun()` then sends a single call at the peak of
-   * everything the flight grew (`ProgressBeats.planCelebration`).
-   */
-  private portalAchievement(id: string, celebrate = true): void {
-    this.platform?.measure("achievement", id, "unlocked");
-    if (celebrate) this.platform?.happyTime(0.85);
-  }
-
-  /**
-   * Shop purchase → the item event plus the shared economy event, so the
-   * dashboard can compare a card's `visible`/`interact` pair with actual spend
-   * (the guide's "UI and shop usage" pattern).
-   */
-  private portalPurchase(category: string, id: string, action: string): void {
-    this.platform?.measure(category, id, action);
-    this.platform?.measure("economy", "coins", "spent");
-  }
-
-  private markFunnel(stage: FunnelStage): void {
-    const ev = this.funnel.mark(stage);
-    if (!ev) return;
-    // Canonical Game Events: each funnel milestone is also a custom event, so
-    // Poki's dashboard reports the percentage of gameplays that reached it.
-    // Stage names carry no digits, which keeps them inside measure()'s
-    // two-numeric limit.
-    this.platform?.measure("player", `funnel-${ev.stage}`, "reached");
-    this.telemetry.track("funnel_stage", {
-      stage: ev.stage,
-      step: ev.step,
-      ms: ev.ms,
-      stepMs: ev.stepMs,
-      progress: Math.round(ev.progress * 100) / 100,
-    });
-  }
-
-  private fireMoment(
-    kind: MomentKind,
-    opts: { shout?: string; toast?: string; popup?: boolean; always?: boolean } = {},
-  ): number {
-    const def = MOMENTS[kind];
-    const before = this.moments.count(kind);
-    const last = this.momentLastAt[kind];
-    const since = last === undefined ? Number.POSITIVE_INFINITY : this.runTime - last;
-    // Throttled beats are ignored outright rather than counted silently: a
-    // beached bird stalls on every physics frame, and a ledger that recorded
-    // all of them would report "PANIC x412" for one bad beach. The cadence in
-    // `momentRepeatGap` is the shared budget, so every kind degrades the same.
-    if (!opts.always && !momentShouldReact(before, since)) return before;
-    const n = this.moments.record(kind);
-    this.momentLastAt[kind] = this.runTime;
-    if (flag("clipWorthy")) {
-      const clip = clipFromMoment(kind);
-      if (clip) {
-        const first = this.clips.isFirstEver(clip);
-        this.clips.record(clip);
-        if (first) {
-          this.telemetry.track("clip_moment", viralEventProps("clip_moment", { kind: clip, mode: this.modeId }));
-          this.camera.pulseClip(clipShotFor(clip), Math.min(1.2, this.bird.speed() / MAX_SPEED), this.bird.altitude);
-        }
-      }
-    }
-    if (opts.popup !== false) this.popupAtBird(opts.shout ?? def.shout, def.popup);
-    if (opts.toast) this.hud.toast(opts.toast, def.tone);
-    this.haptic(def.haptic);
-    // The score is part of the beat, not wallpaper under it: each kind has a
-    // bounded musical reaction (MusicMoments.ts), gated so a beached bird
-    // spamming PANIC cannot stack filter sweeps on the music bus.
-    this.audio.musicMoment(kind);
-    // One telemetry event the first time each kind appears in a session — the
-    // funnel's "first funny moment". Never one per occurrence: a splashy run
-    // would fire dozens of identical beacons for no extra insight.
-    if (this.moments.isFirstEver(kind)) {
-      this.telemetry.track("moment_first", { kind, mode: this.modeId });
-      // "First funny moment" predicts a second run better than distance does,
-      // so it is a funnel stage in its own right.
-      this.markFunnel("first_moment");
-    }
-    return n;
-  }
-
   private popupAtBird(text: string, kind: "perfect" | "great" | "thud" | "bop" | "fever" | "zenith" | "splash" | "power"): void {
     if (this.save.state.settings.reduceMotion) return;
     const [sx, sy] = this.projectToScreen(this.bird.x, this.bird.y + 4);
@@ -6747,58 +5761,21 @@ export class Game {
 
   /** The SDK owns ad focus. Silence and freeze immediately, then restore only
    * after the callback so portal ads cannot leak game audio/input beneath them. */
-  /**
-   * True while a portal break owns the state machine.
-   *
-   * Poki's documented order is `gameplayStop()` → break → `gameplayStart()`,
-   * and the start must not fire *during* the ad. Every path back into gameplay
-   * already awaits the break first, but a break is an await: anything else that
-   * calls `setState("playing")` while it is in flight (a stray tap on a path
-   * that does not disable input, a late callback, a visibility handler) would
-   * emit `gameplayStart` mid-ad. `setState` drops transitions out of `"ad"`
-   * while this is set; `endPortalAd()` releases it.
-   *
-   * Only *portal* breaks take the lock. The self-served interstitial (non-portal
-   * builds) also uses the `"ad"` state but is driven by `adTimer` and released
-   * by `endAd()`, so it must stay out of this.
-   */
-  private adInFlight = false;
-
-  /**
-   * Enter a portal break: `"ad"` state + the in-flight lock + the request
-   * telemetry, in one place so the five placements cannot drift apart.
-   */
-  private beginPortalBreak(placement: string): void {
-    this.setState("ad");
-    this.adInFlight = true;
-    this.telemetry.track("portal_break_request", {
-      portal: this.platform?.name ?? "none",
-      placement,
-    });
-  }
-
   private beginPortalAd(): void {
-    // A break always interrupts the player now that the gameplay window covers
-    // every interactive state, so it is always bookended: stop on the way in,
-    // start on the way out. Poki's only hard rule is that a phase must not
-    // repeat itself — that is exactly what GameplayEventSink enforces — so an
-    // ad that begins while the clock is already stopped (death → results →
-    // break) costs nothing and cannot produce the forbidden duplicate.
-    this.gameplaySink.send("stop");
+    // No gameplay event is sent here on purpose. The stop that precedes a
+    // break is already on the books from the state transition that halted
+    // play (death → gameover, or pause), and Poki's rules are explicit:
+    // a gameplayStop() may NOT follow another gameplayStop(), and ads that
+    // do not interrupt gameplay (a coin break from the shop) must not be
+    // wrapped in stop/start pairs at all. The sink dedupes the rare
+    // late-adapter case without ever producing the duplicate.
     this.input.setEnabled(false);
     this.audio.setAdMuted(true);
   }
 
   private endPortalAd(): void {
-    // Release the state-machine lock FIRST: the caller's next transition
-    // (startRun / resume / menu / continue) is the canonical way back into
-    // gameplay, and it must be honoured now that the break has resolved.
-    this.adInFlight = false;
     this.audio.setAdMuted(false);
     this.input.setEnabled(true);
-    // The player can act again, so the engaged clock resumes — unless the tab
-    // is hidden, in which case onVis owns the next start.
-    if (isInteractive(this.state) && !this.hidden) this.gameplaySink.send("start");
   }
 
   private portalEnabled(): boolean {
@@ -7422,44 +6399,6 @@ export class Game {
         event: this.eventRun, storm: this.stormfront }),
       replay: true,
     };
-    if (this.adsLive()) void this.restartWithPortalBreak(options);
-    else this.startRun(options);
-  }
-
-  /**
-   * Is this run start a break opportunity? (Poki, "PokiSDK: HTML5", step 4.)
-   *
-   * Three things are deliberately NOT opportunities:
-   *  • the first run of the session — the Startup row of Poki's event table is
-   *    `gameLoadingFinished() → gameplayStart()` with no break, because the
-   *    player has already paid for it with the loading screen;
-   *  • a live race — a duel, a room, or a same-screen 1v1 has other people
-   *    waiting, and the platform's own guidance is that a break belongs at a
-   *    natural stop, not between "ready" and the start line;
-   *  • the run that a break is handing into, which must not ask for another.
-   *
-   * Everything else — Play, the daily course, a gauntlet, a solo mode, a storm
-   * run — is a player choosing to keep playing, which is exactly the moment the
-   * doc asks to be signalled. Whether an ad actually serves is Poki's call.
-   */
-  private shouldBreakBeforeRun(opts?: RunOptions): boolean {
-    if (this.inRunStartBreak) return false;
-    if (this.sessionRuns === 0) return false;
-    if (!this.adsLive()) return false;
-    if (opts?.duel || this.versus || this.localRace || this.roomCode) return false;
-    return true;
-  }
-
-  private async restartWithPortalBreak(options: RunOptions = {}): Promise<void> {
-    const platform = this.platform;
-    if (!this.adsLive() || !platform || platform.name === "none") {
-      this.startRun(options);
-      return;
-    }
-    this.beginPortalBreak("restart");
-    await platform.commercialBreak();
-    if (this.disposed) return;
-    this.endPortalAd();
     this.startRun(options);
   }
 
@@ -7477,37 +6416,13 @@ export class Game {
     this.closePauseScreen();
     const platform = this.platform;
     if (this.adsLive() && platform && platform.name !== "none") {
-      this.beginPortalBreak("resume");
+      this.setState("ad");
+      this.telemetry.track("portal_break_request", { portal: platform.name, placement: "resume" });
       await platform.commercialBreak();
       if (this.disposed) return;
       this.endPortalAd();
     }
     if (this.state === "paused" || this.state === "ad") this.setState("playing");
-  }
-
-  /**
-   * The "back to the main menu" commercial break (results → menu on portal
-   * builds). A rejected or absent break resolves straight into the menu —
-   * leaving a results screen can never wedge in the ad state.
-   */
-  private async menuAfterPortalBreak(): Promise<void> {
-    const platform = this.platform;
-<<<<<<< HEAD
-    if (!this.adsLive() || !platform || platform.name === "none") {
-      this.goToMenu();
-      this.bump();
-      return;
-    }
-    this.setState("ad");
-=======
-    if (!this.adsLive() || !platform || platform.name === "none") return;
-    this.beginPortalBreak("to-menu");
->>>>>>> origin/main
-    await platform.commercialBreak();
-    if (this.disposed) return;
-    this.endPortalAd();
-    this.goToMenu();
-    this.bump();
   }
 
   /**
@@ -7529,7 +6444,7 @@ export class Game {
       this.save.addCoins(bonus);
       this.audio.chapterFanfare();
       this.hud.toast(`3× flight bonus — +● ${bonus} coins`, "gold");
-      platform.measure("rewarded", "results-coin-multiplier", "granted");
+      platform.measure("reward", "results-coin-multiplier", "granted");
     } else {
       this.hud.toast("No reward this time — the 3× bonus is still on the card", "warn");
     }
@@ -7571,7 +6486,8 @@ export class Game {
   private async continueWithPortalReward(): Promise<void> {
     const platform = this.platform;
     if (!this.adsLive() || !platform || platform.name === "none") return;
-    this.beginPortalBreak("continue");
+    this.setState("ad");
+    this.telemetry.track("portal_break_request", { portal: platform.name, placement: "continue" });
     const earned = await platform.rewardedBreak();
     if (this.disposed) return;
     this.endPortalAd();
@@ -7585,10 +6501,6 @@ export class Game {
 
   private setState(s: GameState): void {
     const previous = this.state;
-    // While a portal break is in flight, nothing but the code that awaited it
-    // may move the game out of the ad state — otherwise `gameplayStart` can
-    // land mid-ad (see `adInFlight`).
-    if (this.adInFlight && previous === "ad" && s !== "ad") return;
     this.state = s;
     // Arm and disarm the break safety valve (see adWallClock).
     if (s === "ad") {
@@ -7617,13 +6529,10 @@ export class Game {
     else if (s === "gameover" || s === "continue") this.audio.setMusicMode("sleep");
     else if (s === "paused") this.audio.duckMusic(0.55, 3);
     else if (s === "playing") this.audio.setMusicMode(this.feverOn ? "fever" : this.stormfront ? "storm" : "play");
-    // Edge-triggered through the sink on the *interaction* boundary, not the
-    // run boundary: stop exactly once when the player loses the ability to act
-    // (pause, ad), start exactly once when they get it back. Moving between two
-    // interactive states (playing → results → menu) is not a halt, so the
-    // portal keeps counting the session the player is actually having.
-    if (isInteractive(previous) && !isInteractive(s)) this.gameplaySink.send("stop");
-    if (!isInteractive(previous) && isInteractive(s) && !this.hidden) this.gameplaySink.send("start");
+    // Edge-triggered through the sink: stop exactly once per halt
+    // (death, pause, menu), start exactly once per resume.
+    if (previous === "playing" && s !== "playing") this.gameplaySink.send("stop");
+    if (previous !== "playing" && s === "playing") this.gameplaySink.send("start");
     this.bump();
   }
 
@@ -7709,27 +6618,11 @@ export class Game {
     this.screen = s;
     this.menuHold = 0;
     this.needRelease = true;
-    // Track onboarding — when player actually opens these screens
-    if (s === "shop") this.save.markSeen("shop");
-    if (s === "live") this.save.markSeen("pvp");
-    if (s === "practice") this.save.markSeen("pve");
-    if (s === "board") this.save.markSeen("leaderboards");
-    if (s === "challenges") this.save.markSeen("challenges");
-    this.updateOnboarding();
     // Every return to the home screen refreshes the embedded leaderboard so a
     // just-finished run shows up immediately (cache-first, non-blocking). Only
     // do this for the real main menu — during pause, "main" is the pause card.
-<<<<<<< HEAD
     if (s === "main" && this.state !== "paused") void this.refreshBoard();
     this.measureScreenExposure(s);
-=======
-    if (s === "main" && this.state !== "paused") {
-      void this.refreshBoard();
-      // Landing home after a flight is the one calm beat where a "you can
-      // afford this now" nudge reads as a reward instead of an interruption.
-      this.maybeAutoOpenShop();
-    }
->>>>>>> origin/main
     this.bump();
   }
 
@@ -7808,30 +6701,6 @@ export class Game {
     return Math.max(0, this.bird.x - this.startX);
   }
 
-  /** Share leads the recap when the run is clip-worthy, else the A/B decides. */
-  private shareCtaLeads(): boolean {
-    if (this.state !== "gameover") return false;
-    const experimentShareFirst =
-      (this.expShareFirst ??= variant(
-        this.save.state.deviceId,
-        EXPERIMENTS.results_cta_order.id,
-        EXPERIMENTS.results_cta_order.split,
-        (v) => {
-          this.telemetry.track("experiment_exposure", { experiment: EXPERIMENTS.results_cta_order.id, variant: v });
-        },
-      )) === "treatment";
-    if (!flag("oneMoreRun")) return experimentShareFirst;
-    return pickCta({
-      viralScore: this.lastViralScore,
-      newBest: this.newBest,
-      nearMiss: this.nearMiss.kind !== "none",
-      photoFinish: Boolean(this.photoFinish),
-      runsPlayed: this.save.state.runsPlayed,
-      challengeShareOn: flag("challengeShare"),
-      experimentShareFirst,
-    }).shareFirst;
-  }
-
   private runStats(): RunStats {
     return {
       clouds: this.runClouds,
@@ -7846,23 +6715,14 @@ export class Game {
   }
 
   /** 0..1 — continuous musical intensity from the moment-to-moment flight. */
-  /**
-   * The game's own 0..1 energy sum: speed, altitude, fever, danger (daylight
-   * burning down) and ring chain. This is the *input* to the music arc, not the
-   * value written to the score — `MusicArc.ts` shapes it into an envelope over
-   * the whole run, and the two are kept apart so the tuning of one never
-   * silently changes the other.
-   */
-  private musicEnergy(): number {
+  private musicIntensity(): number {
     if (this.state !== "playing") return 0;
-    return runEnergy({
-      speed: this.bird.speed() / 90,
-      alt: this.bird.altitude / ALT_HIGH,
-      fever: this.feverOn,
-      danger: 1 - Math.max(0, Math.min(1, this.daylight / this.daylightMax())),
-      chain: this.ringChain / 4,
-      goalsDone: this.runGoalsDone,
-    });
+    const speed = Math.min(1, this.bird.speed() / 90);
+    const alt = Math.min(1, this.bird.altitude / ALT_HIGH);
+    const fever = this.feverOn ? 1 : 0;
+    const danger = 1 - Math.max(0, Math.min(1, this.daylight / this.daylightMax()));
+    const chain = Math.min(1, this.ringChain / 4);
+    return Math.min(1, speed * 0.35 + alt * 0.22 + fever * 0.3 + danger * 0.12 + chain * 0.12);
   }
 
   private score(): number {
@@ -7895,9 +6755,27 @@ export class Game {
   }
 
   private gauntletCard(): GauntletCard {
-    // Pure view-building lives in Cards.ts, where it can be tested (audit §10.3).
-    const week = weekKey();
-    return buildGauntletCard(week, this.save.gauntletDone(week), this.save.state.challenges.gauntletsCleared);
+    const g = weeklyGauntlet(weekKey());
+    const done = this.save.gauntletDone(g.week);
+    return {
+      week: g.week,
+      stages: g.stages.map((st) => {
+        const mode = modeById(st.mode);
+        return {
+          index: st.index,
+          label: st.label,
+          modeName: mode.name,
+          modeIcon: mode.icon,
+          metric: st.metric,
+          target: st.target,
+          reward: st.reward,
+          done: done.includes(st.index),
+        };
+      }),
+      clearBonus: g.clearBonus,
+      cleared: done.length >= 3,
+      lifetimeClears: this.save.state.challenges.gauntletsCleared,
+    };
   }
 
   private calendarCard(): CalendarCard {
@@ -7916,147 +6794,6 @@ export class Game {
     return { cycleDay: cal.cycleDay, claimedToday, days };
   }
 
-  /** Best distance flown today, or 0 — the mark a "beat today's best" flag stands at. */
-  private todayBestDistance(): number {
-    let best = 0;
-    for (const h of this.save.state.highScores) if (h.date === this.today && h.distance > best) best = h.distance;
-    return best;
-  }
-
-  /**
-   * The marks worth flying at this run, with the caller's own words on them.
-   *
-   * Labels are built here rather than in `BeatLines.ts` so that module stays pure
-   * and owns no vocabulary; a rival's flag carries their name, a daily's carries
-   * the day's title. A daily only counts when this run is actually flying the
-   * daily and its metric is distance — a coin target cannot be a place on the
-   * ground, and a flag that measures the wrong thing is worse than no flag.
-   */
-  private beatInput(flown: number): BeatLineInput {
-    const daily = this.challengeRun === "daily" ? dailyChallenge(this.today) : null;
-    const goal = this.goals.goals.find((g) => !g.done && g.kind === "distance");
-    const rival = this.rival && this.seed === this.rival.seed ? this.rival : null;
-    return {
-      distance: flown,
-      best: this.save.state.bestDistance,
-      todayBest: this.todayBestDistance(),
-      rival: rival ? { name: rival.name, distance: rival.distance } : null,
-      dailyTarget: daily && daily.metric === "distance" ? daily.target : null,
-      goalTarget: goal ? goal.target : null,
-      labels: {
-        rival: rival ? `Beat ${rival.name.toUpperCase()}` : "",
-        best: "Your best",
-        daily: daily ? daily.title.toUpperCase() : "",
-        today: "Today's best",
-        goal: "Goal",
-      },
-      format: (n) => `${Math.round(n).toLocaleString("en-US")} m`,
-    };
-  }
-
-  /** Stand the pool's flags at the marks ahead; hide slots with nothing to show.
-   * In race modes the finish gate is the star — a beat flag 20m from it would
-   * read as clutter and steal the finish moment, so flags within 80m of the gate
-   * or beyond it are hidden. No overlap in gameplay. */
-  private placeBeatFlags(): void {
-    const finish = this.mode.finish > 0 ? this.mode.finish : 0;
-    for (let i = 0; i < this.beatFlags.length; i++) {
-      const flag = this.beatFlags[i]!;
-      const target = this.beatAhead[i];
-      if (!target) {
-        flag.hide();
-        continue;
-      }
-      if (finish > 0 && (target.at >= finish || Math.abs(target.at - finish) < 80)) {
-        flag.hide();
-        continue;
-      }
-      flag.place(this.startX + target.at, this.terrain, target.label, target.metres, BEAT_TINTS[target.kind]);
-    }
-  }
-
-  /**
-   * A mark flown past. Fires once per mark per run — a goal flag can legitimately
-   * return at a new number when the goal refills, but the same number twice would
-   * be the same celebration replayed.
-   */
-  private beatLineCrossed(target: BeatTarget): void {
-    const key = `${target.kind}:${target.at}`;
-    if (this.beatFired.has(key)) return;
-    this.beatFired.add(key);
-    this.telemetry.track("beat_line", { kind: target.kind });
-    this.particles.emitConfetti(this.bird.x, this.bird.y + 3);
-
-    if (target.kind === "best") {
-      // The number the whole session has been chasing, flown past in the world
-      // where it lives: the loudest honest moment the game has.
-      this.showBanner(`${target.metres} beaten`, "best");
-      this.audio.triggerViralGlissando();
-      this.audio.milestone();
-    } else if (target.kind === "rival") {
-      // The words already exist — `rivalBeatenToast` fires on this same threshold
-      // — so the flag turning green plus confetti is the visual half of that
-      // moment, not a second one competing with it.
-      this.audio.milestone();
-    } else if (target.kind === "daily") {
-      const reward = dailyChallenge(this.today).reward;
-      this.audio.ding();
-      // Paid when the run lands, and the pill says so.
-      this.popQueue = enqueuePop(this.popQueue, { text: `${target.label} ✓  +${reward} on landing`, kind: "quest" }, 3);
-    } else {
-      this.audio.ding();
-      this.popQueue = enqueuePop(this.popQueue, { text: `${target.label} ✓  ${target.metres} beaten`, kind: "goal" }, 3);
-    }
-    this.bump();
-  }
-
-  /**
-   * One banner, so two rare moments in one frame queue instead of overwriting:
-   * crossing a personal best and a career rung on the same long flight is not
-   * unusual, and losing either would be losing the point of the flight.
-   */
-  private showBanner(text: string, kind: BannerKind): void {
-    if (this.rankUpT > 0) {
-      this.bannerQueue = enqueue(this.bannerQueue, { text, kind }, 2);
-      return;
-    }
-    this.rankUp = text;
-    this.rankUpKind = kind;
-    this.rankUpT = 2.6;
-  }
-
-  /** Build onboarding context from live save + run state */
-  private onboardingContext(): OnboardingContext {
-    const st = this.save.state;
-    return {
-      runs: st.runsPlayed,
-      bestDistance: st.bestDistance,
-      coins: st.wallet,
-      ownedBirds: st.ownedSkins.length,
-      hasSeenShop: st.seenShop,
-      hasSeenPvp: st.seenPvp,
-      hasSeenPve: st.seenPve,
-      hasSeenLeaderboards: st.seenLeaderboards,
-      hasSeenChallenges: st.seenChallenges,
-      hasSeenStoreBirds: st.onboardingSeen.includes("store-birds"),
-      hasSeenStoreTrails: st.onboardingSeen.includes("store-trails"),
-      hasSeenStoreUpgrades: st.onboardingSeen.includes("store-upgrades"),
-      feverUnlocked: st.lifetime.zeniths > 0 || this.feverReached,
-      sunflowerBounced: st.lifetime.sunflowers > 0,
-      perfectLandings: this.perfects,
-      nearBest: this.rival ? false : false,
-      isRecord: this.newBest,
-    };
-  }
-
-  /** Update current onboarding tip — called on screen changes and run ends */
-  private updateOnboarding(): void {
-    const ctx = this.onboardingContext();
-    const seen = new Set<OnboardingId>(this.save.state.onboardingSeen as OnboardingId[]);
-    const inFlight = this.state === "playing";
-    this.onboardingTip = nextOnboardingTip(ctx, seen, inFlight);
-  }
-
   private wingsCard(): HudSnapshot["wings"] {
     const life = this.save.state.lifetime.distance;
     const cur = wingsFor(life);
@@ -8072,9 +6809,24 @@ export class Game {
   }
 
   private rivalCard(): RivalCard {
-    // Pure view-building lives in Cards.ts; the clock-derived season footer is
-    // passed in so that module never reads a Date.
-    return buildRivalCard(this.save.state.rival, this.seasonCard());
+    const r = this.save.state.rival;
+    const div = divisionFor(r.rating);
+    const next = nextDivision(r.rating);
+    const span = div.max - div.min;
+    return {
+      rating: Math.floor(r.rating),
+      division: div.name,
+      divisionIcon: div.icon,
+      wins: r.wins,
+      losses: r.losses,
+      streak: r.streak,
+      bestStreak: r.bestStreak,
+      nextName: next ? next.div.name : "",
+      nextNeeded: next ? next.needed : 0,
+      progress: span > 0 ? Math.max(0, Math.min(1, (r.rating - div.min) / span)) : 1,
+      matches: r.matches.map((m) => ({ place: m.place, field: m.field, mode: m.mode, date: m.date, won: m.won })),
+      season: this.seasonCard(),
+    };
   }
 
   /** Ranked-season summary: countdown, peak, and the payout it locks in. */
@@ -8169,7 +6921,8 @@ export class Game {
     if (this.viewsVersion !== this.uiVersion) this.refreshViews();
     const st = this.save.state;
     const stats = this.runStats();
-    const todayBest = this.todayBestDistance();
+    let todayBest = 0;
+    for (const h of st.highScores) if (h.date === this.today && h.distance > todayBest) todayBest = h.distance;
     const sTier = this.seasonPass.tier();
     const sProg = this.seasonPass.progressInTier();
     const snap: HudSnapshot = {
@@ -8180,21 +6933,12 @@ export class Game {
       // Poki can render its own leaderboard overlay; the button only appears
       // when the deployed SDK actually offers it.
       portalLeaderboard: this.platform?.capabilities().includes("leaderboard") ?? false,
-      // Same rule as the leaderboard button: only offer a portal surface the
-      // deployed SDK actually exposes, so the privacy screen never grows a
-      // button that silently does nothing.
-      portalExternalLink: this.platform?.capabilities().includes("externalLink") ?? false,
       version: this.uiVersion,
-<<<<<<< HEAD
       // gameover reads the frozen finishRun() number (see resultDistance):
       // the bird keeps coasting under the results card, and re-reading its
       // live position here made the results distance climb past the number
       // that was actually scored and submitted to the leaderboard.
       distance: this.state === "gameover" ? this.resultDistance : stats.distance,
-=======
-      distance: stats.distance,
-      runTime: this.runTime,
->>>>>>> origin/main
       coins: this.runCoins,
       multiplierClaimed: this.multiplierClaimed,
       daylight: this.daylight,
@@ -8221,17 +6965,14 @@ export class Game {
       vipExpiredNotice: this.vipExpiredNotice,
       adsLeftToday: this.save.adsLeftToday(),
       ghostDelta: this.state === "playing" || this.state === "gameover" ? this.ghostDelta() : null,
-      timePressure: this.state === "playing" ? getTimePressureMessage(this.ghostDelta(), Math.max(0, this.bird.x - this.startX), this.save.state.bestDistance, Math.floor(this.runTime)) : null,
       newBest: this.newBest,
-      celebration: celebrationView(this.celebration),
-      proximity: this.proximity,
       continueTimer: this.continueTimer,
       continueReason: this.continueOfferView?.reason ?? "",
       continueHighlight: this.continueOfferView?.highlight ?? false,
       continueCost: CONTINUE_COST,
       canAffordContinue: st.wallet >= CONTINUE_COST,
       // Portal: only advertise a rewarded option the SDK can actually pay out.
-      adAvailable: this.portalEnabled() ? this.adsLive() : SIMULATED_BREAKS && this.ads.isAvailable(),
+      adAvailable: this.portalEnabled() ? this.adsLive() : this.ads.isAvailable(),
       adTimer: this.adTimer,
       adSkippable: !this.portalEnabled(),
       adTotal: this.ads.duration,
@@ -8253,13 +6994,6 @@ export class Game {
       nestMaxed: this.save.state.nestBought >= 10,
       missions: this.missionViews,
       quests: this.questViews,
-      // One next action, from today's quests read against *live* counters, so the
-      // line on the results card is about the flight that just ended and not the
-      // last time the menu was opened.
-      nextAction: nextActionLine(
-        missionRows(this.missions.dailyQuests(this.today), this.state === "menu" ? null : this.runStats(), this.save.questsClaimed(this.today)),
-        Math.max(todayBest, this.state === "menu" ? 0 : this.runStats().distance),
-      ),
       highScores: st.highScores,
       todayBest,
       runsPlayed: st.runsPlayed,
@@ -8301,16 +7035,18 @@ export class Game {
       cloudMessage: this.cloudMessage,
       canInstall: Boolean(this.deferredInstall) && !this.portalEnabled(),
       shareBusy: this.shareBusy,
-      expShareFirst: this.shareCtaLeads(),
+      expShareFirst:
+        this.state !== "gameover"
+          ? false
+          : (this.expShareFirst ??= variant(this.save.state.deviceId, "results_cta_order", 50, (v) => {
+              this.telemetry.track("experiment_exposure", { experiment: "results_cta_order", variant: v });
+            })) === "treatment",
       combo: Math.max(this.perfectChain, this.versus && this.p1 ? this.p1.launch.combo : this.launch.combo),
       ringChain: this.ringChain,
       ringChainFrac: RING_CHAIN_WINDOW > 0 ? this.ringChainTimer / RING_CHAIN_WINDOW : 0,
       slopeChain: this.slopeChain.chain,
       slopeScore: this.slopeChain.score,
-      // Normalised against the real top speed (MAX_SPEED), not a round 100:
-      // the HUD's speed FX share the SpeedFeel bands with the camera, and a
-      // denominator that saturates 8 units early would flatten the ramp.
-      speedNorm: Math.min(1, this.bird.speed() / MAX_SPEED),
+      speedNorm: Math.min(1, this.bird.speed() / 100),
       gust: this.weather.gust,
       inThermal: this.weather.inThermal,
       biomeName: this.terrain.biomeAt(this.bird.x).name,
@@ -8339,26 +7075,12 @@ export class Game {
       goalPop: this.goalPopT > 0 ? this.goalPop : "",
       goalPopKind: this.goalPopKind,
       rankUp: this.rankUpT > 0 ? this.rankUp : "",
-      rankUpKind: this.rankUpKind,
-      onboardingTip: this.onboardingTip ? { id: this.onboardingTip.id, title: this.onboardingTip.title, body: this.onboardingTip.body, target: this.onboardingTip.target } : null,
-      beatLine: this.beatCue
-        ? {
-            kind: this.beatCue.kind,
-            label: this.beatCue.label,
-            metres: this.beatCue.metres,
-            gap: Math.max(0, Math.round(this.beatCue.at - Math.max(0, this.bird.x - this.startX))),
-          }
-        : null,
       nearMiss: this.nearMiss.text,
       skillLabel: this.flow.label(),
       skill: this.flow.skill,
       bestAltitude: this.save.state.bestAltitude,
       bestCombo: this.save.state.bestCombo,
       runGems: this.runGems,
-      moments: this.state === "playing" || this.state === "gameover" || this.state === "continue" ? this.moments.tally(4) : [],
-      clips: this.state === "gameover" || this.state === "continue" ? this.clips.tally(4) : [],
-      viralScore: this.state === "gameover" || this.state === "continue" ? this.lastViralScore : 0,
-      packBalancing: this.massRace.packBalancingOn,
       pilotName: this.pilotName,
       board: this.boardPage,
       boardLoading: this.boardLoading,

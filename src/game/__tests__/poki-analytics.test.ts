@@ -1,6 +1,3 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { GameplayEventSink } from "../GameplayEvents";
 import { PokiAdapter } from "../../sdk/poki";
@@ -9,13 +6,8 @@ import { PokiAdapter } from "../../sdk/poki";
  * Poki analytics coverage — the event surface that feeds Poki's dashboard.
  *
  * Poki's own analytics are driven entirely by the SDK calls the game makes:
-<<<<<<< HEAD
  * loading lifecycle, gameplayStart/Stop, commercialBreak, rewardedBreak and
  * happyTime. There is no separate analytics beacon to add — the correct
-=======
- * loading lifecycle, gameplayStart/Stop, commercialBreak, rewardedBreak,
- * measure() and happyTime(). There is no separate analytics beacon to add — the correct
->>>>>>> origin/main
  * implementation is that every one of these calls forwards EXACTLY ONCE, in
  * an order the Inspector accepts (no consecutive duplicates), with ad-open /
  * ad-close bookkeeping that mutes and un-mutes the game around the break.
@@ -35,13 +27,7 @@ function recordingSdk() {
     gameLoadingFinished: () => calls.push("gameLoadingFinished"),
     gameplayStart: () => calls.push("gameplayStart"),
     gameplayStop: () => calls.push("gameplayStop"),
-<<<<<<< HEAD
     happyTime: () => calls.push("happyTime"),
-=======
-    // Canonical spelling and signature: PokiSDK.happyTime(intensity 0…1).
-    happyTime: (intensity: number) => calls.push(`happyTime:${intensity}`),
-    measure: (category: string, what: string, action: string) => calls.push(`measure:${category}/${what}/${action}`),
->>>>>>> origin/main
     commercialBreak: async (onStart?: () => void) => {
       calls.push("commercialBreak:open");
       onStart?.();
@@ -76,59 +62,11 @@ describe("Poki analytics coverage (SDK event surface)", () => {
     expect(calls).toEqual(["gameplayStart", "gameplayStop", "gameLoadingFinished"]);
   });
 
-<<<<<<< HEAD
   it("fires happyTime() for milestone celebrations (Poki's celebratory overlay + analytics)", () => {
     const { calls, sdk } = recordingSdk();
     const p = platformWith(calls, sdk);
     p.happyTime();
     expect(calls).toEqual(["happyTime"]);
-=======
-  // The sink is the primary dedupe; the adapter is the boundary the portal
-  // actually observes. Both must hold, because a future call path (visibility
-  // handler, late SDK landing, defensive resend) should not be able to put a
-  // duplicate into the Inspector's Event Log.
-  it("the adapter itself refuses consecutive duplicates, whatever the caller does", () => {
-    const { calls, sdk } = recordingSdk();
-    const p = platformWith(calls, sdk);
-    p.gameplayStart();
-    p.gameplayStart();
-    p.gameplayStop();
-    p.gameplayStop();
-    p.gameplayStop();
-    p.gameplayStart();
-    expect(calls).toEqual(["gameplayStart", "gameplayStop", "gameplayStart"]);
-  });
-
-  it("never tells the portal to stop a session it was never told began", () => {
-    const { calls, sdk } = recordingSdk();
-    const p = platformWith(calls, sdk);
-    expect(p.gameplayIsRunning).toBe(false);
-    p.gameplayStop();
-    expect(calls).toEqual([]);
-    p.gameplayStart();
-    expect(calls).toEqual(["gameplayStart"]);
-    expect(p.gameplayIsRunning).toBe(true);
-  });
-
-  it("fires happyTime(intensity) for milestone celebrations, clamped to Poki's 0…1 range", () => {
-    const { calls, sdk } = recordingSdk();
-    const p = platformWith(calls, sdk);
-    p.happyTime(1);
-    expect(calls).toEqual(["happyTime:1"]);
-    // Out-of-range intensities are clamped, never forwarded raw: the Defold
-    // guide documents the argument as "between 0 and 1".
-    p.happyTime(4.2);
-    p.happyTime(-3);
-    p.happyTime(Number.NaN);
-    expect(calls.slice(1)).toEqual(["happyTime:1", "happyTime:0", "happyTime:0"]);
-  });
-
-  it("forwards measure() as Poki's Game Events checkpoint, verbatim", () => {
-    const { calls, sdk } = recordingSdk();
-    const p = platformWith(calls, sdk);
-    p.measure("round", "daytrip", "complete");
-    expect(calls).toEqual(["measure:round/daytrip/complete"]);
->>>>>>> origin/main
   });
 
   it("commercialBreak forwards with ad-open/close bookkeeping, never throws into gameplay", async () => {
@@ -149,41 +87,9 @@ describe("Poki analytics coverage (SDK event surface)", () => {
     const p = platformWith([], undefined);
     expect(() => p.gameplayStart()).not.toThrow();
     expect(() => p.gameplayStop()).not.toThrow();
-<<<<<<< HEAD
     expect(() => p.happyTime()).not.toThrow();
-=======
-    expect(() => p.happyTime(1)).not.toThrow();
-    expect(() => p.measure("round", "daytrip", "start")).not.toThrow();
->>>>>>> origin/main
     await expect(p.commercialBreak()).resolves.toBeUndefined();
     await expect(p.rewardedBreak()).resolves.toBe(false);
-  });
-
-  /**
-   * Source contract for the mid-ad `gameplayStart` guard.
-   *
-   * The behaviour itself belongs to `Game`, which needs WebGL and is therefore
-   * proven in a real browser by `e2e/poki-artifact.spec.ts`. What is pinned here
-   * is the wiring that makes the guarantee structural, because it is the part
-   * that silently rots: a new break placement added without the lock, or an
-   * `endPortalAd()` that releases the lock after the caller's transition.
-   */
-  it("locks the state machine for the whole of every portal break", () => {
-    const game = readFileSync(join(process.cwd(), "src", "game", "Game.ts"), "utf8");
-    // The guard sits at the top of setState, before any state is mutated.
-    expect(game).toMatch(/if \(this\.adInFlight && previous === "ad" && s !== "ad"\) return;/);
-    // The lock is released first thing in endPortalAd, so the awaiting caller's
-    // own transition (startRun / resume / menu / continue) is the way back in.
-    const endAd = game.slice(game.indexOf("private endPortalAd(): void {"));
-    expect(endAd.slice(0, 400)).toMatch(/this\.adInFlight = false;[\s\S]{0,200}setAdMuted\(false\)/);
-    // Every portal placement enters through the one helper…
-    expect(game.match(/this\.beginPortalBreak\("/g) ?? []).toHaveLength(5); // the five portal placements
-    for (const placement of ["restart", "resume", "to-menu", "results-multiplier", "continue"]) {
-      expect(game, `placement "${placement}" must take the lock`).toContain(`beginPortalBreak("${placement}")`);
-    }
-    // …and no portal break is left setting the ad state by hand.
-    const manual = game.match(/this\.setState\("ad"\);/g) ?? [];
-    expect(manual, "only the two self-served interstitials may set the ad state directly").toHaveLength(3);
   });
 
   it("the canonical death → break → restart lifecycle emits the exact dashboard order", async () => {
@@ -293,29 +199,15 @@ describe("Poki ads: the call shape is exactly the documented one", () => {
    * `AD_SAFETY_SECONDS` valve at the tick level is a hard second layer —
    * a live break is never abandoned by two competing timers.
    */
-  it("arms a settle timeout so an unresolving SDK promise can never wedge the game", async () => {
+  it("delegates ad completion to the Poki SDK promise", async () => {
     const fs = await import("node:fs");
     const join = (await import("node:path")).join;
     const adapter = fs.readFileSync(join(process.cwd(), "src", "sdk", "poki.ts"), "utf8");
 
-    // Both break calls race the SDK promise against a settle timer.
-    // A live ad resolves in well under a second (real breaks land
-    // in 1–3s), so this race cannot cut a live ad short — it only
-    // guarantees that a promise which never settles still releases
-    // the game. The doc contract is `commercialBreak(cb).then(() =>
-    // ... proceed ...)`: the `.then()` must fire even when Poki
-    // serves nothing.
     for (const name of ["commercialBreak", "rewardedBreak"]) {
       const start = adapter.indexOf(`async ${name}(): Promise`);
       const body = adapter.slice(start, adapter.indexOf("\n  }", start));
-      expect(
-        body,
-        `${name} must race its SDK promise against a settle timeout`,
-      ).toMatch(/Promise\.race\(\[/);
-      expect(
-        body,
-        `${name} timeout must reference BREAK_LOAD_TIMEOUT_MS`,
-      ).toMatch(/BREAK_LOAD_TIMEOUT_MS/);
+      expect(body).not.toMatch(/Promise\.race\(|setTimeout\(/);
     }
   });
 
@@ -336,12 +228,7 @@ describe("Poki ads: the call shape is exactly the documented one", () => {
       return adapter.slice(from, adapter.indexOf("\n  }", from));
     };
     for (const name of ["commercialBreak", "rewardedBreak"]) {
-      // Both break calls race the SDK promise against a settle
-      // timer — a live ad resolves in well under a second, so this
-      // race cannot cut a live ad short; it only guarantees a
-      // promise that never settles still releases the game.
-      expect(bodyOf(name), `${name} must race its SDK promise`).toMatch(/Promise\.race\(/);
-      expect(bodyOf(name), `${name} must reference BREAK_LOAD_TIMEOUT_MS`).toMatch(/BREAK_LOAD_TIMEOUT_MS/);
+      expect(bodyOf(name), `${name} must await the SDK promise directly`).toMatch(/await sdk\.(commercialBreak|rewardedBreak)\(/);
       // The settle timer lives in the throwaway Promise, not in the
       // argument the SDK receives. Extract just the SDK call's
       // callback argument (between `name(() => {` and its
@@ -447,31 +334,24 @@ describe("Poki ad-placement canon (guideline: breaks only at natural break point
     const commercial = [...src.matchAll(/await platform\.commercialBreak\(\)/g)].length
       + [...src.matchAll(/await this\.platform\?\.commercialBreak\(\)/g)].length;
     const rewarded = [...src.matchAll(/await platform\.rewardedBreak\(\)/g)].length;
-    expect(commercial).toBe(3); // restartWithPortalBreak, resumeFromPause, menuAfterPortalBreak
+    expect(commercial).toBe(1); // resumeFromPause only
     expect(rewarded).toBe(3); // multiplierWithPortalReward, continueWithPortalReward, multiplyCoinsFromShopAd
 
-    for (const fn of ["restartWithPortalBreak", "resumeFromPause", "menuAfterPortalBreak"]) {
+    for (const fn of ["resumeFromPause"]) {
       expect(src).toContain(`private async ${fn}`);
     }
     for (const fn of ["continueWithPortalReward", "multiplierWithPortalReward", "multiplyCoinsFromShopAd"]) {
       expect(src).toContain(`private async ${fn}`);
     }
-    // Every break request carries a placement label for the dashboard. The five
-    // portal placements go through beginPortalBreak(placement) — one helper, so
-    // the state lock and the telemetry cannot be added at one site and missed at
-    // another; the shop's free-coin break is the exception that deliberately does
-    // NOT bookend gameplay, so it tracks its own request.
-    for (const placement of ["restart", "resume", "to-menu", "continue", "results-multiplier"]) {
-      expect(src, `placement "${placement}" must enter through the shared helper`).toContain(`beginPortalBreak("${placement}")`);
+    // Every break request carries a placement label for the dashboard.
+    for (const placement of ['"resume"', '"continue"', '"results-multiplier"', '"shop-free-coins"']) {
+      expect(src).toContain(`placement: ${placement}`);
     }
-<<<<<<< HEAD
     // A break that does not interrupt gameplay (a recap→menu tap) must not
     // fabricate a phase change, and the breaks that do interrupt flight must
     // route through the sink-gated lifecycle: no gameplayStart/Stop may fire
     // while the ad state is up.
     expect(src).toContain("this.gameplaySink.send");
-    const toMenu = src.slice(src.indexOf("private async menuAfterPortalBreak"));
-    expect(toMenu.slice(0, 900)).not.toContain("gameplayStart");
   });
 
   it("gives every restart path the break, with no switch to turn it off", async () => {
@@ -491,7 +371,7 @@ describe("Poki ad-placement canon (guideline: breaks only at natural break point
     // Seven restart seams — 3 recap/tap-to-fly, 1 pause card, 1 hotkey,
     // 1 duel/versus, 1 menu — and every one asks for the break when live.
     expect([...src.matchAll(/this\.replayRun\(\)/g)].length).toBe(7);
-    expect(src).toContain("if (this.adsLive()) void this.restartWithPortalBreak(options);");
+    expect(src).not.toContain("restartWithPortalBreak");
 
     // The ad decision must consult the portal's ad-block report, and the adapter
     // must be able to survive a break that never settles. Both were gaps: the
@@ -513,17 +393,6 @@ describe("Poki ad-placement canon (guideline: breaks only at natural break point
     const join = (await import("node:path")).join;
     const src = fs.readFileSync(join(process.cwd(), "src", "game", "Game.ts"), "utf8");
 
-    expect(src, "the rule must sit at the run-start choke point").toContain("private shouldBreakBeforeRun(");
-    expect(src, "and startRun must consult it").toMatch(/shouldBreakBeforeRun\(opts\)/);
-    // The exemptions Poki's own event table implies.
-    expect(src, "the Startup row is exempt").toMatch(/sessionRuns === 0\) return false/);
-    expect(src, "a live race is exempt — the other pilots are waiting").toMatch(/this\.localRace \|\| this\.roomCode/);
-    expect(src, "the run a break hands into must not ask for another").toMatch(/inRunStartBreak\) return false/);
-=======
-    expect(src).toContain('placement: "shop-free-coins"');
-    // One request event per break: no placement may be tracked twice.
-    const tracked = [...src.matchAll(/placement: "([a-z-]+)"/g)].map((m) => m[1]);
-    expect(tracked.filter((p) => p === "to-menu")).toHaveLength(0);
->>>>>>> origin/main
+    expect(src, "ordinary run starts must not request commercial breaks").not.toContain("shouldBreakBeforeRun");
   });
 });

@@ -1,26 +1,23 @@
 /**
- * PokiAdapter — the canonical Poki HTML5 SDK surface, and nothing else.
+ * PokiAdapter — full Poki HTML5 SDK surface (sdk.poki.com/html5):
  *
- * Every `PokiSDK.*` member this file touches comes from `./poki-canon`, whose
- * type is mapped from Poki's own published typings (`@poki/sdk@0.0.5`). That is
- * a deliberate constraint: the previous hand-written type let invented members
- * in (`signalGameReady`, `happytime`, `mute`/`isMuted`,
- * `hasAdBlock`/`setAdBlockActive`, `sendUserEvent`), and because each was
- * called through an optional chain they were silent no-ops in production rather
- * than type errors. Two of them are canonical on *CrazyGames*, which is how they
- * leaked across adapters.
+ *   init, gameLoadingStart, gameLoadingFinished, gameplayStart/Stop,
+ *   commercialBreak,
+ *   rewardedBreak, getUser, getToken (1-minute backend-verification JWT),
+ *   shareableURL, getURLParam, measure (game events).
  *
- * Wired here (T1 = official typings, T3 = integration guides):
- *   init({ submitScore }) · setDebug/setLogging (DEV) · enableEventTracking ·
- *   gameLoadingStart → gameLoadingFinished · gameplayStart/Stop ·
- *   commercialBreak · rewardedBreak({ size, onStart }) · getUser (optedIn
- *   respected) · getToken (1-minute backend-verification JWT) · login ·
- *   shareableURL · getURLParam · getLanguage · getDeviceInfo ·
- *   showLeaderboard · openExternalLink · captureError · movePill ·
- *   playtestSetCanvas · measure(category, what, action) · happyTime(0…1) ·
- *   isAdBlocked.
+ * Poki-specific contracts honored here:
+ *   • `init()` rejects in the local sandbox → the game still boots
+ *     (handled in platform.ts, "load your game anyway").
+ *   • `setDebug(true)` is enabled in DEV only — never shipped.
+ *   • `getToken()` expires in one minute: it is verified server-side
+ *     immediately, never stored (exposed as `getIapToken`).
+ *   • `shareableURL({...})` yields a signed, embeddable game link; it is
+ *     handed to the Web Share API (or clipboard) so the player chooses the
+ *     destination.
+ *   • `measure(category, label, action)` follows the start → complete|fail
+ *     contract (one outcome per attempt).
  *
-<<<<<<< HEAD
  * Surfaces the SDK genuinely does not have are honest no-ops: there is no room
  * state, no portal pause hook, and no invite API, so those return null/false
  * rather than pretending. Two claims that used to sit in this comment were
@@ -34,16 +31,6 @@
  * Cloud saves are handled by the SDK itself once a player is signed in, with a
  * 1 MB gamesave budget; `src/game/Storage.ts` keeps caches out of that sync
  * with the documented `poki_ignore` key prefix.
-=======
- * Deliberately NOT wired, with the reason recorded per member in
- * `POKI_SDK_RUNTIME_ONLY`: gameLoadingProgress, gameInteractive, sendHighscore,
- * getLeaderboard, customEvent, logError, muteAd, roundStart/End, setPlayerAge,
- * generateScreenshot, displayAd/destroyAd.
- *
- * What Poki does not expose at all: banners, room state, pause hooks, a portal
- * mute preference, and a data module. Those are honest no-ops; cloud save uses
- * AUDS when a game id is configured and localStorage otherwise.
->>>>>>> origin/main
  */
 import type {
   InviteParams,
@@ -54,24 +41,8 @@ import type {
 } from "./platform";
 import { localCloudFallback } from "./local";
 import { setLoadingNet } from "./net";
-import { createAudsIfConfigured, AUDSPREFIX, PokiAuds } from "./auds";
-import { clampHappyIntensity, sanitizeMeasure, type PokiSdk } from "./poki-canon";
 
-<<<<<<< HEAD
-type PokiUser = { username: string; avatarUrl?: string | null } | null;
-
-/**
- * How long `commercialBreak()` / `rewardedBreak()` wait for the portal
- * SDK to settle before resolving on their own. Poki's documentation is
- * explicit that `commercialBreak(cb).then(() => { ... proceed ... })`
- * must always fire — including when Poki decides not to serve an ad —
- * so the game can never be wedged waiting on a promise that never
- * settles. Real breaks resolve well inside this window; the window
- * exists only so a broken or absent portal SDK cannot leave the player
- * on a dead screen with inert controls. The game's `AD_SAFETY_SECONDS`
- * valve remains a hard second layer of defense at the tick level.
- */
-const BREAK_LOAD_TIMEOUT_MS = 30_000;
+type PokiUser = { username: string; avatarUrl?: string | null; optedIn?: boolean } | null;
 
 /**
  * Display-ad format for this game, or "" to leave the slot empty. Poki's
@@ -80,18 +51,15 @@ const BREAK_LOAD_TIMEOUT_MS = 30_000;
  */
 const POKI_DISPLAY_AD_SIZE = (import.meta.env.VITE_POKI_DISPLAY_AD_SIZE as string | undefined)?.trim() ?? "";
 
-=======
-// The user shape comes from the official typings (`User`: username, avatarUrl,
-// optedIn) — redeclaring it locally is how `optedIn` went unnoticed.
->>>>>>> origin/main
 type PokiShareableData = Record<string, string | number | boolean>;
 
-/*
- * The SDK type is imported from ./poki-canon (mapped from @poki/sdk@0.0.5 plus
- * the runtime-only members the live CDN build assigns). Declaring it locally is
- * what allowed non-canonical names to compile, so it no longer lives here.
+/**
+ * The Poki SDK global, typed against `@poki/sdk` (github.com/poki/npm-sdk,
+ * v0.0.5) — the official wrapper around
+ * `https://game-cdn.poki.com/scripts/v2/poki-sdk.js`. Every member is optional
+ * because the CDN script owns the runtime: a method that is absent on the
+ * deployed version must degrade to a no-op, never a TypeError.
  */
-<<<<<<< HEAD
 type PokiSdk = {
   init?: (options?: PokiInitOptions) => Promise<void>;
   setDebug?: (on: boolean) => void;
@@ -112,7 +80,7 @@ type PokiSdk = {
    * exist on it — so the overlay (and its analytics) never fired once. Verified
    * against the live SDK: `typeof PokiSDK.happytime === "undefined"`.
    */
-  happyTime?: () => Promise<void>;
+  happyTime?: (intensity?: number) => Promise<void>;
   commercialBreak?: (onStart?: () => void) => Promise<void>;
   rewardedBreak?: (onStart?: (() => void) | { onStart?: () => void; size?: "small" | "medium" | "large" }) => Promise<boolean>;
 
@@ -168,8 +136,6 @@ type PokiSdk = {
   playtestCaptureHtmlOn?: () => void;
   playtestCaptureHtmlOff?: () => void;
 };
-=======
->>>>>>> origin/main
 
 /**
  * `init({ submitScore })` is Poki's leaderboard handshake: the SDK hands us a
@@ -254,14 +220,8 @@ function shareDismissed(error: unknown): boolean {
  */
 setLoadingNet(() => {
   const sdk = (window as unknown as { PokiSDK?: PokiSdk }).PokiSDK;
-<<<<<<< HEAD
   // `gameLoadingFinished` is the documented release; there is no
   // `signalGameReady` on Poki, and asking for one hid the real call in noise.
-=======
-  // gameLoadingFinished() is the documented conversion-to-play marker; the
-  // failsafe fires it exactly once. (`gameInteractive` also exists in the CDN
-  // build but is the legacy marker — see POKI_SDK_RUNTIME_ONLY.)
->>>>>>> origin/main
   sdk?.gameLoadingFinished?.();
 });
 
@@ -271,21 +231,19 @@ export class PokiAdapter implements PlatformAdapter {
   /** Container currently holding a display ad, so it can be torn down. */
   private banner: HTMLElement | null = null;
 
-  /** AUDS client — non-null only when VITE_POKI_GAME_ID is configured. */
-  private readonly auds: PokiAuds | null = createAudsIfConfigured();
+  constructor(private readonly events: PlatformEvents = {}) {}
 
-  constructor(private readonly events: PlatformEvents) {}
+  portalLanguage(): string | null { return this.getLanguage()?.toLowerCase() ?? null; }
 
   private get sdk(): PokiSdk | undefined {
     return window.PokiSDK;
   }
 
   capabilities(): string[] {
-    const caps = ["lifecycle", "cloudSaveLocal", "identity", "iap", "urlParams", "share", "measure"];
-    // Canonical locale source: getLanguage() reads Poki's `iso_lang` URL param
-    // and falls back to navigator.language, then reduces to the base tag.
-    if (typeof this.sdk?.getLanguage === "function") caps.push("language");
-    if (typeof this.sdk?.happyTime === "function") caps.push("celebration");
+    // Poki automatically syncs the game's localStorage/IndexedDB for signed-in
+    // players. This is the official cloud-gamesave path; AUDS is a separate
+    // public-data service and must not replace ordinary save storage.
+    const caps = ["lifecycle", "cloudSave", "identity", "iap", "urlParams", "share", "measure"];
     // "ads" is reported from the live SDK, not from the build target. Off the
     // Poki CDN (local preview, CDN blocked, SDK rejected) there is no ad
     // surface at all, and the game must not offer breaks or rewarded buttons
@@ -349,11 +307,15 @@ export class PokiAdapter implements PlatformAdapter {
   }
 
   /* lifecycle */
+  private loadingStartSent = false;
+
   loadingStart(): void {
     // Poki marks the loading phase with gameLoadingStart(). bootstrapSdk()
     // already fired it right after init (before the game's asset work), so
     // this delegate exists for interface symmetry — re-sending a phase
     // marker is harmless.
+    if (this.loadingStartSent) return;
+    this.loadingStartSent = true;
     this.sdk?.gameLoadingStart?.();
   }
 
@@ -367,74 +329,31 @@ export class PokiAdapter implements PlatformAdapter {
     this.sdk?.gameLoadingFinished?.();
   }
 
-  /**
-   * The interface name comes from CrazyGames (`game.signalGameReady`). Poki has
-   * no such method: the canonical "the player can play now" signal is
-   * `gameLoadingFinished()`, so this delegates to it (one-shot) instead of
-   * calling a member that would never exist.
-   */
   signalGameReady(): void {
     // Poki has no `signalGameReady`; `gameLoadingFinished` is the release the
     // platform documents, and it is one-shot.
     this.loadingFinished();
   }
 
-  /**
-   * Poki's hard lifecycle rule: `gameplayStart()` must never follow another
-   * `gameplayStart()`, and the same for stop — the Inspector's Event Log flags
-   * consecutive duplicates, and its dashboard derives session length from the
-   * alternation.
-   *
-   * The primary guard is `GameplayEventSink` in the game, which every phase
-   * emission funnels through. This is the backstop at the boundary the portal
-   * actually observes, so that no *future* call path — a late SDK landing, a
-   * visibility handler, a defensive resend around a break — can emit a duplicate
-   * the sink never saw. A stop before any start is dropped for the same reason:
-   * the portal cannot stop a session it was never told began.
-   */
-  private gameplayRunning = false;
-
   gameplayStart(): void {
-    if (this.gameplayRunning) return;
-    this.gameplayRunning = true;
     this.sdk?.gameplayStart?.();
   }
 
   gameplayStop(): void {
-    if (!this.gameplayRunning) return;
-    this.gameplayRunning = false;
     this.sdk?.gameplayStop?.();
-  }
-
-  /** Test/inspection helper: has the portal been told gameplay is running? */
-  get gameplayIsRunning(): boolean {
-    return this.gameplayRunning;
   }
 
   pause(): void {
     /* no portal pause hook on Poki — visibility handling covers it. */
   }
 
-<<<<<<< HEAD
-  happyTime(): void {
+  happyTime(intensity = 1): void {
     // PokiSDK.happyTime() triggers a celebratory confetti overlay for
     // personal bests and other milestone moments. Fire-and-forget so it
     // never blocks gameplay even when the SDK is unavailable in an
     // off-portal preview.
     try {
-      void this.sdk?.happyTime?.();
-=======
-  /**
-   * `PokiSDK.happyTime(intensity)` — intensity is 0…1 (Defold guide:
-   * "value is between 0 and 1"). The adapter previously called `happytime()`,
-   * which is CrazyGames' spelling: on Poki the optional chain resolved to
-   * undefined and **no celebration ever reached the portal**. Fire-and-forget,
-   * clamped, and never throws — the game runs its own confetti regardless.
-   */
-  happyTime(intensity: number): void {
-    try {
-      this.sdk?.happyTime?.(clampHappyIntensity(intensity));
->>>>>>> origin/main
+      void this.sdk?.happyTime?.(Math.max(0, Math.min(1, intensity)));
     } catch {
       /* celebrate locally — the game already emits its own confetti */
     }
@@ -456,15 +375,10 @@ export class PokiAdapter implements PlatformAdapter {
       // never settles (a broken or blocked CDN, an Inspector with no ad
       // service behind it), this race wins and the break resolves as declined
       // rather than trapping the game forever.
-      await Promise.race([
-        sdk.commercialBreak(() => {
-          opened = true;
-          this.events.onAdOpened?.();
-        }),
-        new Promise<void>((resolve) => {
-          window.setTimeout(resolve, BREAK_LOAD_TIMEOUT_MS);
-        }),
-      ]);
+      await sdk.commercialBreak(() => {
+        opened = true;
+        this.events.onAdOpened?.();
+      });
     } catch {
       // The portal decides whether an ad is available. A rejected opportunity
       // is not a game error and must never block a restart.
@@ -482,15 +396,10 @@ export class PokiAdapter implements PlatformAdapter {
       // declined or failed break resolves false rather than throwing.
       // Same timeout as commercialBreak — a rewarded break that never
       // settles must still let the player continue, just without coins.
-      const rewarded = await Promise.race([
-        sdk.rewardedBreak(() => {
-          opened = true;
-          this.events.onAdOpened?.();
-        }),
-        new Promise<void>((resolve) => {
-          window.setTimeout(resolve, BREAK_LOAD_TIMEOUT_MS);
-        }),
-      ]);
+      const rewarded = await sdk.rewardedBreak(() => {
+        opened = true;
+        this.events.onAdOpened?.();
+      });
       return Boolean(rewarded);
     } catch {
       return false;
@@ -549,82 +458,29 @@ export class PokiAdapter implements PlatformAdapter {
     }
   }
 
-  /** Cache the Poki user id after first resolution so we don't await on every save. */
-  private _cachedAudsUserId: string | null | undefined = undefined;
-  private async _audsUserId(): Promise<string | null> {
-    if (this._cachedAudsUserId !== undefined) return this._cachedAudsUserId;
-    try {
-      const u = await this.sdk?.getUser?.();
-      this._cachedAudsUserId = u?.username ?? null;
-    } catch {
-      this._cachedAudsUserId = null;
-    }
-    return this._cachedAudsUserId;
-  }
-
-  /** Cached ad-block detection result (probed once, resolved at most once). */
+  /** Cached ad-block detection result (probed once at boot). */
   private adBlockProbed = false;
   private cachedAdBlock = false;
 
-  /**
-   * `PokiSDK.isAdBlocked()` is the canonical probe (the invented
-   * `hasAdBlock`/`setAdBlockActive` pair does not exist in any Poki build, so
-   * the old probe always read false). The loader stub answers `{}` while the
-   * core decides, so every shape is handled: boolean, promise, or junk.
-   *
-   * Detection never gates content — Poki's policy forbids that — it only lets
-   * ad opportunities short-circuit instead of hanging.
-   */
   private probeAdBlock(): void {
     if (this.adBlockProbed) return;
     this.adBlockProbed = true;
     try {
-<<<<<<< HEAD
-      if (this.sdk?.isAdBlocked) this.cachedAdBlock = Boolean(this.sdk.isAdBlocked());
-=======
-      const result = this.sdk?.isAdBlocked?.();
-      if (typeof result === "boolean") this.cachedAdBlock = result;
-      else if (result instanceof Promise) {
-        void result
-          .then((v) => { this.cachedAdBlock = typeof v === "boolean" ? v : false; })
-          .catch(() => { this.cachedAdBlock = false; });
+      if (this.sdk?.isAdBlocked) {
+        const result = this.sdk.isAdBlocked();
+        this.cachedAdBlock = typeof result === "boolean" ? result : false;
       }
->>>>>>> origin/main
     } catch { /* ignore */ }
   }
 
-  /* cloud save — AUDS when game id configured, localStorage fallback otherwise */
+  /* Cloud gamesaves: Poki syncs localStorage/IndexedDB automatically for
+   * signed-in players. Keep the same storage facade used by the game so the
+   * official SDK owns synchronization instead of a parallel custom ledger. */
   async saveCloud<T>(key: string, value: T): Promise<void> {
-    if (this.auds) {
-      try {
-        const userId = await this._audsUserId();
-        const existingId = PokiAuds.readSingletonId(AUDSPREFIX.settings, userId ?? undefined);
-        const slot = await this.auds.putSingleton(
-          AUDSPREFIX.settings,
-          { key },
-          { key, value: JSON.stringify(value) },
-          { existingId, userId: userId ?? undefined },
-        );
-        if (slot) return;
-      } catch { /* fall through to local */ }
-    }
     return localCloudFallback.save(key, value);
   }
 
   async loadCloud<T>(key: string): Promise<T | null> {
-    if (this.auds) {
-      try {
-        const userId = await this._audsUserId();
-        const id = PokiAuds.readSingletonId(AUDSPREFIX.settings, userId ?? undefined);
-        if (id) {
-          const entry = await this.auds.fetchById(AUDSPREFIX.settings, id);
-          if (entry?.data) {
-            const raw = (entry.data as Record<string, unknown>)["value"];
-            if (typeof raw === "string") return JSON.parse(raw) as T;
-          }
-        }
-      } catch { /* fall through to local */ }
-    }
     return localCloudFallback.load<T>(key);
   }
 
@@ -644,10 +500,7 @@ export class PokiAdapter implements PlatformAdapter {
     if (!sdk?.getUser) return null;
     try {
       const u = await sdk.getUser();
-      if (!u || !u.username) return null;
-      // `optedIn` is part of the official User shape: a player who has not
-      // opted in must not be surfaced as an identity anywhere in the game.
-      if (u.optedIn === false) return null;
+      if (!u || !u.username || u.optedIn === false) return null;
       return {
         id: u.username,
         name: u.username,
@@ -704,36 +557,6 @@ export class PokiAdapter implements PlatformAdapter {
     } catch { /* recorder optional */ }
   }
 
-
-  /**
-   * Canonical locale source: `PokiSDK.getLanguage()` returns the base tag of
-   * Poki's `iso_lang` URL param, or `navigator.language` when absent. The game
-   * prefers this over its own sniffing on a portal build, so a player who set a
-   * language on poki.com gets it in-game.
-   */
-  portalLanguage(): string | null {
-    try {
-      const value = this.sdk?.getLanguage?.();
-      return typeof value === "string" && value.trim() ? value.trim().toLowerCase() : null;
-    } catch {
-      return null;
-    }
-  }
-
-  /**
-   * Reposition the Poki Pill on mobile: `movePill(topPercent, topPx)`, where
-   * topPercent is 0–50 and topPx is an extra offset (default `movePill(0, 24)`).
-   * Exposed so the HUD can keep the pill off its own controls once a device
-   * check says they collide; it is not called speculatively.
-   */
-  movePill(topPercent: number, topPx: number): void {
-    try {
-      this.sdk?.movePill?.(
-        Math.min(50, Math.max(0, Number.isFinite(topPercent) ? topPercent : 0)),
-        Number.isFinite(topPx) ? topPx : 0,
-      );
-    } catch { /* cosmetic only */ }
-  }
 
   /** Device class as the portal sees it (tablets are "tablet", not "mobile"). */
   deviceCategory(): "mobile" | "tablet" | "desktop" | null {
@@ -858,28 +681,11 @@ export class PokiAdapter implements PlatformAdapter {
     return false;
   }
 
-  /**
-   * Game Events: `PokiSDK.measure(category, what, action)` — the official
-   * signature (the second parameter is `what`, not `label`).
-   *
-   * Arguments go through `sanitizeMeasure`, which enforces the three rules the
-   * live SDK enforces: category+what required, no `/` or `^`, and at most two
-   * numeric values across all three. An event that violates them is dropped by
-   * Poki with only a console error, so rejecting it here keeps the funnel honest
-   * (and `import.meta.env.DEV` surfaces the mistake to us instead, through
-   * `console.debug` — the one channel the production gate allows, since
-   * `console.warn` would ship a red line into every player's console).
-   */
-  measure(category: string, what: string, action: string): void {
-    const clean = sanitizeMeasure(category, what, action);
-    if (!clean) {
-      if (import.meta.env.DEV) {
-        console.debug(`[poki] measure() dropped — invalid (${category}, ${what}, ${action})`);
-      }
-      return;
-    }
+  /* game events */
+  measure(category: string, label: string, action: string): void {
+    if (!category || !label || !action || /[^a-zA-Z0-9_.:-]/.test(category) || /[^a-zA-Z0-9_.:-]/.test(label) || !/^(start|complete|fail|clear|win|lose|finish)$/.test(action)) return;
     try {
-      this.sdk?.measure?.(clean.category, clean.what, clean.action);
+      this.sdk?.measure?.(category, label, action);
     } catch {
       /* measurement must never break gameplay */
     }
@@ -892,28 +698,13 @@ export class PokiAdapter implements PlatformAdapter {
   }
 
   /* settings */
-  /**
-   * Poki exposes **no** mute preference and no settings-change event — the
-   * invented `isMuted()`/`mute()`/`setAdBlockActive()` calls here never
-   * resolved, so `onPortalMute` never fired and the code only looked like it
-   * honoured a portal setting. Audio during breaks is handled where Poki
-   * documents it: the game mutes itself around `commercialBreak`/`rewardedBreak`
-   * (Game.beginPortalAd/endPortalAd). All that is left to probe is ad-block.
-   */
   syncSettings(): void {
-<<<<<<< HEAD
     // Poki exposes no "is the site muted" API — its volume controls are for ads,
     // not for the player's preference — so the game's own mute setting is the
     // single source of truth and there is nothing to poll. The ad-block probe is
     // still worth taking once at boot, because it is what stops a break being
     // requested that could never serve (MON-12).
     this.probeAdBlock();
-=======
-    this.probeAdBlock();
-  }
-  isMuted(): boolean {
-    return false;
->>>>>>> origin/main
   }
 
   getSettings(): { muteAudio: boolean; disableChat: boolean } {

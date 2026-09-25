@@ -90,6 +90,36 @@ describe("the break overlay", () => {
     expect(card.textContent ?? "").toMatch(/Continues in/i);
   });
 
+  it("does not get stuck saying 'loading' with an empty bar once our own break finishes", async () => {
+    // The reported bug: the header/spinner/label were painted once from the
+    // initial template and never touched again, and the bar's own formula
+    // reset to 0% the instant the timer hit zero — so a finished placeholder
+    // break looked identical to one that had just started, forever, even
+    // though the skip button underneath had already gone live. `update()` is
+    // called twice here, same as two animation frames of the real game: the
+    // first establishes the card (adTimer still running), the second lands
+    // after the timer reaches zero and exercises the live-sync path alone,
+    // exactly like the real per-frame HUD update does.
+    const { HUD } = await import("../HUD");
+    const hud = new HUD(document.body);
+    const snap = snapshotStub();
+    Object.assign(snap, {
+      state: "ad", screen: "main", portalName: "none", pilotName: "Skywing",
+      settings: { reduceMotion: false, mute: false },
+      adReason: "continue", adSkippable: true, adTimer: 3, adTotal: 4,
+    });
+    hud.update(snap as unknown as HudSnapshot);
+    const root = document.querySelector<HTMLElement>(".hud-root")!;
+    const card = root.querySelector('[data-ref="adCard"]')!;
+    expect(card.querySelector(".portal-ad-wait h3")?.textContent ?? "").toMatch(/loading/i);
+
+    Object.assign(snap, { adTimer: 0 });
+    hud.update(snap as unknown as HudSnapshot);
+    expect(card.querySelector('[data-live="adBar"]')?.getAttribute("style") ?? "", "a finished break is a full bar, not an empty one").toMatch(/width:\s*100%/);
+    expect(card.querySelector(".portal-ad-wait h3")?.textContent ?? "", "the header must stop claiming the ad is still loading").not.toMatch(/loading/i);
+    expect((card.querySelector('[data-live="adSkip"]') as HTMLButtonElement).disabled, "the way out is enabled once it is actually done").toBe(false);
+  });
+
   it("never offers to remove breaks on the portal edition (REQ-31)", async () => {
     const root = await render({ state: "ad", portalName: "poki", adSkippable: false, adTimer: 0, canRemoveBreaks: true });
     expect(

@@ -11,6 +11,12 @@ importers:
       '@poki/netlib':
         specifier: ^0.0.20
         version: 0.0.20
+      '@poki/sdk':
+        specifier: ^0.0.5
+        version: 0.0.5
+      '@stripe/stripe-js':
+        specifier: ^9.15.0
+        version: 9.17.0
       '@upstash/redis':
         specifier: ^1.38.4
         version: 1.38.4
@@ -39,9 +45,6 @@ importers:
       '@poki/cli':
         specifier: ^0.1.19
         version: 0.1.19
-      '@poki/sdk':
-        specifier: ^0.0.5
-        version: 0.0.5
       '@tailwindcss/vite':
         specifier: 4.1.17
         version: 4.1.17(vite@7.3.6(@types/node@22.19.17)(jiti@2.7.0)(lightningcss@1.30.2)(tsx@4.23.13))
@@ -654,6 +657,10 @@ packages:
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
+
+  '@stripe/stripe-js@9.17.0':
+    resolution: {integrity: sha512-uidL4OJum5kivsOAQnVfQmYLJ2zdgirtmT0zWgskASZ4TPXxpXQ0MNrzW4NsXB90uEqmPHpSEtciLFbF1QQvNA==}
+    engines: {node: '>=12.16'}
 
   '@tailwindcss/node@4.1.17':
     resolution: {integrity: sha512-csIkHIgLb3JisEFQ0vxr2Y57GUNYh447C8xzwj89U/8fdW8LhProdxvnVH6U8M2Y73QKiTIH+LWbK3V2BBZsAg==}
@@ -2650,6 +2657,8 @@ snapshots:
     optional: true
 
   '@standard-schema/spec@1.1.0': {}
+
+  '@stripe/stripe-js@9.17.0': {}
 
   '@tailwindcss/node@4.1.17':
     dependencies:

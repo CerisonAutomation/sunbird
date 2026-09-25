@@ -124,7 +124,9 @@ export class Bird {
     this.wingMat = new THREE.MeshLambertMaterial({ color: 0xff9a62 });
     this.bellyMat = new THREE.MeshLambertMaterial({ color: 0xffe6c4 });
     this.beakMat = new THREE.MeshLambertMaterial({ color: 0xffc447 });
-    const eyeW = new THREE.MeshBasicMaterial({ color: 0xfffaf2 });
+    // Keep the whites lit by the scene instead of self-illuminating. MeshBasic
+    // made the eyes read as two glare spots against the dusk sky.
+    const eyeW = new THREE.MeshLambertMaterial({ color: 0xfff4df, emissiveIntensity: 0 });
     const eyeP = new THREE.MeshBasicMaterial({ color: 0x2a1c28 });
     this.lidMat = new THREE.MeshLambertMaterial({ color: 0xff7a45, emissiveIntensity: 0 });
 
@@ -195,30 +197,22 @@ export class Bird {
     this.shadow = new THREE.Mesh(shadowGeo, shadowMat);
     this.shadow.rotation.x = -Math.PI / 2;
 
-    // Best practice: no shadows on the bird by default — shadow maps are the
-    // #1 mobile GPU killer. The ground silhouette (MeshBasicMaterial) is cheap
-    // and reads as shadow. High-quality desktop can opt-in via quality.ts.
     this.squash.traverse((o) => {
       if (o instanceof THREE.Mesh) {
-        o.castShadow = false;
-        o.receiveShadow = false;
-        // Keep frustum culling on for the bird — it's always on screen, but
-        // the check is cheap and saves work when the bird is off-screen in menus.
-        o.frustumCulled = true;
+        o.castShadow = true;
+        o.receiveShadow = true;
       }
     });
-    // PointLight is expensive (affects all Lambert materials). Only visible in
-    // fever — otherwise intensity 0 so it costs nothing. No shadow casting ever.
-    this.glow.castShadow = false;
-    this.glow.visible = false;
 
     this.root.add(this.squash);
     // The bird is the primary gameplay affordance. Render it above foreground
     // props so narrow screens never lose the player silhouette to terrain
     // depth sorting or translucent haze.
-    this.root.renderOrder = 50;
+    // Final focal layer: wake and celebration FX always remain behind the
+    // readable bird silhouette, eyes, and beak.
+    this.root.renderOrder = 100;
     this.squash.traverse((o) => {
-      if (o instanceof THREE.Mesh) o.renderOrder = 50;
+      if (o instanceof THREE.Mesh) o.renderOrder = 100;
     });
     this.shadow.renderOrder = 10;
   }
@@ -327,23 +321,9 @@ export class Bird {
       const n = terrain.normalAt(this.x, this.terrainNormal);
       let vt = this.vx * n.tx + this.vy * n.ty;
 
-      // gravity along the slope: downhill (ty<0) accelerates, uphill decelerates.
-      // TUNED: uphill is less punishing — when ty>0 (uphill) and speed is low,
-      // gravity penalty is scaled down and a small assist pushes you over the crest
-      // so you never get bored crawling up a hill.
+      // gravity along the slope: downhill (ty<0) accelerates, uphill decelerates
       const gGround = diving ? GROUND_G_DIVE : GROUND_G_GLIDE;
-      const uphill = n.ty > 0 ? n.ty : 0; // 0..1, how steep uphill
-      const downhill = n.ty < 0 ? -n.ty : 0;
-      // Downhill still accelerates full, uphill is softened when slow (anti-bore)
-      const uphillPenaltyScale = uphill > 0.08 ? (vt < 18 ? 0.55 : vt < 28 ? 0.75 : 1) : 1;
-      vt += -gGround * (uphill > 0 ? n.ty * uphillPenaltyScale : n.ty) * dt;
-      // Small push over crests when slow — never lets you stall on a hill
-      if (uphill > 0.12 && vt < 18) {
-        const assist = (18 - vt) * uphill * 0.9 * dt;
-        vt += assist;
-      }
-      // Downhill gets a tiny extra kick so you feel the slope
-      if (downhill > 0.15) vt += downhill * 2.2 * dt;
+      vt += -gGround * n.ty * dt;
 
       const fr = diving ? GROUND_FRICTION_DIVE : GROUND_FRICTION;
       vt *= 1 - fr * dt;
@@ -384,30 +364,15 @@ export class Bird {
         this.vy = vt * n2.ty;
       }
     } else {
-      /* ---------- ballistic flight — ANTI-BORE TUNED ---------- */
+      /* ---------- ballistic flight ---------- */
       const sp = Math.max(0.001, this.speed());
-      let lift = diving
+      const lift = diving
         ? 0
         : Math.min(0.85, GLIDE_LIFT_MAX * clamp(sp / GLIDE_LIFT_SPEED, 0, 1) * (opts.liftMult ?? 1)) * glideLiftScale(this.airTime);
-
-      // Anti-bore: after 2.5s in air, lift decays extra if slow; after 3.5s sink hard
-      if (!diving && this.airTime > 2.5) {
-        const slowFactor = clamp((18 - sp) / 12, 0, 1); // 0 when fast, 1 when slow (<6)
-        const timeFactor = clamp((this.airTime - 2.5) / 2.5, 0, 1);
-        lift *= 1 - slowFactor * timeFactor * 0.6; // slow + long = lose lift
-      }
-      // Hard sink after 3.8s if still gliding — forces decision: dive or thermal
-      let extraSink = 0;
-      if (!diving && this.airTime > 3.8) {
-        extraSink = (this.airTime - 3.8) * 4.5; // extra gravity
-      }
-
-      this.vy -= ((diving ? GRAVITY_DIVE : GRAVITY_GLIDE) * gMult * (1 - lift) + extraSink) * dt;
+      this.vy -= (diving ? GRAVITY_DIVE : GRAVITY_GLIDE) * gMult * (1 - lift) * dt;
 
       const k = (diving ? AIR_DRAG_DIVE : AIR_DRAG_GLIDE) * (opts.dragMult ?? 1);
-      // Extra drag when gliding long and slow — prevents infinite float
-      const longGlideDrag = !diving && this.airTime > 2 ? (this.airTime - 2) * 0.00018 : 0;
-      const decay = Math.max(0, 1 - (k + longGlideDrag) * sp * dt);
+      const decay = Math.max(0, 1 - k * sp * dt);
       this.vx *= decay;
       this.vy *= decay;
 
@@ -567,23 +532,17 @@ export class Bird {
     }
 
     this.glowPulse += dt * 6;
-<<<<<<< HEAD
-    this.glow.intensity = fever ? 2.6 + Math.sin(this.glowPulse) * 0.9 : 0;
+    // Fever should feel special without washing out the bird's face or nearby
+    // terrain. The previous 2.6–3.5 point-light pulse was visible as eye glare.
+    this.glow.intensity = fever ? 0.85 + Math.sin(this.glowPulse) * 0.2 : 0;
     this.glow.color.setHex(0xffe08a);
-=======
-    // Only enable PointLight during fever — otherwise it's a hidden cost that
-    // lights every Lambert material in the scene (terrain, pylons, etc).
-    this.glow.visible = fever;
-    this.glow.intensity = fever ? 2.6 + Math.sin(this.glowPulse) * 0.9 : 0;
-    this.glow.color.setHex(fever ? 0xffe08a : 0xfff4dc);
->>>>>>> origin/main
     if (fever) {
       this.bodyMat.emissive.set(0x552200);
-      this.bodyMat.emissiveIntensity = 1;
+      this.bodyMat.emissiveIntensity = 0.45;
       this.wingMat.emissive.set(0x441800);
-      this.wingMat.emissiveIntensity = 1;
+      this.wingMat.emissiveIntensity = 0.4;
       this.bellyMat.emissive.set(0x332200);
-      this.bellyMat.emissiveIntensity = 1;
+      this.bellyMat.emissiveIntensity = 0.35;
     } else {
       this.bodyMat.emissive.set(0, 0, 0);
       this.bodyMat.emissiveIntensity = 0;

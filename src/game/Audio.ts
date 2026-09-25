@@ -1,6 +1,5 @@
 const COIN_SCALE = [1046.5, 1174.66, 1318.51, 1567.98, 1760.0, 2093.0, 2349.32, 2637.02, 3135.96, 3520.0];
 
-<<<<<<< HEAD
 import { GLOCK_PARTIALS, Music, type BiomeMusicStyle, type MusicMode } from "./Music";
 import { SongbookPlayer } from "./SongbookPlayer";
 import type { BiomeId } from "./Songbook";
@@ -24,15 +23,6 @@ const MUSIC_DISABLED = true;
  * engine stays at zero).
  */
 const SONGBOOK_ENABLED = true;
-=======
-import { Music, type BiomeMusicStyle, type MusicMode } from "./Music";
-import {
-  MusicMomentGate, applyMusicActions, momentMusic,
-} from "./MusicMoments";
-import type { MomentKind } from "./Moments";
-import { MAX_SPEED } from "./constants";
-import { whooshRate } from "./SpeedFeel";
->>>>>>> origin/main
 
 /**
  * Master audio graph:
@@ -63,8 +53,6 @@ export class GameAudio {
   private pendingBiome: BiomeMusicStyle = "bright";
   private pendingTrack: number | "shuffle" = "shuffle";
   private onTrackChange: ((name: string) => void) | null = null;
-  /** Gates comedy-moment reactions on the music bus (see MusicMoments.ts). */
-  private readonly momentGate = new MusicMomentGate();
   /** Prevent dense pickup/event bursts from spawning unbounded WebAudio voices.
    *  Shared by every one-shot source (oscillator tones AND noise bursts), so a
    *  boost + storm + fever + landing on the same frame cannot stack voices. */
@@ -336,39 +324,9 @@ export class GameAudio {
     this.songbook?.setIntensity(v);
   }
 
-  /**
-   * Where the flight is, for the *arrangement* — which instruments are in the
-   * band, as opposed to how loud the one arrangement is. Intensity rides a mix;
-   * this re-mixes around the shape of a run (take-off breath, cruise, apex,
-   * landing cadence). See `MusicArrangement.ts`. Cheap: no-ops unless the phase
-   * changed, so the game calls it every frame next to `setMusicIntensity`.
-   */
-  setMusicRunPhase(inRun: boolean, runSeconds: number): void {
-    this.music?.setRunPhase(inRun, runSeconds);
-  }
-
   duckMusic(amount = 0.4, release = 0.5): void {
     this.music?.duck(amount, release);
     this.songbook?.ducked(amount, release);
-  }
-
-  /**
-   * The score reacts to a comedy moment instead of playing under it: BONK
-   * face-plants the band, SPLOSH puts it underwater, BOING launches it, RECORD
-   * gets the full drop + glide + bell run. Recipes are pure data in
-   * `MusicMoments.ts`; this method owns only the gating — nothing happens while
-   * muted, while music is off, or during a portal break, and never two gestures
-   * inside the same cooldown window.
-   *
-   * `now` is injectable so the throttle is testable without an AudioContext.
-   */
-  musicMoment(kind: MomentKind, now = Date.now()): void {
-    const music = this.music;
-    if (!music || !this.started || this.muted || !this.musicOn) return;
-    if (this.adMuted || this.hiddenMuted || this.portalMuted) return;
-    if (!this.momentGate.allow(kind, now)) return;
-    this.momentGate.mark(kind, now);
-    applyMusicActions(music, momentMusic(kind));
   }
 
   update(
@@ -399,15 +357,9 @@ export class GameAudio {
       this.lastWhooshGain,
       0.0015,
     );
-    // Air brightness rides the same warp ramp as the camera and the HUD
-    // streaks, so every channel leans in at the same speeds. The multiplier is
-    // deliberately gentle (max ~1.35x at full warp): the un-ramped filter
-    // already reaches ~2.8 kHz in fever, and pushing past ~3.3 kHz turns a
-    // whoosh into a hiss, which reads as a broken speaker rather than as speed.
-    const bright = 1 + (whooshRate(Math.min(1.2, speed / MAX_SPEED)) - 1) * 0.29;
     this.lastWhooshFreq = this.smoothParam(
       this.whooshFilter.frequency,
-      (280 + speed * 18 + (diving ? 220 : 0)) * bright,
+      280 + speed * 18 + (diving ? 220 : 0),
       0.08,
       this.lastWhooshFreq,
       6,

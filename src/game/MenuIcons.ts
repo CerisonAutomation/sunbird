@@ -25,6 +25,9 @@ const artwork = {
   board: '<path d="M5 33h18v23H5Zm18-15h18v38H23Zm18 23h18v15H41Z" fill="#a1bdb5"/><path d="M23 18h18v38H23Z" fill="#efc278"/><path d="m32 2 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1Z" fill="#ffdf90"/><path d="M30 30h3v13" fill="none" stroke="#9b743c" stroke-width="3"/>',
   account: '<rect x="7" y="12" width="50" height="41" rx="8" fill="#f2d7a9"/><path d="M10 17h44" fill="none" stroke="#fff2d2"/><circle cx="25" cy="28" r="7" fill="#a2bfa8"/><path d="M13 45q1-11 12-11t12 11" fill="#78a992"/><path d="M41 28h8m-8 7h8m-8 7h5" fill="none" stroke="#b4966e"/>',
   daily: '<circle cx="32" cy="32" r="13" fill="#ffd86b"/><path d="M32 8v7m0 34v7M8 32h7m34 0h7m-10-17-5 5M19 45l-5 5m0-34 5 5m17 17 5 5" fill="none" stroke="#f5a623" stroke-width="4" stroke-linecap="round"/><path d="M5 52h54" fill="none" stroke="#ed974a" stroke-width="3" stroke-linecap="round"/>',
+  sound: '<path d="M9 27h12l15-12v34L21 37H9Z" fill="#a8c8bc"/><path d="M43 24q7 8 0 16m5-23q13 15 0 30" fill="none" stroke="#d18d4d" stroke-width="4"/>',
+  soundOff: '<path d="M9 27h12l15-12v34L21 37H9Z" fill="#a8c8bc"/><path d="m43 25 12 12m0-12-12 12" fill="none" stroke="#d46f55" stroke-width="4"/>',
+  fullscreen: '<path d="M8 25V10h15M41 10h15v15M56 39v15H41M23 54H8V39" fill="none" stroke="#799b91" stroke-width="5"/><path d="M15 17 6 8m43 0-9 9M6 56l9-9m34 9-9-9" fill="none" stroke="#d59a4c" stroke-width="3"/>',
 } as const;
 
 export type MenuIconName = keyof typeof artwork;
