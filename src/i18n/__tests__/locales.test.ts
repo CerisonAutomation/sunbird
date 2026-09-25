@@ -90,7 +90,7 @@ describe("browser-language detection (LOC-05)", () => {
   });
 
   it("returns null for languages the game does not ship", () => {
-    expect(matchLocale("fi-FI")).toBeNull();
+    expect(matchLocale("fi-FI")).toBe("fi");
     expect(matchLocale("")).toBeNull();
     expect(matchLocale(null)).toBeNull();
     expect(matchLocale(undefined)).toBeNull();
@@ -107,13 +107,11 @@ describe("runtime packs (generated from the barrel)", () => {
     const codes = [...new Set(Object.values(barrel.barrel).flatMap((e) => Object.keys(e.translations ?? {})))].sort();
     const drift: string[] = [];
     for (const code of codes) {
-      const pack: Record<string, string> = {};
-      for (const [key, entry] of Object.entries(barrel.barrel)) {
-        const text = entry.translations[code] ?? entry.translations.en ?? entry.sourceText;
-        if (typeof text === "string" && text.length > 0) pack[key] = text;
-      }
-      const ordered = Object.fromEntries(Object.entries(pack).sort(([a], [b]) => (a < b ? -1 : 1)));
-      const expected = JSON.stringify(ordered, null, 1) + "\n";
+      const keys = Object.keys(barrel.barrel).sort();
+      const expected = JSON.stringify(keys.map((key) => {
+        const entry = barrel.barrel[key]!;
+        return entry.translations[code] ?? entry.translations.en ?? entry.sourceText;
+      })) + "\n";
       const actual = readFileSync(resolve(root, `src/i18n/packs/${code}.json`), "utf8");
       if (actual !== expected) drift.push(code);
     }
@@ -127,8 +125,8 @@ describe("runtime packs (generated from the barrel)", () => {
     };
     const keys = Object.keys(barrel.barrel);
     for (const file of readdirSync(resolve(root, "src/i18n/packs"))) {
-      const pack = JSON.parse(readFileSync(resolve(root, "src/i18n/packs", file), "utf8")) as Record<string, string>;
-      const missing = keys.filter((k) => typeof pack[k] !== "string" || pack[k].length === 0);
+      const pack = JSON.parse(readFileSync(resolve(root, "src/i18n/packs", file), "utf8")) as string[];
+      const missing = keys.filter((_, index) => typeof pack[index] !== "string" || pack[index].length === 0);
       expect(missing, file).toEqual([]);
     }
   });

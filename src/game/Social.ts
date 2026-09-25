@@ -1,6 +1,7 @@
 import { copyText, shareCancelled } from "./Clipboard";
 import { drawSunbird, FLAP_NEUTRAL, skinPalette } from "./Sunbird";
 import type { SkinDef } from "./Economy";
+import { tSource } from "../i18n";
 
 export type ShareCard = { blob: Blob | null; dataUrl: string; text: string };
 
@@ -55,13 +56,13 @@ export async function buildShareCard(opts: {
   ctx.fillStyle = "#8b571c";
   ctx.font = "500 42px Fredoka, sans-serif";
   ctx.fillStyle = "#bc800f";
-  ctx.fillText("SUNBIRD", 64, 90);
+  ctx.fillText(tSource("SUNBIRD"), 64, 90);
   ctx.font = "600 15px Atkinson Hyperlegible, sans-serif";
   fitText(ctx, opts.seedLabel, 520, 16, "500");
   ctx.fillText(opts.seedLabel, 64, 122);
   ctx.fillStyle = "#857455";
   ctx.font = "700 13px Atkinson Hyperlegible, sans-serif";
-  ctx.fillText("A LITTLE BIRD. A FLIGHT WORTH SHARING.", 64, 180);
+  ctx.fillText(tSource("A LITTLE BIRD. A FLIGHT WORTH SHARING."), 64, 180);
   ctx.fillStyle = "#8b571c";
   const distance = `${Math.max(0, Math.floor(opts.distance)).toLocaleString("en-US")} m`;
   fitText(ctx, distance, 530, 92, "600");
@@ -72,8 +73,8 @@ export async function buildShareCard(opts: {
     ctx.fillStyle = "#8b571c"; fitText(ctx, value, 225, 34, "600");
     ctx.fillText(value, x, 363);
   };
-  stat("COINS COLLECTED", String(opts.coins), 64);
-  stat("FLIGHT SCORE", Math.floor(opts.score).toLocaleString("en-US"), 324);
+  stat(tSource("COINS COLLECTED"), String(opts.coins), 64);
+  stat(tSource("FLIGHT SCORE"), Math.floor(opts.score).toLocaleString("en-US"), 324);
   const points = (opts.flightPath ?? []).filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y)).slice(0, 100);
   if (points.length >= 3) {
     const width = Math.max(1, ...points.map(p => p[0]));
@@ -93,9 +94,9 @@ export async function buildShareCard(opts: {
   ctx.textAlign = "left";
   ctx.fillStyle = "#8b571c"; roundRect(ctx, 48, 465, 904, 108, 20); ctx.fill();
   ctx.fillStyle = "#fff1cd"; ctx.font = "600 23px Fredoka, sans-serif";
-  ctx.fillText(opts.challengeUrl ? "SAME HILLS. CAN YOU GO FARTHER?" : "THE SKY IS BETTER WITH FRIENDS.", 70, 503);
+  ctx.fillText(tSource(opts.challengeUrl ? "SAME HILLS. CAN YOU GO FARTHER?" : "THE SKY IS BETTER WITH FRIENDS."), 70, 503);
   ctx.font = "400 16px Atkinson Hyperlegible, sans-serif";
-  ctx.fillText(opts.challengeUrl ? "Open the challenge link in the shared message. Your flight is next." : "Dive the valleys. Ride the ridgeline. Find your next flight.", 70, 531);
+  ctx.fillText(tSource(opts.challengeUrl ? "Open the challenge link in the shared message. Your flight is next." : "Dive the valleys. Ride the ridgeline. Find your next flight."), 70, 531);
   ctx.font = "500 12px Atkinson Hyperlegible, sans-serif";
   ctx.fillText(`Play free · friend code ${opts.referralCode}`, 70, 554);
 

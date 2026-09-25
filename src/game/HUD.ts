@@ -18,7 +18,7 @@ import { leaderboardBackend } from "./Leaderboard";
 import type { BoardMetric, BoardPage, BoardScope } from "./Leaderboard";
 import type { TournamentView } from "./Tournaments";
 import type { RosterBird, Standing, RivalNameTag } from "./MassRace";
-import { formatNumberLocalized, SUPPORTED_LOCALES, getLocale, t } from "../i18n";
+import { formatNumberLocalized, SUPPORTED_LOCALES, getLocale, t, tSource } from "../i18n";
 import * as THREE from "three";
 import { DAILY_STIPEND, PIGGY_BANK_CAP, PIGGY_BANK_MIN_SMASH, SHOP_AD_COINS, SHOP_AD_SESSION_CAP, VIP_DAILY_GIFT } from "./constants";
 import { COLLECTIONS, dailyFlashBird, GOLD, skinById, STARTER_PACK, VIP, type BoostView, type ShopTrailView, type SkinView } from "./Economy";
@@ -32,6 +32,12 @@ import { seenAgo, type FlightMate } from "./pilots";
 import type { HighScore, Settings } from "./SaveData";
 import { TRACK_NAMES } from "./Music";
 import type { TierView } from "./SeasonPass";
+
+/** Vector-first status glyphs. Emoji vary by operating system and can read as
+ * missing boxes or oversized colour art; these keep the HUD consistent. */
+function hudIcon(name: Parameters<typeof menuIcon>[0], label = ""): string {
+  return `<span class="hud-icon" aria-hidden="true">${menuIcon(name)}</span>${label}`;
+}
 
 export type UiScreen =
   | "progress"
@@ -64,8 +70,15 @@ export const SCREEN = {
   confirmUnlock: "checkout", highGlides: "progress", nestPass: "pass",
   trophyCase: "trophies", account: "account",
 } as const;
+const SCREEN_TITLE_EN: Readonly<Record<string, string>> = {
+  leaderboard: "Leaderboard", raceLobby: "Race Lobby", aiPvp: "AI Practice", challenges: "Challenges",
+  campaign: "Story", squad: "Squad", rivalRank: "Rival Rank", tournaments: "Tournaments",
+  gameModes: "Game Modes", atlas: "Island Atlas", shop: "Shop", coinStore: "Coin Store",
+  confirmUnlock: "Confirm Unlock", highGlides: "High Glides", nestPass: "Nest Pass",
+  trophyCase: "Trophy Case", account: "Account",
+};
 export const SCREEN_TITLES: Readonly<Record<string, { key: string; en: string }>> = Object.fromEntries(
-  Object.entries(SCREEN).map(([key, value]) => [value, { key: `hud.screen.${key}.title`, en: key }]),
+  Object.entries(SCREEN).map(([key, value]) => [value, { key: `hud.screen.${key}.title`, en: SCREEN_TITLE_EN[key] ?? key }]),
 );
 
 export type RivalCard = {
@@ -300,6 +313,7 @@ export type HudSnapshot = {
   netState: string;
   linkQuality: "unknown" | "good" | "fair" | "poor";
   netError: string;
+  nextAction?: string;
   draft: number;
   finishRemaining: number;
   nemesis: string;
@@ -570,6 +584,27 @@ export class HUD {
     this.textCache.clear();
     this.styleCache.clear();
   }
+
+  /** Apply barrel translations to markup that still comes from legacy renderers. */
+  private localizeContent(root: HTMLElement): void {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const nodes: Text[] = [];
+    let node: Node | null;
+    while ((node = walker.nextNode())) nodes.push(node as Text);
+    for (const text of nodes) {
+      const value = text.nodeValue ?? "";
+      const trimmed = value.trim();
+      if (!trimmed) continue;
+      const translated = tSource(trimmed);
+      if (translated !== trimmed) text.nodeValue = value.replace(trimmed, translated);
+    }
+    for (const el of root.querySelectorAll<HTMLElement>("[aria-label], [title], [placeholder]")) {
+      for (const attr of ["aria-label", "title", "placeholder"] as const) {
+        const value = el.getAttribute(attr);
+        if (value) el.setAttribute(attr, tSource(value));
+      }
+    }
+  }
   private contTimerEl: HTMLElement | null = null;
   private adBarEl: HTMLElement | null = null;
   private adSkipEl: HTMLButtonElement | null = null;
@@ -630,7 +665,7 @@ export class HUD {
         <div class="standings hidden" data-ref="standings"></div>
         <div class="roster-bar hidden" data-ref="rosterBar"></div>
         <div class="rival-nametag-container" data-ref="nametags"></div>
-        <div class="draft-meter hidden" data-ref="draftMeter"><i></i><span>SLIPSTREAM</span></div>
+        <div class="draft-meter hidden" data-ref="draftMeter"><i></i><span>${tSource("SLIPSTREAM")}</span></div>
         <div class="finish-countdown hidden" data-ref="finishCd"></div>
         <div class="emote-bubble hidden" data-ref="emoteBubble" role="status" aria-live="polite" aria-atomic="true"></div>
         <div class="emote-wheel hidden" data-ref="emoteWheel">
@@ -655,11 +690,11 @@ export class HUD {
         </div>
         <div class="slope-chain hidden" data-ref="slopeChain">〽 FLOW ×1</div>
         <div class="fever-wrap" data-ref="feverWrap">
-          <div class="fever-label">FEVER</div>
+          <div class="fever-label">${tSource("FEVER")}</div>
           <div class="fever-bar"><div class="fever-fill" data-ref="feverFill"></div></div>
         </div>
-        <button class="icon-btn mute-btn" data-ui data-action="set-mute" data-ref="muteBtn" aria-label="Mute sound" title="Mute sound"><span class="audio-glyph" aria-hidden="true"></span></button>
-        <button class="icon-btn pause-btn" data-ui data-action="pause" data-ref="pauseBtn" aria-label="Pause">❙❙</button>
+        <button class="icon-btn mute-btn" data-ui data-action="set-mute" data-ref="muteBtn" aria-label="${tSource("Mute sound")}" title="${tSource("Mute sound")}"><span class="audio-glyph" aria-hidden="true"></span></button>
+        <button class="icon-btn pause-btn" data-ui data-action="pause" data-ref="pauseBtn" aria-label="${tSource("Pause")}">❙❙</button>
         <div class="combo" data-ref="combo"></div>
         <div class="hint" data-ref="hint" role="status" aria-live="polite" aria-atomic="true"></div>
         <div class="hand" data-ref="hand">☝<span class="hand-hint">Tap · Space · ↑</span></div>
@@ -667,56 +702,56 @@ export class HUD {
 
       <div class="overlay menu hidden" data-ref="menu"><div class="paper-card" data-ref="menuCard"></div></div>
 
-      <div class="overlay pause hidden" data-ref="pause" role="dialog" aria-modal="true" aria-label="Paused">
+      <div class="overlay pause hidden" data-ref="pause" role="dialog" aria-modal="true" aria-label="${tSource("Paused")}">
         <div class="paper-card slim pause-card">
-          <div class="pause-kicker">FLIGHT ON HOLD</div>
-          <h2>Take a breath</h2>
-          <p class="tagline">Your run is safe. Adjust settings, grab boosts, or rally your flock — ready when you are.</p>
+          <div class="pause-kicker">${tSource("FLIGHT ON HOLD")}</div>
+          <h2>${tSource("Take a breath")}</h2>
+          <p class="tagline">${tSource("Your run is safe. Adjust settings, grab boosts, or rally your flock — ready when you are.")}</p>
           <div class="pause-run-stats">
-            <span class="prs"><em>Distance</em><b data-ref="pauseDistance">0 m</b></span>
-            <span class="prs"><em>Altitude</em><b data-ref="pauseAltitude">0 m</b></span>
-            <span class="prs"><em>Combo</em><b data-ref="pauseCombo">×1</b></span>
+            <span class="prs"><em>${tSource("Distance")}</em><b data-ref="pauseDistance">0 m</b></span>
+            <span class="prs"><em>${tSource("Altitude")}</em><b data-ref="pauseAltitude">0 m</b></span>
+            <span class="prs"><em>${tSource("Combo")}</em><b data-ref="pauseCombo">×1</b></span>
           </div>
           <div class="pause-actions">
-            <button class="primary-btn pause-resume" data-ui data-action="resume"><span class="pause-action-icon">${menuIcon("flight")}</span>Keep flying</button>
+            <button class="primary-btn pause-resume" data-ui data-action="resume"><span class="pause-action-icon">${menuIcon("flight")}</span>${tSource("Keep flying")}</button>
           </div>
           <div class="pause-quick-grid" role="group" aria-label="Quick access">
             <button class="pause-q pause-mute" data-ui data-action="set-mute" data-ref="pauseMute" aria-pressed="false">
               <i data-ref="pauseMuteIco">${menuIcon("sound")}</i><span data-ref="pauseMuteLbl">Sound on</span>
             </button>
             <button class="pause-q" data-ui data-action="pause-to" data-id="settings">
-              <i>${menuIcon("settings")}</i><span>Settings</span>
+              <i>${menuIcon("settings")}</i><span>${tSource("Settings")}</span>
             </button>
             <button class="pause-q" data-ui data-action="pause-to" data-id="shop">
-              <i>${menuIcon("shop")}</i><span>Shop</span>
+              <i>${menuIcon("shop")}</i><span>${tSource("Shop")}</span>
             </button>
             <button class="pause-q" data-ui data-action="pause-to" data-id="board">
-              <i>${menuIcon("board")}</i><span>Global Board</span>
+              <i>${menuIcon("board")}</i><span>${tSource("Global Board")}</span>
             </button>
             <button class="pause-q" data-ui data-action="pause-to" data-id="scores">
-              <i>${menuIcon("scores")}</i><span>My Scores</span>
+              <i>${menuIcon("scores")}</i><span>${tSource("My Scores")}</span>
             </button>
             <button class="pause-q" data-ui data-action="pause-to" data-id="pass">
-              <i>${menuIcon("pass")}</i><span>Nest Pass</span>
+              <i>${menuIcon("pass")}</i><span>${tSource("Nest Pass")}</span>
             </button>
             <button class="pause-q" data-ui data-action="pause-to" data-id="squad">
-              <i>${menuIcon("squad")}</i><span>Squad</span>
+              <i>${menuIcon("squad")}</i><span>${tSource("Squad")}</span>
             </button>
             <button class="pause-q" data-ui data-action="pause-to" data-id="trophies">
-              <i>${menuIcon("medal")}</i><span>Trophies</span>
+              <i>${menuIcon("medal")}</i><span>${tSource("Trophies")}</span>
             </button>
             <button class="pause-q" data-ui data-action="pause-to" data-id="progress">
-              <i>${menuIcon("progress")}</i><span>Progress</span>
+              <i>${menuIcon("progress")}</i><span>${tSource("Progress")}</span>
             </button>
             <button class="pause-q" data-ui data-action="toggle-fullscreen">
-              <i>${menuIcon("fullscreen")}</i><span>Fullscreen</span>
+              <i>${menuIcon("fullscreen")}</i><span>${tSource("Fullscreen")}</span>
             </button>
           </div>
           <div class="pause-exit-row">
-            <button class="soft-btn" data-ui data-action="restart-flight"><span class="pause-inline-icon">${menuIcon("flight")}</span>Restart flight</button>
-            <button class="ghost-btn danger-btn" data-ui data-action="menu"><span class="pause-inline-icon">${menuIcon("daily")}</span>Exit to menu</button>
+            <button class="soft-btn" data-ui data-action="restart-flight"><span class="pause-inline-icon">${menuIcon("flight")}</span>${tSource("Restart flight")}</button>
+            <button class="ghost-btn danger-btn" data-ui data-action="menu"><span class="pause-inline-icon">${menuIcon("daily")}</span>${tSource("Exit to menu")}</button>
           </div>
-          <p class="pause-exit-note">Resume keeps your momentum. Restart begins a fresh flight. Exit returns you to the launch pad.</p>
+          <p class="pause-exit-note">${tSource("Resume keeps your momentum. Restart begins a fresh flight. Exit returns you to the launch pad.")}</p>
         </div>
       </div>
 
@@ -735,7 +770,7 @@ export class HUD {
         <div class="matchmaking-rooms hidden" data-ref="matchmakingRooms"></div>
         <div class="btn-row mm-actions">
           <button class="primary-btn mm-ready hidden" data-ui data-ref="matchmakingReady" data-action="mm-ready">Ready up ✓</button>
-          <button class="primary-btn gold mm-ai hidden" data-ui data-ref="matchmakingAi" data-action="mm-ai">🤖 Race the AI flock instead</button>
+          <button class="primary-btn gold mm-ai hidden" data-ui data-ref="matchmakingAi" data-action="mm-ai">${hudIcon("versus")}Race the AI flock instead</button>
           <button class="soft-btn mm-keep hidden" data-ui data-ref="matchmakingKeep" data-action="mm-keep-search">Keep searching</button>
           <button class="soft-btn mm-cancel" data-ui data-action="mm-cancel">Cancel</button>
         </div>
@@ -1283,21 +1318,27 @@ export class HUD {
         }
       }
 
-      // Surface only the goal nearest completion — a single, always-open loop.
+      // Keep one primary chase plus the career rung: readable at a glance,
+      // but never hide the player's longer-term progression.
       let lead: SessionGoal | null = null;
       for (const g of s.sessionGoals) {
         if (g.done) continue;
         if (!lead || g.progress / g.target > lead.progress / lead.target) lead = g;
       }
-      const gk = lead ? `${lead.id}:${Math.floor((lead.progress / lead.target) * 20)}` : "";
+      const gk = lead ? `${lead.id}:${Math.floor((lead.progress / lead.target) * 20)}` : `career:${s.wings.nextNeeded}:${Math.round(s.wings.progress * 20)}`;
       if (gk !== this.lastGoals) {
         this.lastGoals = gk;
         if (lead) {
           const pct = Math.min(100, (lead.progress / lead.target) * 100);
           const close = pct >= 70;
-          this.goalStrip.innerHTML = `<span class="gs ${close ? "close" : ""}"><em>${lead.label}</em><i><b style="width:${pct}%"></b></i></span>`;
+          const career = s.wings.nextNeeded > 0
+            ? `<span class="gs gs-career"><em>${escapeHtml(s.wings.name)} → ${escapeHtml(s.wings.nextName)}</em><i><b style="width:${(s.wings.progress * 100).toFixed(1)}%"></b></i><u>${Math.round(s.wings.nextNeeded)} m to go</u></span>`
+            : "";
+          this.goalStrip.innerHTML = `<span class="gs ${close ? "close" : ""}"><em>${escapeHtml(lead.label)}</em><i><b style="width:${pct.toFixed(1)}%"></b></i><u>${Math.round(lead.progress)}/${Math.round(lead.target)} · +${lead.reward}</u></span>${career}`;
         } else {
-          this.goalStrip.innerHTML = "";
+          this.goalStrip.innerHTML = s.wings.nextNeeded > 0
+            ? `<span class="gs gs-career"><em>${escapeHtml(s.wings.name)} → ${escapeHtml(s.wings.nextName)}</em><i><b style="width:${(s.wings.progress * 100).toFixed(1)}%"></b></i><u>${Math.round(s.wings.nextNeeded)} m to go</u></span>`
+            : "";
         }
       }
       if (s.goalPop !== this.lastGoalPop) {
@@ -1338,12 +1379,12 @@ export class HUD {
             `${s.roomCode ? `<span class="rm-room">ROOM ${escapeHtml(s.roomCode)}</span>` : ""}` +
             `<span class="rm-net ${s.netState}">${s.multiplayerLive ? s.netState : "practice"}</span>` +
             `${s.multiplayerLive && s.linkQuality !== "unknown" ? `<span class="link-quality ${s.linkQuality}" title="Live state cadence">${s.linkQuality} link</span>` : ""}</div>` +
-            `<div class="roster-track" role="img" aria-label="Live race positions">${s.roster
+            `<div class="roster-track" role="img" aria-label="${s.roomAiFallback ? "AI race positions" : s.multiplayerLive ? "Live player race positions" : "Race positions"}">${s.roster
               .map(
                 (r) =>
                   `<span class="rb ${r.you ? "you" : ""} ${r.remote ? "remote" : ""} ${r.ghost ? "ghost" : ""} ${r.finished ? "done" : ""}" ` +
                   `style="left:${(r.progress * 100).toFixed(1)}%;--h:${Math.round(r.hue * 360)}" ` +
-                  `title="#${r.place} ${escapeHtml(r.name)}${r.remote ? " · live player" : r.ghost ? " · player ghost" : ""}">${r.emote ? `<b class="rb-emote">${escapeHtml(r.emote)}</b>` : ""}</span>`,
+                  `title="#${r.place} ${escapeHtml(r.name)}${r.remote ? " · live player" : r.ghost ? " · player ghost" : s.roomAiFallback ? " · AI pilot" : " · local pilot"}">${r.emote ? `<b class="rb-emote">${escapeHtml(r.emote)}</b>` : ""}</span>`,
               )
               .join("")}</div>`;
         }
@@ -1390,14 +1431,15 @@ export class HUD {
           this.lastStandings = key;
           this.lastStandingsAt = nowS;
           const top = s.standings[0];
+          const fieldLabel = s.roomAiFallback ? tSource("AI FLOCK") : s.multiplayerLive ? tSource("LIVE PLAYERS") : tSource("RACE FIELD");
           this.standingsEl.innerHTML =
-            `<div class="st-head"><span>LIVE</span><span>${s.standings.length} shown</span></div>` +
+            `<div class="st-head"><span>${fieldLabel}</span><span>${s.standings.length} ${tSource("shown")}</span></div>` +
             s.standings
               .map((r) => {
                 const gap = top && r.place > top.place ? `-${Math.max(0, Math.round(top.distance - r.distance))}m` : r.finished ? "🏁" : "—";
                 return `<div class="st-row ${r.you ? "you" : ""} ${r.kind === "remote" ? "remote" : ""} ${r.place <= 3 ? "p" + r.place : ""}">
                 <span class="st-p">${r.place <= 3 ? ["🥇", "🥈", "🥉"][r.place - 1] : r.place}</span>
-                <span class="st-n">${escapeHtml(r.name)}${r.kind === "remote" ? " ⇄" : ""}</span>
+                <span class="st-n">${escapeHtml(r.name)}<small class="st-kind">${r.you ? tSource("YOU") : r.kind === "remote" ? tSource("LIVE") : s.roomAiFallback ? tSource("AI") : tSource("LOCAL")}</small></span>
                 <span class="st-d">${r.you || r.place <= 3 ? `${Math.round(r.distance)}m` : gap}</span>
               </div>`;
               })
@@ -1464,6 +1506,7 @@ export class HUD {
   }
 
   toast(text: string, kind = "info"): void {
+    text = tSource(text);
     // Dedup: firing the same line while it is still on screen bumps a ×n
     // counter instead of stacking identical pills (ash storms, repeat
     // pickups). Never show the same words twice at once.
@@ -1557,14 +1600,17 @@ export class HUD {
       const wide = s.state === "paused" ? "" : (s.screen === "shop" || s.screen === "pass" ? "wide" : "");
       const cls = `paper-card ${s.state === "menu" && s.screen === "main" ? "menu-hero" : wide}`;
       this.menuContinuity.render(this.menuCard, s.screen, renderCoins(this.renderScreen(s)), cls);
+      this.localizeContent(this.menuCard);
     }
     if (s.state === "gameover") this.resultsContinuity.render(this.overCard, "results", renderCoins(renderGameOver(s)), "paper-card results-card");
     if (s.state === "continue") {
       this.contCard.innerHTML = renderCoins(renderContinue(s));
+      this.localizeContent(this.contCard);
       this.contTimerEl = this.contCard.querySelector('[data-live="contTimer"]');
     }
     if (s.state === "ad") {
       this.adCard.innerHTML = renderCoins(renderAd(s));
+      this.localizeContent(this.adCard);
       this.adBarEl = this.adCard.querySelector('[data-live="adBar"]');
       this.adSkipEl = this.adCard.querySelector('[data-live="adSkip"]');
       this.adHeaderEl = this.adCard.querySelector(".portal-ad-wait h3");
@@ -1601,11 +1647,11 @@ export class HUD {
       case "cups":
         return renderCups(s);
       case "live":
-        return renderLive(s);
+        return renderRace(s);
       case "rank":
         return renderRank(s);
       case "practice":
-        return renderPractice(s);
+        return renderRace(s);
       case "progress":
         return renderProgress(s);
       case "challenges":
@@ -1730,7 +1776,7 @@ export class HUD {
 function head(title: string, backAction = "back", right = ""): string {
   const destination = [...PLAY_DESTINATIONS, ...COLLECTION_DESTINATIONS, ...PROGRESS_DESTINATIONS].find(d => d.title === title);
   const icon = destination?.icon ?? (title === "Race Lobby" ? "online" : title === "Solo modes" ? "compass" : undefined);
-  return `<div class="screen-head"><button class="back-btn" data-ui data-action="${backAction}" aria-label="Back">‹</button><h2>${icon ? `<span class="heading-art">${menuIcon(icon)}</span>` : ""}${title}</h2><span>${right}</span></div>`;
+  return `<div class="screen-head"><button class="back-btn" data-ui data-action="${backAction}" aria-label="${tSource("Back")}">‹</button><h2>${icon ? `<span class="heading-art">${menuIcon(icon)}</span>` : ""}${tSource(title)}</h2><span>${right}</span></div>`;
 }
 
 function upsellStrip(): string {
@@ -1906,7 +1952,7 @@ function renderBoard(s: HudSnapshot): string {
       : `<div class="board-row empty">${s.boardLoading ? "Loading…" : "No flights recorded yet — be the first wing on the board"}</div>`;
 
   return `
-    ${head("Leaderboard", "back", status)}
+    ${head(tSource("Leaderboard"), "back", status)}
     <div class="seg">${scopes
       .map((x) => `<button data-ui data-action="board-scope" data-id="${x.id}" class="${s.boardScope === x.id ? "on" : ""}">${x.label}</button>`)
       .join("")}</div>
@@ -1950,7 +1996,7 @@ function renderBoard(s: HudSnapshot): string {
 }
 
 /** Compact top-wings leaderboard embedded on the main menu. */
-function renderLive(s: HudSnapshot): string {
+function renderRace(s: HudSnapshot): string {
   const connected = s.netState === "lobby" || s.netState === "racing";
   // The AI fallback seats four generated pilots in the same roster as real
   // ones, so "Connected" and "live" would both be claims about people who are
@@ -1960,23 +2006,8 @@ function renderLive(s: HudSnapshot): string {
     : connected ? "Connected" : s.netState === "connecting" ? "Flock Ready" : "Local Flock";
   const live = s.lobbyRivals.filter((r) => r.tag.includes("live") || r.tag.includes("AI"));
 
-  const modePills = (s.pvpModes || []).map((m) => `
-    <button class="pvp-pill ${s.selectedPvpMode === m.id ? "on" : ""}" data-ui data-action="select-pvp-mode" data-id="${m.id}" title="${m.blurb}">
-      <span>${m.icon}</span> <b>${m.name}</b> <small>${m.finish}m</small>
-    </button>
-  `).join("");
-
-  const worldPills = (s.pvpWorlds || []).map((w) => `
-    <button class="world-pill ${s.selectedPvpWorld === w.id ? "on" : ""}" data-ui data-action="select-pvp-world" data-id="${w.id}" title="${w.tagline}">
-      <span>${w.emoji}</span> <b>${w.name}</b> <small>${w.difficulty}</small>
-    </button>
-  `).join("");
-
-  const activeMode = (s.pvpModes || []).find((m) => m.id === s.selectedPvpMode) ?? (s.pvpModes || [])[0] ?? { name: "Sprint GP", icon: "⚡", finish: 1500 };
-  const activeWorld = (s.pvpWorlds || []).find((w) => w.id === s.selectedPvpWorld) ?? (s.pvpWorlds || [])[0] ?? { name: "Emerald Circuit", emoji: "🌿" };
-
-  return `${head("Race Lobby")}
-    <p class="tagline">40-pilot live &amp; neural AI racing across 9 scenic worlds.</p>
+  return `${head(tSource("Race Lobby"))}
+    <p class="tagline">One tap finds a fair surprise race. PvP or AI, format and world are randomized for you.</p>
     ${s.netState === "error" && s.netError ? `<p class="network-notice" role="alert">${escapeHtml(s.netError)}</p>` : ""}
     <p class="race-fairness">${menuIcon("medal")} Equal flight equipment · your bird, your timing. Store boosts are saved for solo play.</p>
 
@@ -1989,13 +2020,6 @@ function renderLive(s: HudSnapshot): string {
           <span class="room-now-label">Invite code</span>
           <strong class="room-now-code">${escapeHtml(s.roomCode)}</strong>
           <button class="mini-btn" data-ui data-action="copy-invite">Copy link</button>
-        </div>
-
-        <div class="lobby-selector-box">
-          <div class="lobby-selector-label"><span>Race Format</span> <b>${activeMode.icon} ${activeMode.name} (${activeMode.finish} m)</b></div>
-          <div class="pills-scroll">${modePills}</div>
-          <div class="lobby-selector-label"><span>World Circuit</span> <b>${activeWorld.emoji} ${activeWorld.name}</b></div>
-          <div class="pills-scroll">${worldPills}</div>
         </div>
 
         <p class="room-presence" role="status">${Math.max(1, s.roomCount)} ${s.roomAiFallback ? "in room · AI pilots" : "connected"} · ${s.roomReadyCount} ready</p>
@@ -2029,41 +2053,26 @@ function renderLive(s: HudSnapshot): string {
           <h3>⚡ Quick Match</h3>
           <span class="board-badge live">Live search</span>
         </div>
-        <p class="qm-desc">Search this circuit for live pilots. If nobody answers, you choose — keep waiting or race the AI flock.</p>
+        <p class="qm-desc">Every race is a fair surprise: we randomize the format and world, then find human pilots when available or clearly label the AI flock.</p>
 
         <div class="quick-match-btns">
-          <button class="primary-btn gold large-btn" data-ui data-action="quick-match-instant">⚡ ${activeMode.name} on ${activeWorld.name}</button>
-          <button class="soft-btn" data-ui data-action="quick-match-shuffle">🎲 Surprise me — random race</button>
-          <button class="soft-btn" data-ui data-action="pvp-casual">Search Online Pilots</button>
+          <button class="primary-btn gold large-btn" data-ui data-action="quick-match-instant">${hudIcon("flight")}PLAY A SURPRISE RACE</button>
+          ${s.multiplayerConfigured ? `<button class="soft-btn" data-ui data-action="pvp-casual">🌐 Search Online Pilots</button>` : ""}
         </div>
-
-        <details class="customize-race">
-          <summary>Customize · format &amp; world (${activeMode.name} · ${activeWorld.name})</summary>
-          <div class="lobby-selector-box">
-            <div class="lobby-selector-label"><span>PvP Format</span> <b>${activeMode.icon} ${activeMode.name} (${activeMode.finish} m)</b></div>
-            <div class="pills-scroll">${modePills}</div>
-            <div class="lobby-selector-label"><span>World Circuit</span> <b>${activeWorld.emoji} ${activeWorld.name}</b></div>
-            <div class="pills-scroll">${worldPills}</div>
-          </div>
-        </details>
+        <p class="fineprint">No mode or world selection. Commit first, then discover what today’s race has in store.</p>
       </section>
 
-      <section class="race-section room-entry" aria-label="Invite friends">
+      ${s.multiplayerConfigured ? `<section class="race-section room-entry" aria-label="Invite friends">
         <div class="room-entry-crest">${menuIcon("online")}</div>
         <h3>Fly with your flock</h3>
-        ${s.multiplayerConfigured
-          ? `<p>Create a private room with a custom code and link. Race your squad on any course!</p>
-        <button class="primary-btn" data-ui data-action="host-room">Create Private Room</button>`
-          : `<p class="pilot-note island" role="note">Live rooms are not available in this edition. AI practice and same-screen 1v1 below still race.</p>
-        <button class="primary-btn" data-ui data-action="host-room" disabled>Create Private Room</button>`}
-        <!-- Room-code entry is shared markup: the id must exist exactly once
-             in the document (duplicate ids break label/for and getElementById). -->
+        <p>Create a private room with a custom code and link. Race your squad on any course!</p>
+        <button class="primary-btn" data-ui data-action="host-room">Create Private Room</button>
         <label class="field-label" for="race-room-code">Or enter a friend's room code</label>
         <div class="redeem">
           <input id="race-room-code" data-ui data-ref="roomCode" data-enter-action="join-room" aria-label="Room code" maxlength="2048" placeholder="Code or invite link" autocomplete="off" autocapitalize="characters" spellcheck="false" />
-          <button class="mini-btn" data-ui data-action="join-room" ${s.multiplayerConfigured ? "" : "disabled"}>Join</button>
+          <button class="mini-btn" data-ui data-action="join-room">Join</button>
         </div>
-      </section>
+      </section>` : ""}
       <nav class="destination-grid" aria-label="More ways to race">
         <button class="destination" data-ui data-action="open-practice"><span class="destination-art">${menuIcon("compass")}</span><span class="destination-copy"><b>AI Practice</b><span>Custom opponent count &amp; skill</span></span></button>
         <button class="destination" data-ui data-action="versus"><span class="destination-art">${menuIcon("versus")}</span><span class="destination-copy"><b>Same-screen 1v1</b><span>Local split-screen flight</span></span></button>
@@ -2074,52 +2083,44 @@ function renderLive(s: HudSnapshot): string {
 }
 
 function renderPractice(s: HudSnapshot): string {
-  return `${head("AI PvP")}
+  return `${head(tSource("AI Practice"))}
     <section class="race-section" aria-label="AI race practice">
-      <div class="race-section-head"><h3>Race the AI flock offline</h3><span class="section-step">AI pilots · no waiting</span></div>
-      <p>Every format below starts immediately against computer-controlled birds — no server, no room, no rating. Learning the circuits here is the fastest way to win them online.</p>
+      <div class="race-section-head"><h3>Race the AI flock offline</h3><span class="section-step">Instant surprise race</span></div>
+      <p>One tap starts a fresh randomized format and world against computer-controlled birds. No server, no room, no rating — just practice that feels like the real race.</p>
       <div class="room-controls">
         <div class="room-ctl"><span class="room-ctl-label">AI opponents <small>plus you</small></span><div class="seg" role="group" aria-label="AI opponents">${[5, 10, 20, 40].map((n) => `<button data-ui data-action="room-size" data-id="${n}" aria-pressed="${s.roomSize === n}" class="${s.roomSize === n ? "on" : ""}">${n}</button>`).join("")}</div></div>
         <div class="room-ctl"><span class="room-ctl-label">AI skill</span><div class="seg" role="group" aria-label="AI skill">${(["chill", "sharp", "ace"] as const).map((k) => `<button data-ui data-action="room-skill" data-id="${k}" aria-pressed="${s.roomSkill === k}" class="${s.roomSkill === k ? "on" : ""}">${k === "chill" ? "Chill" : k === "sharp" ? "Sharp" : "Ace"}</button>`).join("")}</div></div>
       </div>
-      <button class="primary-btn gold wide" data-ui data-action="ai-pvp" data-id="${s.selectedPvpMode}">🤖 Race the AI flock · ${(s.pvpModes || []).find((m) => m.id === s.selectedPvpMode)?.name ?? "Sprint GP"}</button>
-      <div class="practice-formats"><h3>Race formats</h3>
-        <p class="fineprint">Dynamic AI pilots adapt locally with neural downslope timing, slipstream drafting, and slingshot attacks. No server connection required!</p>
-        ${PVP_MODES.map((m) => `<button class="soft-btn wide ${s.selectedPvpMode === m.id ? "on" : ""}" data-ui data-action="ai-pvp" data-id="${m.id}">${m.icon} ${m.name} · ${m.blurb}</button>`).join("")}
-        <button class="soft-btn wide" data-ui data-action="pvp-duel">⚔ 1v1 Seeded Rival Duel</button>
-        <button class="soft-btn wide" data-ui data-action="practice-storm">⛈ Stormfront Race · wild weather</button>
-        <button class="soft-btn wide" data-ui data-action="practice-ranked">🏆 40-Pilot Flock Grand Prix</button>
-      </div>
+      <button class="primary-btn gold wide" data-ui data-action="ai-pvp">${hudIcon("versus")}PLAY A SURPRISE AI RACE</button>
+      <p class="fineprint">Dynamic AI pilots adapt locally with neural downslope timing, slipstream drafting, and slingshot attacks. The rules stay readable; the race keeps changing.</p>
     </section>
-    <button class="soft-btn wide" data-ui data-action="open-live">🌐 Want human rivals? Open PvP</button>
+    ${s.multiplayerConfigured ? `<button class="soft-btn wide" data-ui data-action="open-live">🌐 Want human rivals? Open PvP</button>` : ""}
     <button class="soft-btn wide" data-ui data-action="open-shop">Change loadout</button>`;
 }
+
+// Kept as a compatibility renderer for older screen routes; the current race
+// screen combines online and AI entry points into one clearer flow.
+void renderPractice;
 
 function renderChallenges(s: HudSnapshot): string {
   const d = s.daily;
   const g = s.gauntlet;
   const c = s.calendar;
-  const modePills = (s.pvpModes || []).map((m) => `
-    <button class="pvp-pill ${s.selectedPvpMode === m.id ? "on" : ""}" data-ui data-action="select-pvp-mode" data-id="${m.id}" title="${escapeHtml(m.blurb)}">
-      <span>${escapeHtml(m.icon)}</span> <b>${escapeHtml(m.name)}</b> <small>${m.finish}m</small>
-    </button>`).join("");
-  const worldPills = (s.pvpWorlds || []).map((w) => `
-    <button class="world-pill ${s.selectedPvpWorld === w.id ? "on" : ""}" data-ui data-action="select-pvp-world" data-id="${w.id}" title="${escapeHtml(w.tagline)}">
-      <span>${escapeHtml(w.emoji)}</span> <b>${escapeHtml(w.name)}</b> <small>${escapeHtml(w.difficulty)}</small>
-    </button>`).join("");
-  const activeMode = (s.pvpModes || []).find((m) => m.id === s.selectedPvpMode) ?? (s.pvpModes || [])[0];
-  const activeWorld = (s.pvpWorlds || []).find((w) => w.id === s.selectedPvpWorld) ?? (s.pvpWorlds || [])[0];
   const raceChallenges = `
     <section class="race-section challenge-races" aria-label="Race challenges">
-      <div class="race-section-head"><h3>${menuIcon("versus")} Race challenges</h3><span class="section-step">PvP · AI · worlds</span></div>
-      <p class="fineprint">Choose a format and world once. Then race online when available, or launch the same challenge against the AI flock.</p>
-      <div class="lobby-selector-label"><span>Format</span><b>${activeMode ? `${escapeHtml(activeMode.name)} · ${activeMode.finish}m` : "Choose a format"}</b></div>
-      <div class="pills-scroll challenge-pills">${modePills}</div>
-      <div class="lobby-selector-label"><span>World</span><b>${activeWorld ? escapeHtml(activeWorld.name) : "Choose a world"}</b></div>
-      <div class="pills-scroll challenge-pills">${worldPills}</div>
-      <div class="quick-match-btns challenge-actions">
-        <button class="primary-btn gold" data-ui data-action="quick-match-instant">${menuIcon("online")} Race this challenge</button>
-        <button class="soft-btn" data-ui data-action="ai-pvp" data-id="${escapeHtml(s.selectedPvpMode)}">${menuIcon("versus")} Practice vs AI</button>
+      <div class="race-section-head"><h3>${menuIcon("versus")} Choose your opponent</h3><span class="section-step">No mode or world selection</span></div>
+      <p class="fineprint">The race is always randomized. Choose only who you want to face; the format and circuit are revealed after you commit.</p>
+      <div class="opponent-choice-grid">
+        <button class="opponent-choice opponent-choice--pvp" data-ui data-action="quick-match-instant">
+          <span class="opponent-choice-icon">${menuIcon("online")}</span>
+          <span><strong>PLAYER vs PLAYER</strong><small>Find live pilots · casual rating frozen</small></span>
+          <span class="opponent-choice-arrow">${arrowRightSvg()}</span>
+        </button>
+        <button class="opponent-choice opponent-choice--ai" data-ui data-action="ai-pvp">
+          <span class="opponent-choice-icon">${menuIcon("versus")}</span>
+          <span><strong>PLAYER vs AI</strong><small>Instant practice · no waiting or rating</small></span>
+          <span class="opponent-choice-arrow">${arrowRightSvg()}</span>
+        </button>
       </div>
     </section>`;
   const daily = `
@@ -2202,7 +2203,7 @@ function renderChallenges(s: HudSnapshot): string {
     </div>`;
 
   return `
-    ${head("Challenges", "back", `<span class="pill">Daily · Weekly</span>`)}
+    ${head(tSource("Challenges"), "back", `<span class="pill">Daily · Weekly</span>`)}
     <p class="tagline">Same hills as everyone else today. Modifiers change how you fly them.</p>
     ${raceChallenges}
     ${event}
@@ -2240,7 +2241,7 @@ function renderCampaign(s: HudSnapshot): string {
     })
     .join("");
   return `
-    ${head("The Long Migration", "back", `<span class="pill">${s.campaignDone}/${s.campaignTotal}</span>`)}
+    ${head(tSource("Story"), "back", `<span class="pill">${s.campaignDone}/${s.campaignTotal}</span>`)}
     <p class="tagline">A journey in eight chapters. Progress accrues from every flight — no separate grind.</p>
     <div class="camp-list">${rows}</div>
   `;
@@ -2420,7 +2421,7 @@ export function renderSquad(s: HudSnapshot): string {
     : "";
 
   return `
-    ${head("Squad", "back", sq.myCode ? `<span class="pill">${escapeHtml(sq.myCode)}</span>` : "")}
+    ${head(tSource("Squad"), "back", sq.myCode ? `<span class="pill">${escapeHtml(sq.myCode)}</span>` : "")}
     <p class="tagline">A little flock. A bigger adventure.</p>
     ${hubBanner}
     ${recovery}
@@ -2429,7 +2430,7 @@ export function renderSquad(s: HudSnapshot): string {
     ${quests}
     <fieldset class="squad-fields"><legend class="sr-only">Squad actions</legend>${friends + clubs}</fieldset>
     <button class="soft-btn wide" data-ui data-action="squad-refresh" ${sq.loading || sq.busy ? "disabled" : ""}>${sq.loading ? "Connecting…" : "Refresh Squad"}</button>
-    <button class="soft-btn wide" data-ui data-action="open-live">Race with friends</button>
+    ${s.multiplayerConfigured ? `<button class="soft-btn wide" data-ui data-action="open-live">🌐 Race with friends</button>` : ""}
   `;
 }
 
@@ -2437,7 +2438,7 @@ function renderRank(s: HudSnapshot): string {
   const r = s.rival;
   const wl = r.wins + r.losses > 0 ? Math.round((r.wins / (r.wins + r.losses)) * 100) : 0;
   return `
-    ${head("Rival Rank", "back", `<span class="pill">${boardSource(s).chip}</span>`)}
+    ${head(tSource("Rival Rank"), "back", `<span class="pill">${boardSource(s).chip}</span>`)}
     <div class="rank-hero">
       <div class="rank-div-big">${r.divisionIcon}</div>
       <div class="rank-hero-num">${r.rating}</div>
@@ -2520,7 +2521,7 @@ function renderCups(s: HudSnapshot): string {
     : "";
 
   return `
-    ${head("Tournaments", "back", `<span class="pill">Weekly</span>`)}
+    ${head(tSource("Tournaments"), "back", `<span class="pill">Weekly</span>`)}
     <p class="tagline">Two cups run every week. Beat a division cut-off, then claim the prize — it lands in your account immediately.</p>
     <div class="cup-list">${cups}</div>
     ${s.lastPrize ? `<div class="reward-strip">Last prize · ${s.lastPrize}</div>` : ""}
@@ -2531,7 +2532,7 @@ function renderCups(s: HudSnapshot): string {
 
 function renderModes(s: HudSnapshot): string {
   return `
-    ${head("Game modes")}
+    ${head(tSource("Game Modes"))}
     <p class="tagline">Solo flights below are you against the course. A <b>PvP circuit</b> opens the PvP options — ranked and casual online racing, private rooms, or the AI flock. All modes share your unlocks.</p>
     <div class="mode-list">
       ${s.modes
@@ -2600,7 +2601,7 @@ function renderVersusResult(s: HudSnapshot): string {
 
 function renderAtlas(s: HudSnapshot): string {
   return `
-    ${head("Island Atlas", "back", `<span class="pill">Farthest: ${s.farthestIsland + 1}</span>`)}
+    ${head(tSource("Island Atlas"), "back", `<span class="pill">Farthest: ${s.farthestIsland + 1}</span>`)}
     <p class="tagline">Every island has its own weather. Learn them, then chain them.</p>
     <div class="atlas">
       ${s.atlas
@@ -2731,7 +2732,7 @@ function homeBoardStrip(s: HudSnapshot): string {
   return `
     <button class="home-board" data-ui data-action="open-board" aria-label="Open the leaderboards">
       <span class="hb-head">
-        <span class="hb-title">🏆 Top pilots</span>
+        <span class="hb-title">${hudIcon("medal")}Top pilots</span>
         <span class="hb-go">All boards ›</span>
       </span>
       ${rows
@@ -2759,8 +2760,8 @@ function renderMain(s: HudSnapshot): string {
       data-action="set-mute"
       data-menu-mute
       aria-pressed="${s.settings.mute ? "true" : "false"}"
-      aria-label="${s.settings.mute ? "Unmute sound" : "Mute sound"}"
-      title="${s.settings.mute ? "Unmute sound" : "Mute sound"}"
+      aria-label="${tSource(s.settings.mute ? "Unmute sound" : "Mute sound") }"
+      title="${tSource(s.settings.mute ? "Unmute sound" : "Mute sound") }"
     >${s.settings.mute ? "\u{1F507}" : "\u{1F50A}"}</button>
     <header class="hero">
       ${menuHorizon()}
@@ -2772,17 +2773,17 @@ function renderMain(s: HudSnapshot): string {
       <div class="hero-title">
         <span class="hero-kicker">chase the daylight</span>
         <h1>SUNBIRD</h1>
-        <p class="hero-sub">Hold to dive. Release to soar.<br>Master the glide across endless islands.</p>
+        <p class="hero-sub">${tSource("Hold to dive. Release to soar.")}<br>${tSource("Master the glide across endless islands.")}</p>
       </div>
     </header>
 
-    <button class="primary-btn home-launch" data-ui data-action="pvp-practice" aria-label="Play free flight now"><span class="launch-art">${menuIcon("flight")}</span><span class="launch-copy"><small>${t("onboarding.skyIsYours", undefined, "THE SKY IS YOURS")}</small><b>Fly now</b><span>${t("onboarding.launchSub", undefined, "Hold to dive · release to glide")}</span></span><span class="launch-arrow" aria-hidden="true">${arrowRightSvg()}</span></button>
-    ${s.runsPlayed < 2 ? `<section class="onboarding-route" aria-label="Your first flight plan">
-      <div class="onboarding-route-head"><span>✦ START HERE</span><small>one input · three small wins</small></div>
+    <button class="primary-btn home-launch" data-ui data-action="pvp-practice" aria-label="${tSource("Play free flight now")}"><span class="launch-art">${menuIcon("flight")}</span><span class="launch-copy"><small>${t("onboarding.skyIsYours", undefined, "THE SKY IS YOURS")}</small><b>${t("onboarding.flyNow", undefined, "Fly now")}</b><span>${t("onboarding.launchSub", undefined, "Hold to dive · release to glide")}</span></span><span class="launch-arrow" aria-hidden="true">${arrowRightSvg()}</span></button>
+    ${s.runsPlayed < 2 ? `<section class="onboarding-route" aria-label="${tSource("Your first flight plan")}">
+      <div class="onboarding-route-head"><span>${hudIcon("flight")}${tSource("START HERE")}</span><small>${tSource("one input · three small wins")}</small></div>
       <div class="onboarding-route-steps">
-        <button class="onboarding-route-step active" data-ui data-action="pvp-practice"><b>01</b><span><strong>Feel the glide</strong><small>Hold downhill · release to soar</small></span><i>Fly ›</i></button>
-        <button class="onboarding-route-step" data-ui data-action="open-shop"><b>02</b><span><strong>Choose your bird</strong><small>Spend the coins you just earned</small></span><i>Shop ›</i></button>
-        <button class="onboarding-route-step" data-ui data-action="open-challenges"><b>03</b><span><strong>Race the flock</strong><small>Choose online or AI when you are ready</small></span><i>Race ›</i></button>
+        <button class="onboarding-route-step active" data-ui data-action="pvp-practice"><b>01</b><span><strong>${tSource("Feel the glide")}</strong><small>${tSource("Hold downhill · release to soar")}</small></span><i>${tSource("Fly ›")}</i></button>
+        <button class="onboarding-route-step" data-ui data-action="open-shop"><b>02</b><span><strong>${tSource("Choose your bird")}</strong><small>${tSource("Spend the coins you just earned")}</small></span><i>${tSource("Shop ›")}</i></button>
+        <button class="onboarding-route-step" data-ui data-action="open-challenges"><b>03</b><span><strong>${tSource("Race the flock")}</strong><small>${tSource("Choose online or AI when you are ready")}</small></span><i>${tSource("Race ›")}</i></button>
       </div>
     </section>` : ""}
     <!-- 01 — PLAY. PvP, AI PvP and the solo modes are all ways of playing, so
@@ -2790,13 +2791,13 @@ function renderMain(s: HudSnapshot): string {
          section as a single full-width bar instead of a sixth row of choices:
          "how am I doing" is a different question from "what shall I play", and
          one bar at the end reads as the section's full stop. -->
-    <div class="home-section-title"><span>Play now</span><small>FLY · RACE · EXPLORE</small></div>
-    <nav class="destination-grid play-destinations home-hub-grid" aria-label="Play">${menuLinks(playDestinations)}</nav>
+    <div class="home-section-title"><span>${t("hud.menu.play", undefined, "Play now")}</span><small>${tSource("FLY · RACE · EXPLORE")}</small></div>
+    <nav class="destination-grid play-destinations home-hub-grid" aria-label="${tSource("Play")}">${menuLinks(playDestinations)}</nav>
     ${homeBoardStrip(s)}
-    <div class="home-section-title"><span>Personalize</span><small>BIRD · FLOCK · SETTINGS</small></div>
-    <nav class="destination-grid utility-destinations" aria-label="Your hangar">${menuLinks(COLLECTION_DESTINATIONS)}</nav>
-    <div class="home-section-title"><span>Progress</span><small>GOALS · RANK · REWARDS</small></div>
-    <nav class="destination-grid progress-destinations home-hub-grid" aria-label="Progress">${menuLinks(progressDestinations)}</nav>
+    <div class="home-section-title"><span>${tSource("Personalize")}</span><small>${tSource("BIRD · FLOCK · SETTINGS")}</small></div>
+    <nav class="destination-grid utility-destinations" aria-label="${tSource("Your hangar")}">${menuLinks(COLLECTION_DESTINATIONS)}</nav>
+    <div class="home-section-title"><span>${t("hud.progress.title", undefined, "Progress")}</span><small>${tSource("GOALS · RANK · REWARDS")}</small></div>
+    <nav class="destination-grid progress-destinations home-hub-grid" aria-label="${tSource("Progress")}">${menuLinks(progressDestinations)}</nav>
     <div class="home-record"><span class="record-art">${menuIcon("medal")}</span><span>${t("hud.menu.personalBest", undefined, "Personal best")} <b>${distanceText(s.bestDistance)}</b></span><span class="record-pass" data-ui data-action="open-pass">Nest Pass Lv.${s.season.tier}/${s.season.maxTier}</span><span class="record-wallet">● ${s.wallet.toLocaleString()} <small>${t("hud.menu.coinBalance", undefined, "coins")}</small></span></div>
   `;
 }
@@ -3045,7 +3046,7 @@ function renderShop(s: HudSnapshot, browse: ShopBrowse): string {
   ] as const;
 
   return `
-    ${head("Shop", "back", `<span class="pill coin">● ${s.wallet.toLocaleString()}</span>`)}
+    ${head(tSource("Shop"), "back", `<span class="pill coin">● ${s.wallet.toLocaleString()}</span>`)}
     <p class="shop-intro">YOUR HANGAR <span>Find your wings. Make them yours.</span></p>
 
     <div class="pc pc--gold pc-row">
@@ -3193,7 +3194,7 @@ function renderPaywall(s: HudSnapshot): string {
     </div>`
     : "";
   return `
-    ${head("Coin Store")}
+    ${head(tSource("Coin Store"))}
     <div class="wallet-row" style="margin-bottom:12px"><span class="pill coin">Your Balance: ● ${s.wallet.toLocaleString()}</span></div>
     ${starter}
     <div class="gold-hero"><div class="gold-badge">✦</div><div class="gold-price">${GOLD.price}<small> lifetime</small></div></div>
@@ -3238,7 +3239,7 @@ function renderCheckout(s: HudSnapshot): string {
 
   const canAfford = s.wallet >= item.coinPrice;
   return `
-    ${head("Confirm Unlock", "checkout-cancel")}
+    ${head(tSource("Confirm Unlock"), "checkout-cancel")}
     <div class="sheet">
       <div class="sheet-row"><span>${item.name}</span><b>${item.price}</b></div>
       <p class="tagline">Wallet: ● ${s.wallet.toLocaleString()}</p>
@@ -3291,7 +3292,7 @@ function renderSettings(s: HudSnapshot): string {
     ${toggle("Colorblind assist", "colorassist", s.settings.colorAssist)}
     ${toggle("Large text", "bigtext", s.settings.bigText)}
     <div class="setting-row setting-select"><label for="render-quality">Render quality</label><select id="render-quality" data-ui data-action="set-quality">${["auto", "high", "low"].map(q => `<option value="${q}" ${s.settings.quality === q ? "selected" : ""}>${q === "auto" ? "Auto · recommended" : q === "high" ? "High · more detail" : "Low · less GPU work"}</option>`).join("")}</select></div>
-    <div class="setting-row"><span>Flights flown</span><b>${s.runsPlayed}</b></div>
+    <div class="setting-row"><span>${t("hud.settings.flightsFlown", undefined, "Flights flown")}</span><b>${s.runsPlayed === 0 ? "First flight coming up!" : s.runsPlayed}</b></div>
     <button class="soft-btn wide" data-ui data-action="toggle-fullscreen">⛶ Fullscreen mode</button>
     <!-- Privacy policy, linked from inside the game. The platform guide asks
          for exactly this before it approves an external service (multiplayer,
@@ -3309,7 +3310,7 @@ function renderSettings(s: HudSnapshot): string {
 
 function renderScores(s: HudSnapshot): string {
   return `
-    ${head("High glides")}
+    ${head(tSource("High Glides"))}
     ${renderScoreTable(s.highScores)}
     ${!s.highScores.length ? `<p class="tagline">Your first flight starts your story. Fly a little farther each time.</p><button class="primary-btn" data-ui data-action="pvp-practice">Take your first flight</button>` : ""}
     <div class="menu-stats"><div>Today's best <b>${distanceText(s.todayBest)}</b></div><div>Flights <b>${s.runsPlayed}</b></div></div>
@@ -3326,7 +3327,7 @@ function rewardLabel(r: { kind: string; amount?: number; id?: string }): string 
 function renderPass(s: HudSnapshot): string {
   const pct = Math.min(100, (s.season.have / s.season.need) * 100);
   return `
-    ${head("Nest Pass", "back", `<span class="pill">Lv.${s.season.tier}/${s.season.maxTier}</span>`)}
+    ${head(tSource("Nest Pass"), "back", `<span class="pill">Lv.${s.season.tier}/${s.season.maxTier}</span>`)}
     <div class="pass-progress"><i style="width:${pct}%"></i></div>
     <p class="tagline">${s.season.label} — fly to earn XP.${SELL_AD_REMOVAL ? " Gold unlocks the premium track." : " Fly to unlock rewards."}</p>
     ${!s.gold && SELL_AD_REMOVAL ? `<button class="upsell" data-ui data-action="open-paywall"><div><b>✦ Unlock premium rewards</b><span>Double the tier rewards with Gold</span></div><span class="mini-btn gold">Unlock</span></button>` : ""}
@@ -3352,7 +3353,7 @@ function renderTrophies(s: HudSnapshot): string {
   for (const v of s.trophies) groups[v.def.rarity]!.push(v);
   const order: (keyof typeof groups)[] = ["bronze", "silver", "gold", "platinum"];
   return `
-    ${head("Trophy Case", "back", `<span class="pill">${s.trophyCounts.unlocked}/${s.trophyCounts.total}</span>`)}
+    ${head(tSource("Trophy Case"), "back", `<span class="pill">${s.trophyCounts.unlocked}/${s.trophyCounts.total}</span>`)}
     ${order
       .map(
         (rarity) => `
@@ -3393,7 +3394,7 @@ function renderAccount(s: HudSnapshot): string {
     </div>`
     : "";
   return `
-    ${head("Account")}
+    ${head(tSource("Account"))}
     ${portalAccount}
     <div class="section-title">Membership</div>
     ${!SELL_AD_REMOVAL ? "" : `
@@ -3572,6 +3573,17 @@ function renderGameOver(s: HudSnapshot): string {
   const clipboardShare = !s.share.available && !s.share.loaded && !s.share.code
     ? `<button class="soft-btn wide" data-ui data-action="copy-score">📋 Copy score to clipboard</button>`
     : "";
+  const viralMoment = s.newBest
+    ? `NEW PERSONAL BEST · ${distanceText(s.distance)}`
+    : s.photoFinish
+      ? "PHOTO FINISH · CAN A FRIEND BEAT IT?"
+      : s.ghostDelta !== null && s.ghostDelta >= 0
+        ? `GHOST BEATEN · +${Math.round(s.ghostDelta)} m`
+        : s.nearMiss
+          ? "NEAR-MISS REPLAY · TRY THIS LINE"
+          : s.massRace && s.racePlace > 0
+            ? `RACE RESULT · PLACE ${s.racePlace}`
+            : "YOUR FLIGHT · MAKE IT A CHALLENGE";
 
   // Async multiplayer by code. Only rendered when this build can actually
   // talk to AUDS (Poki + game id) or when the player has already loaded a run.
@@ -3602,6 +3614,10 @@ function renderGameOver(s: HudSnapshot): string {
     <div class="results-kicker">${escapeHtml(s.modeName)} · flight recap</div>
     <h2>${t("hud.gameover.title", undefined, "Flight completed")}</h2>
     <p class="tagline">${s.massRace ? "Your place, your progress, your next race." : "A little farther. A little smoother. One more flight?"}</p>
+    <section class="share-moment" aria-label="Shareable flight moment" aria-live="polite">
+      <span class="share-moment-icon">${menuIcon("share")}</span>
+      <div><strong>${viralMoment}</strong><small>Share the moment or race it again. Nothing interrupts your next flight.</small></div>
+    </section>
     <div class="result-actions"><button class="play-again-btn" data-ui data-action="${resultsPrimaryAction(s)}">${s.massRace && s.roomCode ? "Back to race lobby" : s.massRace && s.racePlace > 0 ? "Race again · same stakes" : t("hud.gameover.flyAgain", undefined, "Fly Again")}</button><button class="soft-btn" data-ui data-action="menu">${t("hud.gameover.mainMenu", undefined, "Main Menu")}</button></div>
     ${!s.massRace ? `<p class="fineprint replay-note">Fly again replays this exact course so you can race the ghost of the run you just flew 👻</p>` : ""}
     ${s.newBest ? `<div class="new-best">👑 NEW BEST · ${distanceText(s.distance)}<small>your farthest flight yet</small></div>` : ""}
@@ -3611,12 +3627,13 @@ function renderGameOver(s: HudSnapshot): string {
     ${renderFlightRecap(s.flightPath)}
     <div class="over-stats result-summary">
       <div><span>${t("hud.stat.distance", undefined, "Distance")}</span><b>${distanceText(s.distance)}</b></div>
-      <div><span>Score</span><b>${Math.floor(s.score).toLocaleString()}</b></div>
+      <div><span>${t("hud.stat.score", undefined, "Score")}</span><b>${Math.floor(s.score).toLocaleString()}</b></div>
       <div><span>${t("hud.stat.coins", undefined, "Coins")}</span><b>${formatNumberLocalized(s.coins)}</b></div>
     </div>
 
     ${renderCoinMultiplierCard(s.coins, s.multiplierClaimed, s.portalName !== "none")}
 
+    ${s.nextAction ? `<p class="next-action">${escapeHtml(s.nextAction)}</p>` : ""}
     ${renderNextFlight(s)}
     <details class="result-details"><summary>Flight details <span>Landmarks &amp; skill</span></summary><div class="over-stats">
       <div><span>Perfects</span><b>${s.perfects}</b></div>
@@ -3637,11 +3654,10 @@ function renderGameOver(s: HudSnapshot): string {
     <div class="reached-strip">Reached <b>${s.biomeEmoji} ${s.biomeName}</b> · Island ${s.island + 1}</div>
 
     ${clipboardShare}
-    ${s.expShareFirst
-      ? `<button class="soft-btn wide" data-ui data-action="share" ${s.shareBusy ? "disabled" : ""}>${s.shareBusy ? "Preparing…" : `${menuIcon("share")} Share this flight`}</button>
-         <button class="soft-btn wide" data-ui data-action="throw-challenge">${menuIcon("versus")} Challenge a rival on these hills</button>`
-      : `<button class="soft-btn wide" data-ui data-action="throw-challenge">${menuIcon("versus")} Challenge a rival on these hills</button>
-         <button class="soft-btn wide" data-ui data-action="share" ${s.shareBusy ? "disabled" : ""}>${s.shareBusy ? "Preparing…" : `${menuIcon("share")} Share this flight`}</button>`}
+    <div class="result-social-actions">
+      <button class="soft-btn wide" data-ui data-action="throw-challenge">${menuIcon("versus")} Challenge a friend</button>
+      <button class="soft-btn wide" data-ui data-action="share" ${s.shareBusy ? "disabled" : ""}>${s.shareBusy ? "Preparing…" : `${menuIcon("share")} Share result`}</button>
+    </div>
     <div class="btn-row result-links">
       <button class="soft-btn gold-tint" data-ui data-action="open-shop">${menuIcon("shop")} Shop</button>
       <button class="soft-btn" data-ui data-action="open-pass">${menuIcon("pass")} Pass</button>
@@ -3681,7 +3697,7 @@ function renderContinue(s: HudSnapshot): string {
     ${s.continueReason ? `<p class="continue-reason${s.continueHighlight ? " is-highlight" : ""}">${escapeHtml(s.continueReason)}</p>` : ""}
     <div class="over-stats result-summary">
       <div><span>${t("hud.stat.distance", undefined, "Distance")}</span><b>${distanceText(s.distance)}</b></div>
-      <div><span>Score</span><b>${Math.floor(s.score).toLocaleString()}</b></div>
+      <div><span>${t("hud.stat.score", undefined, "Score")}</span><b>${Math.floor(s.score).toLocaleString()}</b></div>
       <div><span>${t("hud.stat.coins", undefined, "Coins")}</span><b>${formatNumberLocalized(s.coins)}</b></div>
     </div>
     ${s.adAvailable

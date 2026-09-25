@@ -10,12 +10,10 @@ import { SQUAD_CHAT } from "./edition";
  */
 export type MenuDestination = { action: string; title: string; detail: string; icon: MenuIconName };
 export const PLAY_DESTINATIONS: MenuDestination[] = [
-  { action: "play-daily", icon: "daily", title: "Long Light", detail: "Today's shared course · daily challenge" },
-  { action: "open-challenges", icon: "challenge", title: "Race the flock", detail: "Online or AI · choose a world" },
-  { action: "open-board", icon: "board", title: "Leaderboards", detail: "All-time · weekly · today · you" },
-  { action: "mode-select", icon: "compass", title: "Solo modes", detail: "Time Trial · Skyline · Coin Rush" },
-  { action: "start-endless", icon: "endless", title: "Endless", detail: "No clock · growing challenge" },
-  { action: "versus", icon: "flight", title: "Same-screen 1v1", detail: "Space / Enter · or touch your half" },
+  { action: "open-challenges", icon: "challenge", title: "PvP + PvAI Races", detail: "Random surprise race · human or AI clearly labeled" },
+  { action: "play-daily", icon: "daily", title: "Daily challenge", detail: "Long Light · today's shared course" },
+  { action: "mode-select", icon: "compass", title: "Solo modes", detail: "Time Trial · Skyline · Coin Rush · Endless" },
+  { action: "pvp-duel", icon: "online", title: "Ghost race", detail: "Chase a real player's ghost · seeded rival" },
 ];
 export const COLLECTION_DESTINATIONS: MenuDestination[] = [
   { action: "open-shop", icon: "shop", title: "Shop", detail: "Birds, trails & upgrades" },
@@ -23,13 +21,10 @@ export const COLLECTION_DESTINATIONS: MenuDestination[] = [
   { action: "open-settings", icon: "settings", title: "Settings", detail: "Sound, controls & display" },
 ];
 export const PROGRESS_DESTINATIONS: MenuDestination[] = [
-  { action: "open-progress", icon: "progress", title: "Your progress", detail: "Missions, gifts & events" },
+  { action: "open-progress", icon: "progress", title: "Your progress", detail: "Missions · trophies · scores · season pass" },
   { action: "open-cups", icon: "trophy", title: "Tournaments", detail: "Weekly score challenges" },
-  { action: "open-campaign", icon: "story", title: "Story", detail: "The Long Migration" },
+  { action: "open-campaign", icon: "story", title: "Story", detail: "The Long Migration · island atlas" },
   { action: "open-rank", icon: "rank", title: "Rival rank", detail: "Your local race rating" },
-  { action: "open-pass", icon: "pass", title: "Nest Pass", detail: "Season rewards" },
-  { action: "open-trophies", icon: "medal", title: "Trophies", detail: "Achievements & mastery" },
-  { action: "open-atlas", icon: "atlas", title: "Island Atlas", detail: "Islands & hazards" },
-  { action: "open-scores", icon: "scores", title: "Your scores", detail: "Saved flight records" },
-  { action: "open-account", icon: "account", title: "Account", detail: "Name & save transfer" },
+  { action: "open-board", icon: "board", title: "Leaderboards", detail: "All-time · weekly · today · you" },
+  { action: "open-account", icon: "account", title: "Account", detail: "Name · save transfer · settings" },
 ];

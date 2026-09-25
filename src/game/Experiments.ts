@@ -55,16 +55,6 @@ export type ExperimentId = (typeof EXPERIMENTS)[keyof typeof EXPERIMENTS]["id"];
 
 const BUCKETS = 100;
 
-/** FNV-1a (32-bit) — fast, deterministic, and stable across JS runtimes. */
-function fnv1a(str: string): number {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return h >>> 0;
-}
-
 /** Stable bucket 0..99 for a (device, experiment) pair. */
 export function bucket(deviceId: string, experimentId: string): number {
   return fnv1a(`${deviceId}:${experimentId}`) % BUCKETS;
@@ -92,3 +82,4 @@ export function variant(
   }
   return v;
 }
+import { fnv1a } from "./validation";

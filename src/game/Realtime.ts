@@ -1,9 +1,10 @@
 import type { NetTransport, RemoteSnapshot } from "./MassRace";
 import { truncate } from "./math";
-import { gradeStateCadence, type LinkQuality } from "./RacePolish";
+import { gradeStateCadence, type LinkQuality } from "./Racer";
 import { PROTOCOL_VERSION } from "./protocol/v1";
 import { normalizeRooms, roomListUrl, type LiveRoom } from "./RoomBrowser";
 import { POKI_MULTIPLAYER } from "./edition";
+import { RealtimeFrameSchema, safeParse } from "../state/schemas";
 // PokiMpUtils is a tiny, dependency-free module so importing it here does
 // not pull @poki/netlib into non-Poki bundles. The heavy PokiNetlibClient
 // class lives in PokiNetlib.ts and is loaded only via dynamic import from
@@ -433,7 +434,10 @@ export class RealtimeClient implements NetTransport {
   private onMessage(ev: MessageEvent): void {
     let msg: ServerMsg;
     try {
-      msg = JSON.parse(String(ev.data)) as ServerMsg;
+      const parsed: unknown = JSON.parse(String(ev.data));
+      const frame = safeParse(RealtimeFrameSchema, parsed);
+      if (!frame) return;
+      msg = frame as ServerMsg;
     } catch {
       return; // Malformed frames are ignored rather than killing the session.
     }

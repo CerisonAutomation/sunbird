@@ -41,10 +41,11 @@ const barrelPath = join(root, "src/i18n/translations.barrel.json");
 const outDir = join(root, "src/i18n/packs");
 
 const barrel = JSON.parse(readFileSync(barrelPath, "utf8"));
-// Locale codes come from the entries themselves (the union of every
-// entry's `translations` keys) — NOT from the barrel's top-level per-file
-// mirror keys, which is a partial listing and has missed tr/ru before.
-const codes = [...new Set(Object.values(barrel.barrel).flatMap((e) => Object.keys(e.translations ?? {})))].sort();
+// Locale codes are the runtime contract, not the union of incidental barrel
+// keys. This prevents legacy `pt.json`/`zh.json` aliases from being generated
+// while region-specific packs are silently ignored at runtime.
+const localesSource = readFileSync(join(root, "src/i18n/locales.ts"), "utf8");
+const codes = [...localesSource.matchAll(/code:\s*"([^"]+)"/g)].map((m) => m[1]);
 
 mkdirSync(outDir, { recursive: true });
 
@@ -54,6 +55,11 @@ mkdirSync(outDir, { recursive: true });
 const keys = Object.keys(barrel.barrel).sort();
 const keysPath = join(root, "src/i18n/pack-keys.json");
 writeFileSync(keysPath, JSON.stringify(keys) + "\n");
+const sourceKeys = keys
+  .map((key) => ({ key, sourceText: barrel.barrel[key]?.sourceText }))
+  .filter((entry) => typeof entry.sourceText === "string" && entry.sourceText.length > 0)
+  .sort((a, b) => b.sourceText.length - a.sourceText.length);
+writeFileSync(join(root, "src/i18n/source-keys.json"), JSON.stringify(sourceKeys, null, 2) + "\n");
 
 let written = 0;
 for (const code of codes) {

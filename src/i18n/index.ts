@@ -1,8 +1,11 @@
 import { storage } from "../game/Storage";
+import PACK_KEYS from "./pack-keys.json";
+import SOURCE_KEYS from "./source-keys.json";
 // Runtime translation source: per-locale packs projected from the barrel
 // (see scripts/gen-i18n-packs.mjs). All locales including English are loaded
 // dynamically to avoid circular dependency warnings and improve code splitting.
 import { SUPPORTED_LOCALES, type SupportedLocale } from "./locales";
+import { uiStore } from "../state/uiStore";
 
 // Re-exported so every existing `from "./i18n"` import keeps working. The data
 // itself lives in ./locales, which has no imports and so is safe to load in
@@ -40,6 +43,22 @@ export function matchLocale(tag: string | null | undefined): SupportedLocale | n
   if (base === "nb" || base === "nn" || base === "no") return null;
   return null;
 }
+
+type Pack = Record<string, string>;
+type PackSource = Pack | readonly string[];
+type SourceKey = { key: string; sourceText: string };
+
+/** Lazy fallback pack (English). Generated from the barrel; total by the
+ * coverage contract (every shipped locale, every key — locales.test.ts). */
+let EN: Pack = {};
+
+const packs = new Map<string, Pack>();
+
+/** Vite-native per-file dynamic imports: each pack becomes its own chunk. */
+const PACK_MODULES = import.meta.glob("./packs/*.json") as Record<
+  string,
+  () => Promise<{ default: PackSource }>
+>;
 
 let currentLocale: SupportedLocale = "en";
 
@@ -117,6 +136,7 @@ export async function setLocale(locale: SupportedLocale): Promise<void> {
     /* private mode */
   }
   updateDocumentDirection();
+  uiStore.getState().setLocale(locale);
   // Notify even when the pack was already resident (cached switch): React
   // bindings key on this version, and imperative UIs re-render on it.
   packVersion += 1;
@@ -132,20 +152,6 @@ if (typeof window !== "undefined") {
 
 /* --------------------------------------------------------- pack registry */
 
-type Pack = Record<string, string>;
-
-/** Lazy fallback pack (English). Generated from the barrel; total by the
- * coverage contract (every shipped locale, every key — locales.test.ts). */
-let EN: Pack = {};
-
-const packs = new Map<string, Pack>();
-
-/** Vite-native per-file dynamic imports: each pack becomes its own chunk. */
-const PACK_MODULES = import.meta.glob("./packs/*.json") as Record<
-  string,
-  () => Promise<{ default: Pack }>
->;
-
 let packVersion = 0;
 const packListeners = new Set<() => void>();
 
@@ -155,16 +161,25 @@ const packListeners = new Set<() => void>();
 export async function loadPack(locale: string): Promise<boolean> {
   if (packs.has(locale)) return true;
   
-  // Special case for English - load from same pattern as other locales
-  const packLocale = locale === "pt-BR" ? "pt" : locale === "zh-CN" ? "zh" : locale;
-  const load = PACK_MODULES[`./packs/${packLocale}.json`];
+  // Runtime must load the same canonical pack that the barrel and generator
+  // validate. Region-specific locales are real packs, not aliases to legacy
+  // language-only files.
+  const load = PACK_MODULES[`./packs/${locale}.json`];
   if (!load) return false;
   try {
     const mod = await load();
-    packs.set(locale, mod.default);
+    // Locale packs are deliberately stored as compact arrays. The generated
+    // key barrel is their schema; convert once at load time so every caller
+    // can continue to use the stable `t(key)` API.
+    const source = mod.default as PackSource;
+    const pack: Pack = Array.isArray(source as readonly unknown[])
+      ? Object.fromEntries(PACK_KEYS.map((key, index) => [key, (source as readonly string[])[index] ?? ""]))
+      : source as Pack;
+    if (Array.isArray(source) && source.length !== PACK_KEYS.length) return false;
+    packs.set(locale, pack);
     // Also cache as EN if this is English for fallback
     if (locale === "en") {
-      EN = mod.default;
+      EN = pack;
     }
     packVersion += 1;
     for (const fn of packListeners) fn();
@@ -221,6 +236,33 @@ export function t(key: string, params?: Record<string, string | number>, default
 }
 
 /**
+ * Translate legacy/player-facing copy by its English source text. This is the
+ * migration seam for gameplay code: callers can centralize copy in the JSON
+ * barrel without making every physics/event path know translation keys.
+ * Exact strings and barrel templates with `{name}`/`{{name}}` placeholders are
+ * both supported; unknown text remains an honest English fallback.
+ */
+export function tSource(source: string): string {
+  const exact = (SOURCE_KEYS as SourceKey[]).find((entry) => entry.sourceText === source);
+  if (exact) return t(exact.key, undefined, source);
+  for (const entry of SOURCE_KEYS as SourceKey[]) {
+    // JavaScript template expressions are source-code artefacts, not runtime
+    // copy. Treating `${value}` as a wildcard makes the empty prefix/suffix
+    // match almost every text node and replaces real UI with the raw template.
+    if (entry.sourceText.includes("${")) continue;
+    const parts = entry.sourceText.split(/\$?\{\{?[^{}]+\}?\}/g);
+    if (parts.length < 2) continue;
+    const pattern = new RegExp(`^${parts.map(escapeRegExp).join(".*?")}$`);
+    if (pattern.test(source)) return t(entry.key, undefined, source);
+  }
+  return source;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
  * International number formatting — the currency readouts (coin counter, wallet
  * totals, run bonuses) go through this so grouping and the decimal separator
  * follow the player's chosen language rather than the browser's.
@@ -233,6 +275,7 @@ export function t(key: string, params?: Record<string, string | number>, default
  */
 export function formatNumberLocalized(num: number, locale = currentLocale): string {
   try {
+    if (Math.abs(num) < 1000) return String(Math.round(num));
     return new Intl.NumberFormat(locale).format(num);
   } catch {
     return String(Math.round(num));

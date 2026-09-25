@@ -20,6 +20,7 @@
  * offering a button that cannot work.
  */
 import type { PokiAuds } from "../sdk/auds";
+import { clampInt, cleanText } from "./validation";
 
 /** Key namespace for run shares. Public + listable (top runs of a seed). */
 export const SHARE_KEY = "sb:shared:run:v1";
@@ -52,19 +53,6 @@ const MODE_MAX = 24;
 const BIRD_MAX = 24;
 const DISTANCE_MAX = 500_000;
 const TIME_MAX = 24 * 60 * 60 * 1000;
-
-function clampInt(value: unknown, max: number, min = 0): number {
-  const n = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(n)) return 0;
-  return Math.max(min, Math.min(max, Math.round(n)));
-}
-
-function cleanText(value: unknown, max: number): string {
-  if (typeof value !== "string") return "";
-  // Strip control characters: a name is rendered in another player's HUD.
-  const stripped = value.replace(/[\u0000-\u001f\u007f]/g, "").trim();
-  return stripped.slice(0, max);
-}
 
 /**
  * True when this build can publish and read share codes at all: a Poki build

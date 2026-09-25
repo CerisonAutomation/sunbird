@@ -19,6 +19,7 @@
  * that code"), never an invented pilot.
  */
 import type { PokiAuds } from "../sdk/auds";
+import { clampInt, cleanText } from "./validation";
 
 /** Public, listable key: one record per pilot code. */
 export const PILOT_KEY = "sb:pilot:v1";
@@ -58,17 +59,6 @@ export function normalizeCode(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
   const code = raw.trim().toUpperCase();
   return PILOT_CODE_RE.test(code) ? code : null;
-}
-
-function cleanText(value: unknown, max: number): string {
-  if (typeof value !== "string") return "";
-  return value.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, max);
-}
-
-function clampInt(value: unknown, max: number, min = 0): number {
-  const n = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(n)) return 0;
-  return Math.max(min, Math.min(max, Math.round(n)));
 }
 
 /** AUDS `values` for a pilot record — scalars only, code included for queries. */

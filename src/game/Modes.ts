@@ -43,6 +43,15 @@ export type PvpWorldCourse = {
 
 export const PVP_WORLDS: PvpWorldCourse[] = [
   {
+    id: "random",
+    name: "Random World",
+    biomeId: "green",
+    island: -1,
+    emoji: "🎲",
+    tagline: "Surprise biome every race — maximum variety",
+    difficulty: "?",
+  },
+  {
     id: "emerald",
     name: "Emerald Circuit",
     biomeId: "green",
@@ -58,15 +67,6 @@ export const PVP_WORLDS: PvpWorldCourse[] = [
     island: 1,
     emoji: "🏝",
     tagline: "Azure ocean channels and towering tropical palms",
-    difficulty: "★★☆☆☆",
-  },
-  {
-    id: "coral",
-    name: "Coral Shallows",
-    biomeId: "reef",
-    island: 2,
-    emoji: "🐚",
-    tagline: "Pastel lagoons with buoyant warm updrafts",
     difficulty: "★★☆☆☆",
   },
   {

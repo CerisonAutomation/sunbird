@@ -21,8 +21,8 @@ import {
  */
 const PHASES: { label: string; codes: SupportedLocale[] }[] = [
   { label: "phase 1 — EFIGS + Turkish", codes: ["en", "es", "de", "fr", "it", "tr"] },
-  { label: "phase 2 — CJK", codes: ["zh", "ja", "ko"] },
-  { label: "phase 3 — Portuguese + Russian", codes: ["pt", "ru"] },
+  { label: "phase 2 — CJK", codes: ["zh-CN", "ja", "ko"] },
+  { label: "phase 3 — Portuguese + Russian", codes: ["pt-BR", "ru"] },
   { label: "phase 4 — RTL (Arabic, Hebrew)", codes: ["ar", "he"] },
   { label: "phase 5 — Indic + Thai scripts", codes: ["hi", "bn", "th"] },
   { label: "phase 6 — Greek + Cyrillic", codes: ["el", "bg", "uk", "sr"] },

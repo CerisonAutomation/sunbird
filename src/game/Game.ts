@@ -1,5 +1,5 @@
 import { splitLayout, splitViews } from "./Viewport";
-import { equalizedRace } from "./RaceRules";
+import { equalizedRace } from "./Racer";
 import { terrainCue, landingLookAhead } from "./FlightGuidance";
 import { ScreenHistory } from "./ScreenHistory";
 import { copyText, shareText } from "./Clipboard";
@@ -26,7 +26,7 @@ import { MassRace } from "./MassRace";
 import { FinishGate } from "./FinishGate";
 import { fetchPublicRooms, isMultiplayerConfigured, makeRoomCode, type AnyRealtimeClient } from "./Realtime";
 import { createNetTransport, prewarmNetTransport } from "./net-transport";
-import { photoFinishMessage } from "./RacePolish";
+import { photoFinishMessage } from "./Racer";
 import { SlopeChain } from "./SlopeChain";
 import { RoomWatcher, ROOM_POLL_MS, roomSummaryLine, summarizeRooms, type LiveRoom } from "./RoomBrowser";
 import { Leaderboard, loadPilotName, savePilotName, isLeaderboardOnline, type BoardMetric, type BoardPage, type BoardScope } from "./Leaderboard";
@@ -52,6 +52,7 @@ import { continueOffer, continuePlacementLabel, type ContinueOffer } from "./Con
 import { createWakeLock, type ScreenWakeLock } from "./WakeLock";
 import { detectDeviceProfile, describeDeviceProfile, deviceProfileTelemetry, type DeviceProfile } from "../sdk/device-report";
 import { campaignProgress, campaignViews, CAMPAIGN } from "./Campaign";
+import { GameFeel } from "./GameFeel";
 import { monthKey, monthlyTheme, THEME_TRAIL_CLEARS, weeklyEvent } from "./Events";
 import { emptySquadState, SquadClient } from "./Squad";
 import { PowerUps } from "./PowerUps";
@@ -263,6 +264,7 @@ export class Game {
   private timeScale = 1;
   private zenithTimer = 0;
   private hitStopTimer = 0;
+  private readonly feel = new GameFeel();
   private frameEma = 1 / 60;
   /** Wall-clock ms of the last emitted frame_error telemetry (throttled). */
   private frameErrAt = 0;
@@ -1238,6 +1240,8 @@ export class Game {
       this.pushHud();
       return;
     }
+    // GameFeel tick — updates trauma shake, fov kick, timescale.
+    this.feel.update(raw);
     if (this.resetArmed) {
       this.resetTimer -= raw;
       if (this.resetTimer <= 0) {
@@ -3748,11 +3752,14 @@ export class Game {
         break;
       }
       case "ai-pvp": {
-        // The explicit offline route: race the neural flock right now, on the
-        // card's circuit when it names one, otherwise on the last selection.
-        const circuit = pvpCircuitFor(id) ?? this.selectedPvpMode;
-        const m = modeById(circuit);
+        // PvAI is intentionally surprise-only: choose both dimensions at the
+        // moment of commitment so stale menu state can never become a hidden
+        // selector. The result is announced before the race begins.
+        const m = PVP_MODES[Math.floor(Math.random() * PVP_MODES.length)]!;
+        const w = PVP_WORLDS[Math.floor(Math.random() * PVP_WORLDS.length)]!;
         this.selectedPvpMode = m.id;
+        this.selectedPvpWorld = w.id;
+        this.selectedCourse = w;
         this.modeId = m.id;
         this.mode = m;
         this.exitVersus();
@@ -3760,7 +3767,7 @@ export class Game {
         this.disconnectRace();
         this.roomCode = "";
         this.rankedRace = false;
-        this.hud.toast(`🤖 AI PvP · ${m.icon} ${m.name} vs the flock`, "info");
+        this.hud.toast(`🤖 Surprise AI race · ${m.icon} ${m.name} on ${w.emoji} ${w.name}`, "info");
         this.launchMatch({ ranked: false, storm: m.id === "pvp_typhoon" }, true);
         break;
       }
@@ -4176,15 +4183,16 @@ export class Game {
         break;
       }
       case "quick-match-instant": {
-        // "Quick Match" is the one-tap ONLINE path: it seats the player in
-        // public matchmaking for the chosen circuit. It used to force a local
-        // AI race (launchMatch(..., true)) while sitting under a "40 pilots,
-        // ready now" hero — the player asked for a PvP race and got bots.
-        // beginMatchmaking falls back to the AI flock only when no transport
-        // exists in this runtime, and now says so when it does.
-        const mode = modeById(this.selectedPvpMode);
+        // Randomize before matchmaking. PvP never exposes a mode/world
+        // selector; the committed race is the source of truth for everyone.
+        const mode = PVP_MODES[Math.floor(Math.random() * PVP_MODES.length)]!;
+        const world = PVP_WORLDS[Math.floor(Math.random() * PVP_WORLDS.length)]!;
+        this.selectedPvpMode = mode.id;
+        this.selectedPvpWorld = world.id;
+        this.selectedCourse = world;
         this.modeId = mode.id;
         this.mode = mode;
+        this.hud.toast(`🎲 Surprise race · ${mode.icon} ${mode.name} on ${world.emoji} ${world.name}`, "gold");
         this.beginMatchmaking({ ranked: true, storm: mode.id === "pvp_typhoon" });
         break;
       }
@@ -4701,6 +4709,11 @@ export class Game {
         this.launchMatch({ ranked: false, storm: false }, true);
         break;
       case "pvp-casual":
+        this.selectedPvpMode = PVP_MODES[Math.floor(Math.random() * PVP_MODES.length)]!.id;
+        this.selectedPvpWorld = PVP_WORLDS[Math.floor(Math.random() * PVP_WORLDS.length)]!.id;
+        this.selectedCourse = PVP_WORLDS.find((w) => w.id === this.selectedPvpWorld) ?? PVP_WORLDS[0]!;
+        this.modeId = this.selectedPvpMode;
+        this.mode = modeById(this.selectedPvpMode);
         this.beginMatchmaking({ ranked: false, storm: false });
         break;
       case "pvp-practice":
@@ -5654,6 +5667,7 @@ export class Game {
   }
 
   private shake(amount: number): void {
+    this.feel.addTrauma(amount * 0.5);
     this.camera.bump(amount);
   }
 

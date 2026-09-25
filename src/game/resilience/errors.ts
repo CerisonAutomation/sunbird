@@ -77,16 +77,6 @@ export function fingerprint(message: string): string {
   return fnv1a(base).toString(36);
 }
 
-/** FNV-1a 32-bit — tiny, dependency-free, good enough for dedup keys. */
-export function fnv1a(s: string): number {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return h >>> 0;
-}
-
 /**
  * Severity policy:
  *  - "fatal": renderer/OOM/context-class failures and anything thrown while
@@ -124,3 +114,5 @@ export class RateGate {
     return this.stamps.length;
   }
 }
+import { fnv1a } from "../validation";
+export { fnv1a } from "../validation";
