@@ -1,0 +1,4850 @@
+[
+  {
+    "key": "auto.data.versus_split_screen_1v1_on_one_device_p1_left_half_spac.479da7",
+    "sourceText": "Versus = split-screen 1v1 on ONE device. P1 = left half / SPACE, P2 = right half / ENTER, or touch your half on mobile. First to finish line wins. Same hills, same physics, but you SEE rival's line — learn faster. Perfect for: teaching friends, settling bets, kids vs parents. No internet, no waiting, instant rematch. Research: local multiplayer = highest fun per minute, 2× retention vs solo. Try it!"
+  },
+  {
+    "key": "auto.data.all_time_forever_best_weekly_resets_monday_top_3_gold_t.3e6a1d",
+    "sourceText": "All-time = forever best, Weekly = resets Monday (top 3 Gold), Today = 24h sprint, You = personal history + ghosts. Global = everyone, Friends = squad + pilots you've flown with. Portal leaderboards use overlay when available. Research: visible progress > hidden — you SEE your rank climb, creates obligation. Goal gradient: effort increases near next rank. Tip: beat ghost = +50 coins!"
+  },
+  {
+    "key": "auto.data.trails_are_cosmetic_but_give_feedback_they_glow_only_wh.f1c5d5",
+    "sourceText": "Trails are cosmetic BUT give feedback: they glow only when fast (>48 speed) or in fever, so you SEE when you're flying well. Prize trails (Harvest, Frost, Carnival) cycle hue and show you completed events. Equip in Shop → Trails. Pro tip: bright trails help time perfect landings — watch the glow!"
+  },
+  {
+    "key": "auto.data.quick_match_gets_you_moving_fast_private_rooms_let_you_.caeadd",
+    "sourceText": "Quick Match gets you moving fast. Private rooms let you invite friends. The same flight rules apply, so every win comes from your line and timing."
+  },
+  {
+    "key": "auto.data.kiss_the_slope_tangentially_don_t_slam_straight_down_pe.36fdfe",
+    "sourceText": "Kiss the slope tangentially — don't slam straight down. Perfect = 98.5% speed kept, good = 94%, bad = 70%. Holding through landing helps!"
+  },
+  {
+    "key": "auto.data.crashed_near_your_record_spend_coins_watch_an_ad_or_use.6b7987",
+    "sourceText": "Crashed near your record? Spend coins, watch an ad, or use Gold for free wake-up. Continues keep run going — best near PB or streak day."
+  },
+  {
+    "key": "auto.data.practice_offline_against_an_ai_flock_with_the_same_flig.8d4b17",
+    "sourceText": "Practice offline against an AI flock with the same flight rules. Use it to learn a route, test a bird, or warm up before a ranked race."
+  },
+  {
+    "key": "auto.data.daily_challenge_one_task_per_day_distance_coins_perfect.d8994e",
+    "sourceText": "Daily challenge = one task per day (distance, coins, perfects, etc) for 150 coins. Weekly gauntlet = 7 stages. Calendar = 28-day gift."
+  },
+  {
+    "key": "auto.data.your_rating_climbs_through_clear_divisions_win_races_to.24855a",
+    "sourceText": "Your rating climbs through clear divisions. Win races to move up, review the result, then queue again when you want a tougher flight."
+  },
+  {
+    "key": "auto.data.land_on_a_sunflower_bloom_to_spring_straight_back_into_.c48fb7",
+    "sourceText": "Land on a sunflower bloom to spring straight back into the sky — 36 vertical speed, keeps momentum. Look for them on gentle slopes."
+  },
+  {
+    "key": "auto.data.squad_friends_clubs_and_chat_direct_build_only_portals_.80ed66",
+    "sourceText": "Squad = friends, clubs, and chat (direct build only — portals forbid chat, use emotes). Share runs via codes, race together."
+  },
+  {
+    "key": "auto.value_mastered_skill_unlocked_value_value_value_coins.9476ce",
+    "sourceText": "★ ${this.mode.name} MASTERED · skill unlocked: ${mastery.skill.name} (${mastery.skill.desc}) · +${mastery.coins} coins"
+  },
+  {
+    "key": "hud.race.fairness.assistOn",
+    "sourceText": "Casual field: rivals left far behind get a small catch-up push so the pack stays together. Rated races turn this off."
+  },
+  {
+    "key": "auto.data.story_mode_authored_islands_with_narrative_the_long_mig.b2aafd",
+    "sourceText": "Story mode = authored islands with narrative. The Long Migration — fly 1100m per island, growing hills and hazards."
+  },
+  {
+    "key": "auto.data.nest_upgrades_improve_every_future_run_compare_the_cost.c85c8a",
+    "sourceText": "Nest upgrades improve every future run. Compare the cost with the bonus, buy when it feels right, and keep flying."
+  },
+  {
+    "key": "auto.value_for_value_coins_value_costs_value_coins_earn_more.d8319d",
+    "sourceText": "${v.affordable ? `Buy ${d.name} for ${price} coins` : `${d.name} costs ${price} coins; earn more coins to unlock`}"
+  },
+  {
+    "key": "auto.data.claim_daily_calendar_gift_28_days_then_cycles_streak_co.5439f5",
+    "sourceText": "Claim daily calendar gift — 28 days, then cycles. Streak = consecutive days. Day 7,14,21,28 have big rewards."
+  },
+  {
+    "key": "auto.value_value_mastery_lv_value_2_coins_in_mode_value_coin.b6d1a3",
+    "sourceText": "${this.mode.icon} ${this.mode.name} mastery Lv.${mastery.level} · +2% coins in mode · +${mastery.coins} coins"
+  },
+  {
+    "key": "auto.data.each_bird_changes_one_part_of_a_run_check_its_perk_equi.ec1ad8",
+    "sourceText": "Each bird changes one part of a run. Check its perk, equip it, then feel the difference on your next flight."
+  },
+  {
+    "key": "auto.data.land_3_perfects_in_a_row_to_enter_fever_max_speed_142_t.86fb4e",
+    "sourceText": "Land 3 perfects in a row to enter FEVER — max speed 142, trail glows, everything tunnels. Don't crash!"
+  },
+  {
+    "key": "auto.data.season_50_tiers_260_xp_per_tier_vip_gets_daily_100_coin.cd0797",
+    "sourceText": "Season = 50 tiers, 260 XP per tier. VIP gets daily 100 coins and double XP. Free track and VIP track."
+  },
+  {
+    "key": "auto.data.collect_coins_to_buy_birds_and_upgrades_coins_magnetize.c14aff",
+    "sourceText": "Collect coins to buy birds and upgrades. Coins magnetize near you when you have a magnet bird."
+  },
+  {
+    "key": "manual.resume_keeps_your_momentum_restart_begins_a_fresh_flight_exit_returns_you_to_the_launch_pad",
+    "sourceText": "Resume keeps your momentum. Restart begins a fresh flight. Exit returns you to the launch pad."
+  },
+  {
+    "key": "auto.data.weekly_score_challenges_top_3_get_gold_top_10_get_coins.efb68a",
+    "sourceText": "Weekly score challenges — top 3 get Gold, top 10 get coins. Resets Monday. Fair race rules."
+  },
+  {
+    "key": "auto.sign_in_to_carry_your_progress_between_devices_and_appe.8b760b",
+    "sourceText": "Sign in to carry your progress between devices and appear on the board under your own name."
+  },
+  {
+    "key": "auto.value_value_value_trail_unlocked.f6e862",
+    "sourceText": "${th.icon} ${th.name} · ✨ ${TRAILS[th.prizeTrail]?.label ?? th.prizeTrail} trail unlocked!"
+  },
+  {
+    "key": "auto.fly_again_replays_this_exact_course_so_you_can_race_the.969455",
+    "sourceText": "Fly again replays this exact course so you can race the ghost of the run you just flew 👻"
+  },
+  {
+    "key": "auto.your_run_is_safe_adjust_settings_grab_boosts_or_rally_y.49180d",
+    "sourceText": "Your run is safe. Adjust settings, grab boosts, or rally your flock — ready when you are."
+  },
+  {
+    "key": "auto.value_value_selected_ranked_casual_a_room_or_the_ai_flo.bdee79",
+    "sourceText": "${this.mode.icon} ${this.mode.name} selected — ranked, casual, a room, or the AI flock"
+  },
+  {
+    "key": "hud.race.fairness.equipment",
+    "sourceText": "Equal flight equipment · your bird, your timing. Store boosts are saved for solo play."
+  },
+  {
+    "key": "auto.a_journey_in_eight_chapters_progress_accrues_from_every.a3cd34",
+    "sourceText": "A journey in eight chapters. Progress accrues from every flight — no separate grind."
+  },
+  {
+    "key": "auto.first_flight_pack_value_coins_goldleaf_trail_sun_flask_.959427",
+    "sourceText": "🎁 First Flight Pack — +${STARTER_PACK.coins} coins, Goldleaf trail, Sun Flask armed"
+  },
+  {
+    "key": "auto.new_room_value_value_value.223284",
+    "sourceText": "New room ${this.roomCode} · ${this.selectedCourse.emoji} ${this.selectedCourse.name}"
+  },
+  {
+    "key": "auto.ace_wingman_crate_unlocked_3_boosts_tideglass_trail_val.6dcc47",
+    "sourceText": "📦 Ace Wingman Crate Unlocked! 3 Boosts + Tideglass Trail + ${DAILY_STIPEND} Coins!"
+  },
+  {
+    "key": "auto.data.2_800_m_high_stakes_treasure_sprint_grabbing_sunstones_.220334",
+    "sourceText": "2,800 m high-stakes treasure sprint. Grabbing sunstones grants instant turbo speed."
+  },
+  {
+    "key": "auto.reset_deletes_progress_saved_on_this_device_export_a_sa.180baa",
+    "sourceText": "Reset deletes progress saved on this device. Export a save code from Account first."
+  },
+  {
+    "key": "auto.and_value_more_value.45d4fe",
+    "sourceText": "And ${s.roomCount - 8} more ${s.roomAiFallback ? \"AI pilots\" : \"connected pilots\"}"
+  },
+  {
+    "key": "auto.create_a_private_room_with_a_custom_code_and_link_race_.1845a6",
+    "sourceText": "Create a private room with a custom code and link. Race your squad on any course!"
+  },
+  {
+    "key": "auto.elimination_in_valuem_outfly_the_pack.3e8f5b",
+    "sourceText": "⚠️ ELIMINATION IN ${Math.round(this.nextKnockoutDist - dist)}m — OUTFLY THE PACK!"
+  },
+  {
+    "key": "auto.data.3_200_m_vertical_dogfight_colossal_thermal_updrafts_lau.cd4f2b",
+    "sourceText": "3,200 m vertical dogfight. Colossal thermal updrafts launch into polar auroras."
+  },
+  {
+    "key": "auto.ranked_season_over_value_reward_value_coins.f9ce2d",
+    "sourceText": "⚔ Ranked season over · ${seasonEnd.division} reward +${seasonEnd.coins} coins"
+  },
+  {
+    "key": "auto.data.1_500_m_lightning_dash_pack_drafting_high_speed_and_pur.a4afe6",
+    "sourceText": "1,500 m lightning dash. Pack drafting, high speed, and pure clutch launches."
+  },
+  {
+    "key": "auto.data.double_slipstream_power_100_draft_ride_rival_wind_strea.6e734f",
+    "sourceText": "Double slipstream power (+100% draft). Ride rival wind streams to slingshot."
+  },
+  {
+    "key": "auto.share_your_code_friends_who_redeem_it_get_a_welcome_bon.a02429",
+    "sourceText": "Share your code — friends who redeem it get a welcome bonus on their device."
+  },
+  {
+    "key": "auto.data.2_500_m_precision_slalom_hit_apex_launch_gates_for_supe.add610",
+    "sourceText": "2,500 m precision slalom. Hit apex launch gates for supersonic warp surges."
+  },
+  {
+    "key": "auto.first_flight_pack_value_1_200_coins_goldleaf_trail.169549",
+    "sourceText": "🎁 First Flight Pack · ${STARTER_PACK.price} — 1,200 coins + Goldleaf trail"
+  },
+  {
+    "key": "auto.just_you_so_far_share_the_code_above_and_the_room_fills.829517",
+    "sourceText": "Just you so far — share the code above and the room fills with real pilots."
+  },
+  {
+    "key": "auto.your_browser_blocked_automatic_copying_select_the_text_.669cb8",
+    "sourceText": "Your browser blocked automatic copying. Select the text below and use Copy."
+  },
+  {
+    "key": "hud.race.fairness.assistOff",
+    "sourceText": "Rated race: no catch-up assist for anyone — the field flies on skill alone."
+  },
+  {
+    "key": "auto.data.6_000_m_epic_endurance_across_4_biomes_weather_shifts_a.2ef528",
+    "sourceText": "6,000 m epic endurance across 4 biomes. Weather shifts and pack drafting."
+  },
+  {
+    "key": "auto.watch_a_short_ad_value_max_value_visit.acfcb3",
+    "sourceText": "Watch a short ad · +● ${SHOP_AD_COINS} (max ${SHOP_AD_SESSION_CAP}/visit)"
+  },
+  {
+    "key": "auto.data.last_bird_standing_elimination_gates_every_500_m_to_cro.ae3ad3",
+    "sourceText": "Last bird standing! Elimination gates every 500 m to crown the champion."
+  },
+  {
+    "key": "auto.value_challenged_you_beat_value_m_on_their_hills.af315b",
+    "sourceText": "🥊 ${rival.name} challenged you: beat ${rival.distance} m on their hills"
+  },
+  {
+    "key": "auto.data.3_000_m_supersonic_tempest_chase_gale_force_tailwinds_p.60033c",
+    "sourceText": "3,000 m supersonic tempest chase. Gale-force tailwinds propel the pack."
+  },
+  {
+    "key": "auto.data.hold_to_dive_down_hills_release_at_the_crest_to_launch_.8d674c",
+    "sourceText": "HOLD to dive down hills, RELEASE at the crest to launch. Stay airborne!"
+  },
+  {
+    "key": "auto.duel_record_value_value_value_streak.5c4c25",
+    "sourceText": "Duel record ${s.duel.wins}–${s.duel.losses} · 🔥${s.duel.streak} streak"
+  },
+  {
+    "key": "auto.nest_upgraded_value_score_forever.7a3c26",
+    "sourceText": "Nest upgraded → ×${this.save.nestMultiplier().toFixed(2)} score forever"
+  },
+  {
+    "key": "auto.reborn_with_solar_crown_permanent_value_coin_multiplier.128847",
+    "sourceText": "👑 Reborn with Solar Crown! Permanent ×${p.toFixed(1)} Coin Multiplier!"
+  },
+  {
+    "key": "auto.vip_active_value_dayvalue_left.23071a",
+    "sourceText": "VIP active — ${s.vipDaysLeft} day${s.vipDaysLeft === 1 ? \"\" : \"s\"} left"
+  },
+  {
+    "key": "auto.need_value_more_coins.acf92e",
+    "sourceText": "Need ● ${(price - this.save.state.wallet).toLocaleString()} more coins"
+  },
+  {
+    "key": "auto.p2_l_enter_value.8de9db",
+    "sourceText": "P2: L / Enter · ${s.splitLayout === \"horizontal\" ? \"bottom\" : \"right\"}"
+  },
+  {
+    "key": "praise.funny.3",
+    "sourceText": "🐟 A fish just photobombed you. It will tell its friends you fly funny"
+  },
+  {
+    "key": "auto.customize_format_world_value_value.b3349c",
+    "sourceText": "Customize · format & world (${activeMode.name} · ${activeWorld.name})"
+  },
+  {
+    "key": "auto.data.chase_the_sunset_across_the_islands_reach_land_to_win_b.7f0051",
+    "sourceText": "Chase the sunset across the islands. Reach land to win back daylight."
+  },
+  {
+    "key": "auto.same_hills_as_everyone_else_today_modifiers_change_how_.ae65ed",
+    "sourceText": "Same hills as everyone else today. Modifiers change how you fly them."
+  },
+  {
+    "key": "auto.value_flew_value_m_here_beat_it.24e7dc",
+    "sourceText": "🥊 ${run.name} flew ${run.distance.toLocaleString()} m here — beat it"
+  },
+  {
+    "key": "auto.value_value_value_coins_value.c79f8a",
+    "sourceText": "${ch.icon} ${ch.title} · +${ch.rewardCoins} coins — ${ch.rewardLabel}"
+  },
+  {
+    "key": "praise.funny.1",
+    "sourceText": "🪶 Fun fact: 90% of birds can't read. You're in the 10% that can fly!"
+  },
+  {
+    "key": "auto.vault_hatched_value_trail.1f7f1a",
+    "sourceText": "🥚 Vault Hatched: ${pick.replace(\"trail_\", \"\").toUpperCase()} Trail!"
+  },
+  {
+    "key": "auto.your_first_flight_starts_your_story_fly_a_little_farthe.0ef57b",
+    "sourceText": "Your first flight starts your story. Fly a little farther each time."
+  },
+  {
+    "key": "praise.funny.5",
+    "sourceText": "🦢 A goose honked at your form. Geese are harsh critics. You passed!"
+  },
+  {
+    "key": "auto.data.open_the_challenge_link_in_the_shared_message_your_flig.2fe475",
+    "sourceText": "Open the challenge link in the shared message. Your flight is next."
+  },
+  {
+    "key": "auto.nest_upgraded_lv_value_value_score.f38862",
+    "sourceText": "Nest upgraded → Lv.${s.nestLevel} · ×${s.nestMult.toFixed(2)} score"
+  },
+  {
+    "key": "auto.all_passes_packs_are_earnable_100_through_in_game_fligh.bcac45",
+    "sourceText": "All passes & packs are earnable 100% through in-game flight coins!"
+  },
+  {
+    "key": "auto.claimed_value_coins_for_value_rank.5947a1",
+    "sourceText": "Claimed ${reward.coins} Coins for ${reward.division.name} Rank! 🏆"
+  },
+  {
+    "key": "auto.day_value_streak_value_coins.d4fc94",
+    "sourceText": "Day ${this.save.state.streak.days} streak · +${streakReward} coins"
+  },
+  {
+    "key": "auto.p1_a_space_value.11b1f6",
+    "sourceText": "P1: A / Space · ${s.splitLayout === \"horizontal\" ? \"top\" : \"left\"}"
+  },
+  {
+    "key": "auto.permanent_coin_boost_value.4a6e75",
+    "sourceText": "Permanent coin boost: +${Math.round((s.prestigeMult - 1) * 100)}%"
+  },
+  {
+    "key": "auto.ready_for_the_social_sky_challenge_a_rival_or_try_today.3ab9df",
+    "sourceText": "Ready for the social sky? Challenge a rival or try today's course"
+  },
+  {
+    "key": "auto.value_flew_value_m_here_chase_them.631e3f",
+    "sourceText": "👻 ${rg.name} flew ${Math.round(rg.distance)} m here — chase them"
+  },
+  {
+    "key": "auto.data.open_race_lobby_for_online_pilots_private_rooms_or_ai_p.b75dfa",
+    "sourceText": "Open Race Lobby for online pilots, private rooms or AI practice."
+  },
+  {
+    "key": "auto.the_nest_pass_resets_every_month_spend_rewards_before_i.508772",
+    "sourceText": "The Nest Pass resets every month — spend rewards before it does!"
+  },
+  {
+    "key": "auto.value_value_lifetime_rank_earned.4494d9",
+    "sourceText": "${promo.icon} ${promo.name.toUpperCase()} — lifetime rank earned"
+  },
+  {
+    "key": "auto.graphics_could_not_be_restored_reload_the_page_to_keep_.f6d797",
+    "sourceText": "Graphics could not be restored — reload the page to keep flying"
+  },
+  {
+    "key": "auto.make_the_flight_feel_right_for_you_changes_save_automat.40ea75",
+    "sourceText": "Make the flight feel right for you. Changes save automatically."
+  },
+  {
+    "key": "auto.new_room_value_value_value.6c5c4f",
+    "sourceText": "New room ${this.roomCode} · ${this.mode.icon} ${this.mode.name}"
+  },
+  {
+    "key": "auto.value_pilotvalue_found_hit_ready_to_race.29285f",
+    "sourceText": "${live} pilot${live === 1 ? \"\" : \"s\"} found — hit Ready to race"
+  },
+  {
+    "key": "auto.value_value_value.744f4e",
+    "sourceText": "${def.icon} ${def.name} ${def.permanent ? \"unlocked\" : \"armed\"}"
+  },
+  {
+    "key": "auto.earn_coins_by_flying_daily_quests_streaks_and_the_nest_.6dcc13",
+    "sourceText": "Earn coins by flying, daily quests, streaks and the Nest Pass."
+  },
+  {
+    "key": "auto.every_island_has_its_own_weather_learn_them_then_chain_.6cca74",
+    "sourceText": "Every island has its own weather. Learn them, then chain them."
+  },
+  {
+    "key": "auto.stormfront_same_storm_for_every_pilot_survive_and_outfl.a18e50",
+    "sourceText": "⛈ STORMFRONT — same storm for every pilot. Survive and outfly."
+  },
+  {
+    "key": "praise.funny.4",
+    "sourceText": "💨 The wind tried to push you. You pushed back. Wind: confused"
+  },
+  {
+    "key": "praise.record.5",
+    "sourceText": "🎉 RECORD! Your past self is eating dust! Future you is proud!"
+  },
+  {
+    "key": "auto.data.ninety_seconds_to_climb_above_the_clouds_and_bonk_the_s.6dae9a",
+    "sourceText": "Ninety seconds to climb above the clouds and bonk the skybox."
+  },
+  {
+    "key": "auto.data.solo_against_the_clock_finish_4_000_m_as_quickly_as_you.17cf21",
+    "sourceText": "Solo against the clock. Finish 4,000 m as quickly as you can."
+  },
+  {
+    "key": "auto.no_ranked_races_yet_your_first_40_bird_finish_sets_the_.e688a2",
+    "sourceText": "No ranked races yet. Your first 40-bird finish sets the tone."
+  },
+  {
+    "key": "auto.online_racing_is_unavailable_here_starting_an_ai_flock_.ec1841",
+    "sourceText": "Online racing is unavailable here — starting an AI flock race"
+  },
+  {
+    "key": "auto.data.gentle_rollers_rhythmic_swoops_classic_high_speed_opene.dc0ba7",
+    "sourceText": "Gentle rollers & rhythmic swoops — classic high-speed opener"
+  },
+  {
+    "key": "auto.day_value_gift_value_trail.689377",
+    "sourceText": "📅 Day ${day} gift · ✨ ${TRAILS[r.id]?.label ?? r.id} trail!"
+  },
+  {
+    "key": "auto.day_value_streak_value_coins.0d5163",
+    "sourceText": "Day ${this.save.state.streak.days} streak · +${reward} coins"
+  },
+  {
+    "key": "hud.toast.shopAfford",
+    "sourceText": "You can afford {{name}} now — one look, then back to the sky"
+  },
+  {
+    "key": "praise.beating.3",
+    "sourceText": "🔥 You're writing history! (And it's faster than last time!)"
+  },
+  {
+    "key": "praise.nearBest.3",
+    "sourceText": "⚡ 8 seconds behind your record. The wind is rooting for you!"
+  },
+  {
+    "key": "auto.daily_flight_stipend_claimed_value_coins.199b77",
+    "sourceText": "🪙 Daily Flight Stipend Claimed! +● ${DAILY_STIPEND} coins!"
+  },
+  {
+    "key": "auto.data.score_comes_almost_entirely_from_chaining_perfect_launc.33bbec",
+    "sourceText": "Score comes almost entirely from chaining perfect launches."
+  },
+  {
+    "key": "auto.value_value_fly_value_m.6452db",
+    "sourceText": "${ev.icon} ${ev.name} · fly ${ev.target.toLocaleString()} m"
+  },
+  {
+    "key": "praise.record.2",
+    "sourceText": "👑 LEGENDARY! Tell your grandkids! (Or at least your squad)"
+  },
+  {
+    "key": "auto.duel_lost_never_reached_the_line_value_rating.f6a5b5",
+    "sourceText": "⚔ Duel lost — never reached the line · ${res.delta} rating"
+  },
+  {
+    "key": "auto.kept_on_this_device_from_races_you_actually_flew_togeth.44d039",
+    "sourceText": "Kept on this device from races you actually flew together."
+  },
+  {
+    "key": "auto.of_value_pilots_values.eac4eb",
+    "sourceText": "of ${s.raceField} pilots · ${s.raceFinishTime.toFixed(1)}s"
+  },
+  {
+    "key": "auto.online_racing_is_unavailable_here_replaying_the_ai_floc.3ba08e",
+    "sourceText": "Online racing is unavailable here — replaying the AI flock"
+  },
+  {
+    "key": "auto.you_ve_already_redeemed_a_friend_code_thanks_for_joinin.3e751d",
+    "sourceText": "You've already redeemed a friend code. Thanks for joining!"
+  },
+  {
+    "key": "hud.toast.firstFlight",
+    "sourceText": "🕊 First flight complete · +{{n}} coins — the sky is yours"
+  },
+  {
+    "key": "praise.beating.5",
+    "sourceText": "⚡ You're beating time itself! (Time is filing a complaint)"
+  },
+  {
+    "key": "praise.funny.2",
+    "sourceText": "🤧 The bird sneezed. Aerodynamics: still 100%. Dignity: 0%"
+  },
+  {
+    "key": "praise.slow.4",
+    "sourceText": "🐌 My grandma's tortoise flies faster. (She has a jetpack)"
+  },
+  {
+    "key": "toast.rival.challenge",
+    "sourceText": "🥊 {name} challenged you: beat {distance} m on their hills"
+  },
+  {
+    "key": "auto.copy_your_save_code_to_transfer_progress_between_device.39d9e6",
+    "sourceText": "Copy your save code to transfer progress between devices."
+  },
+  {
+    "key": "auto.missions_and_rewards_from_all_your_flights_in_one_place.359290",
+    "sourceText": "Missions and rewards from all your flights, in one place."
+  },
+  {
+    "key": "auto.need_value_more_coins_to_unlock.a79d83",
+    "sourceText": "Need ● ${item.coinPrice - s.wallet} more coins to unlock."
+  },
+  {
+    "key": "auto.value_value_collection_complete_value_coins.bc27c9",
+    "sourceText": "${c.icon} ${c.name} collection complete · +${bonus} coins"
+  },
+  {
+    "key": "praise.perfect.2",
+    "sourceText": "💫 That was so smooth, physics said 'okay, fine, you win'"
+  },
+  {
+    "key": "praise.record.4",
+    "sourceText": "🌟 The stars are jealous. You're outshining them at noon!"
+  },
+  {
+    "key": "auto.ads_aren_t_available_right_now_second_wind_costs_coins.c77665",
+    "sourceText": "Ads aren't available right now — second wind costs coins"
+  },
+  {
+    "key": "auto.data.gleaming_ice_shelves_launching_into_cosmic_polar_aurora.81f7bf",
+    "sourceText": "Gleaming ice shelves launching into cosmic polar auroras"
+  },
+  {
+    "key": "auto.need_value_more_coins_to_extend.c1597f",
+    "sourceText": "Need ● ${VIP.coinPrice - s.wallet} more coins to extend."
+  },
+  {
+    "key": "auto.next_step_visit_the_hangar_your_first_bird_is_waiting.656bf4",
+    "sourceText": "Next step: visit the Hangar — your first bird is waiting"
+  },
+  {
+    "key": "auto.value_value.34048e",
+    "sourceText": "${this.selectedCourse.emoji} ${this.selectedCourse.name}"
+  },
+  {
+    "key": "auto.value_value_complete_trail_owned_300_coins.50bcbb",
+    "sourceText": "${th.icon} ${th.name} complete · trail owned, +300 coins"
+  },
+  {
+    "key": "hud.race.tagline",
+    "sourceText": "40-pilot live & neural AI racing across 9 scenic worlds."
+  },
+  {
+    "key": "praise.perfect.4",
+    "sourceText": "🪂 That landing was so smooth, butter filed a complaint!"
+  },
+  {
+    "key": "auto.copy_this_code_to_move_your_progress_to_another_device.6879ec",
+    "sourceText": "Copy this code to move your progress to another device."
+  },
+  {
+    "key": "auto.day_value_trail_already_owned_200_coins_instead.41a48f",
+    "sourceText": "📅 Day ${day} · trail already owned, +200 coins instead"
+  },
+  {
+    "key": "auto.first_flight_complete_50_coins_the_sky_is_yours.0245eb",
+    "sourceText": "🕊 First flight complete · +50 coins — the sky is yours"
+  },
+  {
+    "key": "auto.no_reward_this_time_the_3_bonus_is_still_on_the_card.7d5c6c",
+    "sourceText": "No reward this time — the 3× bonus is still on the card"
+  },
+  {
+    "key": "auto.rank_prize_claimed_the_next_season_starts_a_fresh_one.3feee6",
+    "sourceText": "Rank prize claimed — the next season starts a fresh one"
+  },
+  {
+    "key": "auto.save_couldn_t_be_read_kept_a_backup_starting_fresh.e1ee42",
+    "sourceText": "⚠ Save couldn't be read — kept a backup, starting fresh"
+  },
+  {
+    "key": "auto.say_hello_to_your_club_messages_stay_between_members.8534f8",
+    "sourceText": "Say hello to your club — messages stay between members."
+  },
+  {
+    "key": "praise.nearBest.2",
+    "sourceText": "👻 Your ghost looked back. Mistake. You're catching up!"
+  },
+  {
+    "key": "auto.create_a_private_room_first_then_invites_are_one_tap.10a2a1",
+    "sourceText": "Create a private room first — then invites are one tap"
+  },
+  {
+    "key": "auto.data.no_clock_the_challenge_grows_gradually_as_you_travel.ae09b2",
+    "sourceText": "No clock. The challenge grows gradually as you travel."
+  },
+  {
+    "key": "auto.data.obsidian_glass_crests_and_violent_superheated_thermals.49c4d2",
+    "sourceText": "Obsidian glass crests and violent superheated thermals"
+  },
+  {
+    "key": "auto.invited_to_room_value_ready_up_together_to_race.911d30",
+    "sourceText": "🎟 Invited to room ${code} — ready up together to race"
+  },
+  {
+    "key": "auto.need_value_more_coins.6e72ca",
+    "sourceText": "Need ● ${STARTER_PACK.coinPrice - s.wallet} more coins"
+  },
+  {
+    "key": "auto.today_s_challenge_is_already_complete_back_tomorrow.288d9f",
+    "sourceText": "Today's challenge is already complete — back tomorrow!"
+  },
+  {
+    "key": "auto.wheel_landed_on_value_value.d9797a",
+    "sourceText": "🎡 Wheel landed on ${sector.label}! +● ${sector.value}"
+  },
+  {
+    "key": "praise.beating.2",
+    "sourceText": "👑 New best incoming! The leaderboard is taking notes!"
+  },
+  {
+    "key": "auto.chapter_value_value.03afe2",
+    "sourceText": "Chapter ${ch.index + 1} · ${escapeHtml(ch.def.title)}"
+  },
+  {
+    "key": "auto.claim_3_nbsp_value.1f8429",
+    "sourceText": "Claim 3× &nbsp;+● ${formatNumberLocalized(coins * 2)}"
+  },
+  {
+    "key": "auto.cups_reset_every_monday_won_cosmetics_are_permanent.148f0b",
+    "sourceText": "Cups reset every Monday. Won cosmetics are permanent."
+  },
+  {
+    "key": "auto.eye_wall_survive_to_the_line_coins_2_from_here.3631d8",
+    "sourceText": "🌀 EYE WALL — survive to the line. Coins ×2 from here"
+  },
+  {
+    "key": "auto.no_live_pilots_found_racing_the_ai_flock_practice.a14ae3",
+    "sourceText": "No live pilots found — racing the AI flock (practice)"
+  },
+  {
+    "key": "auto.spin_to_win_up_to_1_000_coins_mystery_vault_keys.dac295",
+    "sourceText": "Spin to win up to ● 1,000 Coins & Mystery Vault Keys!"
+  },
+  {
+    "key": "auto.sunbird_is_dozing_off_at_value.4ab689",
+    "sourceText": "Sunbird is dozing off at ${distanceText(s.distance)}."
+  },
+  {
+    "key": "auto.watch_a_short_ad_triple_value_value.74677e",
+    "sourceText": "Watch a short ad · triple ● ${coins} → ● ${coins * 3}"
+  },
+  {
+    "key": "hud.progress.mastered",
+    "sourceText": "{{mode}} MASTERED · {{skill}} unlocked · +{{c}} coins"
+  },
+  {
+    "key": "praise.nearBest.1",
+    "sourceText": "🔥 You're 12m from your best — the ghost is sweating!"
+  },
+  {
+    "key": "praise.nearBest.5",
+    "sourceText": "💨 You're so close your ghost can hear you breathing!"
+  },
+  {
+    "key": "auto.data.vast_red_canyon_walls_with_extreme_vertical_descents.f0e624",
+    "sourceText": "Vast red canyon walls with extreme vertical descents"
+  },
+  {
+    "key": "auto.fly_value_m_in_one_event_run.02817c",
+    "sourceText": "Fly ${ev.target.toLocaleString()} m in one event run"
+  },
+  {
+    "key": "auto.paste_a_code_from_another_device_to_restore_it_here.ebc584",
+    "sourceText": "Paste a code from another device to restore it here:"
+  },
+  {
+    "key": "auto.value_value_value_in_value.1e6a53",
+    "sourceText": "${p.icon} ${p.label} — ${grant.tier} in ${grant.cup}"
+  },
+  {
+    "key": "auto.wheel_landed_on_value_sun_flask_armed.39ca95",
+    "sourceText": "🎡 Wheel landed on ${sector.label}! Sun Flask Armed!"
+  },
+  {
+    "key": "praise.fever.1",
+    "sourceText": "🔥 FEVER! You're literally on fire! (In a good way!)"
+  },
+  {
+    "key": "auto.flight_logged_open_the_hangar_to_spend_your_coins.3df84b",
+    "sourceText": "Flight logged ✦ Open the Hangar to spend your coins"
+  },
+  {
+    "key": "auto.here_s_a_little_flying_fuel_value_coins.9330ed",
+    "sourceText": "🍪 Here's a little flying fuel — +● ${payout} coins"
+  },
+  {
+    "key": "auto.launching_together_every_pilot_gets_the_countdown.fe0db9",
+    "sourceText": "Launching together — every pilot gets the countdown"
+  },
+  {
+    "key": "auto.need_50_000_coins_to_ascend_solar_crown_prestige.168b0c",
+    "sourceText": "Need ● 50,000 coins to ascend Solar Crown prestige!"
+  },
+  {
+    "key": "auto.value_value_value.5fd871",
+    "sourceText": "${c.modifier.icon} ${c.title} · ${c.modifier.label}"
+  },
+  {
+    "key": "auto.welcome_back_confirm_below_if_you_finished_paying.b0e769",
+    "sourceText": "Welcome back — confirm below if you finished paying"
+  },
+  {
+    "key": "praise.boing.5",
+    "sourceText": "🌻 That bounce was so good, the flower is blushing!"
+  },
+  {
+    "key": "praise.combo.2",
+    "sourceText": "⚡ That chain is so long, it needs its own zip code!"
+  },
+  {
+    "key": "auto.data.long_violet_valleys_and_blazing_downhill_speedways.f7efa3",
+    "sourceText": "Long violet valleys and blazing downhill speedways"
+  },
+  {
+    "key": "auto.data.monster_golden_dunes_offering_astronomical_airtime.1fc29c",
+    "sourceText": "Monster golden dunes offering astronomical airtime"
+  },
+  {
+    "key": "auto.eliminated_value_value_remain.7e2606",
+    "sourceText": "💥 ELIMINATED: ${victim.name}! ${remaining} remain"
+  },
+  {
+    "key": "auto.everyone_you_flew_with_is_already_in_your_wingmen.f8ca58",
+    "sourceText": "Everyone you flew with is already in your wingmen."
+  },
+  {
+    "key": "auto.nest_lv_value_value.16c0c4",
+    "sourceText": "Nest Lv.${s.nestLevel} · ×${s.nestMult.toFixed(2)}"
+  },
+  {
+    "key": "auto.passed_value_s_mark_keep_flying.b84ecd",
+    "sourceText": "🥊 Passed ${this.rival.name}'s mark — keep flying!"
+  },
+  {
+    "key": "auto.searching_again_inviting_any_pilot_who_is_online.b8537d",
+    "sourceText": "Searching again — inviting any pilot who is online"
+  },
+  {
+    "key": "manual.random_surprise_race_human_or_ai_clearly_labeled",
+    "sourceText": "Random surprise race · human or AI clearly labeled"
+  },
+  {
+    "key": "praise.boing.3",
+    "sourceText": "🌻 You bounced so high, the clouds high-fived you!"
+  },
+  {
+    "key": "praise.slow.5",
+    "sourceText": "🍃 The wind is literally waiting for you. Awkward."
+  },
+  {
+    "key": "auto.chase_value_pass_it_before_the_finish.8e1836",
+    "sourceText": "👻 Chase ${pace.name} — pass it before the finish"
+  },
+  {
+    "key": "auto.data.leaderboards_4_ladders_not_1_brag_everywhere.151b1c",
+    "sourceText": "Leaderboards = 4 ladders, not 1 (brag everywhere)"
+  },
+  {
+    "key": "auto.nest_pass_lv_value_value.e0f39f",
+    "sourceText": "Nest Pass Lv.${s.season.tier}/${s.season.maxTier}"
+  },
+  {
+    "key": "auto.peak_value_value_pays.eb91f9",
+    "sourceText": "Peak ${r.season.peakIcon} ${r.season.peak} · pays"
+  },
+  {
+    "key": "auto.solstice_unlocked_welcome_to_sunbird_legend.803bec",
+    "sourceText": "🐦 Solstice unlocked — welcome to Sunbird Legend!"
+  },
+  {
+    "key": "praise.fever.3",
+    "sourceText": "🚀 That was so good, Newton wants your autograph!"
+  },
+  {
+    "key": "auto.data.azure_ocean_channels_and_towering_tropical_palms.bb89fc",
+    "sourceText": "Azure ocean channels and towering tropical palms"
+  },
+  {
+    "key": "auto.data.double_wind_hold_your_hat_you_don_t_have_a_hat.8f5a7f",
+    "sourceText": "Double wind. Hold your hat. You don't have a hat"
+  },
+  {
+    "key": "auto.data.one_fixed_sunset_keep_your_momentum_and_go_far.4c703c",
+    "sourceText": "One fixed sunset. Keep your momentum and go far."
+  },
+  {
+    "key": "auto.data.one_sunset_push_the_furthest_line_you_can_hold.67002e",
+    "sourceText": "One sunset. Push the furthest line you can hold."
+  },
+  {
+    "key": "auto.day_value_gift_boost_armed_for_next_flight.f3e2a7",
+    "sourceText": "📅 Day ${day} gift · boost armed for next flight"
+  },
+  {
+    "key": "auto.solo_flights_below_are_you_against_the_course_a.61fa4a",
+    "sourceText": "Solo flights below are you against the course. A"
+  },
+  {
+    "key": "auto.start_with_a_bird_each_one_changes_your_flight.f8da60",
+    "sourceText": "Start with a bird — each one changes your flight"
+  },
+  {
+    "key": "praise.beating.4",
+    "sourceText": "💫 Past you is eating dust! Future you is proud!"
+  },
+  {
+    "key": "praise.combo.3",
+    "sourceText": "🎶 Your combo is music! The islands are dancing!"
+  },
+  {
+    "key": "praise.fever.4",
+    "sourceText": "💨 You flew so fast, time needed a coffee break!"
+  },
+  {
+    "key": "auto.data.every_coin_counts_double_the_geese_are_furious.4e9f24",
+    "sourceText": "Every coin counts double. The geese are furious"
+  },
+  {
+    "key": "auto.data.gravity_took_the_week_off_float_like_a_rumour.d72b6b",
+    "sourceText": "Gravity took the week off — float like a rumour"
+  },
+  {
+    "key": "auto.official_result_pvalue_server_verified.b9c766",
+    "sourceText": "Official result: P${official} (server-verified)"
+  },
+  {
+    "key": "auto.replace_progress_on_this_device_with_this_save.b3c330",
+    "sourceText": "Replace progress on this device with this save."
+  },
+  {
+    "key": "auto.try_a_bird_name_a_perk_or_a_different_filter.61d1ae",
+    "sourceText": "Try a bird name, a perk, or a different filter."
+  },
+  {
+    "key": "praise.fever.5",
+    "sourceText": "🌈 You painted the sky! Picasso would be proud!"
+  },
+  {
+    "key": "praise.record.3",
+    "sourceText": "💫 You just rewrote history! (And it's faster!)"
+  },
+  {
+    "key": "praise.slow.3",
+    "sourceText": "😴 The sun is getting bored. Show it something!"
+  },
+  {
+    "key": "auto.cheat_mode_activated_you_found_the_secret.d5a464",
+    "sourceText": "✨ Cheat mode activated — you found the secret!"
+  },
+  {
+    "key": "auto.data.that_was_your_best_flight_yet_keep_it_going.a9c848",
+    "sourceText": "That was your best flight yet — keep it going."
+  },
+  {
+    "key": "auto.need_value_more_coins.0013f7",
+    "sourceText": "Need ● ${GOLD.coinPrice - s.wallet} more coins"
+  },
+  {
+    "key": "auto.nest_pass_lv_value_unlocked_claim_it.4e25fd",
+    "sourceText": "Nest Pass Lv.${tierAfter} unlocked — claim it!"
+  },
+  {
+    "key": "auto.value_value_on_value_value.133277",
+    "sourceText": "🎲 ${m.icon} ${m.name} on ${w.emoji} ${w.name}"
+  },
+  {
+    "key": "praise.beating.1",
+    "sourceText": "🚀 You're AHEAD of your best! Don't look down!"
+  },
+  {
+    "key": "praise.boing.2",
+    "sourceText": "🌻 That sunflower just became your launch pad!"
+  },
+  {
+    "key": "praise.nearBest",
+    "sourceText": "You're close to your best — ghost is sweating!"
+  },
+  {
+    "key": "auto.data.chunky_gravity_massive_dives_earn_your_lift.7db341",
+    "sourceText": "Chunky gravity. Massive dives. Earn your lift"
+  },
+  {
+    "key": "auto.data.only_flawless_lips_count_time_every_release.52ef45",
+    "sourceText": "Only flawless lips count. Time every release."
+  },
+  {
+    "key": "auto.data.short_days_fat_rewards_blink_and_it_s_night.329d12",
+    "sourceText": "Short days, fat rewards. Blink and it's night"
+  },
+  {
+    "key": "auto.jewel_hummingbird_unlocked_10_duel_wins.7ab07b",
+    "sourceText": "🐦 Jewel Hummingbird unlocked — 10 duel wins!"
+  },
+  {
+    "key": "auto.need_value_more_coins.d9a357",
+    "sourceText": "Need ● ${VIP.coinPrice - s.wallet} more coins"
+  },
+  {
+    "key": "auto.overcharge_ii_value.d25933",
+    "sourceText": "⚡ OVERCHARGE II — ${PICKUP_STYLE[kind].label}"
+  },
+  {
+    "key": "auto.slope_flow_value_value.5dfcb0",
+    "sourceText": "SLOPE FLOW ×${linked.chain} +${linked.points}"
+  },
+  {
+    "key": "hud.settings.autoShop",
+    "sourceText": "Open the shop when a flight unlocks something"
+  },
+  {
+    "key": "onboarding.holdToDescend",
+    "sourceText": "HOLD to descend · look for a downhill landing"
+  },
+  {
+    "key": "praise.combo.5",
+    "sourceText": "💫 That combo was so smooth, silk is jealous!"
+  },
+  {
+    "key": "praise.fever.2",
+    "sourceText": "⚡ You're so fast your shadow needed a minute!"
+  },
+  {
+    "key": "praise.record.1",
+    "sourceText": "🏆 NEW BEST! The leaderboard is taking notes!"
+  },
+  {
+    "key": "auto.ai_pvp_value_value_vs_the_flock.972ed1",
+    "sourceText": "🤖 AI PvP · ${m.icon} ${m.name} vs the flock"
+  },
+  {
+    "key": "auto.data.bioluminescent_coastline_under_the_full_moon.31b533",
+    "sourceText": "Bioluminescent coastline under the full moon"
+  },
+  {
+    "key": "auto.data.sixty_seconds_every_coin_on_the_ideal_line.965a9d",
+    "sourceText": "Sixty seconds. Every coin on the ideal line."
+  },
+  {
+    "key": "auto.duel_value.5d5e1f",
+    "sourceText": "DUEL ${s.duelWas === \"won\" ? \"WON\" : \"LOST\"}"
+  },
+  {
+    "key": "auto.gauntlet_cleared_value_coins.4060f9",
+    "sourceText": "🏆 GAUNTLET CLEARED · +${g.clearBonus} coins"
+  },
+  {
+    "key": "auto.live_rooms_are_not_available_in_this_edition.df11e3",
+    "sourceText": "Live rooms are not available in this edition"
+  },
+  {
+    "key": "auto.squadron_goal_claimed_value_coins.e4af27",
+    "sourceText": "🎁 Squadron Goal Claimed! +● ${coins} coins!"
+  },
+  {
+    "key": "auto.stormcrow_unlocked_5_gauntlets_cleared.7885ea",
+    "sourceText": "🐦 Stormcrow unlocked — 5 gauntlets cleared!"
+  },
+  {
+    "key": "auto.vault_hatched_value_bird_skin.233f3a",
+    "sourceText": "🥚 Vault Hatched: ${skinDef.name} Bird Skin!"
+  },
+  {
+    "key": "auto.wish_granted_value.9c6c48",
+    "sourceText": "⭐ WISH GRANTED — ${PICKUP_STYLE[wish].label}"
+  },
+  {
+    "key": "auto.your_balance_value.486498",
+    "sourceText": "Your Balance: ● ${s.wallet.toLocaleString()}"
+  },
+  {
+    "key": "praise.boing.4",
+    "sourceText": "🌻 Sunflower says 'weeee!' — you say 'more!'"
+  },
+  {
+    "key": "auto.data.ai_flock_zero_wait_practice_learn_lines.a07ae5",
+    "sourceText": "AI flock = zero-wait practice (learn lines)"
+  },
+  {
+    "key": "auto.data.surprise_biome_every_race_maximum_variety.d1e74e",
+    "sourceText": "Surprise biome every race — maximum variety"
+  },
+  {
+    "key": "auto.need_240_coins_to_claim_ace_wingman_crate.36e408",
+    "sourceText": "Need ● 240 coins to claim Ace Wingman Crate"
+  },
+  {
+    "key": "auto.share_it_with_someone_you_want_to_fly_with.9b8f65",
+    "sourceText": "Share it with someone you want to fly with."
+  },
+  {
+    "key": "auto.smashed_piggy_bank_value_coins.308187",
+    "sourceText": "🐷 Smashed Piggy Bank! +● ${smashed} coins!"
+  },
+  {
+    "key": "auto.value_value_new_personal_best.c61acd",
+    "sourceText": "${cup.icon} ${cup.name} — new personal best"
+  },
+  {
+    "key": "auto.vault_jackpot_value_bonus_coins.b45fe5",
+    "sourceText": "🥚 Vault Jackpot: +● ${reward} bonus coins!"
+  },
+  {
+    "key": "inflight.shop.skip.needCoins",
+    "sourceText": "Need ●{{cost}} to skip — you have ●{{have}}"
+  },
+  {
+    "key": "praise.beating",
+    "sourceText": "You're AHEAD of your best! Don't look down!"
+  },
+  {
+    "key": "praise.nearBest.4",
+    "sourceText": "🏃 Your past self is getting nervous. Good."
+  },
+  {
+    "key": "auto.data.chain_launches_and_touch_the_stratosphere.e2d008",
+    "sourceText": "Chain launches and touch the stratosphere."
+  },
+  {
+    "key": "auto.passed_value_s_flight.6f4827",
+    "sourceText": "👻 Passed ${this.rivalGhostName}'s flight!"
+  },
+  {
+    "key": "auto.phase_ii_the_storm_tightens_wind_25.95f5cb",
+    "sourceText": "⛈ PHASE II — the storm tightens. Wind +25%"
+  },
+  {
+    "key": "auto.rival_rating_value_value.20ce8f",
+    "sourceText": "Rival rating ${s.rival.rating} ${deltaTxt}"
+  },
+  {
+    "key": "auto.value_lifetime.6cf6b2",
+    "sourceText": "${distanceText(s.wings.lifetime)} lifetime"
+  },
+  {
+    "key": "manual.chase_a_real_player_s_ghost_seeded_rival",
+    "sourceText": "Chase a real player's ghost · seeded rival"
+  },
+  {
+    "key": "manual.missions_trophies_scores_season_pass",
+    "sourceText": "Missions · trophies · scores · season pass"
+  },
+  {
+    "key": "manual.time_trial_skyline_coin_rush_endless",
+    "sourceText": "Time Trial · Skyline · Coin Rush · Endless"
+  },
+  {
+    "key": "praise.perfect.5",
+    "sourceText": "🌟 The sun is jealous of how you chase it!"
+  },
+  {
+    "key": "auto.data.ranked_climb_divisions_monthly_rewards.c05522",
+    "sourceText": "Ranked = climb divisions, monthly rewards"
+  },
+  {
+    "key": "auto.duel_vs_value_first_to_the_line.10851b",
+    "sourceText": "⚔ Duel vs ${opp.name} · first to the line"
+  },
+  {
+    "key": "auto.full_screen_not_supported_on_this_browser.238fe5",
+    "sourceText": "Full screen not supported on this browser"
+  },
+  {
+    "key": "auto.no_reward_this_time_try_again_next_hour.6a81d2",
+    "sourceText": "No reward this time — try again next hour"
+  },
+  {
+    "key": "auto.run_shared_send_the_code_to_a_friend.f30cdb",
+    "sourceText": "🔗 Run shared — send the code to a friend"
+  },
+  {
+    "key": "praise.combo.4",
+    "sourceText": "🔥 Combo so hot, the sun is taking notes!"
+  },
+  {
+    "key": "praise.slow.1",
+    "sourceText": "🐢 Your ghost is making coffee. Catch up!"
+  },
+  {
+    "key": "praise.slow.2",
+    "sourceText": "🦥 Even the clouds are passing you. Dive!"
+  },
+  {
+    "key": "auto.data.sixty_seconds_every_coin_counts_double.97fbad",
+    "sourceText": "Sixty seconds. Every coin counts double."
+  },
+  {
+    "key": "auto.data.the_sun_is_showing_off_40_longer_days.e99bb4",
+    "sourceText": "The sun is showing off — 40% longer days"
+  },
+  {
+    "key": "auto.master_the_glide_across_endless_islands.716384",
+    "sourceText": "Master the glide across endless islands."
+  },
+  {
+    "key": "auto.need_value_more_coins.2ccd72",
+    "sourceText": "Need ${def.price - st.wallet} more coins"
+  },
+  {
+    "key": "hud.gameover.retryHint",
+    "sourceText": "Tap anywhere or press Space to fly again"
+  },
+  {
+    "key": "hud.progress.mastery",
+    "sourceText": "{{mode}} mastery Lv.{{n}} · +{{c}} coins"
+  },
+  {
+    "key": "hud.toast.luckyCoin",
+    "sourceText": "🍀 LUCKY COIN — double coins for {{n}} s"
+  },
+  {
+    "key": "manual.master_the_glide_across_endless_islands",
+    "sourceText": "Master the glide across endless islands."
+  },
+  {
+    "key": "moments.bonk.card",
+    "sourceText": "{{n}} BONK — the hills are keeping score"
+  },
+  {
+    "key": "auto.day_value_gift_value_coins.ac4a61",
+    "sourceText": "📅 Day ${day} gift · +${r.amount} coins"
+  },
+  {
+    "key": "auto.golden_hour_coins_are_worth_double.63eb8e",
+    "sourceText": "🌇 GOLDEN HOUR — coins are worth double"
+  },
+  {
+    "key": "auto.host_a_room_first_to_get_an_invite_link.26026c",
+    "sourceText": "Host a room first to get an invite link"
+  },
+  {
+    "key": "auto.lv_value_value.45f111",
+    "sourceText": "Lv.${s.season.tier}/${s.season.maxTier}"
+  },
+  {
+    "key": "auto.no_reward_this_time_try_coins_or_rest.f2b7b5",
+    "sourceText": "No reward this time — try coins or rest"
+  },
+  {
+    "key": "auto.value_p_level_2.b80bb3",
+    "sourceText": "${escapeHtml(p.label)}${p.level === 2 ?"
+  },
+  {
+    "key": "hud.toast.nestPassUnlock",
+    "sourceText": "Nest Pass Lv.{{n}} unlocked — claim it!"
+  },
+  {
+    "key": "inflight.shop.skip.done",
+    "sourceText": "Skipped {{old}} → {{new}} for ●{{cost}}"
+  },
+  {
+    "key": "praise.perfect.3",
+    "sourceText": "🎯 Bullseye! Even the wind is clapping!"
+  },
+  {
+    "key": "auto.by_value_same_device_same_hills.43ff3c",
+    "sourceText": "by ${margin} · same device, same hills"
+  },
+  {
+    "key": "auto.choose_online_or_ai_when_you_are_ready.7a5d65",
+    "sourceText": "Choose online or AI when you are ready"
+  },
+  {
+    "key": "auto.data.a_little_bird_a_flight_worth_sharing.ee69f1",
+    "sourceText": "A LITTLE BIRD. A FLIGHT WORTH SHARING."
+  },
+  {
+    "key": "auto.duel_forfeited_value_rating.e38569",
+    "sourceText": "⚔ Duel forfeited · ${res.delta} rating"
+  },
+  {
+    "key": "auto.free_coin_rewards_capped_for_this_hour.460df3",
+    "sourceText": "Free coin rewards capped for this hour"
+  },
+  {
+    "key": "auto.gauntlet_value_3_value.997963",
+    "sourceText": "🌩 Gauntlet ${idx + 1}/3 · ${st.label}"
+  },
+  {
+    "key": "auto.racing_the_ai_flock_offline_practice.14f3f1",
+    "sourceText": "Racing the AI flock — offline practice"
+  },
+  {
+    "key": "auto.view_local_rival_rank_practice_field.9fe6a9",
+    "sourceText": "View local Rival rank (practice field)"
+  },
+  {
+    "key": "auto.wallet_value.2adec5",
+    "sourceText": "Wallet: ● ${s.wallet.toLocaleString()}"
+  },
+  {
+    "key": "manual.choose_online_or_ai_when_you_are_ready",
+    "sourceText": "Choose online or AI when you are ready"
+  },
+  {
+    "key": "praise.perfect.1",
+    "sourceText": "✨ PERFECT! The hills are taking notes!"
+  },
+  {
+    "key": "toast.rival.passed",
+    "sourceText": "🥊 Passed {name}'s mark — keep flying!"
+  },
+  {
+    "key": "auto.of_value_value.5c57a7",
+    "sourceText": "of ${m.field} · ${escapeHtml(m.mode)}"
+  },
+  {
+    "key": "auto.ring_chain_value_value.63386e",
+    "sourceText": "RING CHAIN ×${this.ringChain} +${pts}"
+  },
+  {
+    "key": "auto.wheel_spin_on_cooldown_until_tomorrow.830473",
+    "sourceText": "Wheel spin on cooldown until tomorrow"
+  },
+  {
+    "key": "hud.toast.newRecord",
+    "sourceText": "👑 NEW DISTANCE RECORD — keep flying!"
+  },
+  {
+    "key": "praise.combo.1",
+    "sourceText": "🔗 COMBO! You're chaining like a pro!"
+  },
+  {
+    "key": "auto.continues_in_value.483aab",
+    "sourceText": "Continues in ${Math.ceil(s.adTimer)}"
+  },
+  {
+    "key": "auto.need_value_more_coins.e84c6f",
+    "sourceText": "Need ${price - st.wallet} more coins"
+  },
+  {
+    "key": "auto.new_shores_charted_value.3d1baf",
+    "sourceText": "New shores charted: ${biomeNow.name}"
+  },
+  {
+    "key": "auto.resume_your_flight_first_then_race.e121c0",
+    "sourceText": "Resume your flight first, then race."
+  },
+  {
+    "key": "auto.value_duel_wins_in_a_row.9e5c94",
+    "sourceText": "🔥 ${res.streak} duel wins in a row!"
+  },
+  {
+    "key": "hud.toast.flightBonus",
+    "sourceText": "{{m}}× flight bonus — +● {{n}} coins"
+  },
+  {
+    "key": "moments.panic.card",
+    "sourceText": "{{n}} PANIC — flapping for dear life"
+  },
+  {
+    "key": "moments.record.card",
+    "sourceText": "{{n}} RECORD — your old best retired"
+  },
+  {
+    "key": "onboarding.buildSpeed",
+    "sourceText": "HOLD · build speed down the big drop"
+  },
+  {
+    "key": "praise.perfect",
+    "sourceText": "PERFECT! The hills are taking notes!"
+  },
+  {
+    "key": "auto.3_flight_bonus_value_coins.efe75d",
+    "sourceText": "3× flight bonus — +● ${bonus} coins"
+  },
+  {
+    "key": "auto.a_little_flock_a_bigger_adventure.53ae0f",
+    "sourceText": "A little flock. A bigger adventure."
+  },
+  {
+    "key": "auto.data.the_peaks_put_on_their_winter_coats.732401",
+    "sourceText": "The peaks put on their winter coats"
+  },
+  {
+    "key": "auto.data.versus_couch_battles_same_device.458375",
+    "sourceText": "Versus = couch battles, same device"
+  },
+  {
+    "key": "auto.no_clubs_yet_found_the_first_one.1a4dc8",
+    "sourceText": "No clubs yet — found the first one."
+  },
+  {
+    "key": "auto.no_players_found_starting_ai_race.352f9e",
+    "sourceText": "No players found — starting AI race"
+  },
+  {
+    "key": "auto.value_value.e83d69",
+    "sourceText": "${this.mode.icon} ${this.mode.name}"
+  },
+  {
+    "key": "inflight.needCoins",
+    "sourceText": "Need ●{{cost}} — you have ●{{have}}"
+  },
+  {
+    "key": "pvp.draft.boost",
+    "sourceText": "SLIPSTREAM DRAFT +{{boost}}% SPEED!"
+  },
+  {
+    "key": "toast.pace.ghost",
+    "sourceText": "👻 {name} on these hills — catch it"
+  },
+  {
+    "key": "auto.claim_pack_value.9556d1",
+    "sourceText": "Claim Pack · ${STARTER_PACK.price}"
+  },
+  {
+    "key": "auto.claim_value_value.2e5dcd",
+    "sourceText": "Claim ${prize.icon} ${prize.label}"
+  },
+  {
+    "key": "auto.finish_pvalue_of_value.c64fa0",
+    "sourceText": "FINISH · P${s.place} of ${s.total}"
+  },
+  {
+    "key": "auto.flock_room_value_ready.68b3d6",
+    "sourceText": "Flock room ${this.roomCode} ready!"
+  },
+  {
+    "key": "auto.graphics_context_lost_restoring.b0ee85",
+    "sourceText": "Graphics context lost — restoring…"
+  },
+  {
+    "key": "auto.invite_shared_send_it_to_friends.452ec2",
+    "sourceText": "Invite shared — send it to friends"
+  },
+  {
+    "key": "auto.invited_to_room_value.1f58b8",
+    "sourceText": "🕊 Invited to room ${portalInvite}"
+  },
+  {
+    "key": "auto.signed_in_progress_is_now_synced.53e6ea",
+    "sourceText": "Signed in — progress is now synced"
+  },
+  {
+    "key": "auto.triple_value_value.074bf5",
+    "sourceText": "Triple ● ${coins} → ● ${coins * 3}"
+  },
+  {
+    "key": "auto.vip_daily_gift_value_coins.795176",
+    "sourceText": "VIP daily gift · +${vipGift} coins"
+  },
+  {
+    "key": "hud.toast.gauntletCleared",
+    "sourceText": "🏆 GAUNTLET CLEARED · +{{n}} coins"
+  },
+  {
+    "key": "manual.long_light_today_s_shared_course",
+    "sourceText": "Long Light · today's shared course"
+  },
+  {
+    "key": "auto.double_the_tier_rewards_with_gold.8bd8fd",
+    "sourceText": "Double the tier rewards with Gold"
+  },
+  {
+    "key": "auto.farthest_value.cfb45a",
+    "sourceText": "Farthest: ${s.farthestIsland + 1}"
+  },
+  {
+    "key": "auto.find_your_wings_make_them_yours.8a48ff",
+    "sourceText": "Find your wings. Make them yours."
+  },
+  {
+    "key": "auto.royale_victory_sole_survivor.6de289",
+    "sourceText": "👑 ROYALE VICTORY! SOLE SURVIVOR!"
+  },
+  {
+    "key": "auto.value_finished_pvalue.ee72c9",
+    "sourceText": "🏁 ${e.name} finished P${e.place}"
+  },
+  {
+    "key": "auto.your_perks_are_active_immediately.0936a4",
+    "sourceText": "Your perks are active immediately"
+  },
+  {
+    "key": "manual.the_long_migration_island_atlas",
+    "sourceText": "The Long Migration · island atlas"
+  },
+  {
+    "key": "onboarding.rideRamp",
+    "sourceText": "RELEASE · ride the ramp to launch"
+  },
+  {
+    "key": "pvp.overtake.notice",
+    "sourceText": "Overtook {{name}} for #{{place}}!"
+  },
+  {
+    "key": "auto.ad_rewards_capped_for_this_visit.65f490",
+    "sourceText": "Ad rewards capped for this visit"
+  },
+  {
+    "key": "auto.best_value.2c6fb0",
+    "sourceText": "Best ${Math.round(c.entry.best)}"
+  },
+  {
+    "key": "auto.data.hit_3_skyline_moments_in_one_run.bdd8ef",
+    "sourceText": "Hit 3 skyline moments in one run"
+  },
+  {
+    "key": "auto.data.land_5_perfect_slides_in_one_run.3ed846",
+    "sourceText": "Land 5 perfect slides in one run"
+  },
+  {
+    "key": "auto.eliminated_at_valuem.e6d6ed",
+    "sourceText": "💥 ELIMINATED at ${targetDist}m!"
+  },
+  {
+    "key": "auto.need_value.b76440",
+    "sourceText": "Need ● ${flash.price - s.wallet}"
+  },
+  {
+    "key": "auto.quest_complete_value_coins.8fc11d",
+    "sourceText": "Quest complete · +${total} coins"
+  },
+  {
+    "key": "auto.rise_from_the_ashes_phoenix.e731da",
+    "sourceText": "🔥 Rise from the ashes, Phoenix!"
+  },
+  {
+    "key": "auto.too_close_to_the_sun_icarus.982542",
+    "sourceText": "🌊 Too close to the sun, Icarus…"
+  },
+  {
+    "key": "auto.vip_flight_unlocked_with_coins.02188a",
+    "sourceText": "VIP flight unlocked with coins ♛"
+  },
+  {
+    "key": "moments.boing.card",
+    "sourceText": "{{n}} BOING — gravity complained"
+  },
+  {
+    "key": "moments.splash.card",
+    "sourceText": "{{n}} SPLOSH — the ocean says hi"
+  },
+  {
+    "key": "moments.wee.card",
+    "sourceText": "{{n}} WEE — the sky was too slow"
+  },
+  {
+    "key": "praise.fever",
+    "sourceText": "FEVER! You're literally on fire!"
+  },
+  {
+    "key": "auto.data.same_hills_can_you_go_farther.9b1e7f",
+    "sourceText": "SAME HILLS. CAN YOU GO FARTHER?"
+  },
+  {
+    "key": "auto.hold_downhill_release_to_soar.0686bb",
+    "sourceText": "Hold downhill · release to soar"
+  },
+  {
+    "key": "auto.need_value.afe2f1",
+    "sourceText": "Need ${s.nestPrice - s.wallet}●"
+  },
+  {
+    "key": "auto.request_sent_waiting_for_them.4e4bb0",
+    "sourceText": "Request sent — waiting for them"
+  },
+  {
+    "key": "auto.rival_skill_value.baaf90",
+    "sourceText": "Rival skill · ${this.roomSkill}"
+  },
+  {
+    "key": "auto.spend_the_coins_you_just_earned.b78688",
+    "sourceText": "Spend the coins you just earned"
+  },
+  {
+    "key": "auto.stage_already_cleared_this_week.028d6e",
+    "sourceText": "Stage already cleared this week"
+  },
+  {
+    "key": "auto.take_this_into_your_next_flight.8853d2",
+    "sourceText": "TAKE THIS INTO YOUR NEXT FLIGHT"
+  },
+  {
+    "key": "auto.today_s_gift_is_already_claimed.eac12d",
+    "sourceText": "Today's gift is already claimed"
+  },
+  {
+    "key": "auto.values_daylight.6317f2",
+    "sourceText": "+${PICKUP_SUN_TIME}s Daylight ☀"
+  },
+  {
+    "key": "auto.vip_daily_gift_value_coins.ac3b0a",
+    "sourceText": "VIP daily gift · +${gift} coins"
+  },
+  {
+    "key": "hud.progress.wings",
+    "sourceText": "Lifetime rank earned · {{name}}"
+  },
+  {
+    "key": "hud.toast.streakDay",
+    "sourceText": "Day {{n}} streak · +{{c}} coins"
+  },
+  {
+    "key": "manual.all_time_weekly_today_you",
+    "sourceText": "All-time · weekly · today · you"
+  },
+  {
+    "key": "manual.hold_downhill_release_to_soar",
+    "sourceText": "Hold downhill · release to soar"
+  },
+  {
+    "key": "manual.name_save_transfer_settings",
+    "sourceText": "Name · save transfer · settings"
+  },
+  {
+    "key": "manual.spend_the_coins_you_just_earned",
+    "sourceText": "Spend the coins you just earned"
+  },
+  {
+    "key": "onboarding.launchSub",
+    "sourceText": "Hold to dive · release to glide"
+  },
+  {
+    "key": "onboarding.soarInAir",
+    "sourceText": "RELEASE & SOAR — stay airborne!"
+  },
+  {
+    "key": "auto.autogenerate_random_pilot_name.2218dc",
+    "sourceText": "Autogenerate random pilot name"
+  },
+  {
+    "key": "auto.coin_magnet_values.dea1b1",
+    "sourceText": "Coin Magnet ${MAGNET_TIME}s 🧲"
+  },
+  {
+    "key": "auto.confirm_unlock_value.06e88c",
+    "sourceText": "Confirm Unlock · ${item.price}"
+  },
+  {
+    "key": "auto.data.2_glide_lift_4_s_daylight.ecc8a7",
+    "sourceText": "+2% glide lift · +4 s daylight"
+  },
+  {
+    "key": "auto.data.hit_20_zenith_moments_lifetime.401064",
+    "sourceText": "Hit 20 zenith moments lifetime"
+  },
+  {
+    "key": "auto.data.hit_75_zenith_moments_lifetime.642a55",
+    "sourceText": "Hit 75 zenith moments lifetime"
+  },
+  {
+    "key": "auto.data.warm_lagoons_and_lazy_thermals.226339",
+    "sourceText": "Warm lagoons and lazy thermals"
+  },
+  {
+    "key": "auto.day_value_of_28.cc4e4e",
+    "sourceText": "day ${c.cycleDay || \"—\"} of 28"
+  },
+  {
+    "key": "auto.hold_to_dive_release_to_soar.595a44",
+    "sourceText": "Hold to dive. Release to soar."
+  },
+  {
+    "key": "auto.pure_sky_power_ups_are_inert.6c3cac",
+    "sourceText": "Pure Sky — power-ups are inert"
+  },
+  {
+    "key": "auto.room_ready_starting_together.16de09",
+    "sourceText": "Room ready — starting together"
+  },
+  {
+    "key": "auto.room_value.bb84eb",
+    "sourceText": "ROOM ${escapeHtml(s.roomCode)}"
+  },
+  {
+    "key": "manual.hold_to_dive_release_to_soar",
+    "sourceText": "Hold to dive. Release to soar."
+  },
+  {
+    "key": "auto.already_armed_for_next_flight.4b4d4f",
+    "sourceText": "Already armed for next flight"
+  },
+  {
+    "key": "auto.claim_value.2287aa",
+    "sourceText": "CLAIM ● ${ch.def.rewardCoins}"
+  },
+  {
+    "key": "auto.climb_or_defend_value.ccaa89",
+    "sourceText": "climb or defend ${r.division}"
+  },
+  {
+    "key": "auto.couldn_t_build_the_share_card.0d2b59",
+    "sourceText": "Couldn't build the share card"
+  },
+  {
+    "key": "auto.custom_opponent_count_skill.2923b5",
+    "sourceText": "Custom opponent count & skill"
+  },
+  {
+    "key": "auto.daily_test_hangar_allowance.ab4bf2",
+    "sourceText": "Daily test & hangar allowance"
+  },
+  {
+    "key": "auto.data.amber_light_over_golden_hills.57b120",
+    "sourceText": "Amber light over golden hills"
+  },
+  {
+    "key": "auto.data.reach_island_10_in_one_flight.e8a1cd",
+    "sourceText": "Reach island 10 in one flight"
+  },
+  {
+    "key": "auto.data.server_refused_the_connection.737cba",
+    "sourceText": "Server refused the connection"
+  },
+  {
+    "key": "auto.data.the_mountain_hums_fly_anyway.21ea4d",
+    "sourceText": "The mountain hums. Fly anyway"
+  },
+  {
+    "key": "auto.event_value.77f0a8",
+    "sourceText": "Event · ${s.weeklyEvent.name}"
+  },
+  {
+    "key": "auto.extend_30_days_value.1e6537",
+    "sourceText": "Extend 30 Days · ${VIP.price}"
+  },
+  {
+    "key": "auto.generated_pilot_name_value.a8d9b8",
+    "sourceText": "Generated Pilot Name: ${next}"
+  },
+  {
+    "key": "auto.need_value_more.6e3028",
+    "sourceText": "Need ● ${240 - s.wallet} more"
+  },
+  {
+    "key": "auto.or_enter_a_friend_s_room_code.5bf819",
+    "sourceText": "Or enter a friend's room code"
+  },
+  {
+    "key": "auto.player_value_wins.4343de",
+    "sourceText": "PLAYER ${s.versusWinner} WINS"
+  },
+  {
+    "key": "auto.their_mark_stands_fly_again.478963",
+    "sourceText": "Their mark stands. Fly again."
+  },
+  {
+    "key": "auto.value_value_armed.771ba2",
+    "sourceText": "${def.icon} ${def.name} armed"
+  },
+  {
+    "key": "auto.wheel_landed_on_vault_key.e8da2b",
+    "sourceText": "🎰 Wheel landed on Vault Key!"
+  },
+  {
+    "key": "hud.prizes.title",
+    "sourceText": "Leaderboard Tournament Prizes"
+  },
+  {
+    "key": "hud.settings.privacy.hint",
+    "sourceText": "How Sunbird handles your data"
+  },
+  {
+    "key": "hud.toast.questComplete",
+    "sourceText": "Quest complete · +{{n}} coins"
+  },
+  {
+    "key": "hud.toast.vipGift",
+    "sourceText": "VIP daily gift · +{{n}} coins"
+  },
+  {
+    "key": "auto.data.beat_your_own_ghost_10_times.9325f9",
+    "sourceText": "Beat your own ghost 10 times"
+  },
+  {
+    "key": "auto.data.complete_30_daily_challenges.89d747",
+    "sourceText": "Complete 30 daily challenges"
+  },
+  {
+    "key": "auto.earn_it_value.c13c32",
+    "sourceText": "🏆 Earn it: ${def.prizeOnly}"
+  },
+  {
+    "key": "auto.forget_value.f0e864",
+    "sourceText": "Forget ${escapeHtml(m.name)}"
+  },
+  {
+    "key": "auto.full_screen_mode_unavailable.64cceb",
+    "sourceText": "Full screen mode unavailable"
+  },
+  {
+    "key": "auto.one_input_three_small_wins.5fe7ef",
+    "sourceText": "one input · three small wins"
+  },
+  {
+    "key": "auto.pilot_left_searching_again.5b9491",
+    "sourceText": "Pilot left — searching again"
+  },
+  {
+    "key": "auto.remove_value.f0dabe",
+    "sourceText": "Remove ${escapeHtml(f.name)}"
+  },
+  {
+    "key": "auto.sunbird_1_0_value.176967",
+    "sourceText": "Sunbird 1.0 · ${s.seedLabel}"
+  },
+  {
+    "key": "auto.tier_value_reward_claimed.6e37bc",
+    "sourceText": "Tier ${tier} reward claimed!"
+  },
+  {
+    "key": "auto.value_joined_the_race.0a6601",
+    "sourceText": "🕊 ${e.name} joined the race"
+  },
+  {
+    "key": "auto.value_trail_is_yours.b68376",
+    "sourceText": "${def.label} trail is yours!"
+  },
+  {
+    "key": "hud.progress.more",
+    "sourceText": "+{{n}} more from this flight"
+  },
+  {
+    "key": "hud.toast.thermal",
+    "sourceText": "Thermal — release to ride it"
+  },
+  {
+    "key": "manual.one_input_three_small_wins",
+    "sourceText": "one input · three small wins"
+  },
+  {
+    "key": "onboarding.releaseToLaunch",
+    "sourceText": "RELEASE at the top to launch"
+  },
+  {
+    "key": "onboarding.softenLanding",
+    "sourceText": "RELEASE · soften the landing"
+  },
+  {
+    "key": "praise.boing.1",
+    "sourceText": "🌻 BOING! Gravity complained"
+  },
+  {
+    "key": "auto.data.2_glide_lift_10_coins.7a6893",
+    "sourceText": "+2% glide lift · +10% coins"
+  },
+  {
+    "key": "auto.data.3_glide_lift_10_coins.04fa99",
+    "sourceText": "+3% glide lift · +10% coins"
+  },
+  {
+    "key": "auto.data.collect_25_coins_in_one_run.6f1853",
+    "sourceText": "Collect 25 coins in one run"
+  },
+  {
+    "key": "auto.data.complete_5_daily_challenges.8607ed",
+    "sourceText": "Complete 5 daily challenges"
+  },
+  {
+    "key": "auto.data.earn_15_total_mastery_stars.dc69ed",
+    "sourceText": "Earn 15 total mastery stars"
+  },
+  {
+    "key": "auto.data.grab_6_power_ups_in_one_run.1ce9a1",
+    "sourceText": "Grab 6 power-ups in one run"
+  },
+  {
+    "key": "auto.data.perfect_landings_keep_speed.0bfa17",
+    "sourceText": "Perfect landings keep speed"
+  },
+  {
+    "key": "auto.data.pick_up_where_you_left_off.2ba825",
+    "sourceText": "Pick up where you left off."
+  },
+  {
+    "key": "auto.data.your_next_island_is_waiting.d057ad",
+    "sourceText": "Your next island is waiting"
+  },
+  {
+    "key": "auto.give_your_club_a_name_first.0372f1",
+    "sourceText": "Give your club a name first"
+  },
+  {
+    "key": "auto.last_prize_value.d5715e",
+    "sourceText": "Last prize · ${s.lastPrize}"
+  },
+  {
+    "key": "auto.practice_field_not_global.70fc9b",
+    "sourceText": "practice field · not global"
+  },
+  {
+    "key": "auto.stormline_trail_unlocked.5c44df",
+    "sourceText": "✨ Stormline trail unlocked!"
+  },
+  {
+    "key": "auto.unlock_gold_value.238709",
+    "sourceText": "Unlock Gold · ${GOLD.price}"
+  },
+  {
+    "key": "hud.privacy.openHosted",
+    "sourceText": "Open the hosted policy page"
+  },
+  {
+    "key": "manual.coins_mystery_vault_keys",
+    "sourceText": "Coins & Mystery Vault Keys!"
+  },
+  {
+    "key": "moments.perfect.card",
+    "sourceText": "{{n}} PERFECT — pure butter"
+  },
+  {
+    "key": "toast.ghost.recorded",
+    "sourceText": "New personal ghost recorded"
+  },
+  {
+    "key": "auto.cloud_boost_light_as_air.3e1da3",
+    "sourceText": "Cloud boost — light as air"
+  },
+  {
+    "key": "auto.create_a_new_squad_profile.bfcfcd",
+    "sourceText": "Create a new Squad profile"
+  },
+  {
+    "key": "auto.data.6_s_daylight_10_coins.ef23b4",
+    "sourceText": "+6 s daylight · +10% coins"
+  },
+  {
+    "key": "auto.data.big_walls_bigger_launches.43cfee",
+    "sourceText": "Big walls, bigger launches"
+  },
+  {
+    "key": "auto.data.birds_shape_your_playstyle.9d62ad",
+    "sourceText": "Birds shape your playstyle"
+  },
+  {
+    "key": "auto.enter_a_5_letter_room_code.67b2e8",
+    "sourceText": "Enter a 5-letter room code"
+  },
+  {
+    "key": "auto.feather_butter_landings.3cf928",
+    "sourceText": "Feather 🐦 Butter Landings"
+  },
+  {
+    "key": "auto.friend_s_code_async_race.fb67a6",
+    "sourceText": "friend's code · async race"
+  },
+  {
+    "key": "auto.friend_s_code_sun_xxxxxx.ab7e82",
+    "sourceText": "Friend's code (SUN-XXXXXX)"
+  },
+  {
+    "key": "auto.goal_complete_value.0bd841",
+    "sourceText": "Goal complete +${g.reward}"
+  },
+  {
+    "key": "auto.p2_enter_right_half.1a24f6",
+    "sourceText": "P2 · ENTER / right half 🔵"
+  },
+  {
+    "key": "auto.permanent_score_multiplier.07fd14",
+    "sourceText": "permanent score multiplier"
+  },
+  {
+    "key": "auto.searching_for_live_pilots.a3e881",
+    "sourceText": "Searching for live pilots…"
+  },
+  {
+    "key": "auto.washed_ashore_on_value.d4c1b6",
+    "sourceText": "Washed ashore on ${b.name}"
+  },
+  {
+    "key": "hud.toast.sunflower",
+    "sourceText": "🌻 Sunflower bounce +{{n}}"
+  },
+  {
+    "key": "hud.toast.vipExpired",
+    "sourceText": "VIP expired — perks paused"
+  },
+  {
+    "key": "inflight.bought.boost",
+    "sourceText": "🚀 Boost! +30 speed {{s}}s"
+  },
+  {
+    "key": "inflight.bought.shield",
+    "sourceText": "🛡 Shield! No crash {{s}}s"
+  },
+  {
+    "key": "onboarding.catchDownslope",
+    "sourceText": "HOLD · catch the downslope"
+  },
+  {
+    "key": "onboarding.holdToDive",
+    "sourceText": "HOLD to dive down the hill"
+  },
+  {
+    "key": "auto.claim_value.3a794b",
+    "sourceText": "Claim +● ${DAILY_STIPEND}"
+  },
+  {
+    "key": "auto.data.6_s_daylight_8_coins.6897f5",
+    "sourceText": "+6 s daylight · +8% coins"
+  },
+  {
+    "key": "auto.data.bounce_off_150_sunflowers.71cb0c",
+    "sourceText": "Bounce off 150 sunflowers"
+  },
+  {
+    "key": "auto.data.collect_15_coins_in_a_run.66c8b0",
+    "sourceText": "Collect 15 coins in a run"
+  },
+  {
+    "key": "auto.data.collect_30_coins_in_a_run.8a53ee",
+    "sourceText": "Collect 30 coins in a run"
+  },
+  {
+    "key": "auto.data.earn_1_500_coins_lifetime.f99686",
+    "sourceText": "Earn 1,500 coins lifetime"
+  },
+  {
+    "key": "auto.data.earn_5_000_coins_lifetime.3c9389",
+    "sourceText": "Earn 5,000 coins lifetime"
+  },
+  {
+    "key": "auto.data.touch_5_clouds_in_one_run.b8911c",
+    "sourceText": "Touch 5 clouds in one run"
+  },
+  {
+    "key": "auto.data.trails_style_feedback.d9414b",
+    "sourceText": "Trails = style + feedback"
+  },
+  {
+    "key": "auto.data.travel_2_000_m_in_one_run.7e89fa",
+    "sourceText": "Travel 2,000 m in one run"
+  },
+  {
+    "key": "auto.data.travel_5_000_m_in_one_run.d20e2e",
+    "sourceText": "Travel 5,000 m in one run"
+  },
+  {
+    "key": "auto.data.you_had_a_good_run_going.144180",
+    "sourceText": "You had a good run going."
+  },
+  {
+    "key": "auto.duelist_trail_unlocked.6dede9",
+    "sourceText": "✨ Duelist trail unlocked!"
+  },
+  {
+    "key": "auto.emotes_muted_in_this_room.364036",
+    "sourceText": "Emotes muted in this room"
+  },
+  {
+    "key": "auto.local_split_screen_flight.fe8008",
+    "sourceText": "Local split-screen flight"
+  },
+  {
+    "key": "auto.please_enter_a_pilot_name.4d4f08",
+    "sourceText": "Please enter a pilot name"
+  },
+  {
+    "key": "auto.race_the_ai_flock_offline.92d126",
+    "sourceText": "Race the AI flock offline"
+  },
+  {
+    "key": "auto.spend_value.e6ff41",
+    "sourceText": "Spend ● ${s.continueCost}"
+  },
+  {
+    "key": "auto.unlock_value.ed31b5",
+    "sourceText": "Unlock · ● ${flash.price}"
+  },
+  {
+    "key": "auto.unlock_vip_value.b91b17",
+    "sourceText": "Unlock VIP · ${VIP.price}"
+  },
+  {
+    "key": "auto.your_exportable_save_code.a0879c",
+    "sourceText": "Your exportable save code"
+  },
+  {
+    "key": "manual.pick_your_hills_with_gold",
+    "sourceText": "Pick your hills with Gold"
+  },
+  {
+    "key": "manual.sound_controls_display",
+    "sourceText": "Sound, controls & display"
+  },
+  {
+    "key": "moments.sleep.card",
+    "sourceText": "{{n}} SLEEP — the sun won"
+  },
+  {
+    "key": "auto.claim_value.349454",
+    "sourceText": "Claim ● ${q.rewardCoins}"
+  },
+  {
+    "key": "auto.cosmetic_yours_forever.3ab89e",
+    "sourceText": "Cosmetic · yours forever"
+  },
+  {
+    "key": "auto.data.authoritative_rooms_live.516539",
+    "sourceText": "authoritative-rooms-live"
+  },
+  {
+    "key": "auto.data.beat_your_ghost_25_times.e570eb",
+    "sourceText": "Beat your ghost 25 times"
+  },
+  {
+    "key": "auto.data.bounce_off_10_sunflowers.ce1c18",
+    "sourceText": "Bounce off 10 sunflowers"
+  },
+  {
+    "key": "auto.data.bounce_off_50_sunflowers.b26e5f",
+    "sourceText": "Bounce off 50 sunflowers"
+  },
+  {
+    "key": "auto.data.clear_5_weekly_gauntlets.a633b0",
+    "sourceText": "Clear 5 weekly gauntlets"
+  },
+  {
+    "key": "auto.data.every_sunset_is_a_parade.5f3a31",
+    "sourceText": "Every sunset is a parade"
+  },
+  {
+    "key": "auto.data.visit_every_island_biome.74b37c",
+    "sourceText": "Visit every island biome"
+  },
+  {
+    "key": "auto.distances_shown_in_value.0a0f0a",
+    "sourceText": "Distances shown in ${id}"
+  },
+  {
+    "key": "auto.field_size_value_rivals.95a836",
+    "sourceText": "Field size · ${n} rivals"
+  },
+  {
+    "key": "auto.friend_code_sun_9f3k2a.e700c2",
+    "sourceText": "Friend code (SUN-9F3K2A)"
+  },
+  {
+    "key": "auto.name_collection_or_perk.879393",
+    "sourceText": "Name, collection or perk"
+  },
+  {
+    "key": "auto.need_value.e50cf2",
+    "sourceText": "Need ● ${150 - s.wallet}"
+  },
+  {
+    "key": "auto.offline_showing_cached.5f79c2",
+    "sourceText": "Offline — showing cached"
+  },
+  {
+    "key": "auto.through_the_ring_value.a03447",
+    "sourceText": "Through the ring +${pts}"
+  },
+  {
+    "key": "auto.value.d75a95",
+    "sourceText": "${escapeHtml(w.tagline)}"
+  },
+  {
+    "key": "auto.wing_boost_super_lift.d78766",
+    "sourceText": "Wing Boost 🕊 Super Lift"
+  },
+  {
+    "key": "auto.your_farthest_flight_yet.735aeb",
+    "sourceText": "your farthest flight yet"
+  },
+  {
+    "key": "hud.progress.challenge",
+    "sourceText": "{{label}} · +{{c}} coins"
+  },
+  {
+    "key": "hud.toast.ringChain",
+    "sourceText": "RING CHAIN ×{{n}} +{{p}}"
+  },
+  {
+    "key": "hud.toast.slopeFlow",
+    "sourceText": "SLOPE FLOW ×{{n}} +{{p}}"
+  },
+  {
+    "key": "manual.birds_trails_upgrades",
+    "sourceText": "Birds, trails & upgrades"
+  },
+  {
+    "key": "manual.flight_bonus_accumulated",
+    "sourceText": "flight bonus accumulated"
+  },
+  {
+    "key": "moments.strip.label",
+    "sourceText": "Moments from this flight"
+  },
+  {
+    "key": "auto.already_in_your_wingmen.94c7a4",
+    "sourceText": "Already in your wingmen"
+  },
+  {
+    "key": "auto.balloon_bounce_150.336048",
+    "sourceText": "🎈 Balloon bounce! +150"
+  },
+  {
+    "key": "auto.bird_flock_settings.d7393b",
+    "sourceText": "BIRD · FLOCK · SETTINGS"
+  },
+  {
+    "key": "auto.cloud_boost_wind_lift.cc5573",
+    "sourceText": "Cloud Boost ☁ Wind Lift"
+  },
+  {
+    "key": "auto.data.2_s_fever_10_coins.0edc75",
+    "sourceText": "+2 s fever · +10% coins"
+  },
+  {
+    "key": "auto.data.clear_a_weekly_gauntlet.1c7b0d",
+    "sourceText": "Clear a weekly gauntlet"
+  },
+  {
+    "key": "auto.data.earn_200_coins_lifetime.c4a5a0",
+    "sourceText": "Earn 200 coins lifetime"
+  },
+  {
+    "key": "auto.data.squad_friends_clubs.0a5ffd",
+    "sourceText": "Squad = friends & clubs"
+  },
+  {
+    "key": "auto.data.touch_2_clouds_in_a_run.36f55c",
+    "sourceText": "Touch 2 clouds in a run"
+  },
+  {
+    "key": "auto.data.touch_4_clouds_in_a_run.0f3a6f",
+    "sourceText": "Touch 4 clouds in a run"
+  },
+  {
+    "key": "auto.flight_altitude_profile.7edca2",
+    "sourceText": "Flight altitude profile"
+  },
+  {
+    "key": "auto.goals_quests_records.3221e2",
+    "sourceText": "Goals, quests & records"
+  },
+  {
+    "key": "auto.p1value.2fa8af",
+    "sourceText": "P1${lead1 ? \" 👑\" : \"\"}"
+  },
+  {
+    "key": "auto.p2value.1ef133",
+    "sourceText": "P2${lead1 ? \"\" : \" 👑\"}"
+  },
+  {
+    "key": "auto.pilot_removed_from_room.32dc86",
+    "sourceText": "Pilot removed from room"
+  },
+  {
+    "key": "auto.ranked_1v1_16_rating.1f02d1",
+    "sourceText": "ranked 1v1 · ±16 rating"
+  },
+  {
+    "key": "auto.sunflower_bounce_80.cc1d78",
+    "sourceText": "🌻 Sunflower bounce +80"
+  },
+  {
+    "key": "auto.swap_sides_for_fairness.f2dc44",
+    "sourceText": "swap sides for fairness"
+  },
+  {
+    "key": "auto.transfer_saved_progress.ce7cea",
+    "sourceText": "Transfer saved progress"
+  },
+  {
+    "key": "auto.you_are_the_sunbird.0fd37b",
+    "sourceText": "🌟 You ARE the Sunbird."
+  },
+  {
+    "key": "inflight.bought.magnet",
+    "sourceText": "🧲 Magnet! Coins {{s}}s"
+  },
+  {
+    "key": "manual.bird_flock_settings",
+    "sourceText": "BIRD · FLOCK · SETTINGS"
+  },
+  {
+    "key": "manual.event_twilight_sprint",
+    "sourceText": "Event · Twilight Sprint"
+  },
+  {
+    "key": "manual.weekly_score_challenges",
+    "sourceText": "Weekly score challenges"
+  },
+  {
+    "key": "moments.phew.card",
+    "sourceText": "{{n}} PHEW — that close"
+  },
+  {
+    "key": "toast.field.size",
+    "sourceText": "Field size · {n} rivals"
+  },
+  {
+    "key": "auto.ai_pilots_no_waiting.95cb6a",
+    "sourceText": "AI pilots · no waiting"
+  },
+  {
+    "key": "auto.already_claimed_today.6896e6",
+    "sourceText": "Already claimed today!"
+  },
+  {
+    "key": "auto.casual_rating_frozen.b20f18",
+    "sourceText": "casual · rating frozen"
+  },
+  {
+    "key": "auto.data.20_000_m_in_one_flight.a0e70f",
+    "sourceText": "20,000 m in one flight"
+  },
+  {
+    "key": "auto.data.3_s_fever_8_coins.546c5c",
+    "sourceText": "+3 s fever · +8% coins"
+  },
+  {
+    "key": "auto.data.blademaster_of_the_sky.61a52f",
+    "sourceText": "Blademaster of the Sky"
+  },
+  {
+    "key": "auto.data.fly_100_000_m_lifetime.895659",
+    "sourceText": "Fly 100,000 m lifetime"
+  },
+  {
+    "key": "auto.data.story_long_migration.747f93",
+    "sourceText": "Story = Long Migration"
+  },
+  {
+    "key": "auto.goals_rank_rewards.cd17be",
+    "sourceText": "GOALS · RANK · REWARDS"
+  },
+  {
+    "key": "auto.island_value.5bbeb6",
+    "sourceText": "Island ${a.island + 1}"
+  },
+  {
+    "key": "auto.long_glide_low_drag.2ff76d",
+    "sourceText": "Long Glide 🪁 Low Drag"
+  },
+  {
+    "key": "auto.race_the_flock_offline.768ebd",
+    "sourceText": "Race the flock offline"
+  },
+  {
+    "key": "auto.squad_profile_recovery.62c04e",
+    "sourceText": "Squad profile recovery"
+  },
+  {
+    "key": "auto.take_your_first_flight.1cffab",
+    "sourceText": "Take your first flight"
+  },
+  {
+    "key": "auto.value.0d37d2",
+    "sourceText": "${escapeHtml(m.blurb)}"
+  },
+  {
+    "key": "auto.value_splash.befd2a",
+    "sourceText": "${racer.label} SPLASH!"
+  },
+  {
+    "key": "auto.you_own_sunbird_gold.386278",
+    "sourceText": "You own Sunbird Gold ✦"
+  },
+  {
+    "key": "auto.your_first_flight_plan.4d571c",
+    "sourceText": "Your first flight plan"
+  },
+  {
+    "key": "manual.goals_rank_rewards",
+    "sourceText": "GOALS · RANK · REWARDS"
+  },
+  {
+    "key": "manual.your_first_flight_plan",
+    "sourceText": "Your first flight plan"
+  },
+  {
+    "key": "manual.your_local_race_rating",
+    "sourceText": "Your local race rating"
+  },
+  {
+    "key": "moments.next.kicker",
+    "sourceText": "BECAUSE OF THIS FLIGHT"
+  },
+  {
+    "key": "auto.chapter_not_ready_yet.66c81a",
+    "sourceText": "Chapter not ready yet"
+  },
+  {
+    "key": "auto.data.5_000_m_in_one_flight.3a06b2",
+    "sourceText": "5,000 m in one flight"
+  },
+  {
+    "key": "auto.data.fly_25_000_m_lifetime.f51636",
+    "sourceText": "Fly 25,000 m lifetime"
+  },
+  {
+    "key": "auto.data.hit_3_skyline_moments.22d653",
+    "sourceText": "Hit 3 skyline moments"
+  },
+  {
+    "key": "auto.data.journeyman_of_the_air.f05734",
+    "sourceText": "Journeyman of the Air"
+  },
+  {
+    "key": "auto.data.land_3_perfect_slides.62f7db",
+    "sourceText": "Land 3 perfect slides"
+  },
+  {
+    "key": "auto.data.land_6_perfect_slides.3bb143",
+    "sourceText": "Land 6 perfect slides"
+  },
+  {
+    "key": "auto.e_g_rook_ivy_vale.5a5db3",
+    "sourceText": "e.g. Rook, Ivy, Vale…"
+  },
+  {
+    "key": "auto.manage_saved_progress.5279a4",
+    "sourceText": "Manage saved progress"
+  },
+  {
+    "key": "auto.no_birds_in_this_view.aeb88f",
+    "sourceText": "No birds in this view"
+  },
+  {
+    "key": "auto.open_the_leaderboards.9320e9",
+    "sourceText": "Open the leaderboards"
+  },
+  {
+    "key": "auto.roll_a_new_pilot_name.ce2e08",
+    "sourceText": "Roll a new pilot name"
+  },
+  {
+    "key": "auto.value_is_yours.2e2a90",
+    "sourceText": "${def.name} is yours!"
+  },
+  {
+    "key": "auto.value_smash.75d74a",
+    "sourceText": "${racer.label} SMASH!"
+  },
+  {
+    "key": "auto.wants_to_fly_with_you.269286",
+    "sourceText": "wants to fly with you"
+  },
+  {
+    "key": "hud.menu.chooseAdventure",
+    "sourceText": "Choose your adventure"
+  },
+  {
+    "key": "hud.menu.leaderboard",
+    "sourceText": "Leaderboards & Prizes"
+  },
+  {
+    "key": "hud.progress.strip",
+    "sourceText": "What this flight grew"
+  },
+  {
+    "key": "hud.toast.butterLanding",
+    "sourceText": "Butter landing +{{n}}"
+  },
+  {
+    "key": "inflight.bought.fever",
+    "sourceText": "🔥 Fever! Warp {{s}}s"
+  },
+  {
+    "key": "toast.ghost.passed",
+    "sourceText": "Passed your ghost! 👻"
+  },
+  {
+    "key": "toast.rival.skill",
+    "sourceText": "Rival skill · {skill}"
+  },
+  {
+    "key": "auto.accept_their_request.4af01a",
+    "sourceText": "Accept their request"
+  },
+  {
+    "key": "auto.daily_flight_stipend.f3f3df",
+    "sourceText": "Daily Flight Stipend"
+  },
+  {
+    "key": "auto.data.complete_100_flights.553a81",
+    "sourceText": "Complete 100 flights"
+  },
+  {
+    "key": "auto.data.complete_200_flights.a53858",
+    "sourceText": "Complete 200 flights"
+  },
+  {
+    "key": "auto.data.daily_weekly_goals.c7b573",
+    "sourceText": "Daily & weekly goals"
+  },
+  {
+    "key": "auto.data.fly_1_000_m_lifetime.f927d5",
+    "sourceText": "Fly 1,000 m lifetime"
+  },
+  {
+    "key": "auto.data.fly_1_500_m_in_a_run.f6c48b",
+    "sourceText": "Fly 1,500 m in a run"
+  },
+  {
+    "key": "auto.data.hit_a_skyline_moment.1e73f6",
+    "sourceText": "Hit a skyline moment"
+  },
+  {
+    "key": "auto.data.reach_1000m_altitude.941e89",
+    "sourceText": "Reach 1000m altitude"
+  },
+  {
+    "key": "auto.data.tournaments_weekly.384716",
+    "sourceText": "Tournaments = weekly"
+  },
+  {
+    "key": "auto.fly_race_explore.dcb38c",
+    "sourceText": "FLY · RACE · EXPLORE"
+  },
+  {
+    "key": "auto.fly_value.41ad45",
+    "sourceText": "Fly · ● ${st.reward}"
+  },
+  {
+    "key": "auto.friend_referral_code.1520af",
+    "sourceText": "Friend referral code"
+  },
+  {
+    "key": "auto.golden_mystery_vault.db1d02",
+    "sourceText": "Golden Mystery Vault"
+  },
+  {
+    "key": "auto.new_twist_every_week.dd6826",
+    "sourceText": "new twist every week"
+  },
+  {
+    "key": "auto.piggy_bank_is_empty.e92c0e",
+    "sourceText": "Piggy Bank is empty!"
+  },
+  {
+    "key": "auto.play_free_flight_now.3da219",
+    "sourceText": "Play free flight now"
+  },
+  {
+    "key": "auto.sea_shield_active.0c7383",
+    "sourceText": "Sea Shield Active 🛡"
+  },
+  {
+    "key": "auto.squadron_team_quests.b2182e",
+    "sourceText": "Squadron Team Quests"
+  },
+  {
+    "key": "auto.starting_race_flock.a62d9b",
+    "sourceText": "Starting race flock…"
+  },
+  {
+    "key": "auto.value_is_ready.e54ada",
+    "sourceText": "✅ ${e.name} is ready"
+  },
+  {
+    "key": "auto.value_value.5ef527",
+    "sourceText": "${b.emoji} ${b.name}"
+  },
+  {
+    "key": "auto.welcome_value.b33f7f",
+    "sourceText": "Welcome, ${curated}!"
+  },
+  {
+    "key": "hud.progress.cosmetic",
+    "sourceText": "Unlocked · {{label}}"
+  },
+  {
+    "key": "hud.toast.goalComplete",
+    "sourceText": "Goal complete +{{n}}"
+  },
+  {
+    "key": "manual.fly_race_explore",
+    "sourceText": "FLY · RACE · EXPLORE"
+  },
+  {
+    "key": "auto.a_friend_s_run_code.16050d",
+    "sourceText": "A friend's run code"
+  },
+  {
+    "key": "auto.claim_rank_prize.d9ce0f",
+    "sourceText": "Claim Rank Prize 🏆"
+  },
+  {
+    "key": "auto.code_or_invite_link.18d2e0",
+    "sourceText": "Code or invite link"
+  },
+  {
+    "key": "auto.create_private_room.cb6492",
+    "sourceText": "Create Private Room"
+  },
+  {
+    "key": "auto.data.30_day_login_streak.b3c293",
+    "sourceText": "30-day login streak"
+  },
+  {
+    "key": "auto.data.complete_10_flights.0bb8db",
+    "sourceText": "Complete 10 flights"
+  },
+  {
+    "key": "auto.data.complete_25_flights.e5700a",
+    "sourceText": "Complete 25 flights"
+  },
+  {
+    "key": "auto.data.own_every_bird_skin.dd500e",
+    "sourceText": "Own every bird skin"
+  },
+  {
+    "key": "auto.data.reach_200m_altitude.b4a076",
+    "sourceText": "Reach 200m altitude"
+  },
+  {
+    "key": "auto.data.reach_500m_altitude.0f9338",
+    "sourceText": "Reach 500m altitude"
+  },
+  {
+    "key": "auto.data.stratosphere_ascent.4f8a8b",
+    "sourceText": "Stratosphere Ascent"
+  },
+  {
+    "key": "auto.data.stratosphere_runner.c2766d",
+    "sourceText": "Stratosphere Runner"
+  },
+  {
+    "key": "auto.data.win_10_ranked_duels.7e6256",
+    "sourceText": "Win 10 ranked duels"
+  },
+  {
+    "key": "auto.data.win_50_ranked_duels.40fca7",
+    "sourceText": "Win 50 ranked duels"
+  },
+  {
+    "key": "auto.fly_with_your_flock.221a37",
+    "sourceText": "Fly with your flock"
+  },
+  {
+    "key": "auto.joined_room_value.7121c3",
+    "sourceText": "Joined room ${code}"
+  },
+  {
+    "key": "auto.live_race_positions.a1b19d",
+    "sourceText": "Live race positions"
+  },
+  {
+    "key": "auto.new_altitude_record.0f71d7",
+    "sourceText": "NEW ALTITUDE RECORD"
+  },
+  {
+    "key": "auto.pilots_in_this_room.f29179",
+    "sourceText": "Pilots in this room"
+  },
+  {
+    "key": "auto.s_settings_mute.75f8bd",
+    "sourceText": "${s.settings.mute ?"
+  },
+  {
+    "key": "auto.save_code_to_import.40a784",
+    "sourceText": "Save code to import"
+  },
+  {
+    "key": "hud.menu.everyFlightCounts",
+    "sourceText": "Every flight counts"
+  },
+  {
+    "key": "hud.progress.proximity",
+    "sourceText": "{{n}} m to {{name}}"
+  },
+  {
+    "key": "hud.settings.quality.low",
+    "sourceText": "Low · less GPU work"
+  },
+  {
+    "key": "manual.friends_club_chat",
+    "sourceText": "Friends & club chat"
+  },
+  {
+    "key": "auto.ace_wingman_bundle.599883",
+    "sourceText": "Ace Wingman Bundle"
+  },
+  {
+    "key": "auto.butter_landing_10.61b42e",
+    "sourceText": "Butter landing +10"
+  },
+  {
+    "key": "auto.chase_the_daylight.765ce3",
+    "sourceText": "chase the daylight"
+  },
+  {
+    "key": "auto.data.3_day_login_streak.5952d3",
+    "sourceText": "3-day login streak"
+  },
+  {
+    "key": "auto.data.7_day_login_streak.bb1e7f",
+    "sourceText": "7-day login streak"
+  },
+  {
+    "key": "auto.data.fever_warp_speed.5b905f",
+    "sourceText": "Fever = warp speed"
+  },
+  {
+    "key": "auto.data.fly_800_m_in_a_run.ace8b8",
+    "sourceText": "Fly 800 m in a run"
+  },
+  {
+    "key": "auto.data.nest_pass_season.37fa7b",
+    "sourceText": "Nest Pass = season"
+  },
+  {
+    "key": "auto.data.nest_upgrades_last.81bc10",
+    "sourceText": "Nest upgrades last"
+  },
+  {
+    "key": "auto.data.sunflowers_bounce.a49759",
+    "sourceText": "Sunflowers bounce!"
+  },
+  {
+    "key": "auto.exited_full_screen.8310db",
+    "sourceText": "Exited full screen"
+  },
+  {
+    "key": "auto.friend_code_copied.ae5801",
+    "sourceText": "Friend code copied"
+  },
+  {
+    "key": "auto.leaderboard_rank.dec0fb",
+    "sourceText": "Leaderboard rank ·"
+  },
+  {
+    "key": "auto.live_state_cadence.97b924",
+    "sourceText": "Live state cadence"
+  },
+  {
+    "key": "auto.pilot_already_gone.4571cb",
+    "sourceText": "Pilot already gone"
+  },
+  {
+    "key": "auto.progress_rewards.4a01a0",
+    "sourceText": "Progress & rewards"
+  },
+  {
+    "key": "auto.resets_at_midnight.cd4678",
+    "sourceText": "Resets at Midnight"
+  },
+  {
+    "key": "auto.resets_at_midnight.df33e8",
+    "sourceText": "resets at midnight"
+  },
+  {
+    "key": "auto.ridge_skim_value.8886dc",
+    "sourceText": "Ridge skim +${pts}"
+  },
+  {
+    "key": "auto.shuffle_all_tracks.191433",
+    "sourceText": "Shuffle all tracks"
+  },
+  {
+    "key": "auto.trophy_value.845efe",
+    "sourceText": "Trophy: ${t.title}"
+  },
+  {
+    "key": "auto.you_re_value.d02f4b",
+    "sourceText": "You're ${okLabel}!"
+  },
+  {
+    "key": "hud.settings.language.detected",
+    "sourceText": "Detected: {{name}}"
+  },
+  {
+    "key": "hud.settings.quality.auto",
+    "sourceText": "Auto · recommended"
+  },
+  {
+    "key": "hud.settings.quality.high",
+    "sourceText": "High · more detail"
+  },
+  {
+    "key": "hud.settings.section.comfort",
+    "sourceText": "Comfort & controls"
+  },
+  {
+    "key": "manual.chase_the_daylight",
+    "sourceText": "CHASE THE DAYLIGHT"
+  },
+  {
+    "key": "auto.boosts_upgrades.904366",
+    "sourceText": "Boosts & upgrades"
+  },
+  {
+    "key": "auto.club_chat_history.d21a31",
+    "sourceText": "Club chat history"
+  },
+  {
+    "key": "auto.daily_lucky_wheel.47972f",
+    "sourceText": "Daily Lucky Wheel"
+  },
+  {
+    "key": "auto.data.carnival_of_wings.7975a8",
+    "sourceText": "Carnival of Wings"
+  },
+  {
+    "key": "auto.data.complete_50_races.a59728",
+    "sourceText": "Complete 50 races"
+  },
+  {
+    "key": "auto.data.fly_25_mass_races.e04bd8",
+    "sourceText": "Fly 25 mass races"
+  },
+  {
+    "key": "auto.data.own_12_bird_skins.b30393",
+    "sourceText": "Own 12 bird skins"
+  },
+  {
+    "key": "auto.data.sunset_expressway.466963",
+    "sourceText": "Sunset Expressway"
+  },
+  {
+    "key": "auto.data.win_a_ranked_duel.2e8050",
+    "sourceText": "Win a ranked duel"
+  },
+  {
+    "key": "auto.fly_value.9ef1e7",
+    "sourceText": "Fly ${c.def.mode}"
+  },
+  {
+    "key": "auto.flying_as_value.7cc1ff",
+    "sourceText": "Flying as ${next}"
+  },
+  {
+    "key": "auto.graphics_restored.c978b0",
+    "sourceText": "Graphics restored"
+  },
+  {
+    "key": "auto.invite_to_my_room.5b6a44",
+    "sourceText": "Invite to my room"
+  },
+  {
+    "key": "auto.join_or_found_one.ab92c9",
+    "sourceText": "join or found one"
+  },
+  {
+    "key": "auto.landmarks_skill.13cf2b",
+    "sourceText": "Landmarks & skill"
+  },
+  {
+    "key": "auto.language_idioma.9ed43d",
+    "sourceText": "Language / Idioma"
+  },
+  {
+    "key": "auto.message_your_club.d6eecb",
+    "sourceText": "Message your club"
+  },
+  {
+    "key": "auto.more_ways_to_race.f46f6d",
+    "sourceText": "More ways to race"
+  },
+  {
+    "key": "auto.new_best_placing.363394",
+    "sourceText": "New best placing!"
+  },
+  {
+    "key": "auto.preview_value.1af641",
+    "sourceText": "Preview ${d.name}"
+  },
+  {
+    "key": "auto.pvp_ai_worlds.456587",
+    "sourceText": "PvP · AI · worlds"
+  },
+  {
+    "key": "auto.sign_in_cancelled.a52aaa",
+    "sourceText": "Sign-in cancelled"
+  },
+  {
+    "key": "auto.sky_gem_value.1ca356",
+    "sourceText": "Sky gem +${value}"
+  },
+  {
+    "key": "auto.value_left.02f77b",
+    "sourceText": "👋 ${e.name} left"
+  },
+  {
+    "key": "auto.welcome_to_gold.4c20c4",
+    "sourceText": "Welcome to Gold ✦"
+  },
+  {
+    "key": "auto.welcome_value.20891c",
+    "sourceText": "Welcome, ${next}!"
+  },
+  {
+    "key": "auto.you_left_the_room.f7f834",
+    "sourceText": "You left the room"
+  },
+  {
+    "key": "auto.your_private_room.363bf5",
+    "sourceText": "Your private room"
+  },
+  {
+    "key": "hud.settings.colorAssist",
+    "sourceText": "Colorblind assist"
+  },
+  {
+    "key": "hud.settings.distancesIn",
+    "sourceText": "Show distances in"
+  },
+  {
+    "key": "hud.toast.ridgeSkim",
+    "sourceText": "Ridge skim +{{n}}"
+  },
+  {
+    "key": "hud.toast.trophy",
+    "sourceText": "Trophy: {{title}}"
+  },
+  {
+    "key": "manual.nest_pass_lv_5_50",
+    "sourceText": "Nest Pass Lv.5/50"
+  },
+  {
+    "key": "manual.spin_to_win_up_to",
+    "sourceText": "Spin to win up to"
+  },
+  {
+    "key": "auto.ai_race_practice.b64a9a",
+    "sourceText": "AI race practice"
+  },
+  {
+    "key": "auto.already_unlocked.c5f5f0",
+    "sourceText": "Already unlocked"
+  },
+  {
+    "key": "auto.choose_your_bird.684c10",
+    "sourceText": "Choose your bird"
+  },
+  {
+    "key": "auto.co_op_milestones.e93fb5",
+    "sourceText": "Co-Op Milestones"
+  },
+  {
+    "key": "auto.data.10x_launch_combo.1e969a",
+    "sourceText": "10x launch combo"
+  },
+  {
+    "key": "auto.data.20x_launch_combo.4b30d4",
+    "sourceText": "20x launch combo"
+  },
+  {
+    "key": "auto.data.coins_progress.aac78b",
+    "sourceText": "Coins = progress"
+  },
+  {
+    "key": "auto.data.enter_fever_mode.ef6e59",
+    "sourceText": "Enter fever mode"
+  },
+  {
+    "key": "auto.data.eye_of_the_storm.15a1b2",
+    "sourceText": "Eye of the Storm"
+  },
+  {
+    "key": "auto.data.find_your_rhythm.40f41f",
+    "sourceText": "Find your rhythm"
+  },
+  {
+    "key": "auto.data.grab_3_power_ups.a7b433",
+    "sourceText": "Grab 3 power-ups"
+  },
+  {
+    "key": "auto.data.own_6_bird_skins.b8c6bd",
+    "sourceText": "Own 6 bird skins"
+  },
+  {
+    "key": "auto.data.own_gold_and_vip.fedab8",
+    "sourceText": "Own Gold and VIP"
+  },
+  {
+    "key": "auto.data.sunbird_prestige.a8da77",
+    "sourceText": "Sunbird Prestige"
+  },
+  {
+    "key": "auto.data.the_sky_is_yours.f6a6f6",
+    "sourceText": "The sky is yours"
+  },
+  {
+    "key": "auto.data.ultra_marathoner.36db89",
+    "sourceText": "Ultra Marathoner"
+  },
+  {
+    "key": "auto.fly_earn_coins.d4f3a0",
+    "sourceText": "Fly & Earn Coins"
+  },
+  {
+    "key": "auto.full_screen_mode.fbc76c",
+    "sourceText": "Full screen mode"
+  },
+  {
+    "key": "auto.golden_cloud_10.9f4bfc",
+    "sourceText": "Golden cloud +10"
+  },
+  {
+    "key": "auto.golden_wings.49491d",
+    "sourceText": "✨ GOLDEN WINGS ✨"
+  },
+  {
+    "key": "auto.need_value.b2487a",
+    "sourceText": "Need ${missing}●"
+  },
+  {
+    "key": "auto.next_flight_plan.96c8e9",
+    "sourceText": "Next flight plan"
+  },
+  {
+    "key": "auto.paste_save_code.a88c04",
+    "sourceText": "Paste save code…"
+  },
+  {
+    "key": "auto.previous_value.693a21",
+    "sourceText": "Previous ${kind}"
+  },
+  {
+    "key": "auto.reading_the_sky.318def",
+    "sourceText": "Reading the sky…"
+  },
+  {
+    "key": "auto.this_device_only.68be4c",
+    "sourceText": "this device only"
+  },
+  {
+    "key": "auto.try_reconnecting.8310b0",
+    "sourceText": "Try reconnecting"
+  },
+  {
+    "key": "auto.value_wins.3ef4a5",
+    "sourceText": "${r.label} wins!"
+  },
+  {
+    "key": "auto.welcome_to_vip.b55863",
+    "sourceText": "Welcome to VIP ♛"
+  },
+  {
+    "key": "auto.your_friend_code.851663",
+    "sourceText": "Your friend code"
+  },
+  {
+    "key": "hud.gameover.title",
+    "sourceText": "Flight completed"
+  },
+  {
+    "key": "hud.leaderboard.claim",
+    "sourceText": "Claim Rank Prize"
+  },
+  {
+    "key": "hud.settings.language.auto",
+    "sourceText": "Browser language"
+  },
+  {
+    "key": "hud.settings.languageUpdated",
+    "sourceText": "Language updated"
+  },
+  {
+    "key": "manual.balance_of_coins",
+    "sourceText": "balance of coins"
+  },
+  {
+    "key": "manual.choose_your_bird",
+    "sourceText": "Choose your bird"
+  },
+  {
+    "key": "manual.daily_gift_ready",
+    "sourceText": "Daily gift ready"
+  },
+  {
+    "key": "manual.pvp_pvai_races",
+    "sourceText": "PvP + PvAI Races"
+  },
+  {
+    "key": "onboarding.skyIsYours",
+    "sourceText": "THE SKY IS YOURS"
+  },
+  {
+    "key": "auto.bird_collection.a8c4c3",
+    "sourceText": "Bird collection"
+  },
+  {
+    "key": "auto.career_progress.d9b52f",
+    "sourceText": "Career progress"
+  },
+  {
+    "key": "auto.choose_language.94d0c9",
+    "sourceText": "Choose language"
+  },
+  {
+    "key": "auto.claimed_today.33a9a5",
+    "sourceText": "Claimed Today ✓"
+  },
+  {
+    "key": "auto.coin_piggy_bank.e8842f",
+    "sourceText": "Coin Piggy Bank"
+  },
+  {
+    "key": "auto.daily_challenge.d6a02c",
+    "sourceText": "Daily challenge"
+  },
+  {
+    "key": "auto.data.5x_launch_combo.86b975",
+    "sourceText": "5x launch combo"
+  },
+  {
+    "key": "auto.data.aurora_speedway.ec317a",
+    "sourceText": "Aurora Speedway"
+  },
+  {
+    "key": "auto.data.emerald_circuit.0dd866",
+    "sourceText": "Emerald Circuit"
+  },
+  {
+    "key": "auto.data.grand_migration.f38c38",
+    "sourceText": "Grand Migration"
+  },
+  {
+    "key": "auto.data.knockout_royale.2d496f",
+    "sourceText": "Knockout Royale"
+  },
+  {
+    "key": "auto.data.perfect_circuit.92bafd",
+    "sourceText": "Perfect Circuit"
+  },
+  {
+    "key": "auto.data.reach_island_20.599b4f",
+    "sourceText": "Reach island 20"
+  },
+  {
+    "key": "auto.data.turquoise_atoll.57bb60",
+    "sourceText": "Turquoise Atoll"
+  },
+  {
+    "key": "auto.data.twilight_sprint.836334",
+    "sourceText": "Twilight Sprint"
+  },
+  {
+    "key": "auto.pvalue.47abb2",
+    "sourceText": "P${s.racePlace}"
+  },
+  {
+    "key": "auto.race_challenges.998320",
+    "sourceText": "Race challenges"
+  },
+  {
+    "key": "auto.race_their_mark.112de9",
+    "sourceText": "Race their mark"
+  },
+  {
+    "key": "auto.request_pending.12ac33",
+    "sourceText": "request pending"
+  },
+  {
+    "key": "auto.rocket_speed.9c0e26",
+    "sourceText": "Rocket Speed 🚀"
+  },
+  {
+    "key": "auto.roll_a_new_name.6cdf96",
+    "sourceText": "Roll a new name"
+  },
+  {
+    "key": "auto.same_screen_1v1.756790",
+    "sourceText": "Same-screen 1v1"
+  },
+  {
+    "key": "auto.shared_run_code.002ee0",
+    "sourceText": "Shared run code"
+  },
+  {
+    "key": "auto.skyline_moments.5f79e4",
+    "sourceText": "Skyline moments"
+  },
+  {
+    "key": "auto.skyline_value.b10ef4",
+    "sourceText": "SKYLINE +${pts}"
+  },
+  {
+    "key": "auto.weekly_gauntlet.73bd1a",
+    "sourceText": "Weekly gauntlet"
+  },
+  {
+    "key": "hud.hand.hint",
+    "sourceText": "Tap · Space · ↑"
+  },
+  {
+    "key": "hud.pilot.autogenerate",
+    "sourceText": "Autogenerate 🎲"
+  },
+  {
+    "key": "hud.settings.fullscreen",
+    "sourceText": "Fullscreen mode"
+  },
+  {
+    "key": "hud.toast.newHills",
+    "sourceText": "New hills today"
+  },
+  {
+    "key": "auto.butter_landing.aa5b67",
+    "sourceText": "Butter landing"
+  },
+  {
+    "key": "auto.change_loadout.a21b28",
+    "sourceText": "Change loadout"
+  },
+  {
+    "key": "auto.daily_weekly.6cc01a",
+    "sourceText": "Daily · Weekly"
+  },
+  {
+    "key": "auto.data.beyond_the_map.f7ed34",
+    "sourceText": "Beyond the Map"
+  },
+  {
+    "key": "auto.data.canyon_calling.4d23aa",
+    "sourceText": "Canyon Calling"
+  },
+  {
+    "key": "auto.data.frequent_flyer.5274b1",
+    "sourceText": "Frequent Flyer"
+  },
+  {
+    "key": "auto.data.horizon_chaser.f0bbc8",
+    "sourceText": "Horizon Chaser"
+  },
+  {
+    "key": "auto.data.marathon_glide.ae05c6",
+    "sourceText": "Marathon Glide"
+  },
+  {
+    "key": "auto.data.reach_island_2.123edf",
+    "sourceText": "Reach island 2"
+  },
+  {
+    "key": "auto.data.reach_island_3.da3c87",
+    "sourceText": "Reach island 3"
+  },
+  {
+    "key": "auto.data.reach_island_5.5e81a5",
+    "sourceText": "Reach island 5"
+  },
+  {
+    "key": "auto.data.skyline_chaser.a98657",
+    "sourceText": "Skyline Chaser"
+  },
+  {
+    "key": "auto.data.skyline_trials.9636f7",
+    "sourceText": "Skyline Trials"
+  },
+  {
+    "key": "auto.data.sun_worshipper.ede7e4",
+    "sourceText": "Sun Worshipper"
+  },
+  {
+    "key": "auto.data.sunstone_heist.61757a",
+    "sourceText": "Sunstone Heist"
+  },
+  {
+    "key": "auto.data.weekly_warrior.97510c",
+    "sourceText": "Weekly Warrior"
+  },
+  {
+    "key": "auto.data.world_wanderer.276f69",
+    "sourceText": "World Wanderer"
+  },
+  {
+    "key": "auto.feel_the_glide.580bfd",
+    "sourceText": "Feel the glide"
+  },
+  {
+    "key": "auto.field_shuffled.44a68d",
+    "sourceText": "Field shuffled"
+  },
+  {
+    "key": "auto.flight_details.557bb6",
+    "sourceText": "Flight details"
+  },
+  {
+    "key": "auto.flight_on_hold.6b945f",
+    "sourceText": "FLIGHT ON HOLD"
+  },
+  {
+    "key": "auto.fly_every_mode.9b2119",
+    "sourceText": "fly every mode"
+  },
+  {
+    "key": "auto.invite_friends.129dae",
+    "sourceText": "Invite friends"
+  },
+  {
+    "key": "auto.keep_searching.011d15",
+    "sourceText": "Keep searching"
+  },
+  {
+    "key": "auto.login_calendar.c07069",
+    "sourceText": "Login calendar"
+  },
+  {
+    "key": "auto.no_flights_yet.8de6d2",
+    "sourceText": "No flights yet"
+  },
+  {
+    "key": "auto.one_time_offer.1606b9",
+    "sourceText": "ONE-TIME OFFER"
+  },
+  {
+    "key": "auto.progress_reset.90752d",
+    "sourceText": "Progress reset"
+  },
+  {
+    "key": "auto.race_the_flock.c1a531",
+    "sourceText": "Race the flock"
+  },
+  {
+    "key": "auto.ranked_local.16bdb5",
+    "sourceText": "ranked · local"
+  },
+  {
+    "key": "auto.restart_flight.be63c0",
+    "sourceText": "Restart flight"
+  },
+  {
+    "key": "auto.restore_passes.3eb0e8",
+    "sourceText": "Restore passes"
+  },
+  {
+    "key": "auto.shield_bounce.2314dd",
+    "sourceText": "Shield bounce!"
+  },
+  {
+    "key": "auto.show_all_birds.91630f",
+    "sourceText": "Show all birds"
+  },
+  {
+    "key": "auto.suggest_a_name.b1d6b4",
+    "sourceText": "Suggest a name"
+  },
+  {
+    "key": "auto.tailwind_cloud.54753f",
+    "sourceText": "Tailwind cloud"
+  },
+  {
+    "key": "auto.today_s_quests.c54ef1",
+    "sourceText": "Today's quests"
+  },
+  {
+    "key": "auto.unlock_500.9f60ec",
+    "sourceText": "Unlock · ● 500"
+  },
+  {
+    "key": "auto.value.ab04b7",
+    "sourceText": "${d.prizeOnly}"
+  },
+  {
+    "key": "auto.welcome_pilot.69292a",
+    "sourceText": "Welcome, Pilot"
+  },
+  {
+    "key": "auto.your_call_sign.e9ca9f",
+    "sourceText": "Your call sign"
+  },
+  {
+    "key": "hud.screen.confirmUnlock.title",
+    "sourceText": "Confirm Unlock"
+  },
+  {
+    "key": "hud.settings.effectsVolume",
+    "sourceText": "Effects volume"
+  },
+  {
+    "key": "hud.settings.mute",
+    "sourceText": "Mute all sound"
+  },
+  {
+    "key": "hud.settings.privacy",
+    "sourceText": "Privacy Policy"
+  },
+  {
+    "key": "hud.settings.renderQuality",
+    "sourceText": "Render quality"
+  },
+  {
+    "key": "hud.toast.nestUpgraded",
+    "sourceText": "Nest upgraded!"
+  },
+  {
+    "key": "hud.toast.skyGem",
+    "sourceText": "Sky gem +{{n}}"
+  },
+  {
+    "key": "inflight.shop.title",
+    "sourceText": "In-flight shop"
+  },
+  {
+    "key": "manual.feel_the_glide",
+    "sourceText": "Feel the glide"
+  },
+  {
+    "key": "manual.race_the_flock",
+    "sourceText": "Race the flock"
+  },
+  {
+    "key": "manual.today_s_quests",
+    "sourceText": "TODAY'S QUESTS"
+  },
+  {
+    "key": "pvp.division.legend",
+    "sourceText": "Sunbird Legend"
+  },
+  {
+    "key": "auto.claim_240.7ceeb1",
+    "sourceText": "Claim · ● 240"
+  },
+  {
+    "key": "auto.connected.aaab8b",
+    "sourceText": "${connected ?"
+  },
+  {
+    "key": "auto.copy_manually.02e728",
+    "sourceText": "Copy manually"
+  },
+  {
+    "key": "auto.data.bloom_bouncer.ec15bb",
+    "sourceText": "Bloom Bouncer"
+  },
+  {
+    "key": "auto.data.deep_explorer.517f78",
+    "sourceText": "Deep Explorer"
+  },
+  {
+    "key": "auto.data.edge_of_space.037b09",
+    "sourceText": "Edge of Space"
+  },
+  {
+    "key": "auto.data.first_horizon.f3399f",
+    "sourceText": "First Horizon"
+  },
+  {
+    "key": "auto.data.harvest_skies.83dd0e",
+    "sourceText": "Harvest Skies"
+  },
+  {
+    "key": "auto.data.long_haul_cup.4a6659",
+    "sourceText": "Long Haul Cup"
+  },
+  {
+    "key": "auto.data.midnight_neon.39e4d1",
+    "sourceText": "Midnight Neon"
+  },
+  {
+    "key": "auto.data.racing_legend.e17ec3",
+    "sourceText": "Racing Legend"
+  },
+  {
+    "key": "auto.data.rain_or_shine.e8e570",
+    "sourceText": "Rain or Shine"
+  },
+  {
+    "key": "auto.data.sky_slalom_gp.e35ede",
+    "sourceText": "Sky Slalom GP"
+  },
+  {
+    "key": "auto.data.skyline_touch.bbd61f",
+    "sourceText": "Skyline Touch"
+  },
+  {
+    "key": "auto.data.skyreach_apex.5d03ad",
+    "sourceText": "Skyreach Apex"
+  },
+  {
+    "key": "auto.data.tempest_draft.e0129e",
+    "sourceText": "Tempest Draft"
+  },
+  {
+    "key": "auto.data.treasure_nest.a5b882",
+    "sourceText": "Treasure Nest"
+  },
+  {
+    "key": "auto.data.typhoon_blitz.594c79",
+    "sourceText": "Typhoon Blitz"
+  },
+  {
+    "key": "auto.free_spin.11a809",
+    "sourceText": "Free Spin! 🎡"
+  },
+  {
+    "key": "auto.nest_missions.bfc5f5",
+    "sourceText": "Nest missions"
+  },
+  {
+    "key": "auto.not_signed_in.848d80",
+    "sourceText": "Not signed in"
+  },
+  {
+    "key": "auto.portal_member.918031",
+    "sourceText": "Portal member"
+  },
+  {
+    "key": "auto.pvai_circuits.545f90",
+    "sourceText": "PvAI Circuits"
+  },
+  {
+    "key": "auto.send_value.a9a54d",
+    "sourceText": "Send ${label}"
+  },
+  {
+    "key": "auto.session_goals.ba535e",
+    "sourceText": "Session goals"
+  },
+  {
+    "key": "auto.shop_sections.3f9a8b",
+    "sourceText": "Shop sections"
+  },
+  {
+    "key": "auto.squad_actions.fd2bf7",
+    "sourceText": "Squad actions"
+  },
+  {
+    "key": "auto.take_a_breath.d9d623",
+    "sourceText": "Take a breath"
+  },
+  {
+    "key": "auto.value_pages.60f189",
+    "sourceText": "${kind} pages"
+  },
+  {
+    "key": "auto.world_circuit.cce11e",
+    "sourceText": "World Circuit"
+  },
+  {
+    "key": "hud.account.title",
+    "sourceText": "Pilot Account"
+  },
+  {
+    "key": "hud.menu.makeItYours",
+    "sourceText": "Make it yours"
+  },
+  {
+    "key": "hud.menu.personalBest",
+    "sourceText": "Personal best"
+  },
+  {
+    "key": "hud.progress.title",
+    "sourceText": "Your progress"
+  },
+  {
+    "key": "hud.settings.flightsFlown",
+    "sourceText": "Flights flown"
+  },
+  {
+    "key": "hud.settings.reduceMotion",
+    "sourceText": "Reduce Motion"
+  },
+  {
+    "key": "hud.settings.sound",
+    "sourceText": "Sound Effects"
+  },
+  {
+    "key": "manual.nest_missions",
+    "sourceText": "NEST MISSIONS"
+  },
+  {
+    "key": "manual.session_goals",
+    "sourceText": "SESSION GOALS"
+  },
+  {
+    "key": "auto.ai_opponents.84d9aa",
+    "sourceText": "AI opponents"
+  },
+  {
+    "key": "auto.all_boards.bd565f",
+    "sourceText": "All boards ›"
+  },
+  {
+    "key": "auto.browse_birds.09471d",
+    "sourceText": "Browse birds"
+  },
+  {
+    "key": "auto.club_message.8774d7",
+    "sourceText": "Club message"
+  },
+  {
+    "key": "auto.data.cartographer.ff40a0",
+    "sourceText": "Cartographer"
+  },
+  {
+    "key": "auto.data.chain_master.1cdf3c",
+    "sourceText": "Chain Master"
+  },
+  {
+    "key": "auto.data.coin_snapper.4ab833",
+    "sourceText": "Coin Snapper"
+  },
+  {
+    "key": "auto.data.combo_legend.5feb35",
+    "sourceText": "Combo Legend"
+  },
+  {
+    "key": "auto.data.dune_highway.33e651",
+    "sourceText": "Dune Highway"
+  },
+  {
+    "key": "auto.data.endless_noon.081f59",
+    "sourceText": "Endless Noon"
+  },
+  {
+    "key": "auto.data.fashion_icon.ee9bc6",
+    "sourceText": "Fashion Icon"
+  },
+  {
+    "key": "auto.data.feather_week.0f1d51",
+    "sourceText": "Feather Week"
+  },
+  {
+    "key": "auto.data.forge_nights.97e026",
+    "sourceText": "Forge Nights"
+  },
+  {
+    "key": "auto.data.ghost_hunter.a66e72",
+    "sourceText": "Ghost Hunter"
+  },
+  {
+    "key": "auto.data.harvestlight.c83b87",
+    "sourceText": "Harvestlight"
+  },
+  {
+    "key": "auto.data.random_world.090f73",
+    "sourceText": "Random World"
+  },
+  {
+    "key": "auto.data.silk_landing.83ab1c",
+    "sourceText": "Silk Landing"
+  },
+  {
+    "key": "auto.data.slipstreamer.c245bc",
+    "sourceText": "Slipstreamer"
+  },
+  {
+    "key": "auto.data.storm_runner.829554",
+    "sourceText": "Storm Runner"
+  },
+  {
+    "key": "auto.data.stratosphere.e079ce",
+    "sourceText": "Stratosphere"
+  },
+  {
+    "key": "auto.exit_to_menu.3fac77",
+    "sourceText": "Exit to menu"
+  },
+  {
+    "key": "auto.filter_birds.12a4ff",
+    "sourceText": "Filter birds"
+  },
+  {
+    "key": "auto.flight_clubs.78cbb9",
+    "sourceText": "Flight Clubs"
+  },
+  {
+    "key": "auto.forgot_value.3bc036",
+    "sourceText": "Forgot ${id}"
+  },
+  {
+    "key": "auto.global_board.477375",
+    "sourceText": "Global Board"
+  },
+  {
+    "key": "auto.let_it_sleep.4b16fb",
+    "sourceText": "Let it sleep"
+  },
+  {
+    "key": "auto.lv_value.d3d9af",
+    "sourceText": "Lv.${t.tier}"
+  },
+  {
+    "key": "auto.mode_mastery.04727c",
+    "sourceText": "Mode mastery"
+  },
+  {
+    "key": "auto.nest_upgrade.c68265",
+    "sourceText": "Nest upgrade"
+  },
+  {
+    "key": "auto.next_value.8805fa",
+    "sourceText": "Next ${kind}"
+  },
+  {
+    "key": "auto.open_150.526ee7",
+    "sourceText": "Open · ● 150"
+  },
+  {
+    "key": "auto.portal_event.364075",
+    "sourceText": "Portal event"
+  },
+  {
+    "key": "auto.prize_trails.686a70",
+    "sourceText": "Prize trails"
+  },
+  {
+    "key": "auto.quick_access.d6fe3d",
+    "sourceText": "Quick access"
+  },
+  {
+    "key": "auto.race_formats.53abfe",
+    "sourceText": "Race formats"
+  },
+  {
+    "key": "auto.recent_races.d07527",
+    "sourceText": "Recent races"
+  },
+  {
+    "key": "auto.second_wind.d6ba16",
+    "sourceText": "Second wind?"
+  },
+  {
+    "key": "auto.second_wind.e95db2",
+    "sourceText": "Second wind!"
+  },
+  {
+    "key": "auto.signed_in_as.a02107",
+    "sourceText": "Signed in as"
+  },
+  {
+    "key": "auto.text_to_copy.8cede4",
+    "sourceText": "Text to copy"
+  },
+  {
+    "key": "auto.today_s_best.aa55be",
+    "sourceText": "Today's best"
+  },
+  {
+    "key": "auto.value.dde5d5",
+    "sourceText": "${w.tagline}"
+  },
+  {
+    "key": "hud.menu.coinBalance",
+    "sourceText": "coin balance"
+  },
+  {
+    "key": "hud.screen.atlas.title",
+    "sourceText": "Island Atlas"
+  },
+  {
+    "key": "hud.settings.music",
+    "sourceText": "Music Volume"
+  },
+  {
+    "key": "manual.all_boards",
+    "sourceText": "ALL BOARDS ›"
+  },
+  {
+    "key": "manual.leaderboards",
+    "sourceText": "Leaderboards"
+  },
+  {
+    "key": "manual.live_players",
+    "sourceText": "LIVE PLAYERS"
+  },
+  {
+    "key": "manual.unmute_sound",
+    "sourceText": "Unmute sound"
+  },
+  {
+    "key": "auto.ai_practice.8366eb",
+    "sourceText": "AI Practice"
+  },
+  {
+    "key": "auto.data.ace_title.a84d94",
+    "sourceText": "“Ace” title"
+  },
+  {
+    "key": "auto.data.archipelago.455252",
+    "sourceText": "Archipelago"
+  },
+  {
+    "key": "auto.data.comet_trail.226c2f",
+    "sourceText": "Comet Trail"
+  },
+  {
+    "key": "auto.data.far_horizon.3fcff6",
+    "sourceText": "Far Horizon"
+  },
+  {
+    "key": "auto.data.fashionista.5e1d88",
+    "sourceText": "Fashionista"
+  },
+  {
+    "key": "auto.data.first_blood.155bb4",
+    "sourceText": "First Blood"
+  },
+  {
+    "key": "auto.data.flockleader.2c278d",
+    "sourceText": "Flockleader"
+  },
+  {
+    "key": "auto.data.heavy_metal.c53249",
+    "sourceText": "Heavy Metal"
+  },
+  {
+    "key": "auto.data.pack_animal.5daf2d",
+    "sourceText": "Pack Animal"
+  },
+  {
+    "key": "auto.data.perfect_run.b06c21",
+    "sourceText": "Perfect Run"
+  },
+  {
+    "key": "auto.data.prism_trail.4d17a9",
+    "sourceText": "Prism Trail"
+  },
+  {
+    "key": "auto.data.sakuradrift.ea1981",
+    "sourceText": "Sakuradrift"
+  },
+  {
+    "key": "auto.data.second_wind.b7b11d",
+    "sourceText": "Second wind"
+  },
+  {
+    "key": "auto.data.second_wind.ee19d6",
+    "sourceText": "Second Wind"
+  },
+  {
+    "key": "auto.data.sky_tickles.12669e",
+    "sourceText": "Sky Tickles"
+  },
+  {
+    "key": "auto.data.sky_veteran.a23295",
+    "sourceText": "Sky Veteran"
+  },
+  {
+    "key": "auto.data.storm_surge.3b711b",
+    "sourceText": "Storm Surge"
+  },
+  {
+    "key": "auto.field_guide.ad839d",
+    "sourceText": "Field guide"
+  },
+  {
+    "key": "auto.find_a_bird.660564",
+    "sourceText": "Find a bird"
+  },
+  {
+    "key": "auto.flock_room.beeac2",
+    "sourceText": "Flock Room:"
+  },
+  {
+    "key": "auto.fly_to_fill.06210a",
+    "sourceText": "Fly to fill"
+  },
+  {
+    "key": "auto.friend_code.9e3f95",
+    "sourceText": "Friend code"
+  },
+  {
+    "key": "auto.import_save.b475dd",
+    "sourceText": "Import save"
+  },
+  {
+    "key": "auto.invite_code.e91cf2",
+    "sourceText": "Invite code"
+  },
+  {
+    "key": "auto.keep_flying.45ab92",
+    "sourceText": "Keep flying"
+  },
+  {
+    "key": "auto.key_missing.0b0dec",
+    "sourceText": "key missing"
+  },
+  {
+    "key": "auto.live_search.309cbd",
+    "sourceText": "Live search"
+  },
+  {
+    "key": "auto.music_track.a33899",
+    "sourceText": "Music track"
+  },
+  {
+    "key": "auto.personalize.7602b3",
+    "sourceText": "Personalize"
+  },
+  {
+    "key": "auto.pvp_circuit.c1adae",
+    "sourceText": "PvP circuit"
+  },
+  {
+    "key": "auto.quick_match.817b28",
+    "sourceText": "Quick Match"
+  },
+  {
+    "key": "auto.race_format.41f01b",
+    "sourceText": "Race Format"
+  },
+  {
+    "key": "auto.random_name.67d02c",
+    "sourceText": "Random name"
+  },
+  {
+    "key": "auto.super_cloud.074460",
+    "sourceText": "SUPER CLOUD"
+  },
+  {
+    "key": "auto.your_hangar.a6242b",
+    "sourceText": "Your hangar"
+  },
+  {
+    "key": "auto.your_hangar.a9fc1c",
+    "sourceText": "YOUR HANGAR"
+  },
+  {
+    "key": "auto.your_rank.1d2ece",
+    "sourceText": "Your rank ·"
+  },
+  {
+    "key": "hud.menu.pvp",
+    "sourceText": "PvP Rivalry"
+  },
+  {
+    "key": "hud.screen.aiPvp.title",
+    "sourceText": "AI Practice"
+  },
+  {
+    "key": "hud.screen.highGlides.title",
+    "sourceText": "High Glides"
+  },
+  {
+    "key": "hud.screen.leaderboard.title",
+    "sourceText": "Leaderboard"
+  },
+  {
+    "key": "hud.screen.tournaments.title",
+    "sourceText": "Tournaments"
+  },
+  {
+    "key": "hud.screen.trophyCase.title",
+    "sourceText": "Trophy Case"
+  },
+  {
+    "key": "manual.fly_to_fill",
+    "sourceText": "FLY TO FILL"
+  },
+  {
+    "key": "manual.personalize",
+    "sourceText": "Personalize"
+  },
+  {
+    "key": "auto.ash_cloud.a29394",
+    "sourceText": "Ash cloud!"
+  },
+  {
+    "key": "auto.data.18_coins.1935d8",
+    "sourceText": "+18% coins"
+  },
+  {
+    "key": "auto.data.aurorawave.8d38c8",
+    "sourceText": "Aurorawave"
+  },
+  {
+    "key": "auto.data.catch_fire.3c9da7",
+    "sourceText": "Catch Fire"
+  },
+  {
+    "key": "auto.data.cloud_kiss.f49cbd",
+    "sourceText": "Cloud Kiss"
+  },
+  {
+    "key": "auto.data.cloud_nine.ed67a4",
+    "sourceText": "Cloud Nine"
+  },
+  {
+    "key": "auto.data.combo_king.fda1c0",
+    "sourceText": "Combo King"
+  },
+  {
+    "key": "auto.data.crystaline.80ec98",
+    "sourceText": "Crystaline"
+  },
+  {
+    "key": "auto.data.daily_gift.056516",
+    "sourceText": "Daily gift"
+  },
+  {
+    "key": "auto.data.flock_race.f35c91",
+    "sourceText": "Flock Race"
+  },
+  {
+    "key": "auto.data.frostreach.b49f42",
+    "sourceText": "Frostreach"
+  },
+  {
+    "key": "auto.data.frostspire.d5cd20",
+    "sourceText": "Frostspire"
+  },
+  {
+    "key": "auto.data.head_start.1b7b0b",
+    "sourceText": "Head Start"
+  },
+  {
+    "key": "auto.data.heliophile.209364",
+    "sourceText": "Heliophile"
+  },
+  {
+    "key": "auto.data.high_flyer.ec85d1",
+    "sourceText": "High Flyer"
+  },
+  {
+    "key": "auto.data.island_hop.7d48e0",
+    "sourceText": "Island Hop"
+  },
+  {
+    "key": "auto.data.long_glide.ab840f",
+    "sourceText": "Long Glide"
+  },
+  {
+    "key": "auto.data.marathoner.8d4fa9",
+    "sourceText": "Marathoner"
+  },
+  {
+    "key": "auto.data.piggy_bank.51485a",
+    "sourceText": "Piggy Bank"
+  },
+  {
+    "key": "auto.data.self_rival.7b72c4",
+    "sourceText": "Self Rival"
+  },
+  {
+    "key": "auto.data.shadowrift.0a6500",
+    "sourceText": "Shadowrift"
+  },
+  {
+    "key": "auto.data.sky_master.553289",
+    "sourceText": "Sky Master"
+  },
+  {
+    "key": "auto.data.skybreaker.1a8917",
+    "sourceText": "Skybreaker"
+  },
+  {
+    "key": "auto.data.slide_poet.b37954",
+    "sourceText": "Slide Poet"
+  },
+  {
+    "key": "auto.data.sparklejet.67c4c5",
+    "sourceText": "Sparklejet"
+  },
+  {
+    "key": "auto.data.sun_runner.c19b52",
+    "sourceText": "Sun Runner"
+  },
+  {
+    "key": "auto.data.time_trial.1c9377",
+    "sourceText": "Time Trial"
+  },
+  {
+    "key": "auto.found_club.54fb2c",
+    "sourceText": "Found club"
+  },
+  {
+    "key": "auto.free_coins.d0be4f",
+    "sourceText": "Free Coins"
+  },
+  {
+    "key": "auto.fullscreen.bb08d1",
+    "sourceText": "Fullscreen"
+  },
+  {
+    "key": "auto.leave_room.451c54",
+    "sourceText": "Leave room"
+  },
+  {
+    "key": "auto.live_event.ca1884",
+    "sourceText": "Live event"
+  },
+  {
+    "key": "auto.local_rank.671fea",
+    "sourceText": "Local rank"
+  },
+  {
+    "key": "auto.membership.53bc96",
+    "sourceText": "Membership"
+  },
+  {
+    "key": "auto.mute_sound.f847e2",
+    "sourceText": "Mute sound"
+  },
+  {
+    "key": "auto.one_flight.1d6957",
+    "sourceText": "one flight"
+  },
+  {
+    "key": "auto.pilot_name.69b82c",
+    "sourceText": "Pilot name"
+  },
+  {
+    "key": "auto.promo_code.edfcc5",
+    "sourceText": "Promo code"
+  },
+  {
+    "key": "auto.pvp_format.805928",
+    "sourceText": "PvP Format"
+  },
+  {
+    "key": "auto.ready_up.d7a087",
+    "sourceText": "Ready up ✓"
+  },
+  {
+    "key": "auto.rebirth.99bbc7",
+    "sourceText": "Rebirth 👑"
+  },
+  {
+    "key": "auto.slope_flow.d627f9",
+    "sourceText": "Slope flow"
+  },
+  {
+    "key": "auto.sunflowers.541ed7",
+    "sourceText": "Sunflowers"
+  },
+  {
+    "key": "auto.today_40.690f82",
+    "sourceText": "TODAY −40%"
+  },
+  {
+    "key": "auto.today_50.36d27d",
+    "sourceText": "TODAY −50%"
+  },
+  {
+    "key": "auto.tsource.c73a5a",
+    "sourceText": "${tSource("
+  },
+  {
+    "key": "auto.value.05e1d7",
+    "sourceText": "${m.blurb}"
+  },
+  {
+    "key": "auto.value_pack.4c0499",
+    "sourceText": "Value Pack"
+  },
+  {
+    "key": "hud.pilot.name",
+    "sourceText": "Pilot Name"
+  },
+  {
+    "key": "hud.screen.challenges.title",
+    "sourceText": "Challenges"
+  },
+  {
+    "key": "hud.screen.coinStore.title",
+    "sourceText": "Coin Store"
+  },
+  {
+    "key": "hud.screen.gameModes.title",
+    "sourceText": "Game Modes"
+  },
+  {
+    "key": "hud.screen.raceLobby.title",
+    "sourceText": "Race Lobby"
+  },
+  {
+    "key": "hud.screen.rivalRank.title",
+    "sourceText": "Rival Rank"
+  },
+  {
+    "key": "hud.settings.largeText",
+    "sourceText": "Large text"
+  },
+  {
+    "key": "manual.free_spin",
+    "sourceText": "Free Spin!"
+  },
+  {
+    "key": "manual.ghost_race",
+    "sourceText": "Ghost race"
+  },
+  {
+    "key": "manual.in_one_run",
+    "sourceText": "in one run"
+  },
+  {
+    "key": "manual.local_rank",
+    "sourceText": "LOCAL RANK"
+  },
+  {
+    "key": "manual.mute_sound",
+    "sourceText": "Mute sound"
+  },
+  {
+    "key": "manual.race_field",
+    "sourceText": "RACE FIELD"
+  },
+  {
+    "key": "manual.rival_rank",
+    "sourceText": "Rival rank"
+  },
+  {
+    "key": "manual.slipstream",
+    "sourceText": "SLIPSTREAM"
+  },
+  {
+    "key": "manual.solo_modes",
+    "sourceText": "Solo modes"
+  },
+  {
+    "key": "manual.start_here",
+    "sourceText": "START HERE"
+  },
+  {
+    "key": "manual.top_pilots",
+    "sourceText": "TOP PILOTS"
+  },
+  {
+    "key": "auto.club_name.86aeb3",
+    "sourceText": "Club name"
+  },
+  {
+    "key": "auto.copy_code.6c1069",
+    "sourceText": "Copy code"
+  },
+  {
+    "key": "auto.copy_link.2f84ee",
+    "sourceText": "Copy link"
+  },
+  {
+    "key": "auto.data.120_coins.756a55",
+    "sourceText": "120 coins"
+  },
+  {
+    "key": "auto.data.320_coins.649050",
+    "sourceText": "320 coins"
+  },
+  {
+    "key": "auto.data.700_coins.8314ea",
+    "sourceText": "700 coins"
+  },
+  {
+    "key": "auto.data.carnivale.8b0832",
+    "sourceText": "Carnivale"
+  },
+  {
+    "key": "auto.data.coin_rush.0ef532",
+    "sourceText": "Coin Rush"
+  },
+  {
+    "key": "auto.data.collector.e3199d",
+    "sourceText": "Collector"
+  },
+  {
+    "key": "auto.data.cosmicray.2f417a",
+    "sourceText": "Cosmicray"
+  },
+  {
+    "key": "auto.data.dedicated.753650",
+    "sourceText": "Dedicated"
+  },
+  {
+    "key": "auto.data.emberline.384c28",
+    "sourceText": "Emberline"
+  },
+  {
+    "key": "auto.data.hat_trick.73f956",
+    "sourceText": "Hat Trick"
+  },
+  {
+    "key": "auto.data.magma_run.cec65f",
+    "sourceText": "Magma Run"
+  },
+  {
+    "key": "auto.data.mintcloud.0bf355",
+    "sourceText": "Mintcloud"
+  },
+  {
+    "key": "auto.data.neonpulse.d1fc1d",
+    "sourceText": "Neonpulse"
+  },
+  {
+    "key": "auto.data.petalfall.d6ecf3",
+    "sourceText": "Petalfall"
+  },
+  {
+    "key": "auto.data.reef_days.2ec3bf",
+    "sourceText": "Reef Days"
+  },
+  {
+    "key": "auto.data.sprint_gp.32d90a",
+    "sourceText": "Sprint GP"
+  },
+  {
+    "key": "auto.data.stormline.a30197",
+    "sourceText": "Stormline"
+  },
+  {
+    "key": "auto.data.sun_flask.a8e7a1",
+    "sourceText": "Sun Flask"
+  },
+  {
+    "key": "auto.data.sunchaser.6a14ab",
+    "sourceText": "Sunchaser"
+  },
+  {
+    "key": "auto.data.tideglass.13cfb5",
+    "sourceText": "Tideglass"
+  },
+  {
+    "key": "auto.gold_perk.a4b99f",
+    "sourceText": "Gold perk"
+  },
+  {
+    "key": "auto.my_scores.893ee1",
+    "sourceText": "My Scores"
+  },
+  {
+    "key": "auto.permanent.8699f2",
+    "sourceText": "permanent"
+  },
+  {
+    "key": "auto.race_time.a25117",
+    "sourceText": "race time"
+  },
+  {
+    "key": "auto.room_code.c5fb7a",
+    "sourceText": "Room code"
+  },
+  {
+    "key": "auto.subscribe.d6981f",
+    "sourceText": "Subscribe"
+  },
+  {
+    "key": "auto.value.0d0452",
+    "sourceText": "♪ ${name}"
+  },
+  {
+    "key": "auto.value.2aaea4",
+    "sourceText": "🐦 ${msg}"
+  },
+  {
+    "key": "auto.your_club.706335",
+    "sourceText": "Your club"
+  },
+  {
+    "key": "common.random",
+    "sourceText": "🎲 Random"
+  },
+  {
+    "key": "hud.gameover.flyAgain",
+    "sourceText": "Fly Again"
+  },
+  {
+    "key": "hud.gameover.mainMenu",
+    "sourceText": "Main Menu"
+  },
+  {
+    "key": "hud.menu.play",
+    "sourceText": "Play Race"
+  },
+  {
+    "key": "hud.screen.nestPass.title",
+    "sourceText": "Nest Pass"
+  },
+  {
+    "key": "onboarding.skipTips",
+    "sourceText": "Skip tips"
+  },
+  {
+    "key": "pvp.division.fledgling",
+    "sourceText": "Fledgling"
+  },
+  {
+    "key": "pvp.division.racer",
+    "sourceText": "Sky Racer"
+  },
+  {
+    "key": "auto.ai_skill.98dde2",
+    "sourceText": "AI skill"
+  },
+  {
+    "key": "auto.altitude.22786d",
+    "sourceText": "Altitude"
+  },
+  {
+    "key": "auto.balloons.26fac8",
+    "sourceText": "Balloons"
+  },
+  {
+    "key": "auto.data.day_trip.02cd36",
+    "sourceText": "Day Trip"
+  },
+  {
+    "key": "auto.data.language.e11523",
+    "sourceText": "language"
+  },
+  {
+    "key": "auto.data.lavaflow.a7e230",
+    "sourceText": "Lavaflow"
+  },
+  {
+    "key": "auto.data.marathon.cfba05",
+    "sourceText": "Marathon"
+  },
+  {
+    "key": "auto.data.rosewind.232147",
+    "sourceText": "Rosewind"
+  },
+  {
+    "key": "auto.data.starfall.acc99c",
+    "sourceText": "Starfall"
+  },
+  {
+    "key": "auto.data.voidwake.d070cb",
+    "sourceText": "Voidwake"
+  },
+  {
+    "key": "auto.data.wanderer.ae36a2",
+    "sourceText": "Wanderer"
+  },
+  {
+    "key": "auto.data.wingling.0112de",
+    "sourceText": "Wingling"
+  },
+  {
+    "key": "auto.daylight.5aaa21",
+    "sourceText": "Daylight"
+  },
+  {
+    "key": "auto.duel_w_l.8f29f6",
+    "sourceText": "Duel W–L"
+  },
+  {
+    "key": "auto.get_gold.978421",
+    "sourceText": "Get Gold"
+  },
+  {
+    "key": "auto.island_1.a89954",
+    "sourceText": "Island 1"
+  },
+  {
+    "key": "auto.perfects.b5c0c9",
+    "sourceText": "Perfects"
+  },
+  {
+    "key": "auto.plus_you.ce4b7a",
+    "sourceText": "plus you"
+  },
+  {
+    "key": "auto.progress.1b9027",
+    "sourceText": "Progress"
+  },
+  {
+    "key": "auto.requests.f7194e",
+    "sourceText": "Requests"
+  },
+  {
+    "key": "auto.run_code.b45419",
+    "sourceText": "Run code"
+  },
+  {
+    "key": "auto.smash.96392a",
+    "sourceText": "Smash 🔨"
+  },
+  {
+    "key": "auto.sound_on.967f1a",
+    "sourceText": "Sound on"
+  },
+  {
+    "key": "auto.trophies.3a1ef6",
+    "sourceText": "Trophies"
+  },
+  {
+    "key": "auto.value.279115",
+    "sourceText": "${label}"
+  },
+  {
+    "key": "auto.watch_ad.1e317c",
+    "sourceText": "Watch Ad"
+  },
+  {
+    "key": "auto.win_rate.79bcb3",
+    "sourceText": "Win rate"
+  },
+  {
+    "key": "hud.menu.settings",
+    "sourceText": "Settings"
+  },
+  {
+    "key": "hud.settings.language",
+    "sourceText": "Language"
+  },
+  {
+    "key": "hud.settings.title",
+    "sourceText": "Settings"
+  },
+  {
+    "key": "hud.stat.daylight",
+    "sourceText": "daylight"
+  },
+  {
+    "key": "hud.stat.distance",
+    "sourceText": "Distance"
+  },
+  {
+    "key": "manual.ai_flock",
+    "sourceText": "AI FLOCK"
+  },
+  {
+    "key": "onboarding.gotIt",
+    "sourceText": "Got it ✓"
+  },
+  {
+    "key": "app.title",
+    "sourceText": "Sunbird"
+  },
+  {
+    "key": "auto.data.contact.1a73af",
+    "sourceText": "contact"
+  },
+  {
+    "key": "auto.data.duelist.903b4b",
+    "sourceText": "Duelist"
+  },
+  {
+    "key": "auto.data.endless.185441",
+    "sourceText": "Endless"
+  },
+  {
+    "key": "auto.data.forager.831004",
+    "sourceText": "Forager"
+  },
+  {
+    "key": "auto.data.kestrel.e3f175",
+    "sourceText": "Kestrel"
+  },
+  {
+    "key": "auto.data.regular.8d4e4e",
+    "sourceText": "Regular"
+  },
+  {
+    "key": "auto.data.skyline.cc5338",
+    "sourceText": "Skyline"
+  },
+  {
+    "key": "auto.data.sunbird.b078e5",
+    "sourceText": "SUNBIRD"
+  },
+  {
+    "key": "auto.decline.b59cf9",
+    "sourceText": "Decline"
+  },
+  {
+    "key": "auto.finish.7d6fba",
+    "sourceText": "FINISH!"
+  },
+  {
+    "key": "auto.flights.2edc9e",
+    "sourceText": "Flights"
+  },
+  {
+    "key": "auto.forever.e07f8c",
+    "sourceText": "forever"
+  },
+  {
+    "key": "auto.islands.afa70d",
+    "sourceText": "Islands"
+  },
+  {
+    "key": "auto.owned.5e00ab",
+    "sourceText": "Owned ✓"
+  },
+  {
+    "key": "auto.preview.f1fbb2",
+    "sourceText": "Preview"
+  },
+  {
+    "key": "auto.reached.debd1f",
+    "sourceText": "Reached"
+  },
+  {
+    "key": "auto.release.d41f56",
+    "sourceText": "Release"
+  },
+  {
+    "key": "auto.shared.a950e6",
+    "sourceText": "Shared!"
+  },
+  {
+    "key": "auto.sign_in.ada2e9",
+    "sourceText": "Sign in"
+  },
+  {
+    "key": "hud.menu.account",
+    "sourceText": "Account"
+  },
+  {
+    "key": "hud.screen.account.title",
+    "sourceText": "Account"
+  },
+  {
+    "key": "hud.settings.haptics",
+    "sourceText": "Haptics"
+  },
+  {
+    "key": "manual.collect",
+    "sourceText": "Collect"
+  },
+  {
+    "key": "manual.fly_now",
+    "sourceText": "Fly now"
+  },
+  {
+    "key": "moments.perfect",
+    "sourceText": "PERFECT"
+  },
+  {
+    "key": "pvp.division.ace",
+    "sourceText": "Sky Ace"
+  },
+  {
+    "key": "auto.accept.bb54db",
+    "sourceText": "Accept"
+  },
+  {
+    "key": "auto.active.a733b8",
+    "sourceText": "Active"
+  },
+  {
+    "key": "auto.cancel.77dfd2",
+    "sourceText": "Cancel"
+  },
+  {
+    "key": "auto.data.purist.b2916a",
+    "sourceText": "Purist"
+  },
+  {
+    "key": "auto.extend.281dd8",
+    "sourceText": "Extend"
+  },
+  {
+    "key": "auto.fly_on.52a137",
+    "sourceText": "Fly on"
+  },
+  {
+    "key": "auto.format.041a5d",
+    "sourceText": "Format"
+  },
+  {
+    "key": "auto.invite.b13660",
+    "sourceText": "Invite"
+  },
+  {
+    "key": "auto.linked.a089f6",
+    "sourceText": "Linked"
+  },
+  {
+    "key": "auto.loaded.6db90a",
+    "sourceText": "Loaded"
+  },
+  {
+    "key": "auto.paused.c7dfb6",
+    "sourceText": "Paused"
+  },
+  {
+    "key": "auto.race.05a6f5",
+    "sourceText": "Race ›"
+  },
+  {
+    "key": "auto.redeem.db3f81",
+    "sourceText": "Redeem"
+  },
+  {
+    "key": "auto.s_left.0639c5",
+    "sourceText": "s left"
+  },
+  {
+    "key": "auto.season.62255f",
+    "sourceText": "Season"
+  },
+  {
+    "key": "auto.shop.8cbd0a",
+    "sourceText": "Shop ›"
+  },
+  {
+    "key": "auto.streak.ac4792",
+    "sourceText": "Streak"
+  },
+  {
+    "key": "auto.trails.abe7e3",
+    "sourceText": "Trails"
+  },
+  {
+    "key": "auto.unlock.1526a1",
+    "sourceText": "Unlock"
+  },
+  {
+    "key": "auto.weekly.158f3d",
+    "sourceText": "Weekly"
+  },
+  {
+    "key": "inflight.shop.magnet",
+    "sourceText": "Magnet"
+  },
+  {
+    "key": "inflight.shop.shield",
+    "sourceText": "Shield"
+  },
+  {
+    "key": "manual.race",
+    "sourceText": "Race ›"
+  },
+  {
+    "key": "manual.shop",
+    "sourceText": "Shop ›"
+  },
+  {
+    "key": "moments.record",
+    "sourceText": "RECORD"
+  },
+  {
+    "key": "moments.splash",
+    "sourceText": "SPLOSH"
+  },
+  {
+    "key": "pvp.division.glider",
+    "sourceText": "Glider"
+  },
+  {
+    "key": "auto.apply.cfea41",
+    "sourceText": "Apply"
+  },
+  {
+    "key": "auto.clear.719ea3",
+    "sourceText": "Clear"
+  },
+  {
+    "key": "auto.combo.dcae58",
+    "sourceText": "Combo"
+  },
+  {
+    "key": "auto.data.comet.524a6d",
+    "sourceText": "Comet"
+  },
+  {
+    "key": "auto.data.prism.82a2ea",
+    "sourceText": "Prism"
+  },
+  {
+    "key": "auto.data.shape.5080fd",
+    "sourceText": "shape"
+  },
+  {
+    "key": "auto.duels.566afa",
+    "sourceText": "Duels"
+  },
+  {
+    "key": "auto.equip.d76496",
+    "sourceText": "Equip"
+  },
+  {
+    "key": "auto.fly.a85cd9",
+    "sourceText": "Fly ›"
+  },
+  {
+    "key": "auto.leave.7e3520",
+    "sourceText": "Leave"
+  },
+  {
+    "key": "auto.max.769c57",
+    "sourceText": "MAX ✓"
+  },
+  {
+    "key": "auto.pause.781961",
+    "sourceText": "Pause"
+  },
+  {
+    "key": "auto.prize.d59709",
+    "sourceText": "Prize"
+  },
+  {
+    "key": "auto.rings.75b04b",
+    "sourceText": "Rings"
+  },
+  {
+    "key": "auto.today.24345a",
+    "sourceText": "Today"
+  },
+  {
+    "key": "auto.world.70c07e",
+    "sourceText": "World"
+  },
+  {
+    "key": "hud.screen.campaign.title",
+    "sourceText": "Story"
+  },
+  {
+    "key": "hud.screen.squad.title",
+    "sourceText": "Squad"
+  },
+  {
+    "key": "hud.settings.musicToggle",
+    "sourceText": "Music"
+  },
+  {
+    "key": "hud.settings.section.pilot",
+    "sourceText": "Pilot"
+  },
+  {
+    "key": "hud.settings.section.sound",
+    "sourceText": "Sound"
+  },
+  {
+    "key": "hud.stat.coins",
+    "sourceText": "Coins"
+  },
+  {
+    "key": "hud.stat.score",
+    "sourceText": "Score"
+  },
+  {
+    "key": "hud.toast.fever",
+    "sourceText": "FEVER"
+  },
+  {
+    "key": "inflight.shop.boost",
+    "sourceText": "Boost"
+  },
+  {
+    "key": "inflight.shop.fever",
+    "sourceText": "Fever"
+  },
+  {
+    "key": "manual.claim",
+    "sourceText": "CLAIM"
+  },
+  {
+    "key": "manual.coins",
+    "sourceText": "coins"
+  },
+  {
+    "key": "manual.local",
+    "sourceText": "LOCAL"
+  },
+  {
+    "key": "manual.reach",
+    "sourceText": "Reach"
+  },
+  {
+    "key": "manual.shown",
+    "sourceText": "shown"
+  },
+  {
+    "key": "manual.story",
+    "sourceText": "Story"
+  },
+  {
+    "key": "moments.boing",
+    "sourceText": "BOING"
+  },
+  {
+    "key": "moments.panic",
+    "sourceText": "PANIC"
+  },
+  {
+    "key": "moments.sleep",
+    "sourceText": "SLEEP"
+  },
+  {
+    "key": "race.skill.chill",
+    "sourceText": "chill"
+  },
+  {
+    "key": "race.skill.sharp",
+    "sourceText": "sharp"
+  },
+  {
+    "key": "auto.best.77003d",
+    "sourceText": "Best"
+  },
+  {
+    "key": "auto.best.c5f5e4",
+    "sourceText": "best"
+  },
+  {
+    "key": "auto.copy.af74f7",
+    "sourceText": "Copy"
+  },
+  {
+    "key": "auto.done.e9b450",
+    "sourceText": "Done"
+  },
+  {
+    "key": "auto.hold.3bd328",
+    "sourceText": "Hold"
+  },
+  {
+    "key": "auto.join.e0d731",
+    "sourceText": "Join"
+  },
+  {
+    "key": "auto.load.ddcb77",
+    "sourceText": "Load"
+  },
+  {
+    "key": "auto.menu.57f5f5",
+    "sourceText": "Menu"
+  },
+  {
+    "key": "auto.nest.b14de6",
+    "sourceText": "Nest"
+  },
+  {
+    "key": "auto.play.5d12bd",
+    "sourceText": "Play"
+  },
+  {
+    "key": "auto.send.9bc257",
+    "sourceText": "Send"
+  },
+  {
+    "key": "common.back",
+    "sourceText": "Back"
+  },
+  {
+    "key": "common.save",
+    "sourceText": "Save"
+  },
+  {
+    "key": "hud.screen.shop.title",
+    "sourceText": "Shop"
+  },
+  {
+    "key": "manual.grab",
+    "sourceText": "Grab"
+  },
+  {
+    "key": "manual.land",
+    "sourceText": "Land"
+  },
+  {
+    "key": "manual.live",
+    "sourceText": "LIVE"
+  },
+  {
+    "key": "moments.bonk",
+    "sourceText": "BONK"
+  },
+  {
+    "key": "moments.phew",
+    "sourceText": "PHEW"
+  },
+  {
+    "key": "auto.w_l.6a4616",
+    "sourceText": "W–L"
+  },
+  {
+    "key": "auto.you.905cb3",
+    "sourceText": "You"
+  },
+  {
+    "key": "manual.fly",
+    "sourceText": "fly"
+  },
+  {
+    "key": "manual.you",
+    "sourceText": "YOU"
+  },
+  {
+    "key": "moments.wee",
+    "sourceText": "WEE"
+  },
+  {
+    "key": "onboarding.tip",
+    "sourceText": "Tip"
+  },
+  {
+    "key": "race.skill.ace",
+    "sourceText": "ace"
+  },
+  {
+    "key": "manual.ai",
+    "sourceText": "AI"
+  },
+  {
+    "key": "manual.of",
+    "sourceText": "of"
+  }
+]

@@ -1,0 +1,21 @@
+[Unit]
+Description=Sunbird PvP websocket room server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/opt/sunbird/sunbird-server
+Environment=SUNBIRD_BIND_ADDR=0.0.0.0:8080
+User=nobody
+Group=nogroup
+# Small VM safety net: absorb bursts instead of dying (OOM on 1 GB).
+MemoryMax=700M
+Restart=always
+RestartSec=2
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
