@@ -73,3 +73,8 @@ poki-upload/
 sunbird-poki.zip
 scripts-tmp/
 *.tsbuildinfo
+
+# local scratch: Playwright/visual probe scripts and capture output
+/*.mjs
+critique-shots/
+game-dev-studio/

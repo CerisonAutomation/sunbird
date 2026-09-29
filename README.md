@@ -15,6 +15,46 @@ Sunbird is a complete HTML5 arcade game: 8 flight modes, 40-pilot races, daily/w
 - **Review** — 360° comparative review vs multiplayer/mobile category standards: [docs/COMPARATIVE_REVIEW_360.md](./docs/COMPARATIVE_REVIEW_360.md)
 - **Poki** — developer-guide implementation matrix, verified against Poki's public sources: [docs/POKI_IMPLEMENTATION_MATRIX.md](./docs/POKI_IMPLEMENTATION_MATRIX.md)
 
+## Engineering quality
+
+| | |
+|---|---|
+| **Automated tests** | **1,973** across **179** spec files |
+| Test code | 27,500 lines |
+| Game source | 46,427 lines |
+| **Test-to-source ratio** | **0.59** |
+| Unit / game logic | 1,840 |
+| End-to-end journeys | 78 |
+| Server / API | 47 |
+| Multiplayer | 8 |
+
+Everything in that table is countable from this repository:
+
+```bash
+find . -name "*.spec.ts" -o -name "*.test.ts" -o -name "*.test.tsx" | wc -l   # 179
+grep -rhoE "^\s*(test|it)(\.each)?\s*\(" --include="*.spec.ts" --include="*.test.ts" | wc -l   # 1,973
+```
+
+Modules under test include the anti-cheat layer, the economy, the campaign and career
+progression systems, and the maths core.
+
+## Quality gates
+
+| Gate | What it enforces |
+|---|---|
+| `pnpm verify` | typecheck, typecheck:server, unit, server tests, production build |
+| `pnpm poki:preflight` | UI audit, portal builds, portal verification, build isolation check, Poki audit |
+| `pnpm test:coverage` | coverage reporting |
+| `pnpm pvp:check` / `botsim:40` | multiplayer integrity and a 40-pilot race simulation |
+
+CI runs on every push across `ci.yml`, `botsim.yml` and `rust.yml`.
+
+Secret scanning and static analysis are part of the workflow, not an afterthought:
+**gitleaks** for secret detection, **semgrep** for SAST, **knip** for unused code and
+dependencies, **pyright** for type checking, **SonarQube** for code quality gates.
+
+---
+
 ## Tech stack
 
 | Layer | Choice |
