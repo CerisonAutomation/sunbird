@@ -15,6 +15,12 @@ Sunbird is a complete HTML5 arcade game: 8 flight modes, 40-pilot races, daily/w
 - **Review** — 360° comparative review vs multiplayer/mobile category standards: [docs/COMPARATIVE_REVIEW_360.md](./docs/COMPARATIVE_REVIEW_360.md)
 - **Poki** — developer-guide implementation matrix, verified against Poki's public sources: [docs/POKI_IMPLEMENTATION_MATRIX.md](./docs/POKI_IMPLEMENTATION_MATRIX.md)
 
+## Media kit
+
+Brand and promotional assets (logos, screenshots, promo video) are published as a
+[GitHub Release](https://github.com/CerisonAutomation/sunbird/releases/tag/media-kit-v1)
+rather than committed, to keep clones fast. Nothing in the game build references them.
+
 ## Engineering quality
 
 | | |

@@ -78,3 +78,6 @@ scripts-tmp/
 /*.mjs
 critique-shots/
 game-dev-studio/
+
+# media kit moved to GitHub Releases (media-kit-v1), kept out of the clone
+assets/mediakit/
